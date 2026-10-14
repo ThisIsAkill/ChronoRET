@@ -8,16 +8,30 @@
 ; the comment says what the call site expects.
 ; ============================================================
 
-; --- Bank $C1 (battle engine, not matched yet) ---
-
-org $C10045
-BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
-                                        ; $C1:0051 (also reached through JMP at $C1:0003)
-
-org $C10003
-BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
-org $C10006
-BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
+; --- Long targets of bank $C1's entry block and service 0 (EngCall_BattleMain,
+;     BattleSys_SceneSetup, BattleSys_Service6; none analysed) ---
+org $CFFB65
+BattleCF_EnterBattle:                   ; JML from $C1:001B: clears battle RAM and JMLs to $C1:8000
+org $CFFBE5
+BattleCF_UnkFBE5:                       ; JML from $C1:001F (BattleSys_ExitVec's way out of the battle)
+org $CFE300
+BattleCF_UnkE300:                       ; JML from $C1:0076 (vector $C1:0009)
+org $CFE58A
+BattleCF_UnkE58A:                       ; JML from $C1:007A (vector $C1:000C)
+org $CCE000
+BattleCC_UnkE000:                       ; JML from $C1:0072 (vector $C1:000F)
+org $CFFE20
+BattleCF_UnkFE20:                       ; JSL from BattleSys_Service6
+org $CCE2E4
+BattleCC_UnkE2E4:                       ; JSL from BattleSys_SceneSetup (first step)
+org $CCED87
+BattleCC_UnkED87:                       ; JSL from BattleSys_SceneSetup
+org $CD0003
+BattleSys_VecCD0003:                    ; JSL vector (JMP $CD:0399) from BattleSys_SceneSetup
+org $CD000C
+BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleSys_SceneSetup
+org $CD0012
+BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
 
 ; --- Bank $C3 ---
 

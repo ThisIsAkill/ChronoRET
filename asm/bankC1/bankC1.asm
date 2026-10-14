@@ -12,6 +12,213 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
+; Callers (1 JSL site): DefaultHandler ($C0:18A7).
+; Callers of BattleSys_RunServiceVec (27 JSR sites): BattleSys_Main ($C1:802D, $C1:8129, $C1:8151,
+;   $C1:8161, $C1:8188, $C1:83A8), BattleSys_Unk8461 ($C1:856D), BattleAi_TestTargetWithin32
+;   ($C1:927B), BattleAi_TestAnySameRow ($C1:92D1), BattleAi_TestAnyAboveOrLeft ($C1:934A),
+;   BattleAi_TestPathClear ($C1:93C0), BattleAi_TestScreenArea ($C1:9417),
+;   BattleAi_TestTargetWithin48 ($C1:9783), BattleAi_TargetNearestPc ($C1:A4C2),
+;   BattleAi_TargetFarthestPc ($C1:A4F4), BattleAi_TargetNearestEnemy ($C1:A719),
+;   BattleAi_TargetFarthestEnemy ($C1:A747), BattleSys_UnkAC5E ($C1:AC7E), BattleSys_UnkB3F9
+;   ($C1:B43B), BattleSys_UnkB762 ($C1:B7D7), BattleSys_UnkB7F2 ($C1:B7F7, $C1:B800, $C1:B809),
+;   BattleSys_RemoveReadyLong ($C1:B963), BattleSys_UnkBFA4 ($C1:BFA6) and BattleSys_UnkC1DD
+;   ($C1:C73D, $C1:C748).
+; Callers of BattleSys_ExitVec (1 JMP site): BattleSys_Main ($C1:845E).
+; Callers of BankC1_VecCFE300 (1 JSL site): unmatched ($CD:08B4).
+; Callers of BankC1_VecCFE58A (2 JSL sites): unmatched ($CD:0997, $EF:523C).
+; Callers of BankC1_VecCCE000 (1 JSL site): unmatched ($CD:0AB4).
+; Callers of BankC1_VecRefreshMenu (1 JSL site): unmatched ($CD:3E78).
+; Callers of BankC1_VecLongDispatch (1 JSL site): unmatched ($CC:F066).
+; Entry vectors and the service dispatcher ($C1:0000–$C1:007D)
+; ============================================================
+
+; $C1:0000 — EngCall_BattleMain (35 bytes, $0000–$0022)
+; The bank's entry block: nine 3-byte JMPs reached from other banks by
+; JSL (each target returns with RTL or never returns), then the two
+; JMLs out of the bank they lead to. The name is the one bank $C0's
+; caller uses. By entry:
+;   - $0000 EngCall_BattleMain: JMP BankC1_EnterBattleJml ($001B), JML
+;     $CF:FB65, which starts the battle (it clears battle RAM and JMLs
+;     to BankC1_BattleStartVec, $C1:8000; see BattleSys_PumpFrames).
+;     JSL from DefaultHandler ($C0:18A7).
+;   - $0003 BattleSys_RunServiceVec: JMP BattleSys_RunService; reached
+;     by JSR inside bank $C1 (it returns with RTS, so not by JSL).
+;   - $0006 BattleSys_ExitVec: JMP BankC1_ExitBattleJml ($001F), JML
+;     $CF:FBE5 (not analysed); BattleSys_Main JMPs here at its end.
+;   - $0009 BankC1_VecCFE300: JMP $0076, JML $CF:E300 (JSL from $CD:08B4).
+;   - $000C BankC1_VecCFE58A: JMP $007A, JML $CF:E58A (JSL from $CD:0997
+;     and $EF:523C).
+;   - $000F BankC1_VecCCE000: JMP $0072, JML $CC:E000 (JSL from $CD:0AB4).
+;   - $0012 BankC1_VecRefreshMenu: JMP BattleMenu_RefreshIfDirtyL (which
+;     ends with RTL; JSL from $CD:3E78).
+;   - $0015 BankC1_VecRts: JMP BattleSys_RunService_Rts, an RTS; a JSL
+;     here would return wrongly. No caller found.
+;   - $0018 BankC1_VecLongDispatch: JMP BankC1_LongDispatch (JSL from
+;     $CC:F066 with A = 0).
+; None of these instructions touches a register or flag.
+; Callers note: the JSL sites named above are in unmatched code in banks
+;   $CC, $CD and $EF; BattleSys_RunServiceVec and BattleSys_ExitVec are
+;   listed below.
+; Entry: M any, X any, DP any, DB any (nothing is used here; each target
+;        has its own needs)
+; Exit:  through the jump target; nothing is changed here
+; Sub-entries: BattleSys_RunServiceVec, BattleSys_ExitVec,
+;   BankC1_VecCFE300, BankC1_VecCFE58A, BankC1_VecCCE000,
+;   BankC1_VecRefreshMenu, BankC1_VecRts, BankC1_VecLongDispatch,
+;   BankC1_EnterBattleJml, BankC1_ExitBattleJml.
+org $C10000
+EngCall_BattleMain:
+    JMP BankC1_EnterBattleJml
+BattleSys_RunServiceVec:                ; header: see EngCall_BattleMain
+    JMP BattleSys_RunService
+BattleSys_ExitVec:                      ; header: see EngCall_BattleMain
+    JMP BankC1_ExitBattleJml
+BankC1_VecCFE300:                       ; header: see EngCall_BattleMain
+    JMP BankC1_JmlCFE300
+BankC1_VecCFE58A:                       ; header: see EngCall_BattleMain
+    JMP BankC1_JmlCFE58A
+BankC1_VecCCE000:                       ; header: see EngCall_BattleMain
+    JMP BankC1_JmlCCE000
+BankC1_VecRefreshMenu:                  ; header: see EngCall_BattleMain
+    JMP BattleMenu_RefreshIfDirtyL
+BankC1_VecRts:                          ; header: see EngCall_BattleMain
+    JMP BattleSys_RunService_Rts
+BankC1_VecLongDispatch:                 ; header: see EngCall_BattleMain
+    JMP BankC1_LongDispatch
+BankC1_EnterBattleJml:                  ; header: see EngCall_BattleMain
+    JML BattleCF_EnterBattle
+BankC1_ExitBattleJml:                   ; header: see EngCall_BattleMain
+    JML BattleCF_UnkFBE5
+
+; $C1:0023 — BattleSys_SceneSetup (34 bytes, $0023–$0044)
+; Service 0 (!BattleSys_ServiceUnk0), the first service BattleSys_Main
+; requests: the battle's display set-up, probably. In order:
+; BattleCC_UnkE2E4, BattleUI_BuildStatusBarFrame,
+; Battle_CacheBattlerCoordsAll, BattleCC_UnkED87,
+; Battle_DrawAllBattlerFrames, BattleSys_VecCD0003, BattleSys_VecCD000C,
+; then BattleSys_VecCD0012 again and again while it returns with Z
+; clear (a wait, probably), then JMP to Battle_StartPose, whose RTS
+; returns to BattleSys_RunService. What the bank-$CC/$CD callees do is
+; not analysed, so "scene set-up" rests on the bank-$C1 steps (status
+; bar frame, battler coordinates and frames, the start pose).
+; Callers note: none by call; BattleSys_ServiceTable entry 0 (JSR (T,X)
+;   in BattleSys_RunService).
+; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_Main requests it; the
+;        bank-$C1 callees assume them)
+; Exit:  as Battle_StartPose leaves it (M=1, X=0, DP=0, DB=$7E assumed
+;        after the bank-$CC/$CD callees, not analysed); A, X, Y
+;        clobbered (BattleSys_RunService restores them)
+BattleSys_SceneSetup:
+    JSL BattleCC_UnkE2E4
+    JSR BattleUI_BuildStatusBarFrame
+    JSR Battle_CacheBattlerCoordsAll
+    JSL BattleCC_UnkED87
+    JSR Battle_DrawAllBattlerFrames
+    JSL BattleSys_VecCD0003
+    JSL BattleSys_VecCD000C
+.wait:
+    JSL BattleSys_VecCD0012
+    BNE .wait
+    JMP Battle_StartPose
+
+; $C1:0045 — BattleSys_RunService (12 bytes, $0045–$0050)
+; The service dispatcher: runs BattleSys_ServiceTable entry A (JSR
+; (T,X) with X = A * 2) and puts A, X and Y back as they were. The
+; BattleSys_RunService_Rts sub-entry ($0050, its RTS) is the target of
+; BankC1_VecRts.
+; Callers note: also BattleSys_RunServiceVec (JMP at $C1:0003), the
+;   usual way in.
+; Callers (3 sites: 2 JSR, 1 JMP): BattleSys_RunServiceVec (JMP $C1:0003), Battle_UpdatePcFacing
+;   (JSR $C1:2F60) and Battle_FaceAllPcsNearestEnemy (JSR $C1:351E).
+; Callers of BattleSys_RunService_Rts (1 JMP site): BankC1_VecRts ($C1:0015).
+; Entry: M=1 (8-bit PHA/PLA and ASL), X=0 (16-bit PHX/PHY), DP=0,
+;        DB=$7E (what the services expect); A = the service number
+;        (0-9), B = 0 (the 16-bit TAX)
+; Exit:  A, X, Y as on entry (8-bit A, 16-bit X and Y pulled back; this
+;        holds only while the service returns with the same M and X,
+;        which every matched service does); P, DP, DB and memory as the
+;        service leaves them
+BattleSys_RunService:
+    PHA
+    PHX
+    PHY
+    ASL A
+    TAX
+    JSR (BattleSys_ServiceTable,X)
+    PLY
+    PLX
+    PLA
+BattleSys_RunService_Rts:               ; header: see BattleSys_RunService
+    RTS
+
+; $C1:0051 — BattleSys_ServiceTable (10 words, $0051–$0064)
+; The services of BattleSys_RunService, by number * 2.
+BattleSys_ServiceTable:
+    dw BattleSys_SceneSetup             ; 0 !BattleSys_ServiceUnk0
+    dw BattleMenu_EnqueueReadyBattler   ; 1 !BattleSys_ServiceEnqueue
+    dw BattleMenu_RemoveBattlerFromReady ; 2 !BattleSys_ServiceRemoveReady
+    dw BattleSys_UpkeepTwoFrames        ; 3 !BattleSys_ServiceUpkeep
+    dw BattleSys_RunAction              ; 4 !BattleSys_ServiceRunAction
+    dw BattlePos_Query                  ; 5 !BattleSys_ServicePosQuery
+    dw BattleSys_Service6               ; 6 !BattleSys_ServiceUnk6
+    dw BattleTgt_RunAreaQuery           ; 7 !BattleSys_ServiceAreaQuery
+    dw BattleSys_VictoryPose            ; 8 !BattleSys_ServiceVictory
+    dw BattleSys_DefeatPose             ; 9 !BattleSys_ServiceDefeat
+
+; $C1:0065 — BankC1_LongDispatch (6 bytes, $0065–$006A)
+; A long-callable dispatcher (through BankC1_VecLongDispatch): runs
+; BankC1_LongDispatchTable entry A, then RTL. The table has room for one
+; entry only (entry 0, BattleMsg_ReencodeTextBuffer): the bytes after it
+; are BattleSys_Service6's code, so A = 1 would run $2022 (quirk, or
+; never asked; the one caller, $CC:F066, passes A = 0).
+; Callers note: through BankC1_VecLongDispatch (JMP at $C1:0018).
+; Callers (1 JMP site): BankC1_VecLongDispatch ($C1:0018).
+; Entry: M=1 (8-bit ASL), X=0, DP=0, DB any (what
+;        BattleMsg_ReencodeTextBuffer needs); A = 0, B = 0 (the 16-bit
+;        TAX)
+; Exit:  RTL; M=1, X=0, DB=$7E (the MVN in BattleMsg_ReencodeTextBuffer);
+;        A, X, Y clobbered
+BankC1_LongDispatch:
+    ASL A
+    TAX
+    JSR (BankC1_LongDispatchTable,X)
+    RTL
+
+; $C1:006B — BankC1_LongDispatchTable (1 word, $006B–$006C)
+; BankC1_LongDispatch's table: entry 0 only (see there).
+BankC1_LongDispatchTable:
+    dw BattleMsg_ReencodeTextBuffer
+
+; $C1:006D — BattleSys_Service6 (5 bytes, $006D–$0071)
+; Service 6 (!BattleSys_ServiceUnk6): JSL BattleCF_UnkFE20 (not
+; analysed), RTS.
+; Callers note: none by call; BattleSys_ServiceTable entry 6 (JSR (T,X)
+;   in BattleSys_RunService).
+; Entry: M=1, X=0, DP=0, DB=$7E (as the callers of service 6 run)
+; Exit:  as BattleCF_UnkFE20 leaves it (not analysed)
+BattleSys_Service6:
+    JSL BattleCF_UnkFE20
+    RTS
+
+; $C1:0072 — BankC1_JmlCCE000 (12 bytes, $0072–$007D)
+; The JMLs behind three of the entry vectors (see EngCall_BattleMain):
+; $0072 to $CC:E000 (BankC1_VecCCE000), BankC1_JmlCFE300 ($0076) to
+; $CF:E300 (BankC1_VecCFE300) and BankC1_JmlCFE58A ($007A) to $CF:E58A
+; (BankC1_VecCFE58A). None of the three targets is analysed.
+; Callers (1 JMP site): BankC1_VecCCE000 ($C1:000F).
+; Callers of BankC1_JmlCFE300 (1 JMP site): BankC1_VecCFE300 ($C1:0009).
+; Callers of BankC1_JmlCFE58A (1 JMP site): BankC1_VecCFE58A ($C1:000C).
+; Entry: M any, X any, DP any, DB any (nothing is used here)
+; Exit:  through the target (which returns to the JSL caller)
+; Sub-entries: BankC1_JmlCFE300, BankC1_JmlCFE58A.
+BankC1_JmlCCE000:
+    JML BattleCC_UnkE000
+BankC1_JmlCFE300:                       ; header: see BankC1_JmlCCE000
+    JML BattleCF_UnkE300
+BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
+    JML BattleCF_UnkE58A
+
+; ============================================================
 ; Frame Wait ($C1:007E–$C1:0088)
 ; ============================================================
 
@@ -623,7 +830,7 @@ Battle_CalcAngle:
 ;        otherwise), set !BattleMenu_ActivePc, redraw every roster PC's
 ;        command list (BattleMenu_DrawCommandList) and the command-window
 ;        frames (BattleMenu_DrawCommandWindowFrames).
-; Callers (2 JSR sites): BattleMenu_UpdateMainWindow ($C1:0C5C) and unmatched ($C1:0027).
+; Callers (2 JSR sites): BattleSys_SceneSetup ($C1:0027) and BattleMenu_UpdateMainWindow ($C1:0C5C).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87, $8E and
 ;        $A2/$A3 used as temporaries, plus the callees' DP: $79-$7B,
@@ -3568,7 +3775,7 @@ Battle_DrawBattlerFrameAnyLayout:
 ; input, redraw cursor overlay). Returns with RTL (long return) since
 ; callers reach this via JSL through the $C10012 vector, not a
 ; same-bank JSR.
-; Callers (1 JMP site): unmatched ($C1:0012).
+; Callers (1 JMP site): BankC1_VecRefreshMenu ($C1:0012).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
 ;        clobbered (see their headers; the JSL targets they reach are not
@@ -5812,11 +6019,11 @@ BattleTgt_AnyCandidate:
 ; ==================================================================
 ; Copies every present battler's screen position into its probe
 ; position and rebuilds its box.
-; Callers (4 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10B8, $C1:10DF), BattleSys_RunAction
-;   ($C1:40C8) and unmatched ($C1:002A).
+; Callers (4 JSR sites): BattleSys_SceneSetup ($C1:002A), BattleSys_UpkeepTwoFrames ($C1:10B8,
+;   $C1:10DF) and BattleSys_RunAction ($C1:40C8).
 ; Callers note (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
-; instructions discarded): BattleSys_UpkeepTwoFrames (twice), the
-; unmatched service 0 at $C1:002A and $C1:40C8.
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
+; BattleSys_SceneSetup (service 0) and BattleSys_RunAction.
 ; Entry: M=1, X=0 (16-bit slot counter), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X = 11; A clobbered; Y unchanged
 ; Callee: Battle_CalcBattlerBox
@@ -8105,7 +8312,7 @@ Battle_TickEnemyGroup:
 ; counts them down).
 ; !Pc_AnimTimer serves as the loop counter (16-bit store, 8-bit count)
 ; before it gets those values.
-; Callers (1 JSR site): unmatched ($C1:0031).
+; Callers (1 JSR site): BattleSys_SceneSetup ($C1:0031).
 ; Callers note (JSR; scanned as above): the battle set-up of service 0 at
 ; $C1:0031 only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
@@ -8154,7 +8361,7 @@ Battle_DrawAllBattlerFrames:
 ; targetable PCs (animation 0 on the others) through Battle_RunPcPose,
 ; with !Battle_PoseUnk5DDD set and KO'd PCs left out. That this is the
 ; PCs' entry into battle is inferred from where it runs.
-; Callers (1 JMP site): unmatched ($C1:0042).
+; Callers (1 JMP site): BattleSys_SceneSetup ($C1:0042).
 ; Callers note (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
 ; inside other instructions discarded): service 0 at $C1:0042 only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
@@ -29170,8 +29377,8 @@ BattleAi_ClearTargets:
 ;   BattleSys_UpdateKo ($C1:B376), BattleSys_UnkB967 ($C1:BB26, $C1:BC1E), BattleSys_RunPcAttack
 ;   ($C1:C00E) and BattleSys_UnkC1DD ($C1:C6A3).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-;        (the service dispatcher is not matched; the code assumes it
-;        keeps these)
+;        (BattleSys_RunService puts A, X and Y back, and service 4
+;        returns with these)
 ; Exit:  M=1, X=0 (as assumed after BattleFD_UnkACFD, the last callee of
 ;        Battle_ApplyHits; not analysed), DP=0, DB=$7E; A, X, Y
 ;        clobbered; plus what BattleSys_UnkBFA4 and Battle_ApplyHits change
@@ -29183,8 +29390,8 @@ BattleSys_UnkAC57:
 ; $C1:AC5E — BattleSys_UnkAC5E (39 bytes, $AC5E–$AC84)
 ; If !Battle_UnkAEB2 is set: !Battle_UnkAE85[n] = 1 for each enemy n
 ; (0-7) whose !Battle_UnkAEB3 entry is non-zero, then, unless
-; !Battle_Unk2989 has bit 5, service !BattleSys_ServiceUnk6 ($C1:006D,
-; not analysed). !Battle_UnkAEB2 = 0 in any case.
+; !Battle_Unk2989 has bit 5, service !BattleSys_ServiceUnk6 (BattleSys_Service6:
+; JSL $CF:FE20, not analysed). !Battle_UnkAEB2 = 0 in any case.
 ; Callers (1 JSR site): BattleSys_Unk8461 ($C1:881C).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered (and what service 6
@@ -31642,8 +31849,8 @@ BattleSys_ListOffsetTable:
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the service needs; see its header);
 ;        !Battle_ArgSlot = the slot to remove
 ; Exit:  as BattleSys_RunService and the service leave them
-;        (BattleSys_RunService is not matched; its stub notes it saves
-;        A, X, Y); back with RTL
+;        (BattleSys_RunService puts A, X and Y back: A = the service
+;        number); back with RTL
 BattleSys_RemoveReadyLong:
     LDA.b #!BattleSys_ServiceRemoveReady
     JSR BattleSys_RunServiceVec
@@ -32655,8 +32862,8 @@ BattleSys_UnkBF81:
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_RunAction needs; see its
 ;        header)
 ; Exit:  as BattleSys_RunService and BattleSys_RunAction leave them
-;        (BattleSys_RunService is not matched; its stub notes it saves
-;        A, X, Y)
+;        (BattleSys_RunService puts A, X and Y back: A = the service
+;        number)
 BattleSys_UnkBFA4:
     LDA.b #!BattleSys_ServiceRunAction
     JSR BattleSys_RunServiceVec

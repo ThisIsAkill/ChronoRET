@@ -480,9 +480,9 @@ if !constants_battle_inc == 0
 !Sfx_Unk18Arg            = $FF   ; !Sfx_Param1 sent with it
 
 ; --- Battle main routine (BattleSys_Main) ---
-!BattleSys_ServiceUnk0    = 0     ; $C10045 service run first by BattleSys_Main ($C1:0023; not analysed)
+!BattleSys_ServiceUnk0    = 0     ; $C10045 service run first by BattleSys_Main (BattleSys_SceneSetup)
 !BattleSys_ServiceUpkeep  = 3     ; ... BattleSys_UpkeepTwoFrames
-!BattleSys_ServiceUnk6    = 6     ; ... $C1:006D, run by the debug win; not analysed
+!BattleSys_ServiceUnk6    = 6     ; ... BattleSys_Service6 (JSL $CF:FE20, not analysed), run by the debug win
 !BattleSys_ServiceVictory = 8     ; ... BattleSys_VictoryPose
 !BattleSys_ServiceDefeat  = 9     ; ... BattleSys_DefeatPose
 !Battle_EntryNone         = $FF   ; list / slot entry: empty (the BattleSys_Main lists, !Battler_UnkAEFF)

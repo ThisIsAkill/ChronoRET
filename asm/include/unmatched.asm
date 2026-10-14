@@ -24,8 +24,6 @@
 
 ; --- Other banks, called from bank $C0 ---
 
-org $C10000
-EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
 org $C2F871
 Menu_UnkF871:       ; JSR from Menu_SprThread for each object with .Flags18 = 0 (DP = its page);
                     ; probably places its sprites in OAM (not analysed)
