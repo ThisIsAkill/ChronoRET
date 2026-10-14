@@ -4144,7 +4144,9 @@ BattleCD_StartFxChannel:
 ; Callers (1 JSR site): BattleCD_NmiMain ($CD:09AF).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleCD_NmiMain runs)
 ; Exit:  M=1, X=0 (every opcode handler returns so); A, X, Y clobbered;
-;        DP $40-$43 written by the steps
+;        DP $40-$44 written by the steps (BattleCD_RunFxOp's 16-bit STX
+;        to $43 also writes $44), plus whatever DP the opcode handlers
+;        run write (see each handler's Exit)
 BattleCD_StepFxChannels:
     LDA.w !Battle_BgFxEnded
     BNE .done
@@ -4200,7 +4202,9 @@ BattleCD_StepFxChannels:
 ;        is what its handler left: see the banner before
 ;        BattleCD_FxOpTable for the two that are not known to leave 0)
 ; Exit:  M=1, X=0 (every opcode handler returns so) and X as on entry;
-;        A, Y clobbered; DP $40-$43 written
+;        A, Y clobbered; DP $40-$44 written (BattleCD_RunFxOp's 16-bit
+;        STX to $43 also writes $44), plus whatever DP the opcode
+;        handlers run write (see each handler's Exit)
 BattleCD_RunFxScript:
     PHX
     LDY.w !Battle_FxChannels+3,X
@@ -4262,7 +4266,9 @@ BattleCD_RunFxScript:
 ;        of the doubled opcode); X = the channel's offset
 ; Exit:  M=1, X=0 (every handler returns so); X = the channel's offset
 ;        (from DP $43); A, Y and B as the handler leaves them (see the
-;        banner after this routine)
+;        banner after this routine); DP $40-$41 (the pointer) and
+;        $43-$44 (the 16-bit STX of X) written, plus whatever DP the
+;        handler writes (see its Exit)
 BattleCD_RunFxOp:
     STX.b !BattleCD_Tmp43
     ASL A
@@ -5445,7 +5451,10 @@ BattleCD_FxOpSwapObjPalettes:
 ; Opcode $C8 (one operand byte, not read): the channel's
 ; !BattleFx_BounceOut + (!BattleCD_FxEnemyLine - slot 3's
 ; !Battler_ScreenY) (DP $45, 16-bit), through BattleCD_FxAddScrollY
-; (tail jump). Slot 3 is the first enemy's.
+; (tail jump). Slot 3 is the first enemy's. Quirk: the difference is
+; taken at 8 bits and zero-extended (TAX with B = 0), so with slot 3's
+; y above $6F the word added is 256 - (y - $6F), not the negative
+; difference.
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $43 = the
 ;        channel
 ; Exit:  as BattleCD_FxAddScrollY leaves it: M=1, X=0; A = 0 (B = 0); X
@@ -6151,8 +6160,8 @@ BattleCD_FxOpColours:
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (BattleCD_FillHangingTriangle's
 ;        16-bit TAX); DP $40 at the operand
 ; Exit:  as BattleCD_FillHangingTriangle leaves it: M=1, X=0, DB=$7E; A
-;        = 0 (B = 0); X, Y = the last edges (8.8); DP $00-$17, $45-$4A
-;        written; APU port 3 written
+;        = 0 (B = 0); X, Y = the last edges (8.8); DP $00-$17, $20 (0)
+;        and $45-$4A written; APU port 3 written
 BattleCD_FxOpFillHangingTriangle:
     LDA.b [!BattleCD_FxScriptPtr]
     JSR BattleCD_FillHangingTriangle
@@ -6177,12 +6186,13 @@ BattleCD_FxOpTilePageSlot:
 ; right edge; then !Battle_FxValues+6 = 0 and
 ; BattleCD_FxCopyShape (the words copied into the window of shape slot
 ; !Battle_FxShapeSlot, as the last opcode $8B left it, around its centre
-; y). With v = 0 nothing is written.
+; y). With v = 0 only DP $45/$46 (the pair) and $49 (c) are written.
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX and the doubled
 ;        v); DP $40 at the operand
-; Exit:  v = 0: M=1, X=0; A = 0; X = the index; Y unchanged. Else as
-;        BattleCD_FxCopyShape leaves it: M=1, X=0; A = 0 (B = 0); X, Y
-;        clobbered; DP $45-$4F, $51 written
+; Exit:  v = 0: M=1, X=0; A = 0; X = the index; Y unchanged; DP $45,
+;        $46, $49 written. Else as BattleCD_FxCopyShape leaves it: M=1,
+;        X=0; A = 0 (B = 0); X, Y clobbered; DP $45-$4C and $4F/$50
+;        written, $51/$52 after a cut at the top
 BattleCD_FxOpWindowBand:
     LDA.b [!BattleCD_FxScriptPtr]
     TAX
@@ -7880,8 +7890,9 @@ BattleCD_FxEllipseTriangle:
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (BattleCD_FillObjTriangle's
 ;        16-bit TAX); DP $40 at the operand
 ; Exit:  as BattleCD_FillTriangle leaves it: M=1, X=0, DB=$7E; A = 0 (B
-;        = 0); X, Y = the last edges (8.8); DP $00-$17, $45, $47 written;
-;        APU port 3 written
+;        = 0); X, Y = the last edges (8.8); DP $00-$17, $20 (0, by
+;        BattleCD_FillObjTriangle) and $45-$48 written; APU port 3
+;        written
 BattleCD_FxOpFillObjTriangle:
     LDA.b [!BattleCD_FxScriptPtr]
     JSR BattleCD_FillObjTriangle
@@ -8254,7 +8265,7 @@ BattleCD_FxMiscLoadBgRows:
 ; Marks a random entry of !BattleFx_WaveMoving: the RandomTable byte
 ; at !BattleFx_CountB (which counts up) picks the word, which gets + 1.
 ; Quirk: the 212 marks BattleCD_FxMiscDropWaveBase reads are entries
-; 0-$D3; a random byte $D4-$FF marks a word past them ($7E:EBA0-$EC4C,
+; 0-$D3; a random byte $D4-$FF marks a word past them ($7E:EBA0-$EC4D,
 ; not cleared by sub-op $15 either; what is there is not traced).
 ; Callers (3 JSR sites): BattleCD_FxMiscDropWaveBase ($CD:2AC6, $CD:2AC9, $CD:2ACC).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX)
@@ -9182,7 +9193,9 @@ BattleCD_FxOpPageLoopEnd:
 ; high nibble, its size (bits 4-7) the old size + (b AND $0F), at most
 ; !BattleCD_FxMosaicMax, or with b bit 7 set the old size - (b AND
 ; $0F), at least 0 (bit 7 is then also the BG4 bit).
-; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E; DP $40 at the operand
+; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E; B = 0 (as the dispatcher
+;        leaves it: only the floor path's TDC sets it here, so the
+;        Exit's B = 0 rests on it); DP $40 at the operand
 ; Exit:  M=1, X=0; A = the new byte (B = 0); X, Y unchanged; DP $45,
 ;        $47, $49 written
 BattleCD_FxOpMosaic:
@@ -9731,17 +9744,17 @@ BattleCD_FxLineDeltas:
 
 ; $CD:3189 — BattleCD_FxDrawShape (21 bytes, $CD:3189–$CD:319D)
 ; Draws shape slot A: !Battle_FxShapeSlot = A, the half widths of a
-; circle of its size (BattleCD_FxCircleHalfWidths); with size 0 nothing
-; more. Else the handler BattleCD_FxShapeTable entry kind (the slot's
+; circle of its size (BattleCD_FxCircleHalfWidths); with size AND $7F
+; = 0 nothing more. Else the handler BattleCD_FxShapeTable entry kind (the slot's
 ; !Battle_FxObjUnkD1; a kind over 5 would take code bytes as an
 ; address).
 ; Callers note: also the tail jump of BattleCD_FxOpDrawShape (opcode
 ;   $8B).
 ; Callers (1 JMP site): BattleCD_FxOpDrawShape ($CD:2FB9).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = the slot, B = 0 (the 16-bit TAXs)
-; Exit:  size 0: M=1, X=0; A = 0; X = the slot; Y unchanged. Else as the
-;        handler leaves it (each one: M=1, X=0; A = 0, B = 0; X, Y
-;        clobbered)
+; Exit:  size AND $7F = 0: M=1, X=0; A = 0; X = the slot; Y unchanged.
+;        Else as the handler leaves it (each one: M=1, X=0; A = 0, B =
+;        0; X, Y clobbered)
 BattleCD_FxDrawShape:
     STA.w !Battle_FxShapeSlot
     JSR BattleCD_FxCircleHalfWidths
@@ -10192,8 +10205,9 @@ BattleCD_FxShapeBig:
 ; Callers (2 JMP sites): BattleCD_FxShapeTall ($CD:33CA) and BattleCD_FxShapeBig ($CD:33D6).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E; B = 0 (the 16-bit TAX and
 ;        TAYs)
-; Exit:  M=1, X=0; A = 0 (B = 0); X, Y past the last line; DP $45-$4F,
-;        $51 written
+; Exit:  M=1, X=0; A = 0 (B = 0); X, Y past the last line; DP $45-$4C
+;        and $4F/$50 written, $51/$52 after a cut at the top ($4D/$4E
+;        not written)
 BattleCD_FxCopyShapeTall:
     LDA.w !Battle_FxShapeSlot
     TAX
@@ -10302,7 +10316,8 @@ BattleCD_FxCopyShapeTall:
 ;        TAYs)
 ; Exit:  M=1, X=0; A = 0 (B = 0); X = 4y + the window's byte; Y as
 ;        BattleCD_FxCopyLines left it (or the first source offset);
-;        DP $45-$4F, $51 written
+;        DP $45-$4C and $4F/$50 written, $51/$52 after a cut at the top
+;        ($4D/$4E not written)
 BattleCD_FxCopyShapeHanging:
     LDA.w !Battle_FxShapeSlot
     TAX
@@ -10416,14 +10431,18 @@ BattleCD_FxCopyShapeHanging:
 ; the squashed lower half BattleCD_FxBuildDome wrote) into the slot's
 ; window of this frame's table from line y - r (y = its centre y),
 ; through BattleCD_FxCopyLines (not run when nothing is left). Lines
-; above line 0 are skipped; when the last line would reach
-; !BattleCD_FxShapeLineEnd, the excess is cut from the end.
+; above line 0 are skipped; when r + r / 2 + the first line reaches
+; !BattleCD_FxShapeLineEnd, the excess is cut from the end (reckoned
+; from the full r + r / 2 words even after a cut at the top, which
+; leaves the first line 0: with y < r and r + r / 2 above $DE, that is
+; r >= 149, lines that never reach $DE are cut).
 ; Callers note: the tail jump of BattleCD_FxShapeDome.
 ; Callers (1 JMP site): BattleCD_FxShapeDome ($CD:33BE).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E; B = 0 (the 16-bit TAX and
 ;        TAYs)
 ; Exit:  M=1, X=0; A = 0 (B = 0); X, Y as BattleCD_FxCopyLines left
-;        them (or the start offsets); DP $45-$4F, $51 written
+;        them (or the start offsets); DP $45-$4C and $4F/$50 written,
+;        $51/$52 after a cut at the top ($4D/$4E not written)
 BattleCD_FxCopyShapeDome:
     LDA.w !Battle_FxShapeSlot
     TAX
@@ -10510,7 +10529,8 @@ BattleCD_FxCopyShapeDome:
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E; B = 0 (the 16-bit TAX and
 ;        TAYs)
 ; Exit:  M=1, X=0; A = 0 (B = 0); X, Y as BattleCD_FxCopyLines left
-;        them; DP $45-$4F, $51 written
+;        them; DP $45-$4C and $4F/$50 written, $51/$52 after a cut at
+;        the top ($4D/$4E not written)
 BattleCD_FxCopyShape:
     LDA.w !Battle_FxShapeSlot
     TAX
@@ -10690,7 +10710,7 @@ BattleCD_FillObjTriangle:
 ;        set to $00 for the I/O registers); DP $12-$17 the points
 ; Exit:  M=1, X=0, DB restored; A = 0 (B = 0); X, Y = the last edges
 ;        (8.8; their start values when no line is drawn); DP $00-$11
-;        written (as the path needs), DP $12-$17 reordered, DP $45 and $47
+;        written (as the path needs), DP $12-$17 reordered, DP $45-$48
 ;        written (BattleCD_AimWinLine);
 ;        WMADD moved; APU port 3 ($2143) written by the word stores to
 ;        WMDATA-1
@@ -11024,7 +11044,7 @@ BattleCD_WinLineBases:
 ; Entry: M=1, X=0, DP=0, DB=$00 (as BattleCD_AimWinLine); A = the line,
 ;        B = 0
 ; Exit:  as BattleCD_AimWinLine: M=1, X=0; A = $7E (B = 0); X, Y
-;        unchanged; DP $45, $47 written
+;        unchanged; DP $45-$48 written
 BattleCD_AimWinLineL:
     JSR BattleCD_AimWinLine
     RTL
@@ -11038,8 +11058,8 @@ BattleCD_AimWinLineL:
 ;   ($CD:38B2).
 ; Entry: M=1, X=0, DP=0, DB=$00 (WMADDL/M/H are written .w); A = the
 ;        line, B = 0 (the 16-bit ASLs)
-; Exit:  M=1, X=0; A = $7E (B = 0); X unchanged; Y unchanged; DP $45,
-;        $47 written
+; Exit:  M=1, X=0; A = $7E (B = 0); X unchanged; Y unchanged; DP $45-$48
+;        written (two 16-bit stores)
 BattleCD_AimWinLine:
     PHX
     REP #$20
@@ -11424,7 +11444,8 @@ BattleCD_FillHangingTriangle:
 ; Entry: M=1, X=0, DP=0, DB=$00 (WMADD and WMDATA are absolute); A = the
 ;        line count; X, Y = the left and right edges (8.8)
 ; Exit:  M=1, X=0; A = 0 (B = 0); X, Y as on entry; DP $45 (0 after a
-;        fill), $47 written; $48-$4A also when A is not 0
+;        fill) and $47/$48 (a 16-bit store) written; $49/$4A also when A
+;        is not 0
 BattleCD_AimWinTopFill:
     PHX
     STA.b !BattleCD_Tmp45

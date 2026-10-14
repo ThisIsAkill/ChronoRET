@@ -15,7 +15,9 @@
 ; (BattleCD_FxOpHalfPlane, opcode $97; BattleCD_FxCopyLines, the window
 ; shapes' line copy; BattleCD_FxOpCopyWindowEdges, opcode $B2; and
 ; BattleCD_CalcAngle, part of opcode $CC's handler), the others from BattleCD_NmiMain,
-; BattleCD_StepWipe, BattleFx_Init and BattleFx_ReloadCeSet.
+; BattleCD_StepWipe, BattleFx_Init and BattleFx_ReloadCeSet. Inside
+; the bank, BattleCE_DrawHalfPlane calls BattleCE_PresetWinEdges by JSR
+; ($CE:EA88).
 ; (tools/xref.py's other hits into this range, from $C7:CCEA, $C7:E0CC,
 ; $C8:151E and $CA:81BB, sit in data, by symbols/code_survey.csv, and
 ; aim at the middle of an instruction, into BattleCE_WaveTable or at the
@@ -51,12 +53,19 @@ org $CEE000
 ; !BattleCD_FxScriptPtr (not stepped past here) times 2 is the byte
 ; offset s it starts at: s = 0 is window 1 of line 0, s = 2 window 2 of
 ; line 0. The copy runs with 8-bit X over s, s+4, ... up to s +
-; !BattleCE_BlockBytes (exclusive) and moves the word at that offset in
-; each of the eight blocks of !BattleCE_BlockLines lines; for s + $6C
-; <= $100 that is the same pair of lines s/4 to s/4 + 215. A larger s
-; wraps X (the pair kept, the lines wrapping inside each block); the
-; script bytes used are not traced. The ASL drops bit 7 of the byte.
-; Lines 216-223 are not copied.
+; !BattleCE_BlockBytes (exclusive), 27 steps, and moves the word at
+; that offset in each of the eight blocks of !BattleCE_BlockLines lines:
+; line 27j + X/4 (s/4 rounded down below). For s <= 150 (X does not
+; wrap) that is the same pair of lines s/4 to s/4 + 215: lines 0-215
+; for s < 4 (lines 216-223 are not copied), and for larger s also lines
+; 216 to s/4 + 215. With s >= 36 (s/4 > 8) the copy runs past line 223
+; (up to line 252 at most): into WinTable1 it reads WinTable1's own
+; first lines (past WinTable0's end) and writes past its end
+; ($7E:C861 on, !Battle_WinRegs); into WinTable0 it reads from $7E:C861
+; on and writes over WinTable1's first lines. With s >= 152 X wraps:
+; block j gets lines 27j + s/4 to 27j + 63 and 27j to 27j + s/4 - 38.
+; The script bytes used are not traced. The ASL drops bit 7 of the
+; byte (s is at most $FE).
 ; Callers note: the JSL at $CD:20D3 is the whole handler of layer-effect
 ;   script opcode $B2 (BattleCD_FxOpCopyWindowEdges, BattleCD_FxOpTable
 ;   entry $32; JSL, RTS).
