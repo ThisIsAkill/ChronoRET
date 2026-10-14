@@ -153,15 +153,18 @@ BattleSys_SceneSetup:
 ;        not checked here (its bank-$CD callees BattleCD_SetNmiMode1,
 ;        BattleCD_StartOpenWipe and BattleCD_WipeRunning are matched, but
 ;        StartOpenWipe calls the unmatched $CD:3B71 and $CD:3E7D). The
-;        other five reach these unmatched addresses (by way of
-;        BattleSys_FrameTickVec and BattleSys_PumpFrames, and for 4 also
-;        BattleCD_ActOp80, for 6 BattleSys_VecCD0024): $CD:3B5F, $CD:3E3B, $CD:3E44, $CD:3E75,
+;        other five reach these unmatched addresses (services 3, 4, 8
+;        and 9 by way of BattleSys_FrameTickVec and BattleSys_PumpFrames,
+;        4 also BattleCD_ActOp80; service 6 only through
+;        BattleSys_VecCD0024): $CD:3B5F, $CD:3E3B, $CD:3E44, $CD:3E75,
 ;        $CD:3ED2 and $D1:ECF3 for services 3, 8 and 9; those and
 ;        $D1:F67A for service 4; those and $CD:3B71 for service 6. The
 ;        call trees of BattleMenu_UpdateWindows and of
 ;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027) are all matched.
-;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which services 0, 3, 4
-;        and 8 reach, is matched and returns M=1, X=0. B, P (N and Z
+;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which the call trees of
+;        services 0, 3, 4, 8 and 9 contain (9 through Battle_PoseStep,
+;        which skips it while !Battle_PoseIncludeKo is set), is matched
+;        and returns M=1, X=0. B, P (N and Z
 ;        from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
