@@ -2078,9 +2078,9 @@ Audio_SampleParamA:
     dw $00E1, $003C, $0000, $0000, $0000, $0000
 
 ; $C7:0C9C — Audio_SampleParamB (124 bytes, $0C9C–$0D17)
-; One word per sample, sent to !AudioAram_SongParamB: bytes $FF,$E0 for
-; most, $FE or $Ex otherwise; the ADSR pair, probably (from the values
-; only).
+; One word per sample, sent to !AudioAram_SongParamB: first byte $FF or
+; $FE; second byte $E0 for most, otherwise $EA-$F4; the ADSR pair,
+; probably (from the values only).
 Audio_SampleParamB:
     dw $E0FF, $E0FF, $E0FF, $E0FF, $E0FF, $E0FF, $E0FF, $E0FF
     dw $E0FF, $E0FF, $E0FF, $E0FF, $E0FF, $E0FF, $E0FF, $E0FF
