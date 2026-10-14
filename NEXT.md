@@ -1480,13 +1480,42 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     the batch: most direct-page bytes are `Unk` names with what was observed (`!Spc_Unk24`/`25`,
     `!Spc_Flags87`/`88`, the `$F2xx`-`$F4xx` track arrays); the callees are stubs.
 
-    **Next batches**, in the order they make the rest readable: `$0E11`-`$12DD`, the handlers of
-    $80-$8F/$F0-$FF and the transfer receiver `$100E` (Audio_SendSeq's counterpart, modes 2/3/5/7);
-    the track pass and command queue (`$0377`-`$07A2`, `$07AF`-`$0B95`); the sequence command
-    handlers (`$1722`-`$1D6C` with the tables `$1544`-`$1721`); echo and save/restore
-    (`$12DE`-`$1543`); the tables `$1D6D`-`$1DEE`, and the length word last. Headers to fix at
-    their next edit (verified, not edited here): `bankC7.asm`'s banner and Audio_Boot / Audio_StartSong
-    say the SPC700 side is not traced (now partly matched; the constants' comments are updated).
+    **Second batch (branch match-c7-spc700-2, 1,342 bytes):** `$0E11`-`$12DD`, every handler of
+    Spc_CmdTable80 and the transfer receiver, and the command queue `$0892`-`$0902`
+    (`Spc_QueueCommand`, `Spc_RunQueue`). The commands: $80-$83 fade the three `!Spc_GroupVol`
+    volumes (Arg0 steps, Arg1 target; `Spc_StartFade`, `Spc_FadeDelta`); $86 / $87 fade a signed
+    tempo / song pitch adjustment ($85 both, probably: their readers `$0377` and `$0A78` are not
+    matched), $89 the effect pitch of tracks 14-15; $88 sets `!Spc_SongCond`, which sequence
+    commands compare to choose a branch; $8E doubles the echo volume and sets MVOL $7F (else $40);
+    $F0 / $F1 / $F2 stop all / the song / one effect group (tracks pointed at a lone sequence
+    command $EB at `$1DC1`); $F3 mono; $F4 / $F8 / $F9 set / clear / add `!Spc_Mute` voices; $F5
+    pause (envelopes held through GAIN, volumes 0, `!Spc_Flags87` bit 4) and resume; $F6 a fast
+    timer 0 (125 us passes, tempo bypassed); $FF reset to the IPL ROM (Arg0 $F0) or the port
+    report flag (Arg0 1); $84, $8A-$8D, $8F, $F7, $FA, $FB do nothing. The transfers (`$FE` and
+    every song load): after the command, a header per block (address in APUIO2/3, mode in
+    APUIO1, `$E0` ends the load), then steps until a value with bit 7 set; `$FF` with APUIO1 `$F0`
+    resets even mid-transfer. Modes: 1 bytes, 2 words, 3 triples, 5 triples while the song keeps
+    playing (`$0415` runs on timer 0), 7 moves; 0, 4, 6 and any block below `$1E00` are taken and
+    dropped (the driver protects itself), a block in `$2Fxx` first stops both effect groups.
+    Quirks: the stores of modes 2, 3 and 5 and the copies of mode 7 rewrite their own operands
+    (labels `.store1`-`3`, `.page_load` ...); mode 3/5 echo a step after reading APUIO1 but before
+    APUIO2/3 (a timing assumption); `Spc_XferNextStep` returns C=0 by branching into the operand
+    of `mov y,#$60` (`clrc`); command $81 marks voices 0-6 (`$7F`) for a volume rewrite, leaving
+    voice 7 out; a full command queue keeps overwriting its last entry. Mode 5 on the 65816 side:
+    only `Audio_CmdSwapSample` ($71) and `Audio_UploadBlock2F00` when `Audio_CmdId` is $70 send it
+    (the same routine sends mode 3 inside a song load, from `Audio_SendSongData`); every other
+    header uses `!Audio_XferWords`, `!Audio_XferTriples` or `!Audio_XferMove`, and mode 1 is never
+    sent. Verified headers edited (back to review): `Spc_Start` (the banner's matched list, now
+    pointing at `symbols/spc700_functions.csv`), `Spc_MainLoop` and `Spc_StartSong` (callees
+    renamed from `Spc_Unk0892`/`08CD`/`100E`, `!Spc_UnkD2` -> `!Spc_SongCond`), `Spc_WriteDsp`,
+    `Spc_ClearPorts01` and `Spc_PollCommand` (callers and callee names).
+
+    **Next batches**, in the order they make the rest readable: the track pass (`$0377`-`$07A2`,
+    `$07AF`-`$0891`, `$0903`-`$0B95`); the sequence command handlers (`$1722`-`$1D6C` with the
+    tables `$1544`-`$1721`); echo and save/restore (`$12DE`-`$1543`); the tables
+    `$1D6D`-`$1DEE`, and the length word last. Headers to fix at their next edit (verified, not
+    edited here): `bankC7.asm`'s banner and Audio_Boot / Audio_StartSong say the SPC700 side is not
+    traced (now partly matched; the constants' comments are updated).
 
 ## Code survey
 

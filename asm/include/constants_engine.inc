@@ -200,7 +200,7 @@ if !constants_engine_inc == 0
 ; APUIO1-3 and the next sequence value in APUIO0, then waits for the echo
 ; (Audio_SendSeq). These meanings are read from the 65816 side; the SPC700 side
 ; (asm/spc700/driver.asm) is matched in part: Spc_PollCommand / Spc_RunCommand
-; take the commands, the transfers ($FE, ARAM $100E) are not matched yet.
+; take the commands, Spc_XferReceive the transfers (modes: Spc_XferModeTable).
 !Audio_IplReady = $BBAA                  ; APUIO0/1 read as a word: the IPL ROM's ready signature
 !Audio_IplKick = $CC                     ; the IPL ROM's first transfer value (APUIO0 and APUIO1)
 !Audio_ResetKick0 = $FF                  ; APUIO0 and
