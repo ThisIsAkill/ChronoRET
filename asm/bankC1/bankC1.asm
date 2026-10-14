@@ -140,11 +140,14 @@ BattleSys_SceneSetup:
 ;        Checked only for services 2, 5 and 7, whose callees are all
 ;        matched bank-$C1 code. The other seven reach code that is not
 ;        analysed, so for them it is assumed: 0 (bank-$CC/$CD JSLs, see
-;        BattleSys_SceneSetup), 1 (Audio_ProcessEntry, $C7:0004),
+;        BattleSys_SceneSetup, and BattleFx_SetPtrA2FromTable $CF:FD9E
+;        through Battle_StartPose / Battle_PoseStep), 1 (Audio_ProcessEntry,
+;        $C7:0004),
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
-;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
-;        through the menu code), 4 (BattleSys_PumpFrames,
+;        BattleSys_IdleVecCD0036 $CD:0036, $CF:FD9E through
+;        Battle_PoseStep, and more cross-bank JSLs through the menu code),
+;        4 (BattleSys_PumpFrames,
 ;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
 ;        6 (BattleCF_UnkFE20), 8 (BattleSys_FrameTickVec,
 ;        BattleSys_PumpFrames and the $CD/$CF JSLs of
@@ -27544,7 +27547,10 @@ BattleAi_AddStatByteAtY:
 ; below): BattleAi_EnemyTurn sets !Battle_UnkB252 = !Battle_UnkAEC8 and
 ; !Battle_UnkB18B = that + 3 ($C1:8D01-$8D07). In BattleSys_Unk8461's reaction tests they differ:
 ; !Battle_UnkB252 is the reacting enemy, while !Battle_UnkB18B still
-; holds the battler that last acted (!Battle_UnkB3B7), or, once an
+; holds !Battle_UnkB3B7, which BattleSys_Unk8461 copies from it at
+; $C1:8637 after the BattleSys_UnkB223 call at $C1:8626 (so the battler
+; that last acted, or a KO'd PC's slot left by that call's
+; BattleSys_UpdateKo, as below), or, once an
 ; earlier reaction in the same pass has run BattleAi_EnemyTurn, that
 ; enemy's slot, or a PC's slot: after each reaction's
 ; BattleAi_EnemyTurn the loop runs BattleSys_UnkB223 (JSR at $C1:8787),
