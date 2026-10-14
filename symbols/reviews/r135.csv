@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$FF:F9BB,BankFF_CharBits,2026-10-09,rev135a,approved,71a65b64ea9e,"ROM search: exactly 9 BB F9 FF long refs (BF/3F), all at named sites/routines; C2 ones unmatched, instr-aligned. Entry 8 iff bit 0 set (search n=8 down). Data=$80>>n,0."
