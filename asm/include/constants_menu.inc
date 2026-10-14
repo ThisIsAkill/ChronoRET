@@ -754,7 +754,7 @@ if !constants_menu_inc == 0
 !Menu_ThNewWait1 = $0101                 ; .State = Menu_ThStNew with .Wait = 1, as one word
 !Menu_ThWait1 = $0102                    ; .State = Menu_ThStWaiting with .Wait = 1
 !Menu_MainThreadSlot = $0008             ; slot 1 (byte offset): Menu_MainThread
-!Menu_Thread3Slot = $0018                ; slot 3: Menu_UnkE91B
+!Menu_Thread3Slot = $0018                ; slot 3: Menu_MainCursorThread
 !Menu_Unk58Init = $3020                  ; Menu_Unk58's value before thread 3 starts
 !Menu_FadeInSlot = $0000                 ; slot 0: Menu_FadeInThread
 !Menu_AllThreads = $FF                   ; Menu_KillThreads mask: every slot
@@ -813,5 +813,218 @@ if !constants_menu_inc == 0
 !Menu_ArrowGap = $08                     ; the down arrow's Y below the up arrow's
 !Menu_ArrowUpTile = $3022                ; tile $22, attributes $30
 !Menu_ArrowDownTile = $B022              ; tile $22, attributes $B0 (vertical flip)
+
+; --- Menu NMI upload and commands ($C2:85D6-$C2:8662, $C2:8C36-$C2:8E2C) ---
+!Menu_NmiMoveReq = $80                   ; Menu_HdmaenShadow bit 7: Menu_NmiUpload runs the queued move
+!Menu_WinRegBytes = $10                  ; bytes of Menu_WinRegShadow
+!Menu_MoveCodeMvn = $7E54                ; MVN opcode $54, destination bank $7E
+!Menu_MoveCodeRtl = $6B7E                ; source bank $7E, RTL ($6B)
+!Menu_BonusHalfId = $A1                  ; Menu_CharRec.Unk2A values: Menu_RecRefillWord3 adds half ...
+!Menu_BonusQuarterId = $A0               ; ... or a quarter of .Word5
+!Menu_StatMax = 999                      ; cap of Menu_RecRefillWord3
+!Menu_SramUnk7FE2Set = $FF               ; Menu_CmdSetSram7FE2's value
+!Menu_SaveSlots = 3                      ; slots Menu_CmdBootCheckSaves tries
+!Menu_DataNew = 0                        ; Menu_DataInitDone after Menu_CmdBootCheckSaves: no slot passed
+!Menu_DataFromSave = 2                   ; ... one passed
+!Menu_EquipKeepChar = 5                  ; record whose category-0 byte Menu_CmdEquip's id-0 path keeps
+!Menu_EquipSlots = 4                     ; equipment bytes per record (categories 0-3)
+
+; --- Menu setup: tiles, graphics, OAM, item tables ($C2:960B-$C2:99C9, $C2:C511, $C2:ED08) ---
+!MenuRom_BankFF = $FF0000                ; bank $FF base for LDA.l this,X with X a bank-$FF address
+!Menu_Tile2bppBytes = $0010              ; bytes in one 2bpp 8x8 tile (= planes 0-1 of a 4bpp tile)
+!Menu_TileRows = 8                       ; rows of an 8x8 tile
+!Menu_TilePlane0 = $0000                 ; offsets in a 4bpp tile of row 0's plane 0, 1, 2 and 3 bytes
+!Menu_TilePlane1 = $0001
+!Menu_TilePlane2 = $0010
+!Menu_TilePlane3 = $0011
+!Menu_ColorBytes = 2                     ; bytes per CGRAM colour
+!MenuRom_Font2bpp = $FF8E60              ; $E00 B of 2bpp tiles (Menu_LoadGraphics step 1)
+!Menu_Font2bppBytes = $0E00
+!MenuRom_Font2bppB = $FFC9FC             ; $100 B (16 tiles) laid over its tiles $10-$1F
+!Menu_Font2bppBBytes = $0100
+!Menu_Font2bppBTile = $10
+!Menu_FontFirstTile = $10                ; first tile the 2bpp-to-4bpp loop copies (2bpp tile $10 of
+                                         ; Menu_Bg3TileBuf to 4bpp tile $10 of Menu_TileBuf)
+!Menu_FontTiles = $00F0                  ; tiles it copies
+!Menu_FontTile2F = $2F                   ; Menu_TileBuf tiles given plane 2 = 0 OR 1: $2F and $D4-$DD
+!Menu_FontTileD4 = $D4
+!Menu_FontTileDE = $DE
+!MenuRom_Tiles4bpp = $FFD5E4             ; $600 B of 4bpp tiles (step 2)
+!Menu_Tiles4bppBytes = $0600
+!MenuRom_Tiles3bpp = $FFDBE4             ; $95 3bpp tiles expanded after them
+!Menu_Tiles3bppCount = $0095
+!Menu_Tiles3bppOr3 = $0008               ; of those, the first 8 get plane 3 = OR
+!Menu_TilesBBytes = $12A0                ; bytes moved to Menu_TileBuf ($95 tiles: the $30 4bpp ones, then the first $65 expanded)
+!MenuRom_WindowGfx = $FF9E10             ; 8 window styles of $280 B (20 4bpp tiles each)
+!Menu_WindowGfxBytes = $1400
+!Menu_WinStyleBytes = $0280
+!Menu_WinExtraTile = $88                 ; Menu_Bg3TileBuf tile copied after the window styles ...
+!Menu_WinExtraTiles = 13                 ; ... and how many
+!Menu_WinTilesOr3 = $00A4                ; tiles given plane 3 = OR in step 3
+!MenuRom_PalA = $FF9C68                  ; 4 colours, loaded to colours 0-3 and 4-7
+!MenuRom_PalB = $FF9C78                  ; 4 colours -> 16-19
+!MenuRom_PalC = $FFCBBC                  ; 4 colours -> 20-23
+!MenuRom_PalD = $FFCBC4                  ; 16 colours -> $70-$7F
+!MenuRom_ObjPal = $FF9DF0                ; 16 colours -> $80-$8F (the first sprite palette)
+!MenuRom_ObjTiles = $FF9CF0              ; 4 pieces of 64 B laid over sprite tiles $20, $30, $22, $32
+!Menu_ObjPieceBytes = $0040
+!Menu_ObjClearBytes = $1000              ; Menu_TileBuf bytes cleared before the sprite tiles
+!Menu_ObjExtraTile = $70                 ; first of 24 Menu_Bg3TileBuf tiles in a row: $70-$7B to tile 4, $7C-$87 to tile $14
+!Menu_ObjExtraTiles = 12
+!Menu_ObjCopyBytes = $0400               ; Menu_TileBuf tiles 0-$1F copied to tile $20
+!Menu_TileBufBytes = $4000               ; Menu_TileBuf bytes cleared at the end
+!Menu_Unk0D47Init = $0010
+!Menu_WinStyleMask = $07                 ; Menu_Config01 bits 0-2: the window style
+!Menu_WinVramDest = $3DC0                ; VRAM word address of the window-style tiles
+!MenuRom_WindowPals = $FFB210            ; 16 B (8 colours) per window style
+!Menu_WinPalRowMask = $001C              ; Menu_Unk0D47 high-byte bits picking the palette row
+!Menu_OamHidden = $E000                  ; OAM entry X 0, Y $E0: off the screen
+!Menu_OamHighInit = $AAAA                ; OAM high-table bytes: every sprite large, X bit 8 clear
+!Oam_LowTableBytes = $0200               ; bytes of Oam_LowTable
+!Oam_HighTableBytes = $0020              ; bytes of Oam_HighTable
+!MenuRom_ItemRec0 = $CC0000              ; bytes 0-4 of an item record (X = Menu_ItemDataPtr or
+!MenuRom_ItemRec1 = $CC0001              ; Menu_ItemDataPtrB, an address in bank $CC)
+!MenuRom_ItemRec2 = $CC0002
+!MenuRom_ItemRec3 = $CC0003
+!MenuRom_ItemRec4 = $CC0004
+!Menu_ItemInfo0Mask = $1E                ; record A byte 0 bits kept in Menu_ItemInfo0
+!Menu_ItemInfo0Bit1 = $02                ; the Menu_ItemInfo0 bit cleared for item Menu_ItemIdC8
+!Menu_ItemIdC8 = $C8
+!Menu_ItemRecB1Bit6 = $40                ; record B byte 1 bit 6: byte 2 goes to Menu_ItemInfo4 (category 3)
+!Menu_ItemCat4First = $BC                ; first id of item category 4 (Menu_ItemCategoryBounds)
+!Menu_ItemNameFirst = $0B5E              ; first word of Menu_ItemNamePtrs ...
+!Menu_ItemNameBytes = $000B              ; ... and the step
+!Menu_Flag7F00BABit0 = $0001             ; Menu_Flag7F00BA bits Menu_BuildItemTables tests
+!Menu_Flag7F00BABit1 = $0002
+
+; --- Menu settings, weapon records, save slots, text ---
+!Menu_CfgBytes = $0C                     ; bytes Menu_UnpackConfig zeroes ($0D86-$0D91)
+!Menu_Cfg3BitMask = $07
+!Menu_Cfg2BitMask = $03
+!MenuRom_WeaponUnkIdx = $CD6CEC          ; a byte per weapon id: its 6-byte record in bank $D1
+!Menu_Unk21BASrc = $4B00                 ; bank-$D1 address of record 0
+!Menu_Unk21BABytes = 6
+!Menu_SramBankByte = $30                 ; SRAM bank (MVN source)
+!Menu_SramRecordsOfs = $0200             ; a slot's character records
+!Menu_SramUnk05B0Ofs = $05B0             ; 6 B per character id
+!Menu_SramUnk05B0Bytes = 6
+!Menu_SramUnk05E0Ofs = $05E0             ; 10 B copied to summary +$34
+!Menu_SramUnk05E0Bytes = 10
+!Menu_SramUnk05F3Mask = $01FF
+!Menu_SramUnk0793Bit7 = $0080
+!Menu_SumEmpty = $FF                     ; summary entry byte 0: empty place
+!Menu_SumRecBytes = 9                    ; record bytes copied per entry
+!Menu_SumEntryBytes = $10
+!Menu_SumEntryMask = $F0
+!Menu_SumEntryUnk04 = $0004              ; entry offsets of the bytes Menu_ReadSlotSummary writes by hand
+!Menu_SumEntryUnk0F = $000F
+!Menu_Unk0D4CInit = $FF
+!Menu_StrEmptySlot = $1A                 ; MenuRom_SlotStrings string of an empty slot (after the 26
+!Menu_SlotLocCount = $1A                 ; strings MenuRom_SlotLocBounds picks from)
+!MenuRom_SlotStrings = $FFD03E           ; string table (TextWin_StrTable) of the slot texts
+!MenuRom_SlotLabelStrings = $FFD3FE      ; string table of the slot labels
+!Menu_StrSlotLabel0 = $0E                ; its string of slot 0 (slot n: $0E + n)
+!Menu_SlotIdxHiMask = $0300              ; Menu_SlotIdx in the high byte of a word load
+!Menu_SlotTextBytes = $0200
+!Menu_SlotLabelBytes = $20
+!Menu_SlotLabelAreaBytes = $0200
+!Menu_LabelTileA = $0000                 ; Menu_ShiftLabelRight: left and right tile of the upper row ...
+!Menu_LabelTileB = $0010
+!Menu_LabelTileC = $0100                 ; ... and of the row below
+!Menu_LabelTileD = $0110
+!Menu_TextWinMode = $80                  ; TextWin_Mode of Menu_DrawText (bit 7: pen X from 0; 2bpp)
+!Menu_TextStepCount = $20                ; TextWin_StepCount per TextWin_Step
+!Menu_TextLineBreak = 5                  ; TextWin_Status at which Menu_DrawText moves on $400 bytes
+
+; --- Menu main cursor (thread 3) ---
+!Menu_OamHideFirst = $0740               ; OAM copy entry 16: Menu_DrawMainCursor hides entries 16-95 ...
+!Menu_OamHideBytes = $0140
+!Menu_OamHighHideFirst = $0904           ; ... and their high-table bytes
+!Menu_OamHighHideBytes = $0014
+!Menu_OamMainCursor = $0770              ; OAM copy entry 28: the main cursor
+!Menu_OamFlipH = $40                     ; OAM attribute bit 6: horizontal flip
+!Menu_Unk0D9BAll = $FF                   ; TRB mask clearing Menu_Unk0D9B
+
+; --- Menu sprite objects ---
+!Menu_SprPageBytes = $0040
+!Menu_SprOff = $FF                       ; .Id of an unused object
+!Menu_SprNoFrame = $FF                   ; .PrevAnim / .LastFrame after Menu_SprLoad
+!Menu_SprDefBytes = 5                    ; bytes of a definition (kind-2 records are twice that)
+!Menu_SprKindLong = 2                    ; first .Kind with 10-byte records
+!Menu_SprDefSizeMask = $03               ; definition byte 4 bits 0-1: .TileCount (Menu_SprTileCounts)
+!Menu_SprDefKeepBit4 = $EF               ; TRB mask: byte 4 keeps only bit 4 (the second palette set)
+!Menu_SprNoDef = $FF                     ; definition byte 0: nothing to load
+!MenuRom_E4GfxPtrs = $E4FFE0             ; words in bank $E4 (= RomE4_PtrInit + 0, 2, 4, 6, 8): the
+!MenuRom_E4FramePtrs = $E4FFE2           ; addresses of its tables of graphics pointers (3 B each),
+!MenuRom_E4AnimFrames = $E4FFE4          ; frame-record pointers (3 B), animation frame lists and
+!MenuRom_E4AnimTimes = $E4FFE6           ; time lists (words) and palettes (words)
+!MenuRom_E4Palettes = $E4FFE8
+!Menu_SprPalAltOfs = $0200               ; palette offset with definition byte 4 bit 4
+!Menu_SprAttrPalMask = $0E00             ; .TileAttr palette bits
+!Menu_SprAttrTileMask = $01FF            ; .TileAttr tile bits
+!Menu_SprPageNumMask = $03C0             ; DP bits giving the object number (x $40)
+!Menu_SprNoDraw = $40                    ; .Flags18 of Menu_SprResetChars
+!Menu_SprSlot = $0028                    ; thread slot 5: Menu_SprThread
+!Menu_SprAnimMask = $007F
+!Menu_OpRtl = $6B                        ; RTL opcode (the end of Menu_NmiMoveCode)
+!Menu_SprTileCountHi = $0F00             ; .TileCount in the high byte of a word load of .Kind
+!Menu_SprTileNumMask = $07FF             ; tile list word: the tile number; bit 14: mirrored
+!Menu_SprVramBase = $4000                ; VRAM word address of sprite tile 0
+!Menu_SprUnitWords = $80                 ; VRAM words of 8 tiles
+!Menu_SprRowEvenMask = $FE
+
+; --- Menu mode 0 ---
+!Menu_SubThreads = $74                   ; Menu_KillThreads mask: slots 2, 4, 5, 6
+!MenuRom_MainConfirmList = $FFBD51       ; Menu_UnkED31 lists of the main menu
+!MenuRom_MainIconList = $FFBD2E
+!MenuRom_MainIconOam = $FFBD5C           ; 6 OAM entries: the icons
+!MenuRom_MainPalA = $FFCC14              ; 8 colours -> $80-$87
+!MenuRom_MainPalB = $FFCC24              ; 8 colours per icon -> $88-$8F
+!MenuRom_MainPalC = $FF9E0A              ; 3 colours -> $FD-$FF
+!Menu_MainHdmaBits = $83                 ; Menu_HdmaenShadow bits: HDMA 0, 1 and Menu_NmiMoveReq
+!Menu_MainMoveBytes = $001E
+!Menu_MainIconLit = $20                  ; tile offset of the selected icon
+!Menu_ArrowBelowOfs = $1001              ; X + 1, Y + 16 (one word)
+!Menu_ArrowAboveOfs = $2000              ; Y - 32 from there
+!Menu_ArrowTileAttr = $3E22              ; tile $22, attributes $3E
+!Menu_ArrowTileAttrFlip = $BE22          ; the same flipped vertically
+!Menu_MapRowBytes = $0040                ; bytes of a 32-tile tilemap row
+!Menu_MainFrameInner = $001C             ; bytes the frame rows' MVNs fill + 3
+!Menu_Bg2Rest = $0780
+!Menu_FrameLastCol = $001E              ; byte offset of the frame's right column (tile 15)
+!Menu_FrameTopLeft = $3FA4               ; frame tiles of Menu_MainMenuMaps
+!Menu_FrameTop = $3FA5
+!Menu_FrameTopRight = $3FA6
+!Menu_FrameLeft = $3FA7
+!Menu_FrameRight = $3FA8
+!Menu_FrameBottomLeft = $3FA9
+!Menu_FrameBottom = $3FAA
+!Menu_FrameBottomRight = $3FAB
+!Menu_FrameFill = $3FAC
+!Menu_Bg2Tile0 = $1FA0                  ; first of the 2 x 2 BG2 pattern tiles
+
+; --- Menu character stats ---
+!Menu_DoubleStat5Item = $A8              ; accessory with which Menu_CharRecalc doubles stat 5
+!Menu_StatCalcBytes = 9                  ; bytes zeroed: Menu_StatBoosts, Menu_WeaponPower, Menu_ArmorSum
+!Menu_StatCount = 7
+!Menu_CurDerivedBytes = 11              ; Menu_CurStats to Menu_CurMaxHp ($9B1C-$9B26)
+!MenuRom_StatOrder = $FFCF2C             ; 7 B: stat numbers in the order the loops visit them
+!MenuRom_StatCaps = $FFCF33              ; 7 B: the cap of each (by visit order)
+!MenuRom_ItemBoosts = $CC29D7            ; words by Menu_ItemInfo4: stat bits (low byte), amount (high)
+!MenuRom_Char5Attack = $CC2D69           ; words by record byte $12 (Menu_AttackFormulaC)
+!Menu_CharIdMask = $07                   ; record byte 0 bits picking the attack formula
+!Menu_ByteMax = $FF                      ; cap of the 8-bit results
+!Menu_AtkWeaponMulA = 5                  ; Menu_AttackFormulaA: 5 x power + 12 x stat 0, / 9
+!Menu_AtkStatMulA = 12
+!Menu_AtkDivisorA = 9
+!Menu_AtkDivisorB = 3                    ; Menu_AttackFormulaB: 2 x (stat 4 + power) / 3
+!Menu_AtkStatMulC = 16                   ; Menu_AttackFormulaC: 16 x stat 0 + table, / 9
+!Menu_AtkDivisorC = 9
+!Menu_BoostFlagsMask = $FFFE
+
+; --- List paging ---
+!Menu_PadPageBits = $03                  ; Menu_PadAction bits 0-1: page on / back (set by Menu_UnkE984)
+!Menu_PadPageBack = $02
+!Menu_Unk81Set = $FF
 
 endif
