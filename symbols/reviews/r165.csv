@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:FE0C,BankC2_OldBuildLeftovers,2026-10-09,rev165a,approved,99d460e27134,"Fix OK: +$DF copy from GainGold, 2 CapGold JSRs. 4 copies byte-exact, +$4E/$7E/$DF; xref sweep 5 JSLs; tail decode/repeats OK. nit: 6-byte runs of tail ($FF0D) do occur in code"
