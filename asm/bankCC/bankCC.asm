@@ -229,7 +229,7 @@ Battle_InitUploadStep:
     STA.l DAS7H
     TDC
     STA.l VMADDL
-    LDA.b #!Battle_InitWindowMapVram>>8
+    LDA.b #!Battle_WindowMapVram>>8
     STA.l VMADDH
     LDA.b #!MDMAEN_Ch7
     STA.l MDMAEN
@@ -353,7 +353,7 @@ Battle_InitUploadObjTilesDead:
 ;   - the config bytes (!Battle_Config0-2) into the battle's copies;
 ;   - PC defaults (screen offsets, box size, move speed and delay), the
 ;     attribute bytes from !Battle_ActAttrBits, and three OAM helper tables
-;     (!Battle_OamHiXBit, !Battle_OamHiXClear, !Battle_OamHiByteIdx);
+;     (!Battle_OamHighXBit, !Battle_OamHighXClear, !Battle_OamHighIdx);
 ;   - !Battle_CellMap: a frame of blocked cells from ROM, ORed with bit 7
 ;     of the field's tile attributes under each cell;
 ;   - clears the tech-text, tech-window and status-bar map buffers, copies
@@ -419,7 +419,7 @@ Battle_InitScene:
     STA.w !Battle_CmdQueue+3
     STA.w !Battle_Unk95D2
     STA.w !BattleMenu_ItemScrollDrawn
-    STA.w !Battle_UnkA4EF
+    STA.w !Battle_CursorGlowStep
     STA.w !BattleMenu_Roster
     STA.w !BattleMenu_Roster+1
     STA.w !BattleMenu_Roster+2
@@ -542,15 +542,15 @@ Battle_InitScene:
     TAX
 .pattern_byte:
     LDA.l !BattleRom_Unk8E2DPattern,X
-    STA.w !Battle_OamHiXBit,Y
-    STA.w !Battle_OamHiXBit+1,Y
-    STA.w !Battle_OamHiXBit+2,Y
-    STA.w !Battle_OamHiXBit+3,Y
+    STA.w !Battle_OamHighXBit,Y
+    STA.w !Battle_OamHighXBit+1,Y
+    STA.w !Battle_OamHighXBit+2,Y
+    STA.w !Battle_OamHighXBit+3,Y
     LDA.l !BattleRom_Unk8C2DPattern,X
-    STA.w !Battle_OamHiXClear,Y
-    STA.w !Battle_OamHiXClear+1,Y
-    STA.w !Battle_OamHiXClear+2,Y
-    STA.w !Battle_OamHiXClear+3,Y
+    STA.w !Battle_OamHighXClear,Y
+    STA.w !Battle_OamHighXClear+1,Y
+    STA.w !Battle_OamHighXClear+2,Y
+    STA.w !Battle_OamHighXClear+3,Y
     INY
     INY
     INY
@@ -566,7 +566,7 @@ Battle_InitScene:
     STA.w !Battler_UnkA5C2,X
     DEX
     BPL .fill_a5c2
-    ; !Battle_OamHiByteIdx: entry n = n / 16.
+    ; !Battle_OamHighIdx: entry n = n / 16.
     TDC
     TAX
 .div16_entry:
@@ -577,7 +577,7 @@ Battle_InitScene:
     LSR A
     LSR A
     SEP #$20
-    STA.w !Battle_OamHiByteIdx,X
+    STA.w !Battle_OamHighIdx,X
     INX
     CPX.w #!Battle_OamTableBytes
     BNE .div16_entry
@@ -1277,8 +1277,8 @@ Battle_InitScene:
     CLC
     ADC.w Battler_StartRec.SubY,X
     STA.w !Battler_ScreenY,Y
-    LDA.b #!Battler_Unk1D7FPc
-    STA.w !Battler_Unk1D7F,Y
+    LDA.b #!Battler_SprBytesPc
+    STA.w !Battler_SprBytes,Y
     LDA.w Battler_StartRec.Frame,X
     STA.w !Battler_StartFrame,Y
     TDC
@@ -1418,8 +1418,8 @@ Battle_InitScene:
     STA.w !Battler_FrameLayout,Y
     PHX
     TAX
-    LDA.l !BattleRom_LayoutUnk1D7F,X
-    STA.w !Battler_Unk1D7F,Y
+    LDA.l !BattleRom_LayoutSprBytes,X
+    STA.w !Battler_SprBytes,Y
     PLX
     LDA.w FieldBtlObj.TileX,X
     ASL A
@@ -1554,9 +1554,9 @@ Battle_InitScene:
     LDA.w !Enemy_SprFlags,Y
     AND.b #!Enemy_SprFlag08
     BEQ .not_flag8
-    INC.w !Battle_UnkAA63
+    INC.w !Battle_EnemyPartsOn
     LDA.b !BattleTmp_80
-    STA.w !Battle_UnkA002
+    STA.w !Battle_PartsAnchor
 .not_flag8:
     LDA.w !Enemy_SprFlags,Y
     AND.b #!Enemy_SprFlag20
@@ -1635,9 +1635,9 @@ Battle_InitScene:
     JMP .enemy_slot
     ; With an !Enemy_SprFlag08 enemy, every enemy's offset from the last such one.
 .enemies_done:
-    LDA.w !Battle_UnkAA63
+    LDA.w !Battle_EnemyPartsOn
     BEQ .kind_list
-    LDA.w !Battle_UnkA002
+    LDA.w !Battle_PartsAnchor
     TAX
     LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
     STA.b !BattleTmp_80
@@ -1651,11 +1651,11 @@ Battle_InitScene:
     SEC
     LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
     SBC.b !BattleTmp_80
-    STA.w !Enemy_UnkAA64,X
+    STA.w !Enemy_PartOfsX,X
     SEC
     LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
     SBC.b !BattleTmp_81
-    STA.w !Enemy_UnkAA6C,X
+    STA.w !Enemy_PartOfsY,X
 .next_enemy_offset:
     INX
     CPX.w #!Battle_NumEnemies
@@ -1839,7 +1839,7 @@ Battle_InitScene:
 ;   - OAM sprites 0-3 (the target cursors' entries): at 0,0, tile 0,
 ;     !BattleOam_CursorAttr, high-table byte $FF;
 ;   - !Battle_HitNumColoursA/B and six colours from bank $D1;
-;   - the six !Battler_UnkA654... words of each battler present: two fixed
+;   - the six !Battler_FrameDmaSrcA... words of each battler present: two fixed
 ;     sets for frame layout 2 (one for slot 3, one for the others), else
 ;     from ROM by slot and layout;
 ;   - !Battle_Unk9F34 counted up when a PC's BattlerStats.Unk57 is $A4 or
@@ -2081,7 +2081,7 @@ Battle_InitSceneGfx:
     INX
     CPX.w #$0006
     BNE .colours_38fa
-    ; The six !Battler_UnkA654... words of each battler present (Y = slot * 2).
+    ; The six !Battler_FrameDmaSrcA... words of each battler present (Y = slot * 2).
     TDC
     TAX
     STX.b !BattleTmp_80
@@ -2102,86 +2102,86 @@ Battle_InitSceneGfx:
     TYX
     CPY.w #$0006
     BNE .layout2_other
-    LDA.b #!Battler_UnkA680Slot3&$FF
-    STA.w !Battler_UnkA680,Y
-    LDA.b #!Battler_UnkA680Slot3>>8
-    STA.w !Battler_UnkA680+1,Y
-    LDA.b #!Battler_UnkA696Slot3&$FF
-    STA.w !Battler_UnkA696,Y
-    LDA.b #!Battler_UnkA696Slot3>>8
-    STA.w !Battler_UnkA696+1,Y
-    LDA.b #!Battler_UnkA6ACSlot3&$FF
-    STA.w !Battler_UnkA6AC,Y
-    LDA.b #!Battler_UnkA6ACSlot3>>8
-    STA.w !Battler_UnkA6AC+1,Y
-    LDA.b #!Battler_UnkA6C2Slot3&$FF
-    STA.w !Battler_UnkA6C2,Y
-    LDA.b #!Battler_UnkA6C2Slot3>>8
-    STA.w !Battler_UnkA6C2+1,Y
-    LDA.b #!Battler_UnkA654Slot3&$FF
-    STA.w !Battler_UnkA654,Y
-    LDA.b #!Battler_UnkA654Slot3>>8
-    STA.w !Battler_UnkA654+1,Y
-    LDA.b #!Battler_UnkA66ASlot3&$FF
-    STA.w !Battler_UnkA66A,Y
-    LDA.b #!Battler_UnkA66ASlot3>>8
-    STA.w !Battler_UnkA66A+1,Y
+    LDA.b #!Battler_FrameDmaVramASlot3&$FF
+    STA.w !Battler_FrameDmaVramA,Y
+    LDA.b #!Battler_FrameDmaVramASlot3>>8
+    STA.w !Battler_FrameDmaVramA+1,Y
+    LDA.b #!Battler_FrameDmaVramBSlot3&$FF
+    STA.w !Battler_FrameDmaVramB,Y
+    LDA.b #!Battler_FrameDmaVramBSlot3>>8
+    STA.w !Battler_FrameDmaVramB+1,Y
+    LDA.b #!Battler_FrameDmaSizeASlot3&$FF
+    STA.w !Battler_FrameDmaSizeA,Y
+    LDA.b #!Battler_FrameDmaSizeASlot3>>8
+    STA.w !Battler_FrameDmaSizeA+1,Y
+    LDA.b #!Battler_FrameDmaSizeBSlot3&$FF
+    STA.w !Battler_FrameDmaSizeB,Y
+    LDA.b #!Battler_FrameDmaSizeBSlot3>>8
+    STA.w !Battler_FrameDmaSizeB+1,Y
+    LDA.b #!Battler_FrameDmaSrcASlot3&$FF
+    STA.w !Battler_FrameDmaSrcA,Y
+    LDA.b #!Battler_FrameDmaSrcASlot3>>8
+    STA.w !Battler_FrameDmaSrcA+1,Y
+    LDA.b #!Battler_FrameDmaSrcBSlot3&$FF
+    STA.w !Battler_FrameDmaSrcB,Y
+    LDA.b #!Battler_FrameDmaSrcBSlot3>>8
+    STA.w !Battler_FrameDmaSrcB+1,Y
     BRA .layout2_done
 .layout2_other:
-    LDA.b #!Battler_UnkA680Other&$FF
-    STA.w !Battler_UnkA680,Y
-    LDA.b #!Battler_UnkA680Other>>8
-    STA.w !Battler_UnkA680+1,Y
-    LDA.b #!Battler_UnkA696Other&$FF
-    STA.w !Battler_UnkA696,Y
-    LDA.b #!Battler_UnkA696Other>>8
-    STA.w !Battler_UnkA696+1,Y
-    LDA.b #!Battler_UnkA6ACOther&$FF
-    STA.w !Battler_UnkA6AC,Y
-    LDA.b #!Battler_UnkA6ACOther>>8
-    STA.w !Battler_UnkA6AC+1,Y
-    LDA.b #!Battler_UnkA6C2Other&$FF
-    STA.w !Battler_UnkA6C2,Y
-    LDA.b #!Battler_UnkA6C2Other>>8
-    STA.w !Battler_UnkA6C2+1,Y
-    LDA.b #!Battler_UnkA654Other&$FF
-    STA.w !Battler_UnkA654,Y
-    LDA.b #!Battler_UnkA654Other>>8
-    STA.w !Battler_UnkA654+1,Y
-    LDA.b #!Battler_UnkA66AOther&$FF
-    STA.w !Battler_UnkA66A,Y
-    LDA.b #!Battler_UnkA66AOther>>8
-    STA.w !Battler_UnkA66A+1,Y
+    LDA.b #!Battler_FrameDmaVramAOther&$FF
+    STA.w !Battler_FrameDmaVramA,Y
+    LDA.b #!Battler_FrameDmaVramAOther>>8
+    STA.w !Battler_FrameDmaVramA+1,Y
+    LDA.b #!Battler_FrameDmaVramBOther&$FF
+    STA.w !Battler_FrameDmaVramB,Y
+    LDA.b #!Battler_FrameDmaVramBOther>>8
+    STA.w !Battler_FrameDmaVramB+1,Y
+    LDA.b #!Battler_FrameDmaSizeAOther&$FF
+    STA.w !Battler_FrameDmaSizeA,Y
+    LDA.b #!Battler_FrameDmaSizeAOther>>8
+    STA.w !Battler_FrameDmaSizeA+1,Y
+    LDA.b #!Battler_FrameDmaSizeBOther&$FF
+    STA.w !Battler_FrameDmaSizeB,Y
+    LDA.b #!Battler_FrameDmaSizeBOther>>8
+    STA.w !Battler_FrameDmaSizeB+1,Y
+    LDA.b #!Battler_FrameDmaSrcAOther&$FF
+    STA.w !Battler_FrameDmaSrcA,Y
+    LDA.b #!Battler_FrameDmaSrcAOther>>8
+    STA.w !Battler_FrameDmaSrcA+1,Y
+    LDA.b #!Battler_FrameDmaSrcBOther&$FF
+    STA.w !Battler_FrameDmaSrcB,Y
+    LDA.b #!Battler_FrameDmaSrcBOther>>8
+    STA.w !Battler_FrameDmaSrcB+1,Y
 .layout2_done:
     BRA .next_battler_vram
 .layout_table:
     ASL A
     TAX
-    LDA.l !BattleRom_UnkA6AC,X
-    STA.w !Battler_UnkA6AC,Y
-    LDA.l !BattleRom_UnkA6AC+1,X
-    STA.w !Battler_UnkA6AC+1,Y
-    LDA.l !BattleRom_UnkA6C2,X
-    STA.w !Battler_UnkA6C2,Y
-    LDA.l !BattleRom_UnkA6C2+1,X
-    STA.w !Battler_UnkA6C2+1,Y
+    LDA.l !BattleRom_FrameDmaSizeA,X
+    STA.w !Battler_FrameDmaSizeA,Y
+    LDA.l !BattleRom_FrameDmaSizeA+1,X
+    STA.w !Battler_FrameDmaSizeA+1,Y
+    LDA.l !BattleRom_FrameDmaSizeB,X
+    STA.w !Battler_FrameDmaSizeB,Y
+    LDA.l !BattleRom_FrameDmaSizeB+1,X
+    STA.w !Battler_FrameDmaSizeB+1,Y
     TYX
-    LDA.l !BattleRom_UnkA680,X
-    STA.w !Battler_UnkA680,Y
-    LDA.l !BattleRom_UnkA680+1,X
-    STA.w !Battler_UnkA680+1,Y
-    LDA.l !BattleRom_UnkA696,X
-    STA.w !Battler_UnkA696,Y
-    LDA.l !BattleRom_UnkA696+1,X
-    STA.w !Battler_UnkA696+1,Y
-    LDA.l !BattleRom_UnkA654,X
-    STA.w !Battler_UnkA654,Y
-    LDA.l !BattleRom_UnkA654+1,X
-    STA.w !Battler_UnkA654+1,Y
-    LDA.l !BattleRom_UnkA66A,X
-    STA.w !Battler_UnkA66A,Y
-    LDA.l !BattleRom_UnkA66A+1,X
-    STA.w !Battler_UnkA66A+1,Y
+    LDA.l !BattleRom_FrameDmaVramA,X
+    STA.w !Battler_FrameDmaVramA,Y
+    LDA.l !BattleRom_FrameDmaVramA+1,X
+    STA.w !Battler_FrameDmaVramA+1,Y
+    LDA.l !BattleRom_FrameDmaVramB,X
+    STA.w !Battler_FrameDmaVramB,Y
+    LDA.l !BattleRom_FrameDmaVramB+1,X
+    STA.w !Battler_FrameDmaVramB+1,Y
+    LDA.l !BattleRom_FrameDmaSrcA,X
+    STA.w !Battler_FrameDmaSrcA,Y
+    LDA.l !BattleRom_FrameDmaSrcA+1,X
+    STA.w !Battler_FrameDmaSrcA+1,Y
+    LDA.l !BattleRom_FrameDmaSrcB,X
+    STA.w !Battler_FrameDmaSrcB,Y
+    LDA.l !BattleRom_FrameDmaSrcB+1,X
+    STA.w !Battler_FrameDmaSrcB+1,Y
 .next_battler_vram:
     INC.b !BattleTmp_80
     LDA.b !BattleTmp_80
@@ -2294,7 +2294,7 @@ BattleAct_ResetState:
     BPL .clear_pal_seqs
     STZ.w !Battle_ActCalcSel+4
     STZ.w !Battle_ActCalcSel+5
-    LDX.w #!Battle_ActObjLinkBytes-1
+    LDX.w #!Battle_ActLinkBytes-1
 .clear_links:
     STZ.w !Battle_ActObjLinks,X
     DEX
@@ -2312,7 +2312,7 @@ BattleAct_ResetState:
     DEX
     BPL .clear_history
     STZ.w !Battle_ActUnkA3D1
-    STZ.w !Battle_Unk9931
+    STZ.w !Battle_FrameCount8
     STZ.w !Battle_ActScriptDone
     STZ.w !Battle_ActAnimNextSlot
     STZ.w !Battle_ActFrameHold
@@ -2614,9 +2614,9 @@ BattleAct_TickUnkA1A8:
 ; !Battle_ActObjAnimCount * 4 past !Battle_ActObjAnimList). Its time byte
 ; reloads !Battle_ActObjAnimTimer, its offset bytes (sign-extended) go to
 ; !Battle_ActObjOfsX/Y, and its first byte's low bits to
-; !Battle_ActObjUnkA2C0. A record with a type (bits 5-7) ends the list:
+; !Battle_ActObjFrame. A record with a type (bits 5-7) ends the list:
 ; in mode !Battle_ActAnimLoop the entry goes back to $FF (start again),
-; else !Battle_ActUnkA1A8 is cleared and !Battle_ActObjUnkA2C0 gets bit 7.
+; else !Battle_ActUnkA1A8 is cleared and !Battle_ActObjFrame gets bit 7.
 ; When the entry wraps from $FF to 0 and !Battle_ActObjAnimStop is set,
 ; the thread is switched off as well.
 ; Quirk kept: the facing test at the start stores !Battle_ActObjFacing back
@@ -2713,7 +2713,7 @@ BattleAct_StepObjAnim:
     BEQ .loop_list
     TDC
     STA.w !Battle_ActUnkA1A8,Y
-    LDA.b #!Battle_ActObjUnkA2C0Stop
+    LDA.b #!Battle_ActObjFrameStop
     STA.b !BattleTmp_8E
     BRA .store_flags
 .loop_list:
@@ -2723,12 +2723,12 @@ BattleAct_StepObjAnim:
     LDA.l BattleRom_ActObjRec.Flags,X
     AND.b #!Battle_ActObjRecLowMask
     ORA.b !BattleTmp_8E
-    STA.w !Battle_ActObjUnkA2C0,Y
+    STA.w !Battle_ActObjFrame,Y
     LDA.b !BattleTmp_8F
     BEQ .done
-    LDA.w !Battle_ActObjUnkA2C0,Y
-    ORA.b #!Battle_ActObjUnkA2C0Bit5
-    STA.w !Battle_ActObjUnkA2C0,Y
+    LDA.w !Battle_ActObjFrame,Y
+    ORA.b #!Battle_ActObjFrameBit5
+    STA.w !Battle_ActObjFrame,Y
 .done:
     RTS
 

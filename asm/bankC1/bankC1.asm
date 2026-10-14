@@ -45,10 +45,12 @@ incsrc "../hardware.inc"
 ;   - $0003 BattleSys_RunServiceVec: JMP BattleSys_RunService; reached
 ;     by JSR inside bank $C1 (it returns with RTS, so not by JSL).
 ;   - $0006 BattleSys_ExitVec: JMP BankC1_ExitBattleJml ($001F), JML
-;     $CF:FBE5 (not analysed); BattleSys_Main JMPs here at its end.
-;   - $0009 BankC1_VecCFE300: JMP $0076, JML $CF:E300 (JSL from $CD:08B4).
-;   - $000C BankC1_VecCFE58A: JMP $007A, JML $CF:E58A (JSL from $CD:0997
-;     and $EF:523C).
+;     BattleCF_ExitBattle ($CF:FBE5), which ends the battle and returns
+;     to the field; BattleSys_Main JMPs here at its end.
+;   - $0009 BankC1_VecCFE300: JMP $0076, JML BattleCF_VblankUploads
+;     ($CF:E300; JSL from $CD:08B4).
+;   - $000C BankC1_VecCFE58A: JMP $007A, JML BattleCF_FrameUpdate
+;     ($CF:E58A; JSL from $CD:0997 and $EF:523C).
 ;   - $000F BankC1_VecCCE000: JMP $0072, JML Battle_InitUploadStep
 ;     ($CC:E000; JSL from $CD:0AB4).
 ;   - $0012 BankC1_VecRefreshMenu: JMP BattleMenu_RefreshIfDirtyL (which
@@ -90,7 +92,7 @@ BankC1_VecLongDispatch:                 ; header: see EngCall_BattleMain
 BankC1_EnterBattleJml:                  ; header: see EngCall_BattleMain
     JML BattleCF_EnterBattle
 BankC1_ExitBattleJml:                   ; header: see EngCall_BattleMain
-    JML BattleCF_UnkFBE5
+    JML BattleCF_ExitBattle
 
 ; $C1:0023 — BattleSys_SceneSetup (34 bytes, $0023–$0044)
 ; Service 0 (!BattleSys_ServiceUnk0), the first service BattleSys_Main
@@ -141,23 +143,27 @@ BattleSys_SceneSetup:
 ;        (0-9), B = 0 (the 16-bit TAX)
 ; Exit:  A, X, Y as on entry (8-bit A, 16-bit X and Y pulled back; this
 ;        holds only while the service returns with the same M and X).
-;        Checked only for services 2, 5 and 7, whose callees are all
-;        matched bank-$C1 code. The other seven reach code that is not
-;        analysed, so for them it is assumed: 0 (bank-$CC/$CD JSLs, see
-;        BattleSys_SceneSetup, and BattleFx_SetPtrA2FromTable $CF:FD9E
-;        through Battle_StartPose / Battle_PoseStep), 1 (Audio_ProcessEntry,
-;        $C7:0004),
+;        Checked only for services 1, 2, 5 and 7: the callees of 2, 5
+;        and 7 are all matched bank-$C1 code, and 1 calls only
+;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
+;        DB. The other six reach code that is not analysed, so for them
+;        it is assumed: 0 (the bank-$CD JSLs of BattleSys_SceneSetup; its
+;        bank-$CC steps are matched),
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
-;        BattleSys_IdleVecCD0036 $CD:0036, $CF:FD9E through
-;        BattleMenu_UpdateWindows and BattleMenu_ConfirmCommand, and more
-;        cross-bank JSLs through the menu code),
+;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
+;        through the menu code),
 ;        4 (BattleSys_PumpFrames,
 ;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
-;        6 (BattleCF_UnkFE20), 8 (BattleSys_FrameTickVec,
+;        6 (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies),
+;        8 (BattleSys_FrameTickVec,
 ;        BattleSys_PumpFrames and the $CD/$CF JSLs of
 ;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
-;        BattleSys_PumpFrames). B, P (N and Z from the PLA), DP, DB and
+;        BattleSys_PumpFrames). BattleFx_SetPtrA2FromTable ($CF:FD9E),
+;        which services 0 (through Battle_StartPose / Battle_PoseStep)
+;        and 3 (through BattleMenu_UpdateWindows and
+;        BattleMenu_ConfirmCommand) reach, is matched and returns M=1,
+;        X=0. B, P (N and Z from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
     PHA
@@ -212,22 +218,27 @@ BankC1_LongDispatchTable:
     dw BattleMsg_ReencodeTextBuffer
 
 ; $C1:006D — BattleSys_Service6 (5 bytes, $006D–$0071)
-; Service 6 (!BattleSys_ServiceUnk6): JSL BattleCF_UnkFE20 (not
-; analysed), RTS.
+; Service 6 (!BattleSys_ServiceUnk6): JSL BattleCF_RemoveMarkedEnemies
+; (the enemies marked in !Battle_UnkAEB3 leave, !Battler_Present
+; cleared, except one with !Battler_Unk9FF7 0, !Battler_ActAttr non-zero
+; and !Battle_FieldObjKind6Flag set in its Battle_FieldObj record, which
+; stays present; see there), RTS.
 ; Callers note: none by call; BattleSys_ServiceTable entry 6 (JSR (T,X)
 ;   in BattleSys_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the callers of service 6 run)
-; Exit:  as BattleCF_UnkFE20 leaves it (not analysed)
+; Exit:  as BattleCF_RemoveMarkedEnemies leaves it: M=1, X=0, DP=0,
+;        DB=$7E; A, Y clobbered; X = 2; DP $80 and $82-$83 written; and
+;        what BattleSys_VecCD0024 changes (not analysed)
 BattleSys_Service6:
-    JSL BattleCF_UnkFE20
+    JSL BattleCF_RemoveMarkedEnemies
     RTS
 
 ; $C1:0072 — BankC1_JmlCCE000 (12 bytes, $0072–$007D)
 ; The JMLs behind three of the entry vectors (see EngCall_BattleMain):
 ; $0072 to Battle_InitUploadStep ($CC:E000, BankC1_VecCCE000),
-; BankC1_JmlCFE300 ($0076) to $CF:E300 (BankC1_VecCFE300) and
-; BankC1_JmlCFE58A ($007A) to $CF:E58A (BankC1_VecCFE58A). The two
-; bank-$CF targets are not analysed.
+; BankC1_JmlCFE300 ($0076) to BattleCF_VblankUploads ($CF:E300,
+; BankC1_VecCFE300) and BankC1_JmlCFE58A ($007A) to BattleCF_FrameUpdate
+; ($CF:E58A, BankC1_VecCFE58A).
 ; Callers (1 JMP site): BankC1_VecCCE000 ($C1:000F).
 ; Callers of BankC1_JmlCFE300 (1 JMP site): BankC1_VecCFE300 ($C1:0009).
 ; Callers of BankC1_JmlCFE58A (1 JMP site): BankC1_VecCFE58A ($C1:000C).
@@ -237,9 +248,9 @@ BattleSys_Service6:
 BankC1_JmlCCE000:
     JML Battle_InitUploadStep
 BankC1_JmlCFE300:                       ; header: see BankC1_JmlCCE000
-    JML BattleCF_UnkE300
+    JML BattleCF_VblankUploads
 BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
-    JML BattleCF_UnkE58A
+    JML BattleCF_FrameUpdate
 
 ; ============================================================
 ; Frame Wait ($C1:007E–$C1:0088)
@@ -2508,8 +2519,8 @@ BattleMenu_BlankNameTailCells:
 ;   the same !BattleMenu_Dirty gate) and BattleSys_VictoryPose.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered, plus the DP scratch of
-;        whichever window routine ran (see their headers) and whatever
-;        BattleFx_SetPtrA2FromTable (not matched yet) changes
+;        whichever window routine ran (see their headers) and DP $A2
+;        (BattleFx_SetPtrA2FromTable)
 ; Callees: BattleFx_SetPtrA2FromTable, BattleMenu_UpdateMainWindow,
 ;          BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow
 org $C10C2D
@@ -2547,8 +2558,8 @@ BattleMenu_UpdateWindows_Exit:      ; shared exit — branched to from UpdateMai
 ; Exit:  M=1, X=0, DP=0, DB=$7E (through BattleMenu_Return); A, X, Y
 ;        clobbered, plus the callees' DP: BuildStatusBarFrame's or
 ;        UpdateNextPcPanel's (see their headers), $80/$81 from
-;        ClearActivePanelColumn, and whatever Battle_QueueVramUpload_0CC0
-;        (not matched yet) changes
+;        ClearActivePanelColumn, and the queued upload
+;        Battle_QueueVramUpload_0CC0 describes (!Battle_VramQPending set)
 ; Callees: BattleMenu_LoadCommandWindowMap, BattleUI_BuildStatusBarFrame,
 ;          BattleUI_UpdateNextPcPanel, BattleUI_ClearActivePanelColumn,
 ;          Battle_QueueVramUpload_0CC0
@@ -2853,8 +2864,9 @@ BattleMenu_UpdateTechWindow:
 ; Callers (1 JMP site): BattleMenu_UpdateTechWindow ($C1:0D84).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E (via BattleMenu_Return); A, X, Y and DP $80
-;        clobbered, plus whatever the two JSL targets (not matched yet)
-;        change
+;        clobbered, plus whatever BattleMsg_ShowFromTableCC3A09Vec (not
+;        matched yet) changes and the queued upload
+;        Battle_QueueVramUpload_A6E1 describes
 ; Callees: BattleMenu_ClearTechCursorTiles, BattleMsg_ShowFromTableCC3A09Vec,
 ;          Battle_QueueVramUpload_A6E1
 !BattleMenu_TechCursorRow = !BattleTmp_80 ; 1 B: !Pc_TechRow of the active PC
@@ -3920,7 +3932,8 @@ BattleMenu_DrawCursorSprites:
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
 ;        they all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered
 ;        (DP scratch and pad edges as in each handler's header), plus
-;        whatever Battle_MergePendingEntries1580 (not matched yet) changes
+;        what Battle_MergePendingEntries1580 changes (Item_BattleList,
+;        Battle_PcItem, !Pc_UnkA0B5, DP $80-$87)
 ; Callees: Battle_MergePendingEntries1580,
 ;          BattleMenu_TargetSelectInput, BattleMenu_DrawCursorSprites,
 ;          BattleMenu_TechListInput, BattleMenu_ItemListInput,
@@ -4264,8 +4277,7 @@ Battle_PlaySfx0:
 ;        each ends in Battle_ClearPadEdges with M=1, X=0, DP=0, DB=$7E;
 ;        A, X, Y clobbered, plus the chosen handler's DP scratch and
 ;        callee effects (see BattleMenu_ChooseAttack / OpenTechList /
-;        OpenItemList) and whatever BattleFx_SetPtrA2FromTable (not
-;        matched yet) changes
+;        OpenItemList) and DP $A2 (BattleFx_SetPtrA2FromTable)
 ; Callees: BattleFx_SetPtrA2FromTable,
 ;          BattleMenu_ChooseAttack, BattleMenu_OpenTechList,
 ;          BattleMenu_OpenItemList
@@ -4363,8 +4375,8 @@ BattleMenu_OpenTechList:
 ; Callers (1 JMP site): BattleMenu_ConfirmCommand ($C1:1299).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll, TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
-;        Y clobbered; DP as in RenderItemListRows, plus whatever
-;        Battle_QueueVramUpload_0E80 (not matched yet) changes
+;        Y clobbered; DP as in RenderItemListRows, plus the queued upload
+;        Battle_QueueVramUpload_0E80 describes
 ; Callees: BattleMenu_RenderItemListRows, Battle_QueueVramUpload_0E80,
 ;          Battle_ClearPadEdges
 org $C112ED
@@ -7690,14 +7702,15 @@ Battle_ApplyPendingEffect:
 ;   - an overlay (!Battler_FxOverlayOn): frame !Battler_FxOverlayFrame
 ;     (0-3, $FF = before the first) steps every !Battler_FxOverlayPeriod
 ;     frames (counted in !Battler_FxOverlayTimer), from frame block
-;     !Battler_FxOverlayBase of the table at $CC:F6D4 (code at $CF:EE38);
+;     !Battler_FxOverlayBase of the table at $CC:F6D4
+;     (BattleCF_DrawFxOverlay);
 ;   - a colour cycle (!Battler_FxCycleOn): colours from $CE:0100 by
 ;     !Battler_FxCycleStep, written into the battler's live palette
-;     (code at $CF:E7E0).
+;     (BattleCF_StepFxColourCycle).
 ; Overlay block n ($10 * n) has its period in !BattleRom_FxOverlayPeriod
-; entry n-1. The "overlay" and "colour cycle" readings come from that
-; code in bank $CF, which is not matched; what each overlay looks like
-; has not been checked.
+; entry n-1. The "overlay" and "colour cycle" readings come from those
+; two routines in bank $CF; what each overlay looks like has not been
+; checked.
 ; Entry (all): M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot
 ; Exit (all):  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered
 
@@ -8796,7 +8809,7 @@ Battle_PoseStep:
 ; (!Enemy_StepStartX/Y), puts the enemy's probe (!Battler_ProbeX/Y) one
 ; step ahead and tests the box there against the cell map and the other
 ; battlers. If the way is free it sets !Enemy_Stepping, and the
-; unmatched stepper at $CF:F978 moves the enemy along the heading over
+; stepper BattleCF_StepEnemies moves the enemy along the heading over
 ; the next frames. When the move's goal is reached (or, for some movers,
 ; when a step is blocked) the mover sets !Enemy_MoveDone and saves
 ; !Enemy_AnimWanted in !Enemy_ResumeAnim. "Target" below is the battler
@@ -12880,7 +12893,7 @@ BattleAct_OpSetSpeed:
 ;   - threads 0-3, the thread's battler: when it is not moving
 ;     (!Battle_ActorMoving 0), starts the move (BattleAct_StartBattlerMove)
 ;     and keeps the length in the thread's !Battle_ActThreadOpLen; it
-;     stays on the opcode until the mover at $CF:F040 (unmatched) sets
+;     stays on the opcode until the mover (BattleCF_MoveStraight) sets
 ;     the battler's !Battler_MoveDone, then clears !Battle_ActorMoving
 ;     and advances by the kept length;
 ;   - thread 4: starts the move of every slot of the target set and
@@ -12893,7 +12906,7 @@ BattleAct_OpSetSpeed:
 ;     !Battle_ActObjUnkA5B5, its facing in !Battle_ActObjFacing and
 ;     zeroes !Battle_ActObjUnkA31C; then waits for
 ;     !Battle_ActObjMoveDone like the battlers.
-; "Move" is inferred from the mover at $CF:EFC4/$CF:F040, which adds the
+; "Move" is inferred from the mover (BattleCF_MoveStraight), which adds the
 ; step to the offset each step and writes start + offset to
 ; !Battler_ScreenX/Y.
 ; Callers note: BattleAct_OpcodeTable entries $10 (BattleAct_OpMoveTo), $11
@@ -13212,13 +13225,13 @@ BattleAct_StartBattlerMove:
 ; ==================================================================
 ; The curving move opcodes: like the move opcodes $10-$12
 ; (BattleAct_OpMoveTo) they move the thread's actor to a point and wait
-; for it, but with mover kind !Battle_MoveKindCurve: the mover at
-; $CF:F405 (unmatched) keeps a heading (!Battle_ActorHeading), turns it
+; for it, but with mover kind !Battle_MoveKindCurve: the mover
+; (BattleCF_MoveCurve) keeps a heading (!Battle_ActorHeading), turns it
 ; towards the angle to the point by up to !Battle_ActorMoveSpeed per
 ; step, the way !Battle_ActorTurnDir says, and moves along it; once the
 ; heading has reached that angle (!Battle_ActorOnCourse) it stops
-; turning. That the move ends near the point is from the mover's call
-; of $CF:F957 with $10 before it sets the done flag (not traced).
+; turning. It sets the done flag once the actor is within 16 pixels of
+; the point in both axes (BattleCF_PointsNear).
 ; The first operand h is the start heading ($FF: the actor's
 ; !Battle_ActorUnkA5AA; quirk, kept: on thread 4 the start loop stores
 ; each slot's heading back into DP $82, so only the first slot of the
@@ -13594,7 +13607,7 @@ BattleAct_CurveTurnDir:
 ;     !Battler_PathFromDir to !Battle_PathDirNone, the step frame to $FF
 ;     (no step under way) and !Battler_PathWalking to 1;
 ;   - while a step is under way (!Battler_PathStepFrame 0-7) it waits;
-;     $CF:EC78 (unmatched) moves the battler by the step's table
+;     BattleCF_StepPathWalks moves the battler by the step's table
 ;     entries each frame and counts the frame down;
 ;   - when the step is done: the step frame = !Battle_PathStepFrames,
 ;     the battler's map is copied to !Battle_PathWalkMap and the next
@@ -14015,7 +14028,7 @@ BattleAct_OpSetPosCalc:                 ; header: see BattleAct_OpSetPos
 ; something: !Battle_ActObjFollow of the object = entry n of
 ; !Battle_ActBattlers (a battler slot) for n below
 ; !Battle_ActFollowFirstObj, else !Battle_ActFollowObj + (n - 9) (object
-; thread n - 9). $CF:ECC2 (unmatched) then copies the slot's
+; thread n - 9). BattleCF_FollowObjects then copies the slot's
 ; !Battler_ScreenX/Y, or the other object's !Battle_ActObjX/Y, to the
 ; object's position each frame. On other threads it does nothing.
 ; Goes on with the next opcode in the same frame; advances 2.
@@ -15830,8 +15843,8 @@ BattleAct_RestorePaletteBody:           ; header: see BattleAct_OpRestorePalette
 ; ==================================================================
 ; BattleAct_OpStartPalCycle ($C15EDF–$C15F12, 52 bytes)
 ; ==================================================================
-; Opcode $6B <delay>: starts the colour rotation at $CF:E600
-; (unmatched): every delay frames it turns the colours of
+; Opcode $6B <delay>: starts the colour rotation of BattleCF_FrameUpdate
+; ($CF:E600 on): every delay frames it turns the colours of
 ; !Battle_PaletteLive+$82-$99 (the special palette's 12 colours) on by
 ; one. !Battle_PalCycleTimer = 1, !Battle_UnkAB4E (its on flag) = 1.
 ; When !Battle_Unk99D2 is set, the first battler from the main target
@@ -16657,8 +16670,8 @@ BattleAct_OpSetHeading:
 ; ==================================================================
 ; The arc opcodes: like the move opcodes $10-$12 (BattleAct_OpMoveTo)
 ; they move the thread's actor in a straight line to a point and wait
-; for it, but with mover kind !Battle_MoveKindArc ($CF:F087,
-; unmatched), which also makes a height rise and fall back over the
+; for it, but with mover kind !Battle_MoveKindArc (BattleCF_MoveArc),
+; which also makes a height rise and fall back over the
 ; move (see !Battle_ActorArcSteps; probably a jump):
 ;   - $98 / $9C <mode> <n> (BattleAct_OpArcToCalc): the point left by
 ;     BattleAct_RunCalc handler n; length 3; the height subtracted;
@@ -17455,7 +17468,7 @@ BattleAct_OpArcDownToUnkPoint:
 ; ==================================================================
 ; Opcode $A2: moves the thread's actor along its heading
 ; (!Battle_ActorUnkA5AA; for the objects !Battle_ActObjUnkA5B5) with
-; mover kind !Battle_MoveKindHeading ($CF:F194, unmatched; up to $FF
+; mover kind !Battle_MoveKindHeading (BattleCF_MoveHeading; up to $FF
 ; steps, see !Battle_ActorHeadSteps) until the cell
 ; !Battle_HeadProbeDist pixels ahead along the angle (sine lookups:
 ; sin to y, cos to x) has either blocking bit (!Battle_CellBlocksAny)
@@ -17475,8 +17488,8 @@ BattleAct_OpArcDownToUnkPoint:
 ;     any is. Quirk, kept: on the frame that starts the whole set the
 ;     test loop starts at the set's end, so it advances at once
 ;     without testing; the start loop never sets !Battle_ActorMoving
-;     (only the test loop does), and the mover at $CF:EFC4 skips actors
-;     with it 0, so none of the set moves: the opcode only sets angle,
+;     (only the test loop does), and BattleCF_RunMovers skips actors
+;     with it 0 (its test at $CF:EFC4), so none of the set moves: the opcode only sets angle,
 ;     facing and move state;
 ;   - threads 8-15, object j: as a battler with the object's entries
 ;     (index 11 + j), its position !Battle_ActObjX/Y, and
@@ -18304,7 +18317,7 @@ BattleAct_OpMoveHeadingChecked:
 ; ==================================================================
 ; Opcode $C0 <n> <r> <a> <q>: moves the thread's actor round a circle
 ; whose centre is the point left by BattleAct_RunCalc handler n, with
-; mover kind !Battle_MoveKindCircle ($CF:F1F8, unmatched; see
+; mover kind !Battle_MoveKindCircle (BattleCF_MoveCircle; see
 ; !Battle_ActorCircleX): radius r & !Battle_CircleRadiusMask, start
 ; angle a ($FF (!Battle_CurveKeepHeading) = the actor's
 ; !Battle_ActorUnkA5AA, or !Battle_ActObjUnkA5B5 for an object), and
@@ -18686,7 +18699,7 @@ BattleAct_OpCircleToUnkPoint:
 ; BattleAct_OpEllipseToCalc ($C16F53–$C16F74, 34 bytes)
 ; ==================================================================
 ; Opcode $C2 <n> <r> <a> <q>: opcode $C0 (BattleAct_OpCircleToCalc)
-; with mover kind !Battle_MoveKindEllipse ($CF:F354, unmatched), which
+; with mover kind !Battle_MoveKindEllipse (BattleCF_MoveEllipse), which
 ; differs from the circle mover only in using half the radius for the
 ; y offset (so probably an ellipse, flattened like a ring on the
 ; ground); length 5. The kind is the same 5 as the length (one store
@@ -18931,7 +18944,7 @@ BattleAct_OpClearUnkA5D8:
 ; ==================================================================
 ; Opcode $D2 <n>: sets up, without starting it, a move of the thread's
 ; actor to the point left by BattleAct_RunCalc handler n with mover
-; kind !Battle_MoveKindUnk4 ($CF:F23D, unmatched); length 2; it
+; kind !Battle_MoveKindUnk4 (BattleCF_MoveKind4); length 2; it
 ; advances at once. !Battle_ActorMoving is not set, so the mover (which
 ; runs only for moving actors, $CF:EFC4) waits for opcode $D4, $D5 or
 ; $D6 (BattleAct_OpRunMoveAfterUnkAAFC, BattleAct_OpRunMoveAfterMajorDist)
@@ -18942,12 +18955,13 @@ BattleAct_OpClearUnkA5D8:
 ; accel !Battle_ArcSpeedHalf / !Battle_Kind4AccelDiv ($FF), and
 ; !Battle_ActorUnkAB00 = 0. BattleAct_CalcMidpointSteps also leaves the
 ; raised midpoint (!Battle_ActUnkMidX/Y, read by opcode $D3) and
-; !Battle_ActUnkAAFC = !Battle_ActUnkAAFCStart. The kind-4 mover (read,
-; not matched) steps the offset and the arc like the arc mover, sets
-; the done flag at the top of the rise, and once falling sets it again
-; and stops when the actor is within 16 pixels of the point in both
-; axes with !Battler_UnkA4AF between -24 and -1 (so probably a jump
-; that lands at the point; "jump" is a guess). By thread:
+; !Battle_ActUnkAAFC = !Battle_ActUnkAAFCStart. The kind-4 mover
+; (BattleCF_MoveKind4) steps the offset and the arc like the arc mover,
+; counts the done flag up at the top of the rise, and once falling
+; counts it up again when the actor is within 16 pixels of the point in
+; both axes with !Battler_UnkA4AF between -24 and -1, and once more
+; within 1 pixel (so probably a jump that lands at the point; "jump" is
+; a guess). By thread:
 ;   - threads 0-7 other than 4, the thread's battler: from its
 ;     position (also kept in !Battle_ActorFromX/Y);
 ;   - thread 4: nothing;
@@ -19604,12 +19618,13 @@ BattleAct_OpPointTowardCalc:
 ; BattleAct_OpShake ($C174B4–$C17539, 134 bytes)
 ; ==================================================================
 ; Opcode $D8 <a> <p> <f>: starts mover kind !Battle_MoveKindShake
-; ($CF:F39F, unmatched) for the thread's battler and advances at once
+; (BattleCF_MoveShake) for the thread's battler and advances at once
 ; (length 4): !Battler_ShakeAmp = a, !Battler_ShakePeriod = p,
 ; !Battler_ShakeFrames = f + 1, !Battler_ShakeTimer and
 ; !Battler_ShakeOff = 1, !Battle_ActorMoveDelay and
 ; !Battle_ActorMoveTimer = 1 (the mover runs every frame) and
-; !Battle_ActorMoving = 1. The mover (read, not matched) toggles the
+; !Battle_ActorMoving = 1. The mover (BattleCF_MoveShake, through
+; BattleCF_ShakeStep) toggles the
 ; offset (!Battler_UnkA4A4/A4AF) between 0 and a pixels along
 ; !Battle_ActorUnkA5AA every p frames and ends the move itself (offset
 ; and !Battle_ActorMoving zeroed) after f frames, so probably a shake
@@ -21237,13 +21252,13 @@ BankC1_OldBuildLeftovers:
 ; $C1:8000 starts a new part of the bank: two JMP vectors, then the
 ; routine the battle runs in from its setup to its end. The battle entry
 ; reaches it as JSL $C10000 (from the field at $C0:18A7) -> JMP $001B ->
-; JML $CF:FB65, which clears the battle RAM and JMLs to $C1:8000
-; (BattleSys_PumpFrames' header; the JML is at $CF:FBE1).
+; JML BattleCF_EnterBattle ($CF:FB65), which clears the battle RAM and
+; JMLs to $C1:8000 (the JML is at $CF:FBE1).
 
 ; $C1:8000 — BankC1_BattleStartVec (3 bytes)
 ; Vector into BattleSys_Main.
-; Callers (2 sites: 1 JSL, 1 JML): unmatched (JML $CF:FBE1, JSL $E2:74F3).
-; Callers note: JML at $CF:FBE1 (the battle entry, unmatched); xref also
+; Callers (2 sites: 1 JSL, 1 JML): BattleCF_EnterBattle (JML $CF:FBE1) and unmatched (JSL $E2:74F3).
+; Callers note: JML at $CF:FBE1 (BattleCF_EnterBattle); xref also
 ;   confirms a JSL $C1:8000 decoded at $E2:74F3 (unmatched, not checked
 ;   to be code).
 ; Entry: as BattleSys_Main (M=1, X=0, DP=0, DB=$7E)
@@ -29445,7 +29460,7 @@ BattleSys_UnkAC57:
 ; If !Battle_UnkAEB2 is set: !Battle_UnkAE85[n] = 1 for each enemy n
 ; (0-7) whose !Battle_UnkAEB3 entry is non-zero, then, unless
 ; !Battle_Unk2989 has bit 5, service !BattleSys_ServiceUnk6 (BattleSys_Service6:
-; JSL $CF:FE20, not analysed). !Battle_UnkAEB2 = 0 in any case.
+; BattleCF_RemoveMarkedEnemies). !Battle_UnkAEB2 = 0 in any case.
 ; Callers (1 JSR site): BattleSys_Unk8461 ($C1:881C).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered (and what service 6

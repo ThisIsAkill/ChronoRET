@@ -482,7 +482,7 @@ if !constants_battle_inc == 0
 ; --- Battle main routine (BattleSys_Main) ---
 !BattleSys_ServiceUnk0    = 0     ; $C10045 service run first by BattleSys_Main (BattleSys_SceneSetup)
 !BattleSys_ServiceUpkeep  = 3     ; ... BattleSys_UpkeepTwoFrames
-!BattleSys_ServiceUnk6    = 6     ; ... BattleSys_Service6 (JSL $CF:FE20, not analysed), run by the debug win
+!BattleSys_ServiceUnk6    = 6     ; ... BattleSys_Service6 (BattleCF_RemoveMarkedEnemies), run by the debug win
 !BattleSys_ServiceVictory = 8     ; ... BattleSys_VictoryPose
 !BattleSys_ServiceDefeat  = 9     ; ... BattleSys_DefeatPose
 !Battle_EntryNone         = $FF   ; list / slot entry: empty (the BattleSys_Main lists, !Battler_UnkAEFF)
@@ -1066,7 +1066,6 @@ if !constants_battle_inc == 0
 !Battle_InitMapBufHead    = $01C0 ; stage 2: the first 7 rows of !Battle_InitMapBuf ...
 !Battle_InitMapBufVram    = $7B00 ; ... to here
 !Battle_InitMapTailVram   = $7800 ; stage 2: the eighth row (!Battle_InitMapBufTail)
-!Battle_InitWindowMapVram = $7A00 ; stage 3: !BattleMenu_WindowMap (through bank $00)
 !Battle_InitFrameBufBytes = $0C00 ; stage 3: !Battle_ActFrameBuf ($2D00-$38FF, with !Battle_InitTileBuf)
 !Battle_InitFrameBufVram  = $1800
 !Battle_ObjPiece2Vram     = $0060 ; Battle_InitUploadObjTilesDead: the third piece (never reached)
@@ -1084,7 +1083,7 @@ if !constants_battle_inc == 0
 !Battle_PcOffsetYInit     = $F0   ; !Battler_ScreenOffsetY of the PCs at set-up (-16)
 !Enemy_MoveBytes          = $10   ; !Enemy_MoveTimer and !Enemy_MoveInterval, 8 B each
 !Enemy_MoveTimerInit      = $20   ; their value at set-up (overwritten for each enemy present)
-!Battle_OamTableBytes     = $0200 ; entries of !Battle_OamHiXBit / !Battle_OamHiXClear / !Battle_OamHiByteIdx
+!Battle_OamTableBytes     = $0200 ; entries of !Battle_OamHighXBit / !Battle_OamHighXClear / !Battle_OamHighIdx
 !Battler_UnkA5C2Init      = $C0   ; !Battler_UnkA5C2 at set-up
 !Battle_CellRowBytes      = $10   ; cells per !Battle_CellMap row
 !Battle_CellMapBytes      = $0100 ; bytes of !Battle_CellMap (16 rows)
@@ -1106,9 +1105,9 @@ if !constants_battle_inc == 0
 !Tech_DoubleEntries       = 6
 !Tech_FirstTripleEntry    = $12   ; Tech_MenuEntry 18: the triple tech
 !Battler_StartRecBytes    = 5     ; bytes of a Battler_StartRec
-!Battler_Unk1D7FPc        = $0F   ; !Battler_Unk1D7F of a PC
+!Battler_SprBytesPc       = $0F   ; !Battler_SprBytes of a PC
 !Enemy_SprFlag80          = $80   ; !Enemy_SprFlags bit 7: copied to !Battler_UnkA5C2 / !Battler_UnkA5CD
-!Enemy_SprFlag08          = $08   ; bit 3: counted in !Battle_UnkAA63, enemy noted in !Battle_UnkA002
+!Enemy_SprFlag08          = $08   ; bit 3: counted in !Battle_EnemyPartsOn, enemy noted in !Battle_PartsAnchor
 !Enemy_SprFlag20          = $20   ; bit 5: counts !Enemy_UnkA006 up
 !Enemy_SprFlag04          = $04   ; bit 2: copied to !Battler_UnkA08C
 !Enemy_IdLowerA           = $D8   ; enemy ids (high byte 0) whose !Battler_ScreenY is set one pixel lower at set-up
@@ -1125,18 +1124,18 @@ if !constants_battle_inc == 0
 !Battle_Tile2bppBytes     = $10   ; bytes of a 2bpp tile (also the zero planes added to widen it)
 !Battle_InitTiles4bppCount = $40  ; tiles in !BattleRom_InitTiles4bpp
 !Battle_Tile4bppBytes     = $20   ; bytes of a 4bpp tile
-!Battler_UnkA680Slot3     = $0400 ; the six words Battle_InitSceneGfx gives slot 3 when its frame layout is 2 ...
-!Battler_UnkA696Slot3     = $0700
-!Battler_UnkA6ACSlot3     = $0500
-!Battler_UnkA6C2Slot3     = $0100
-!Battler_UnkA654Slot3     = $6BAD
-!Battler_UnkA66ASlot3     = $71AD
-!Battler_UnkA680Other     = $0680 ; ... and any other slot with frame layout 2
-!Battler_UnkA696Other     = $0780
-!Battler_UnkA6ACOther     = $0100
-!Battler_UnkA6C2Other     = $0500
-!Battler_UnkA654Other     = $70AD
-!Battler_UnkA66AOther     = $72AD
+!Battler_FrameDmaVramASlot3 = $0400 ; the six words Battle_InitSceneGfx gives slot 3 when its frame layout is 2 ...
+!Battler_FrameDmaVramBSlot3 = $0700
+!Battler_FrameDmaSizeASlot3 = $0500
+!Battler_FrameDmaSizeBSlot3 = $0100
+!Battler_FrameDmaSrcASlot3 = $6BAD
+!Battler_FrameDmaSrcBSlot3 = $71AD
+!Battler_FrameDmaVramAOther = $0680 ; ... and any other slot with frame layout 2
+!Battler_FrameDmaVramBOther = $0780
+!Battler_FrameDmaSizeAOther = $0100
+!Battler_FrameDmaSizeBOther = $0500
+!Battler_FrameDmaSrcAOther = $70AD
+!Battler_FrameDmaSrcBOther = $72AD
 !Battle_Unk57ValueA       = $A4   ; BattlerStats.Unk57 values of a PC that make Battle_InitSceneGfx set !Battle_Unk9F34
 !Battle_Unk57ValueB       = $B8   ; (probably an accessory's id; not traced)
 !Battle_ActVarsBytes      = $8D   ; bytes BattleAct_ResetState zeroes from !Battle_ActVars ($5D80-$5E0C)
@@ -1145,7 +1144,6 @@ if !constants_battle_inc == 0
 !Battle_ActListEnd        = $FF   ; end of the !Battle_ActBattlers / !Battle_ActTargets lists
 !Battle_ActObjAnimBytes   = $40   ; ... from !Battle_ActUnkA1A8 ($A1A8-$A1E7)
 !Battle_ActorMoveBytes    = $72   ; ... from !Battle_ActorMoving ($A337-$A3A8)
-!Battle_ActObjLinkBytes   = $58   ; bytes of !Battle_ActObjLinks (8 threads x 11)
 !Battle_PosHistBytes      = $58   ; bytes of the position history from !Battler_PosHistX (4 records x 22)
 !Battle_PosHistInit       = $F0   ; value it is filled with
 !Battle_FxAppliedStale    = $55   ; !Battler_FxApplied value no effect has (BattleAct_ResetFxApplied)
@@ -1154,9 +1152,91 @@ if !constants_battle_inc == 0
 !Battle_NumPalSeqs        = 4     ; palette sequences BattleAct_StepPalettes steps
 !Battle_ActObjThreads     = 8     ; object threads 0-7
 !Battle_ActObjTimeMask    = $7F   ; BattleRom_ActObjRec.Time: the frame count
-!Battle_ActObjUnkA2C0Stop = $80   ; !Battle_ActObjUnkA2C0 bit 7: the list ended at this record
+!Battle_ActObjFrameStop   = $80   ; !Battle_ActObjFrame bit 7: the list ended at this record
 !Battle_ActObjEntryRestart = $FF  ; !Battle_ActObjAnimEntry: the next step starts the list again
 !Battle_ActObjRecLowMask  = $1F   ; BattleRom_ActObjRec.Flags bits 0-4
-!Battle_ActObjUnkA2C0Bit5 = $20   ; !Battle_ActObjUnkA2C0 bit 5: the record's .Time had bit 7
+!Battle_ActObjFrameBit5   = $20   ; !Battle_ActObjFrame bit 5: the record's .Time had bit 7
+
+; --- Bank $CF: vblank uploads and the per-frame update ---
+!Battle_OamBytes          = $0220 ; bytes of OAM (low and high table) BattleCF_VblankUploads sends
+!Battle_CgramBytes        = $0200 ; bytes of CGRAM (all 256 colours)
+!Battle_WindowMapVram     = $7A00 ; VRAM word address !BattleMenu_WindowMap goes to (also stage 3 of
+                                  ; Battle_InitUploadStep, through bank $00)
+!Battle_GfxSteps          = 4     ; graphics steps of !BattleRom_GfxStepSrcA..; !Battle_UnkA4 wraps at this
+!Battle_BlinkFrames       = $0C   ; frames between toggles of !BattleUI_UnkA110
+!Battle_PartMainSlot      = 3     ; battler slot copied under !Battle_UnkA113 ...
+!Battle_PartMirrorSlot    = 9     ; ... and the slot it is copied to
+!Battle_CursorGlowSteps   = $3E   ; entries of !BattleRom_CursorGlow
+!Battle_CursorPalBit      = $08   ; !BattleMenu_CursorPalette bit that picks OBJ palette 5 for the glow
+!Battle_RotObjLastOfs     = $16   ; byte offset of colour 11 from colour 0: the last colour the rotation moves up
+!Battle_ColourInRow       = $0F   ; colour number within a 16-colour row (mask), also the row's last colour
+!Battle_ColoursPerRow     = $10   ; colours per palette row
+!Battle_RowBytes          = $20   ; bytes per palette row
+!Battle_DemoQuitFlag      = $80   ; value stored to !Battle_UnkBB80 before the demo battle restarts the game
+!Battle_PadLR             = $30   ; JOY1L bits 5 and 4: the R and L buttons
+!Battle_LrHoldFrames      = $78   ; frames L and R must be held before !Battle_Unk99CD is bumped (120)
+!Battle_2989Bit7          = $80   ; !Battle_Unk2989 bit 7: holding L and R does not bump !Battle_Unk99CD
+!Battle_HitNumBounceEnd   = $80   ; !BattleRom_HitNumBounce entry that ends the bounce
+!Battle_HitNumSprites     = 4     ; hit-number sprites per battler slot (Battle_HitNumSprite records)
+!Battle_FxCycleSecondOfs  = $18   ; second copy of the cycled colour: byte $18 of the palette unit
+!Battle_FxCycleBytes      = $7C   ; length of an effect's colour list (62 colours); the step wraps here
+
+; --- Bank $CF: the sprite builder ---
+!Battle_SprIdxBias        = $0C   ; sprite index of battler slot 0 (index = slot + 12)
+!Battle_SprIdxEnd         = $17   ; sprite index after the last battler (slot 10 + 12 + 1)
+!Battle_SprListBattler    = $40   ; !BattleSpr_List bit: the battler's own entry (it gets the position history)
+!Battle_SprListIdxMask    = $1F   ; !BattleSpr_List bits holding the sprite index
+!Battle_SprListEnd        = $FF   ; !BattleSpr_List value after the last entry
+!Battle_SprKeyTop         = $FE   ; sort key of the extra entry of a !Battler_UnkA5CD battler (sorts first)
+!Battle_SprFirstOamOfs    = $10   ; first OAM byte offset the builder uses (sprite 4; 0-3 are the cursors)
+!Battle_SprDrawn          = $80   ; !Battler_SprDrawState once the battler is drawn
+!Battle_PosHistRecBytes   = 22    ; bytes from one position-history record to the next (11 x, then 11 y)
+!Battle_SignFill          = $FF   ; high byte of a sign-extended negative byte
+!Battle_OamKeepTileFlip   = $C1FF ; OAM tile/attribute word bits kept: flips, name bit and tile (palette and priority
+                                  ; are replaced)
+!Battle_SprHideY          = $F0   ; y low byte from which a sprite with y off the 0-255 range is left showing
+!Battle_UnkA5D8DX         = 8     ; x left of the battler's screen x of the !Battler_UnkA5D8 sprite
+!Battle_UnkA5D8DY         = 4     ; y above its screen y
+!Battle_UnkA5D8Tile       = 2     ; tile of that sprite
+!Battle_SprGroupBytes     = $10   ; OAM bytes of four sprites
+!Battle_LastObjThread     = 7     ; object threads 0-7
+!Battle_ObjThreadMask     = $07   ; bits naming an object thread
+!Battle_ActLinkThreadMask7F = $7F ; clears the in-front bit (7) of a !Battle_ActObjLinks entry
+!Battle_ActLinkThreadMaskBF = $BF ; clears the behind bit (6)
+!Battle_ActLinkBytes      = $58   ; bytes of !Battle_ActObjLinks (8 threads x 11 slots; BattleAct_ResetState sets them)
+!Battle_FxOverlayFrames   = 4     ; status-overlay frames (0-3)
+!Battle_ActFrameMask      = $3F   ; !Battle_ActObjFrame bits holding the frame
+!Battle_OamAttrNoPriority = $CF   ; attribute bits kept when an object's priority bits are put in
+
+; --- Bank $CF: movers, entry and exit ---
+!Battle_CellRowBottom     = $0E   ; cell row the heading movers stop at (the bottom edge row, probably)
+!Battle_CellColRight      = $0F   ; cell column they stop at (the right edge column, probably)
+!Battle_NearMargin        = $10   ; BattleCF_PointsNear margin of the curving and kind-4 movers (16 pixels)
+!Battle_ObjNearMargin     = $18   ; the objects' kind-4 mover's first margin (24 pixels)
+!Battle_Kind4LandHeight   = $E8   ; !Battler_UnkA4AF from which the kind-4 mover lands (-24..-1)
+!Battle_Kind4ArcSteps     = 4     ; arc steps per move step of the kind-4 movers
+!Battle_ActLinkFront      = $80   ; !Battle_ActObjLinks bit 7: the object is drawn in front of the battler
+!Battle_ActLinkBehind     = $40   ; bit 6: drawn behind it
+!Battle_ItemListBytes     = $0500 ; bytes of Item_BattleList (256 records of 5)
+!Battle_ItemRecBytes      = 5     ; bytes per Item_BattleList record
+!Battle_ItemQtyLimit      = $64   ; 100: a merged quantity that would reach this is not stored
+!Battle_2989Bit1          = $02   ; !Battle_Unk2989 bit 1: copied to !Battle_UnkEC at the battle's start
+!Battle_2989Bit4          = $10   ; !Battle_Unk2989 bit 4: ORed into !Battle_ActAttrBits at the start
+!Battle_ActAttrInit       = $20   ; !Battle_ActAttrBits at the start (OAM priority 2), with that bit
+!Battle_ClearRamLast      = $7FEB ; last word offset of the battle RAM clear from !Battle_ActFrameBuf ($7E:2D01-$ACEC)
+!Battle_ClearDpLast       = $006A ; last word offset of the DP clear from $80 ($80-$EB)
+!Battle_UnkB9Init         = $0F   ; !Battle_UnkB9 at the start
+!Battle_Flag7F00BABit0    = $01   ; !Battle_Flag7F00BA bit 0
+!Battle_Flag7F00BABit1    = $02   ; !Battle_Flag7F00BA bit 1
+!Battle_CharIdMask        = $07   ; !Pc_CharId bits used as the character id
+!Battle_TilePixelMask     = $0F   ; pixel within a 16-pixel tile
+!Battle_FieldPcBytes      = 5     ; bytes per Battle_FieldPc record
+!Battle_FieldObjBytes     = $0C   ; bytes per Battle_FieldObj record
+!Battle_OamHighAllSet     = $FF   ; OAM high-table byte with x bit 8 and the size bit set for four sprites
+!Battle_LastCharRecOfs    = $0C   ; offset of the last !BattleRom_CharRecOffset entry (character id 6)
+!Battle_PanelMapVram      = $7820 ; VRAM word address the three queued window maps go to
+!Battle_VramQRun          = $80   ; !Battle_VramQPending value set by the queue routines
+!Battle_FieldObjKind6Flag = $40   ; Battle_FieldObj.Flags bit 6 (the field's FieldBtl_ObjKind6Flag): the enemy stays
+                                  ; present when service 6 removes it
 
 endif
