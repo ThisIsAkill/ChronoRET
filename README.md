@@ -28,8 +28,16 @@ reached only through indirect jumps (code-like blocks next to traced code),
 with a low/high range per bank. The SPC700 sound driver and the compressed
 code module in `$C3` are listed in their own columns and are not in the total.
 The survey is re-run on purpose (`--write`), not as code gets matched;
-`--calibrate` repeats it with the source of `$C0` or `$C1` hidden to show
-how close it comes.
+`--calibrate` repeats it with the source of `$C0`, `$C1`, `$C2` or `$FD`
+hidden to show how close it comes.
+
+The estimate for unmatched code tends to be LOW: with a bank's source
+hidden it came out `$C0` -2.3%, `$C1` -3.7%, `$C2` -17.6% (its code is
+reached mostly through tables the trace cannot follow) and `$FD` -4.0%
+(recall 94%). A low code estimate makes the share HIGH: on 2026-10-14 the
+share was 71.27% of 239,779 code bytes, with a range of about 65-73%
+(65.0% against the high total of 262,780, 73.5% against the low total of
+232,629), and the true figure is more likely below 71% than above it.
 
 Progress notes, the address map, the devlog and a function-level breakdown
 live in the companion wiki, **[Kajar](https://thisisakill.github.io/Kajar-site/)**.

@@ -34,15 +34,24 @@ Per bank, code_bytes = matched + traced + allowance:
   code_bytes_low / _high: the allowance at score >= +0.5 / >= -0.5 (the high
               bound also adds the isolated blocks).
 
-Calibration (--calibrate): treat every matched routine of $C0 or $C1 as
-unmatched, run the same survey, and compare with the survey made with the
-source. On 2026-10-14 the trace reached 78% ($C0) and 62% ($C1) of the matched
-code and none of the matched data; with the allowance the estimate came out
-2.3% ($C0: 59,473 for 60,857) and 3.7% ($C1: 60,740 for 63,058) low. So the
-figures for unmatched code are, if anything, a few percent low. The block
-scorer passes 87% of matched code blocks and 1-2% of the blocks of banks that
-hold no code (sound, graphics), which is why code-like blocks not joined to
-any code are left out.
+Calibration (--calibrate): treat every matched routine of $C0, $C1, $C2 or
+$FD as unmatched, run the same survey, and compare with the survey made with
+the source. On 2026-10-14 the trace reached 78% ($C0), 62% ($C1), 10% ($C2)
+and 74% ($FD) of the matched code and none of the matched data; with the
+allowance the estimate came out low every time: $C0 -2.3% (59,473 for
+60,857), $C1 -3.7% (60,740 for 63,058), $FD -4.0% (15,505 for 16,149, recall
+94%: trace + allowance count 94% of the matched code bytes) and $C2 -17.6%
+(46,776 for 56,791: its code is reached mostly through scene-op tables the
+trace cannot follow). So the estimate for unmatched code tends to be LOW,
+by a few percent where the trace reaches most of a bank and by much more
+where it does not, and a low code estimate makes the share of matched code
+HIGH. The headline share is therefore more likely too high than too low; the
+low/high totals give its range. The block scorer passes 87% of matched code
+blocks and 1-2% of the blocks of banks that hold no code (sound, graphics),
+which is why code-like blocks not joined to any code are left out.
+
+Data known to sit inside banks with code (TABLES, e.g. the APU interface
+tables $C7:0A98-$0D52) is kept out of the trace and the allowance.
 
 Not 65816 code, reported in their own columns and never in code_bytes:
   spc700_bytes      the sound driver program uploaded to the SPC700 (its
@@ -53,8 +62,9 @@ Not 65816 code, reported in their own columns and never in code_bytes:
                     $FE:0003) and runs with JML $7E:3000. Its size is the
                     packed-length word the decompressor reads, plus that word.
 
-A bank with no matched or traced code gets 0 when nothing in the ROM is
-shown to transfer control into it: every JSL/JML byte pattern into the bank
+A bank with no matched or traced code gets 0 when no JSL/JML from matched
+or traced code reaches it (indirect transfers through RAM vectors are not
+ruled out): every JSL/JML byte pattern into the bank
 is listed with tools/xref.py's verdict, and the note says how many are
 CONFIRMED from matched or traced code (the noise level of the sweep verdict
 on data is ~20% of patterns, so a CONFIRMED pattern in data proves nothing).
@@ -62,7 +72,7 @@ on data is ~20% of patterns, so a CONFIRMED pattern in data proves nothing).
 Usage:
     python3 tools/code_survey.py              print the survey (does not write)
     python3 tools/code_survey.py --write      write symbols/code_survey.csv
-    python3 tools/code_survey.py --calibrate  the held-out test on $C0 and $C1
+    python3 tools/code_survey.py --calibrate  the held-out test on $C0, $C1, $C2 and $FD
 """
 
 import argparse
@@ -103,17 +113,23 @@ UPLOAD_TABLE = '$C7:0010'
 # table ($C7:0D18, 83 long pointers); each item starts with its length word.
 SAMPLE_TABLE, SAMPLES = '$C7:0AEA', 62
 SONG_TABLE, SONGS = '$C7:0D18', 83
+# Data inside banks with code, kept out of the allowance (and the trace).
+TABLES = [('$C7:0A98', '$C7:0D52', 'APU interface tables: the sample table $C7:0AEA and the song table '
+           '$C7:0D18 (read by the unmatched sound driver at $C7:0666/$0773/$050F) and their neighbours')]
 
 # What is known of the content of banks that hold data, for the notes. Each
-# claim names its evidence (a reader in matched code or a pointer table).
+# claim names its evidence: a reader (in matched code unless said otherwise)
+# or a pointer table. The sound tables $C7:0AEA/$C7:0D18 are read by the
+# unmatched sound driver ($C7:050F, $0666, $0773), not by matched code.
 CONTENT = {
     '$C3': '$C3:0000-$10C8 kernel (ends at the ASCII marker "CODE END C3"); the trace does not '
            'reach $0307-$0547 and $08B3-$0EF9: the NMI/IRQ code installed as JML $C3:0548 / '
            '$C3:0529 at $0500/$0504, and routines presumably called from the packed module',
     '$C6': '$C6:E000-$EE3F scene helpers (JSL from C2Scene_ObjAFly/ObjBFly; probably more via scene op $4E); '
            '$C6:F560- scene tables read by matched code',
-    '$C7': '$C7:0000-$0A97 APU interface (65816); $0A98-$0D52 tables; SPC700 driver $24C3-$40B3; '
-           'samples from $C7:730D (table $C7:0AEA)',
+    '$C7': '$C7:0000-$0A97 APU interface (65816); $0A98-$0D52 tables, kept out of the allowance (the sample '
+           'and song tables $0AEA/$0D18 are read by the unmatched driver at $C7:050F/$0666/$0773); '
+           'SPC700 driver $24C3-$40B3; samples from $C7:730D (table $C7:0AEA)',
     '$C8': 'BRR samples (table $C7:0AEA)',
     '$C9': 'BRR samples (table $C7:0AEA)',
     '$CA': 'BRR samples to $CA:8ACB, then song data $CA:8ACC- (tables $C7:0AEA, $C7:0D18): the 2026-09 '
@@ -121,17 +137,19 @@ CONTENT = {
            'The two code-like JML patterns into it ($D1:A87B, $D1:ADDB) lie in $D1\'s '
            'window-map data and point inside a sample ($CA:8A9C)',
     '$CB': 'song data $CB:0000-$F163 (table $C7:0D18): the 2026-09 survey\'s 61,797 matches it, i.e. it '
-           'counted song data as code',
-    '$CC': '$CC:0000-$DFFF tables (417 long data reads from matched battle code); code '
-           '$CC:E000-$F382; tables after',
+           'counted song data as code; $CB:F164-$FFFF (3,740 bytes) lies outside both sound tables and is '
+           'unexplained (counted as 0 code)',
+    '$CC': '$CC:0000-$DFFF tables (320 long data reads from matched battle code); code '
+           '$CC:E000-$F382; tables after (115 long reads into $CC:F383 and up)',
     '$CD': 'code $CD:0000-$3FE5 with tables inside; $CD:4000- data (pointer tables at $CD:66F0 '
            'score as code but nothing reaches them)',
     '$CE': 'code $CE:E000-$F0DF (JSL from $CD and $D1 only); the rest data',
     '$CF': 'code $CF:E300-$FFFC with tables; $CF:0000-$E2FF data',
     '$D1': 'code $D1:E700-$FEBF with tables; $D1:0000-$E6FF data (battle window maps)',
-    '$DE': 'data read by TextWin_State0_Draw ($DE:FA00); long pointer tables at $E4:234E-$25A3 '
-           'point into it',
-    '$E4': 'palettes ($E4:0000, read by Menu_LoadCharPalettes), sprite records ($E4:F000, '
+    '$DE': 'data read by TextWin_State0_Draw ($DE:FA00); the long pointer table at $E4:234E-$25A3 '
+           'points into $DD, $DE and $E3 (and once into $E1)',
+    '$E4': 'a word offset table at $E4:0000 (AnimRom, read by six routines, Menu_LoadCharPalettes '
+           'among them; palettes are reached through it), sprite records ($E4:F000, '
            'Evt_LoadSpriteRec) and other tables read by matched code (42 long reads)',
     '$E5': 'map tile tables read by Map_StepTileEffects / Map_LoadExitTiles; 29 long pointers '
            'at $F6:2220 (read by LocLoad_UploadPack) point into it',
@@ -315,8 +333,9 @@ def ranges_mask(n, ranges):
     return mask
 
 
-def bank_figures(b, code, data, reached, excl, scores):
-    """traced, allowance at TH/TH_HI/TH_LO, isolated at TH and TH_LO for bank offset b<<16."""
+def bank_figures(b, code, data, reached, excl, scores, counted=None):
+    """traced, allowance at TH/TH_HI/TH_LO, isolated at TH and TH_LO for bank offset b<<16.
+    counted: a bytearray the size of the ROM, set where a byte enters traced + allowance at TH."""
     base, nb = b << 16, 0x10000 // BLOCK
     traced = [0] * nb
     free = [0] * nb
@@ -352,6 +371,11 @@ def bank_figures(b, code, data, reached, excl, scores):
                         break
         inside = sum(free[k] for k in range(nb) if pos[k] and k in joined)
         isolated = sum(free[k] for k in range(nb) if pos[k] and k not in joined)
+        if counted is not None and th == TH:
+            for o in range(base, base + 0x10000):
+                k = (o - base) // BLOCK
+                if not (code[o] or data[o] or excl[o]) and (reached[o] or (pos[k] and k in joined)):
+                    counted[o] = 1
         return inside, isolated
 
     al, iso = allowance(TH)
@@ -415,15 +439,22 @@ def upload_blocks(rom):
     return out
 
 
+def exclusions(rom):
+    """(SPC700, packed, sound data, union of those and TABLES) masks: bytes that are not 65816 code."""
+    n = len(rom)
+    spc, packed, tables = ranges_mask(n, SPC700), ranges_mask(n, COMPRESSED), ranges_mask(n, TABLES)
+    sound = bytearray(n)
+    for s, e in sound_items(rom) + upload_blocks(rom)[1:]:
+        sound[s:e + 1] = b'\1' * (e - s + 1)
+    excl = bytes(a | b | c | d for a, b, c, d in zip(spc, packed, sound, tables))
+    return spc, packed, sound, excl
+
+
 def survey():
     strict, reached, xr = trace()
     rom, n = xr.rom, len(xr.rom)
     code, data = kinds_masks(n)
-    spc, packed = ranges_mask(n, SPC700), ranges_mask(n, COMPRESSED)
-    sound = bytearray(n)
-    for s, e in sound_items(rom) + upload_blocks(rom)[1:]:
-        sound[s:e + 1] = b'\1' * (e - s + 1)
-    excl = bytes(a | b | c for a, b, c in zip(spc, packed, sound))
+    spc, packed, sound, excl = exclusions(rom)
     scores = block_scores(xr)
     rows = []
     for bank in BANKS:
@@ -476,12 +507,19 @@ HEADER = """\
 # through indirect jumps (code-like 32-byte blocks joined to traced code).
 # code_bytes_low/high bound the allowance. SPC700 and compressed code are
 # counted apart and are not in code_bytes. Re-run only to re-survey.
+# Uncertainty: the estimate for unmatched code tends to be LOW (held-out
+# tests, --calibrate: hiding $C0 -2.3%, $C1 -3.7%, $C2 -17.6%; $FD recall
+# 94%), and a low code estimate makes the share of matched code HIGH. The
+# share's range is matched code over the high and the low total.
 """
 
 
 def render(rows) -> str:
     buf = io.StringIO()
     buf.write(HEADER)
+    buf.write(f'# Total: {sum(r["code_bytes"] for r in rows):,} code bytes '
+              f'(low {sum(r["code_bytes_low"] for r in rows):,}, '
+              f'high {sum(r["code_bytes_high"] for r in rows):,}).\n')
     w = csv.DictWriter(buf, fieldnames=COLS, lineterminator='\n')
     w.writeheader()
     w.writerows(rows)
@@ -494,10 +532,14 @@ def read_survey(path: Path = SURVEY_CSV) -> list[dict]:
         return list(csv.DictReader(line for line in f if not line.startswith('#')))
 
 
+CALIBRATE = ('$C0', '$C1', '$C2', '$FD')
+
+
 def calibrate():
-    """Hide each of $C0 and $C1 from the trace and compare with the full survey."""
+    """Hide the matched routines of each bank in CALIBRATE from the trace and
+    compare with the survey made with the source."""
     full = {r['bank']: r for r in survey()}
-    for bank in ('$C0', '$C1'):
+    for bank in CALIBRATE:
         b = int(bank[1:], 16) - 0xC0
         rows = [r for r in generated.function_rows() if r['bank'] == bank]
         _, reached, xr = trace([off(r['address']) for r in rows])
@@ -508,20 +550,24 @@ def calibrate():
         true_code = sum(truth_code[lo:hi])
         hit_code = sum(1 for o in range(lo, hi) if reached[o] and truth_code[o])
         hit_data = sum(1 for o in range(lo, hi) if reached[o] and truth_data[o])
-        traced, al, al_hi, al_lo, _, iso_lo = bank_figures(b, code, data, reached, bytes(n),
-                                                         block_scores(xr))
+        counted = bytearray(n)
+        traced, al, al_hi, al_lo, _, iso_lo = bank_figures(b, code, data, reached, exclusions(xr.rom)[3],
+                                                         block_scores(xr), counted)
+        found = sum(1 for o in range(lo, hi) if counted[o] and truth_code[o])
+        wrong = sum(1 for o in range(lo, hi) if counted[o] and not truth_code[o])
         ref = full[bank]['code_bytes']
         print(f'{bank} hidden: the trace reaches {hit_code:,} of {true_code:,} matched code bytes '
               f'({hit_code / true_code:.1%}) and {hit_data} of {sum(truth_data[lo:hi]):,} matched '
               f'data bytes; estimate {traced + al:,} (low {traced + al_hi:,}, high '
               f'{traced + al_lo + iso_lo:,}) against {ref:,} with the source '
-              f'({(traced + al - ref) / ref:+.1%})')
+              f'({(traced + al - ref) / ref:+.1%}); trace + allowance count {found:,} of the matched '
+              f'code bytes (recall {found / true_code:.1%}) and {wrong:,} other bytes')
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--write', action='store_true', help=f'write {SURVEY_CSV}')
-    ap.add_argument('--calibrate', action='store_true', help='held-out test on $C0 and $C1')
+    ap.add_argument('--calibrate', action='store_true', help='held-out test on $C0, $C1, $C2 and $FD')
     args = ap.parse_args()
     if not X.ROM_PATH.exists():
         print(f'code_survey: no ROM at {X.ROM_PATH}', file=sys.stderr)
