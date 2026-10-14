@@ -124,13 +124,23 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    message by `!Battle_UnkB3C7`, probably), `!Battle_UnkB19E`'s 4-byte records (tests $11-$15),
    `!Battle_UnkB320`, `!Battle_UnkB158`, what the action codes 5 / 7 left in `!BattleAi_ActCode`
    by run handlers $07 / $09 do later, and the many quirks recorded in the headers (tests
-   $01, $0D, $0E, $14, $18, $1C; run handlers $0D, $12, $15). Next, in reach order: the target
-   handlers (stubs `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`);
-   the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
-   (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
-   `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
-   and service 0
-   (`$C1:0023`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
+   $01, $0D, $0E, $14, $18, $1C; run handlers $0D, $12, $15). Also matched (the target-handler batch): the 57 target handlers
+   `$C1:A3F6`-`$C1:AC13` (`BattleAi_TargetNone`, `TargetPcs`, `TargetAll`, `TargetSelf`, the random /
+   nearest / farthest / lowest- and highest-HP picks, the stat-byte lists `TargetPc*` / `TargetEnemy*`
+   / `TargetOtherEnemy*` through BattleAi_AddPcByByte, the fixed `TargetEnemy0-7` / `TargetSlot0-6`);
+   the entry block `$C1:0000`-`$C1:007D` (`EngCall_BattleMain` and its vectors, `BattleSys_SceneSetup`
+   = service 0, `BattleSys_RunService` with `BattleSys_ServiceTable`, `BankC1_LongDispatch`,
+   `BattleSys_Service6`, the JMLs); the bank-$FD callees `$FD:A8A5`-`$FD:A981` (`BattleFD_UnkA8A5`
+   the can-act check, `BattleFD_DropPcCommand`, `BattleFD_DropLatchedPcCommand`, `BattleFD_UnkA93C`,
+   `BattleFD_UnkA95F`); and the bank's end `$C1:FDD3`-`$C1:FFFF` (`BankC1_OldBuildTail`, old-build
+   leftovers, and `BankC1_DebugFlag`). Bank $C1 is now matched in full. Headers edited by it (back to
+   review): BattleAi_ReadTargets, TargetsByPcByte, PickPcTarget, AddPcByByte, BattleSys_UpdateKo,
+   the TargetTable header, Battle_CacheBattlerCoordsAll, BattleSys_UnkAC57, UnkAC5E,
+   RemoveReadyLong, UnkBFA4, UnkB575, UnkB967. Open from it: the quirks recorded in target handlers
+   $05 (endless loop with !Battle_Unk2989 bit 5), $08 (PC 0 never compared), $1F (STA for STX),
+   $2F (entry numbers, not slots), $38 (one-entry clear); whether !Battle_UnkB252 + 3 and
+   !Battle_UnkB18B always name the same enemy; what the bank-$CC/$CD/$CF callees of service 0 and
+   the vectors do (stubs `BattleCC_*`, `BattleCF_*`, `BattleSys_VecCD00xx`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
    (`!BattleRom_AiActLength` `$FD:BA4A` gives lengths $FF for codes 4/5), what the fixed scripts
    `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits;
    BattleSys_UnkB0B6 sets `!BattleAi_ChosenBlock` to $FF when Status2 bit 2 changes), and the
@@ -611,8 +621,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    re-reviewed: `EngFD_UnkC2C1` FieldHdma_RunFrame. Next, in reach order: `PalAnim_UnkE82C` (kind 4,
    `$FD:E82C`, with its callees up to about `$FD:EAA0`) and `PalAnim_UnkE807` (kind 6, which
    branches into it at `$FD:E869`); who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
-   `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
-   BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967) and the data at `$FD:B957` (pointer table and
+   `LayerDrift_L1X/Y`; the data at `$FD:B957` (pointer table and
    records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
    sums, the end messages 4-7 and their bits (`!Battle_UnkB2B0`/`B2B3`), the `BattlerStats.Unk57`
    values ($A0/$A1/$A9/$AB/$B3) and the PcStatBlk stats mean; who fills BattleEnemyInit ($29C4) and
