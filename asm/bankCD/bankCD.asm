@@ -10,7 +10,8 @@ hirom
 ; read by bank $C1). Other banks reach the code through the JMP vectors
 ; at $CD:0000-$CD:0038; inside the bank it calls itself by JSR and, for
 ; a few routines, by JSL. Banks $CD, $CE and $D1 call each other; the
-; bank-$CE/$D1 routines are not matched (stubs in
+; bank-$D1 routines are matched (bankD1.asm, BattleFx_*), the bank-$CE
+; ones and this bank's past $16B4 are not (stubs in
 ; asm/include/unmatched_battle.asm).
 ;
 ; Unless a header says otherwise the code runs as the rest of the battle
@@ -150,29 +151,30 @@ BattleSys_IdleVecCD0036:                ; header: see BattleSys_VecCD0000
 ; ============================================================
 
 ; $CD:0039 — BattleCD_EnterBattle (5 bytes, $0039–$003D)
-; The bank-$CD step of the battle's start: JSL BattleD1_InitBattle
-; ($D1:F1B0, not matched: from its first bytes it sets DB=$7E and DP=0,
-; installs JML $D1:E77C / JML $D1:FE97 as the NMI and IRQ trampolines at
-; $0500/$0504, runs BattleCD_ScrollStepL and BattleCD_InitHdmaDataL and
-; zeroes many of this bank's variables), then RTL.
+; The bank-$CD step of the battle's start: JSL BattleFx_Init
+; ($D1:F1B0: it sets DB=$7E and DP=0, installs JML $D1:E77C / JML
+; $D1:FE97 (BattleFx_Nmi / BattleFx_Irq) as the NMI and IRQ trampolines
+; at $0500/$0504, runs BattleCD_ScrollStepL and BattleCD_InitHdmaDataL and
+; zeroes or sets many of this bank's variables), then RTL.
 ; Callers (1 JMP site): BattleSys_VecCD0000 ($CD:0000).
 ; Entry: M=1, X=0 (as BattleCF_EnterBattle leaves them), DP any, DB any
 ;        (the callee sets DP=0 and DB=$7E itself, from its first bytes)
-; Exit:  as BattleD1_InitBattle leaves it (not traced; DP=0 and DB=$7E
-;        from its first bytes)
+; Exit:  as BattleFx_Init leaves it: M=1, X=0, DP=0, DB=$7E; A = 0; X
+;        and Y clobbered
 BattleCD_EnterBattle:
-    JSL BattleD1_InitBattle
+    JSL BattleFx_Init
     RTL
 
 ; $CD:003E — BattleCD_ActOp80 (5 bytes, $003E–$0042)
 ; Action opcode $80's long call (BattleAct_OpRunVecCD001B, after it
-; copied its operand bytes to !Battle_ActOp80Args): JSL BattleD1_ActOp80
-; ($D1:F67A, not matched), then RTL.
+; copied its operand bytes to !Battle_ActOp80Args): JSL BattleFx_Op80Dispatch
+; ($D1:F67A), then RTL.
 ; Callers (1 JMP site): BattleAct_UnkVecCD001B ($CD:001B).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the action code runs)
-; Exit:  as BattleD1_ActOp80 leaves it (not traced)
+; Exit:  as BattleFx_Op80Dispatch leaves it: M=1, X=0, DP=0, DB=$7E; A,
+;        X and Y as its handler leaves them
 BattleCD_ActOp80:
-    JSL BattleD1_ActOp80
+    JSL BattleFx_Op80Dispatch
     RTL
 
 ; ============================================================
@@ -428,11 +430,11 @@ BattleCD_MsgTimeTable:
 ; The messages are bank $C2's text window (TextWin_Init / TextWin_Step
 ; through BankC2_Entry0003 / 0009) drawn into !Battle_TextGfxBuf, with
 ; the string tables named below. !Battle_MsgShown = !BattleCD_MsgShownOn
-; while one is up; the bank-$D1 NMI handler ($D1:E7EC, not matched) counts
+; while one is up; the bank-$D1 NMI handler (BattleFx_Nmi, $D1:E7EC) counts
 ; !Battle_MsgTimer down while !Battle_MsgTiming is set and at 0 clears
 ; !Battle_MsgShown and !Battle_MsgTiming (and !Battle_ScriptMsgUp,
 ; setting !Battle_LastScriptMsg to $FF when it was set) and bumps
-; !Battle_UnkCA24.
+; !BattleFx_CeSetReload.
 
 ; $CD:01A5 — BattleCD_GetMsgTime (14 bytes, $01A5–$01B2)
 ; A = BattleCD_MsgTimeTable entry by bits 3-5 of !Menu_Config+1: the
@@ -457,13 +459,13 @@ BattleCD_GetMsgTime:
 ; $CD:01B3 — BattleCD_ShowMessage (87 bytes, $01B3–$0209)
 ; Shows battle message A (string A of !BattleRom_MsgStrings, its
 ; arguments at $0200, BattleMsg_InfoArgs / !Battle_MsgArg0) and waits for
-; it: plays the message's sound (!BattleRom_MsgSfx entry A, unless $FF)
+; it: plays the message's sound (BattleFx_MsgSfx entry A, unless $FF)
 ; through BattleCD_ApuCmd18 with X = !BattleCD_SfxArgCentre, starts the
 ; text (BattleCD_StartText, BattleCD_ShowText), waits 16 frames, then:
 ; message !Battle_EndUnkCD0021Arg waits !BattleCD_MsgFixedWait frames;
 ; any other waits up to BattleCD_GetMsgTime frames, and stops early on a
 ; frame that sees !Battle_PadHeld bit 7 (a button held). Then
-; !Battle_MsgShown and !Battle_MsgTiming = 0, !Battle_UnkCA24 + 1, and
+; !Battle_MsgShown and !Battle_MsgTiming = 0, !BattleFx_CeSetReload + 1, and
 ; 16 more frames.
 ; Callers (1 JMP site): BattleSys_UnkVecCD0021 ($CD:0021).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_Main, BattleSys_UnkB967
@@ -481,7 +483,7 @@ BattleCD_ShowMessage:
     STA.w !TextWin_Dp+!TextWin_StrTable+2
     PLA
     TAX
-    LDA.l !BattleRom_MsgSfx,X
+    LDA.l BattleFx_MsgSfx,X
     CMP.b #!BattleCD_MsgNoSfx
     BEQ .text
     LDX.w #!BattleCD_SfxArgCentre
@@ -515,7 +517,7 @@ BattleCD_ShowMessage:
 .close:
     STZ.w !Battle_MsgShown
     STZ.w !Battle_MsgTiming
-    INC.w !Battle_UnkCA24
+    INC.w !BattleFx_CeSetReload
     JSR BattleCD_Wait16Frames
     RTL
 
@@ -563,9 +565,9 @@ BattleCD_ShowMessageTimed:
     RTL
 
 ; $CD:0235 — BattleCD_ClearTextGfxL (4 bytes, $0235–$0238)
-; BattleCD_ClearTextGfx as a long call (JSL from the bank-$D1 code at
-; $D1:F3FE, not matched).
-; Callers (1 JSL site): unmatched ($D1:F3FE).
+; BattleCD_ClearTextGfx as a long call (JSL from BattleFx_Init at
+; $D1:F3FE).
+; Callers (1 JSL site): BattleFx_Init ($D1:F3FE).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (as BattleCD_ClearTextGfx needs)
 ; Exit:  as BattleCD_ClearTextGfx (M=1, X=0; A = 0; X = 0; Y unchanged),
 ;        returning with RTL
@@ -634,7 +636,7 @@ BattleCD_StartText:
 ; Draws the started string: TextWin_StepCount = A (the callers pass
 ; !BattleCD_TextStepCount from BattleCD_StartText), one TextWin_Step
 ; (through BankC2_Entry0009), two BattleCD_WaitFrame, then
-; !Battle_MsgShown = !BattleCD_MsgShownOn and !Battle_UnkCA24 + 1.
+; !Battle_MsgShown = !BattleCD_MsgShownOn and !BattleFx_CeSetReload + 1.
 ; Callers (3 JSR sites): BattleCD_ShowMessage ($CD:01D5), BattleCD_ShowMessageTimed ($CD:0225) and
 ;   BattleCD_ShowScriptMessage ($CD:02B0).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = the step count
@@ -647,7 +649,7 @@ BattleCD_ShowText:
     JSR BattleCD_WaitFrame
     LDA.b #!BattleCD_MsgShownOn
     STA.w !Battle_MsgShown
-    INC.w !Battle_UnkCA24
+    INC.w !BattleFx_CeSetReload
     RTS
 
 ; $CD:0295 — BattleCD_ShowScriptMessage (54 bytes, $0295–$02CA)
@@ -662,8 +664,10 @@ BattleCD_ShowText:
 ; BattleCD_GetMsgTime, !Battle_LastScriptMsg = the message,
 ; !Battle_MsgTiming + 1 (the NMI closes it), one more frame.
 ; Quirk: !Battle_ScriptMsgUp goes up even when the message is the same
-; as the last one and nothing is shown; then nothing closes it here
-; (what clears it then is not traced). Kept as found.
+; as the last one and nothing is shown; then nothing closes it here.
+; BattleFx_Nmi's message timer (when !Battle_MsgTimer runs out while
+; !Battle_MsgTiming is set) and BattleFx_Init (at the battle's start)
+; clear it. Kept as found.
 ; Callers (1 JMP site): BattleMsg_UnkVecCD0033 ($CD:0033).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the enemy-script run handlers run);
 ;        A = the message (non-zero)
@@ -703,7 +707,7 @@ BattleCD_ShowScriptMessage:
 ; (BattleCD_ShowTargetInfo: the caller's path that also puts the
 ; target's HP in BattleMsg_InfoArgs) of !BattleRom_MsgStrings
 ; (BattleCD_StartText),
-; sets !Battle_MsgShown = !BattleCD_MsgShownOn, !Battle_UnkCA24 + 1, and
+; sets !Battle_MsgShown = !BattleCD_MsgShownOn, !BattleFx_CeSetReload + 1, and
 ; !Battle_TextStepping = 1 so BattleCD_StepText draws it a step a frame.
 ; The key itself only goes to !Battle_InfoKey (the string's arguments
 ; are at $0200). DP $53 holds the string number.
@@ -751,7 +755,7 @@ BattleCD_ShowTargetInfo:                ; header: see BattleCD_ShowEnemyInfo
     JSR BattleCD_StartText
     LDA.b #!BattleCD_MsgShownOn
     STA.w !Battle_MsgShown
-    INC.w !Battle_UnkCA24
+    INC.w !BattleFx_CeSetReload
     LDA.b #1
     STA.w !Battle_TextStepping
 .done:
@@ -763,7 +767,7 @@ BattleCD_ShowTargetInfo:                ; header: see BattleCD_ShowEnemyInfo
 ; nothing while the word at !Battle_ScriptMsgUp is non-zero, when A is
 ; !Battle_InfoKey or when it is !BattleMsg_InfoNone; else !Battle_InfoKey
 ; = A, BattleCD_StartText, !Battle_MsgShown = !BattleCD_MsgShownOn,
-; !Battle_UnkCA24 + 1, !Battle_TextStepping = 1.
+; !BattleFx_CeSetReload + 1, !Battle_TextStepping = 1.
 ; Callers (2 sites: 1 JSR, 1 JMP): BattleMsg_ShowFromTableCC3A09Vec (JMP $CD:0027) and unmatched
 ;   (JSR $CD:7EDA).
 ; Callers note: the JSR byte pattern at $CD:7EDA lies in the bank's data
@@ -789,7 +793,7 @@ BattleCD_ShowTechInfo:
     JSR BattleCD_StartText
     LDA.b #!BattleCD_MsgShownOn
     STA.w !Battle_MsgShown
-    INC.w !Battle_UnkCA24
+    INC.w !BattleFx_CeSetReload
     LDA.b #1
     STA.w !Battle_TextStepping
 .done:
@@ -908,14 +912,14 @@ BattleCD_ApuCmd81:
 ;   - FieldBtl_EvtFlags bit 6 clear: BattleCD_ApuCmd81;
 ;   - the closing wipe (BattleCD_StartCloseWipe), waited for frame by
 ;     frame (BattleCD_WaitFrame, BattleCD_WipeRunning);
-;   - !Battle_UnkCA25 = !BattleCD_CA25Unk0E, !Battle_UnkCA24 + 1, a frame;
+;   - !BattleFx_CeSetBase = !BattleCD_CA25Unk0E, !BattleFx_CeSetReload + 1, a frame;
 ;   - with !Battle_Unk2A21 bit 0 set: BattleCD_LayerFx84 when
 ;     FieldBtl_Result is 0, else BattleCD_LayerFx87; with bit 4 set (and
 ;     bit 0 clear): BattleCD_LayerFx87 when FieldBtl_Result is non-zero;
-;   - !Battle_UnkCA25 = !BattleCD_CA25Unk08, !Battle_UnkCA24 + 1, a frame;
-;   - the NMI trampoline's target becomes BattleD1_NmiExit ($D1:F4C0, not
-;     matched); DP $45 = !Battle_Brightness (the brightness, for that
-;     handler to fade from, probably: not traced); waits
+;   - !BattleFx_CeSetBase = !BattleCD_CA25Unk08, !BattleFx_CeSetReload + 1, a frame;
+;   - the NMI trampoline's target becomes BattleFx_NmiAlt ($D1:F4C0);
+;     DP $45 = !Battle_Brightness (the brightness, which that handler
+;     writes to INIDISP every NMI); waits
 ;     (BattleCD_WaitNmiAck) until APUIO1 reads
 ;     0, unless FieldBtl_EvtFlags bit 6 is set (one wait then);
 ;   - !Battle_Unk2A21 = 0, AudioFadeDispatch (through ReentryVectors
@@ -950,8 +954,8 @@ BattleCD_ExitBattle:
     JSL BattleCD_WipeRunning
     BNE .wipe_wait
     LDA.b #!BattleCD_CA25Unk0E
-    STA.w !Battle_UnkCA25
-    INC.w !Battle_UnkCA24
+    STA.w !BattleFx_CeSetBase
+    INC.w !BattleFx_CeSetReload
     JSR BattleCD_WaitFrame
     LDA.w !Battle_Unk2A21
     AND.b #!Battle_2A21Bit0|!Battle_2A21Bit4
@@ -969,12 +973,12 @@ BattleCD_ExitBattle:
     JSR BattleCD_LayerFx87
 .no_end_fx:
     LDA.b #!BattleCD_CA25Unk08
-    STA.w !Battle_UnkCA25
-    INC.w !Battle_UnkCA24
+    STA.w !BattleFx_CeSetBase
+    INC.w !BattleFx_CeSetReload
     JSR BattleCD_WaitFrame
-    LDA.b #BattleD1_NmiExit>>16
+    LDA.b #BattleFx_NmiAlt>>16
     STA.w !NmiTrampoline+3
-    LDX.w #BattleD1_NmiExit&$FFFF
+    LDX.w #BattleFx_NmiAlt&$FFFF
     STX.w !NmiTrampoline+1
     LDA.w !Battle_Brightness
     STA.b !BattleCD_Tmp45
@@ -999,9 +1003,9 @@ BattleCD_ExitBattle:
     RTL
 
 ; $CD:044A — BattleCD_WaitNmiAck (9 bytes, $044A–$0452)
-; DP $47 = 1, then waits until something else (an interrupt handler,
-; probably BattleD1_NmiExit, which BattleCD_ExitBattle installs just
-; before: not traced) sets it back to 0.
+; DP $47 = 1, then waits until something else sets it back to 0 (at
+; both call sites the NMI handler is BattleFx_NmiAlt, which
+; BattleCD_ExitBattle installs just before and which zeroes DP $47).
 ; Callers (2 JSR sites): BattleCD_ExitBattle ($CD:0428, $CD:0446).
 ; Entry: M=1, X any, DP=0, DB any
 ; Exit:  M=1; A = 0; X, Y, DP, DB unchanged
@@ -1085,16 +1089,16 @@ BattleCD_IdleTick:
 ; pending sound (BattleCD_PlayPendingSfx); BattleCD_PauseWait; then,
 ; unless !Battle_DmaQueueBusy is set: ends the layer effect
 ; (BattleCD_EndLayerFx) when !Battle_BgFxEnded is set and no action runs
-; (!Battle_ActRunning 0); and when !Battle_UnkCD44 is set and
-; !Battle_UnkCD43 is 0, JSL BattleD1_UnkECF3 ($D1:ECF3, not matched) with
-; A = !Battle_UnkCD45 and !Battle_UnkCD44 = 0. Last, always, the text
+; (!Battle_ActRunning 0); and when !BattleFx_BgRequest is set and
+; !BattleFx_BgLoading is 0, JSL BattleFx_LoadBgSet ($D1:ECF3) with
+; A = !Battle_UnkCD45 and !BattleFx_BgRequest = 0. Last, always, the text
 ; step (BattleCD_StepText).
 ; Callers (5 sites: 4 JSL, 1 JMP): BattleSys_FrameTickVec (JMP $CD:0009), BattleCD_EnemyDissolve
 ;   (JSL $CD:0049), BattleCD_EnemyDissolveFx (JSL $CD:00FB), BattleCD_LayerFx84 (JSL $CD:0DDE) and
 ;   BattleCD_RunLayerFx (JSL $CD:0E1C).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E (RTL; as the callees leave them,
-;        assumed for the bank-$D1 one); A, X, Y clobbered
+; Exit:  M=1, X=0, DP=0, DB=$7E (RTL; as the callees leave them); A, X,
+;        Y clobbered
 BattleCD_FrameTick:
     LDA.w !Battle_Paused
     BNE .pause
@@ -1109,13 +1113,13 @@ BattleCD_FrameTick:
     BNE .unk_cd44
     JSR BattleCD_EndLayerFx
 .unk_cd44:
-    LDA.w !Battle_UnkCD44
+    LDA.w !BattleFx_BgRequest
     BEQ .text
-    LDA.w !Battle_UnkCD43
+    LDA.w !BattleFx_BgLoading
     BNE .text
     LDA.w !Battle_UnkCD45
-    JSL BattleD1_UnkECF3
-    STZ.w !Battle_UnkCD44
+    JSL BattleFx_LoadBgSet
+    STZ.w !BattleFx_BgRequest
 .text:
     JSR BattleCD_StepText
     RTL
@@ -1168,7 +1172,7 @@ BattleCD_StartOpenWipe:
 
 ; $CD:0516 — BattleCD_StartCloseWipe (30 bytes, $0516–$0533)
 ; The battle end's closing wipe: !Battle_UnkCE16 = 1, a frame,
-; !Battle_UnkCA25 = !BattleCD_CA25Unk0C and !Battle_UnkCA24 + 1, a frame,
+; !BattleFx_CeSetBase = !BattleCD_CA25Unk0C and !BattleFx_CeSetReload + 1, a frame,
 ; !Battle_WipeSteps = !BattleCD_WipeSteps, !Battle_WipeMode =
 ; !BattleCD_WipeClose.
 ; Callers (2 sites: 1 JSL, 1 JMP): BattleSys_VecCD000F (JMP $CD:000F) and BattleCD_ExitBattle (JSL
@@ -1181,8 +1185,8 @@ BattleCD_StartCloseWipe:
     STA.w !Battle_UnkCE16
     JSR BattleCD_WaitFrame
     LDA.b #!BattleCD_CA25Unk0C
-    STA.w !Battle_UnkCA25
-    INC.w !Battle_UnkCA24
+    STA.w !BattleFx_CeSetBase
+    INC.w !BattleFx_CeSetReload
     JSR BattleCD_WaitFrame
     LDA.b #!BattleCD_WipeSteps
     STA.w !Battle_WipeSteps
@@ -1300,15 +1304,15 @@ BattleCD_WipeStepClose:
 ; frame), by !Battle_WipeMode:
 ;   - 0: nothing;
 ;   - !BattleCD_WipeOpen ($FF, set by BattleCD_StartOpenWipe): first
-;     !Battle_UnkCA25 = 0 and JSL BattleCE_UnkEE6E ($CE:EE6E, not matched;
-;     A = !Battle_UnkCA22, set up the tables, probably), then the mode
+;     !BattleFx_CeSetBase = 0 and JSL BattleCE_UnkEE6E ($CE:EE6E, not matched;
+;     A = !BattleFx_CeSet, set up the tables, probably), then the mode
 ;     becomes 1;
 ;   - 1-$7F: while !Battle_WipeSteps is non-zero, BattleCD_WipeStepOpen
-;     and a step less; when that reaches 0, !Battle_UnkCA25 =
-;     !BattleCD_CA25Unk02 and !Battle_UnkCA24 + 1; on the next call (no
+;     and a step less; when that reaches 0, !BattleFx_CeSetBase =
+;     !BattleCD_CA25Unk02 and !BattleFx_CeSetReload + 1; on the next call (no
 ;     steps left) !Battle_UnkCE16 = 0 and the mode = 0;
 ;   - $80-$FE (!BattleCD_WipeClose): BattleCD_WipeStepClose and a step
-;     less; at 0, !Battle_UnkCA25 = 0, !Battle_UnkCA24 + 1 and the mode =
+;     less; at 0, !BattleFx_CeSetBase = 0, !BattleFx_CeSetReload + 1 and the mode =
 ;     0 (!Battle_UnkCE16 kept).
 ; Callers (2 JSR sites): BattleCD_NmiMain ($CD:08F5, $CD:08F8).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (as BattleCD_NmiMain sets it)
@@ -1324,14 +1328,14 @@ BattleCD_StepWipe:
     DEC.w !Battle_WipeSteps
     BNE .done
     LDA.b #!BattleCD_CA25Unk02
-    STA.w !Battle_UnkCA25
-    INC.w !Battle_UnkCA24
+    STA.w !BattleFx_CeSetBase
+    INC.w !BattleFx_CeSetReload
     BRA .done
 .closing:
     CMP.b #!BattleCD_WipeOpen
     BNE .close_step
-    STZ.w !Battle_UnkCA25
-    LDA.w !Battle_UnkCA22
+    STZ.w !BattleFx_CeSetBase
+    LDA.w !BattleFx_CeSet
     JSL BattleCE_UnkEE6E
     LDA.b #1
     STA.w !Battle_WipeMode
@@ -1340,8 +1344,8 @@ BattleCD_StepWipe:
     JSR BattleCD_WipeStepClose
     DEC.w !Battle_WipeSteps
     BNE .done
-    STZ.w !Battle_UnkCA25
-    INC.w !Battle_UnkCA24
+    STZ.w !BattleFx_CeSetBase
+    INC.w !BattleFx_CeSetReload
 .finish:
     LDA.w !Battle_WipeMode
     BMI .stop
@@ -1360,7 +1364,7 @@ BattleCD_TileUploadVram:
 ; ============================================================
 ; The NMI work ($CD:0607–$CD:0CA0)
 ; ============================================================
-; The bank-$D1 NMI handler ($D1:E77C, not matched) runs
+; The bank-$D1 NMI handler (BattleFx_Nmi, $D1:E77C) runs
 ; BattleCD_NmiDispatch every frame with M=1, X=0, DP=0 and DB=$00; it
 ; picks BattleCD_NmiSetup or BattleCD_NmiMain by !Battle_NmiMode.
 
@@ -1370,7 +1374,7 @@ BattleCD_TileUploadVram:
 ;     (!Battle_TilePageReq, set by BattleCD_RunFxScript): unless it is
 ;     the same slot (!Battle_TilePageSlot) and page (!Battle_TilePageSrc)
 ;     as the last one (!Battle_LastPageSlot / !Battle_LastPageSrc),
-;     JSL BattleD1_UploadPage ($D1:E8D9, not matched) with A:X = $7E:the
+;     JSL BattleFx_UploadMapBlock ($D1:E8D9) with A:X = $7E:the
 ;     page and DP $45 = the BattleCD_TileUploadVram word, and
 ;     !Battle_UnkA01F + 1; the request and slot are cleared;
 ;   - the message text, half a frame: !Battle_TextHalf + 1; with a
@@ -1414,7 +1418,7 @@ BattleCD_NmiUploadText:
 .upload:
     LDX.w !Battle_TilePageSrc
     LDA.b #!Battle_WramBank
-    JSL BattleD1_UploadPage
+    JSL BattleFx_UploadMapBlock
     INC.w !Battle_UnkA01F
 .text:
     LDX.w #!BattleCD_TextHalfBytes
@@ -1589,8 +1593,8 @@ BattleCD_ScrollFill:                    ; header: see BattleCD_ScrollPlain
 
 ; $CD:076C — BattleCD_ScrollFxBg3 (77 bytes, $076C–$07B8)
 ; As BattleCD_ScrollPlain, but layer 3's pair is the effect's scroll:
-; !Battle_FxScrollX + !Battle_FxScrollAddX + !Battle_ShakeOfs3X and
-; !Battle_FxScrollY + !Battle_FxScrollAddY + !Battle_ShakeOfs3Y; then
+; !BattleFx_ShakeX + !Battle_FxScrollAddX + !Battle_ShakeOfs3X and
+; !BattleFx_ShakeY + !BattleFx_BounceOut + !Battle_ShakeOfs3Y; then
 ; JMP BattleCD_ScrollFill.
 ; Callers note: none by call; BattleCD_ScrollModeTable entry 1 (JMP (T,X)
 ;   in BattleCD_NmiLayerScroll).
@@ -1619,15 +1623,15 @@ BattleCD_ScrollFxBg3:
     CLC
     ADC.w !Battle_ShakeOfs2Y
     STA.b !BattleCD_Tmp4B
-    LDA.w !Battle_FxScrollX
+    LDA.w !BattleFx_ShakeX
     CLC
     ADC.w !Battle_FxScrollAddX
     CLC
     ADC.w !Battle_ShakeOfs3X
     STA.b !BattleCD_Tmp4D
-    LDA.w !Battle_FxScrollY
+    LDA.w !BattleFx_ShakeY
     CLC
-    ADC.w !Battle_FxScrollAddY
+    ADC.w !BattleFx_BounceOut
     CLC
     ADC.w !Battle_ShakeOfs3Y
     STA.b !BattleCD_Tmp4F
@@ -1707,15 +1711,15 @@ BattleCD_ScrollWaves:
     CLC
     ADC.w !Battle_ShakeOfs2Y
     STA.b !BattleCD_Tmp4B
-    LDA.w !Battle_FxScrollX
+    LDA.w !BattleFx_ShakeX
     CLC
     ADC.w !Battle_FxScrollAddX
     CLC
     ADC.w !Battle_ShakeOfs3X
     STA.b !BattleCD_Tmp4D
-    LDA.w !Battle_FxScrollY
+    LDA.w !BattleFx_ShakeY
     CLC
-    ADC.w !Battle_FxScrollAddY
+    ADC.w !BattleFx_BounceOut
     CLC
     ADC.w !Battle_ShakeOfs3Y
     STA.b !BattleCD_Tmp4F
@@ -1789,27 +1793,27 @@ BattleCD_ScrollWaves:
 ;   - channel 7's window table (BattleCD_SetWh0Table, with DB=$00 around
 ;     it); two wipe steps (BattleCD_StepWipe); HDMAEN = !Battle_HdmaEnable;
 ;   - paused (!Battle_Paused): INIDISP = !Battle_Brightness, halved
-;     unless the ROM byte !BattleRom_PauseFullBright is non-zero (it is
+;     unless the ROM byte !BattleRom_DebugSlowMo is non-zero (it is
 ;     0, so the screen is dimmed); the pad (BankC2_Entry8002,
 ;     BattleCD_PadRepeat); RTS;
 ;   - else INIDISP = !Battle_Brightness; the scroll data
 ;     (BattleCD_NmiLayerScroll); the shake (BattleCD_StepShake); on even
 ;     frames with no wipe: when !Battle_UnkEC differs from
-;     !Battle_UnkCA21, the latter toggles (0/1) and !Battle_UnkEC takes
+;     !BattleFx_CeSetWant, the latter toggles (0/1) and !Battle_UnkEC takes
 ;     its value; and while
-;     !Battle_UnkCD27 bit 5 is clear a new press of !Battle_PadHeld bit 0
+;     !BattleFx_Unk2989Copy bit 5 is clear a new press of !Battle_PadHeld bit 0
 ;     toggles them once more (!Battle_UnkCA23 holds it until the button
 ;     is let go);
 ;   - with !Battle_Unk2A21 bit 0: JSL BattleCE_UnkE18E, and on the frames
-;     where !Battle_FrameCount AND !Battle_UnkCE13 is 0 JSL
-;     BattleD1_UnkEA4B (not matched);
+;     where !Battle_FrameCount AND !BattleFx_GradTickMask is 0 JSL
+;     BattleFx_HpGradientTick;
 ;   - unless !Battle_UnkCD2D or !Battle_UnkA028: JSL BattleCE_UnkF066;
 ;     BankC1_VecCFE58A (the bank-$CF frame update); unless !Battle_UnkCD2E
 ;     or !Battle_UnkA028, while an action runs, BattleCD_Unk3B82 with A =
 ;     !BattleCD_Unk3B82Arg;
 ;   - the layer effect's script channels (BattleCD_StepFxChannels);
 ;     !Battle_UnkA028 = !Battle_UnkCD29; BattleCD_ClampPalAnims; JSL
-;     BattleD1_UnkF426 (not matched) and FdVec_FFF7 (the palette
+;     BattleFx_HoldAnimsTick and FdVec_FFF7 (the palette
 ;     animations, PalAnim_TickAll);
 ;     BattleCD_TickCDC9; the pad (BankC2_Entry8002, BattleCD_PadRepeat).
 ; Callers note: none by call; BattleCD_NmiTable entries 1 and 2 (JSR (T,X)
@@ -1869,7 +1873,7 @@ BattleCD_NmiMain:
     STA.l HDMAEN
     LDA.w !Battle_Paused
     BEQ .running
-    LDA.l !BattleRom_PauseFullBright
+    LDA.l !BattleRom_DebugSlowMo
     BEQ .dim
     LDA.w !Battle_Brightness
     BRA .brightness
@@ -1892,26 +1896,26 @@ BattleCD_NmiMain:
     LDA.w !Battle_WipeMode
     BNE .bank_ce
     LDA.b !Battle_UnkEC
-    CMP.w !Battle_UnkCA21
+    CMP.w !BattleFx_CeSetWant
     BEQ .button
-    LDA.w !Battle_UnkCA21
+    LDA.w !BattleFx_CeSetWant
     INC A
     AND.b #1
-    STA.w !Battle_UnkCA21
+    STA.w !BattleFx_CeSetWant
     STA.b !Battle_UnkEC
 .button:
-    LDA.w !Battle_UnkCD27
-    AND.b #!Battle_CD27Bit5
+    LDA.w !BattleFx_Unk2989Copy
+    AND.b #!Battle_2989NoPause
     BNE .released
     LDA.b !Battle_PadHeld
     AND.b #!BattleCD_PadToggleBit
     BEQ .released
     LDA.w !Battle_UnkCA23
     BNE .bank_ce
-    LDA.w !Battle_UnkCA21
+    LDA.w !BattleFx_CeSetWant
     INC A
     AND.b #1
-    STA.w !Battle_UnkCA21
+    STA.w !BattleFx_CeSetWant
     STA.b !Battle_UnkEC
     LDA.b #1
     STA.w !Battle_UnkCA23
@@ -1924,9 +1928,9 @@ BattleCD_NmiMain:
     BEQ .unk_ce_f066
     JSL BattleCE_UnkE18E
     LDA.b !Battle_FrameCount
-    AND.w !Battle_UnkCE13
+    AND.w !BattleFx_GradTickMask
     BNE .unk_ce_f066
-    JSL BattleD1_UnkEA4B
+    JSL BattleFx_HpGradientTick
 .unk_ce_f066:
     LDA.w !Battle_UnkCD2D
     BNE .frame_update
@@ -1948,7 +1952,7 @@ BattleCD_NmiMain:
     LDA.w !Battle_UnkCD29
     STA.w !Battle_UnkA028
     JSR BattleCD_ClampPalAnims
-    JSL BattleD1_UnkF426
+    JSL BattleFx_HoldAnimsTick
     JSL FdVec_FFF7
     JSR BattleCD_TickCDC9
     JSL BankC2_Entry8002
@@ -1960,11 +1964,12 @@ BattleCD_NmiMain:
 ; !Battle_PaletteLiveLo (bank $7E), to CGRAM from colour 0 by DMA on
 ; channel 7 (one register written twice: CGDATA). DAS7B is zeroed
 ; first.
-; Callers (3 JSL sites): BattleCD_NmiMain ($CD:0893), BattleCD_NmiSetup ($CD:09F1) and unmatched
-;   ($D1:F4DE).
+; Callers (3 JSL sites): BattleCD_NmiMain ($CD:0893), BattleCD_NmiSetup ($CD:09F1) and
+;   BattleFx_NmiAlt ($D1:F4DE).
 ; Entry: M=1, X=0 (the 16-bit STX pairs), DP any, DB=$00 (the registers
-;        are written .w; both callers in this bank have DB=$00, the
-;        bank-$D1 one is not traced)
+;        are written .w; both callers in this bank have DB=$00;
+;        BattleFx_NmiAlt calls it with the interrupted code's DB, see
+;        its header)
 ; Exit:  M=1, X=0; A = !MDMAEN_Ch7; X = !Battle_CgramBytes; Y, DP, DB
 ;        unchanged
 BattleCD_UploadCgram:
@@ -1992,7 +1997,7 @@ BattleCD_UploadCgram:
 ; with DB=$7E: JSL BankC1_VecCCE000 when !Battle_UnkCAD3 is set; with
 ; DB=$00: channel 7 (BattleCD_SetWh0Table), HDMAEN = $FF (all eight),
 ; INIDISP = !Battle_Brightness; back to DB=$7E: the scroll data
-; (BattleCD_ScrollPlain), BattleCD_ClampPalAnims, JSL BattleD1_UnkF426
+; (BattleCD_ScrollPlain), BattleCD_ClampPalAnims, JSL BattleFx_HoldAnimsTick
 ; and FdVec_FFF7 (the palette animations), BattleCD_TickCDC9.
 ; Callers note: none by call; BattleCD_NmiTable entry 0 (JSR (T,X) in
 ;   BattleCD_NmiDispatch).
@@ -2089,26 +2094,26 @@ BattleCD_NmiSetup:
     PLB
     JSR BattleCD_ScrollPlain
     JSR BattleCD_ClampPalAnims
-    JSL BattleD1_UnkF426
+    JSL BattleFx_HoldAnimsTick
     JSL FdVec_FFF7
     JSR BattleCD_TickCDC9
     RTS
 
 ; $CD:0ADE — BattleCD_TickCDC9 (16 bytes, $0ADE–$0AED)
 ; While FieldAnimB[0].Unk4 (palette animation record 0's frame counter)
-; is 0: !Battle_UnkCDC9 counts down and wraps from
-; below 0 to !BattleCD_CDC9Period (a 14-frame cycle, 13 down to 0; what
-; reads it is not traced).
+; is 0: !BattleFx_GradStart counts down and wraps from
+; below 0 to !BattleCD_CDC9Period (a 14-frame cycle, 13 down to 0;
+; BattleFx_HpGradientTick rotates the gradient's colours by it).
 ; Callers (2 JSR sites): BattleCD_NmiMain ($CD:09C3) and BattleCD_NmiSetup ($CD:0ADA).
 ; Entry: M=1, X any, DP any, DB=$7E
 ; Exit:  M=1; A clobbered; X, Y unchanged
 BattleCD_TickCDC9:
     LDA.w FieldAnimB[0].Unk4
     BNE .done
-    DEC.w !Battle_UnkCDC9
+    DEC.w !BattleFx_GradStart
     BPL .done
     LDA.b #!BattleCD_CDC9Period
-    STA.w !Battle_UnkCDC9
+    STA.w !BattleFx_GradStart
 .done:
     RTS
 
@@ -2383,9 +2388,10 @@ BattleCD_NmiTable:
 ; The field's ScrollStepAccum (through ReentryVectors vector [1]: the
 ; drift of layers 2 and 3 in FieldBtlPpu.Scroll2) between PHB/PHD/PHP
 ; and PLP/PLD/PLB, then A = D (TDC) and RTL. JSL from the bank-$D1 code
-; ($D1:E7E3 in the NMI handler unless !Battle_Paused, $D1:F1D7 and
-; $D1:F549; not matched).
-; Callers (3 JSL sites): unmatched ($D1:E7E3, $D1:F1D7, $D1:F549).
+; (BattleFx_Nmi unless !Battle_Paused, BattleFx_Init and
+; BattleFx_NmiAlt).
+; Callers (3 JSL sites): BattleFx_Nmi ($D1:E7E3), BattleFx_Init ($D1:F1D7) and BattleFx_NmiAlt
+;   ($D1:F549).
 ; Entry: M=1 (ScrollStepAccum needs it), X any, DP any, DB any (all
 ;        saved and restored)
 ; Exit:  M, X, DP, DB as on entry; A = D (0 when DP=0; B = 0 then); X, Y
@@ -2404,8 +2410,8 @@ BattleCD_ScrollStepL:
 ; $CD:0C95 — BattleCD_NmiDispatch (8 bytes, $0C95–$0C9C)
 ; The NMI's bank-$CD work: runs BattleCD_NmiTable entry !Battle_NmiMode
 ; (0 BattleCD_NmiSetup, 1 and 2 BattleCD_NmiMain), then RTL. JSL from
-; the bank-$D1 NMI handler ($D1:E7DA, not matched).
-; Callers (1 JSL site): unmatched ($D1:E7DA).
+; the bank-$D1 NMI handler (BattleFx_Nmi, $D1:E7DA).
+; Callers (1 JSL site): BattleFx_Nmi ($D1:E7DA).
 ; Entry: M=1, X=0, DP=0, DB=$00 (the handler set them: REP #$30, D = 0,
 ;        DB = 0 from TDC, SEP #$20); B = 0 (the 16-bit TAX; the
 ;        handler's TDC leaves it)
@@ -2419,9 +2425,9 @@ BattleCD_NmiDispatch:
     RTL
 
 ; $CD:0C9D — BattleCD_InitHdmaDataL (4 bytes, $0C9D–$0CA0)
-; BattleCD_InitHdmaData as a long call (JSL from BattleD1_InitBattle at
-; $D1:F1DB, not matched).
-; Callers (1 JSL site): unmatched ($D1:F1DB).
+; BattleCD_InitHdmaData as a long call (JSL from BattleFx_Init at
+; $D1:F1DB).
+; Callers (1 JSL site): BattleFx_Init ($D1:F1DB).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (as BattleCD_InitHdmaData needs)
 ; Exit:  as BattleCD_InitHdmaData, returning with RTL
 BattleCD_InitHdmaDataL:
@@ -2632,10 +2638,10 @@ BattleCD_LayerFx87:
 
 ; $CD:0DB1 — BattleCD_LayerFx84 (73 bytes, $0DB1–$0DF9)
 ; The other end effect: BattleCD_ApuCmd81, frames until APUIO1 reads 0,
-; !Battle_UnkCE13 = 3, !Battle_UnkCE0E = $80; the wait below once; 128
+; !BattleFx_GradTickMask = 3, !BattleFx_GradForce = $80; the wait below once; 128
 ; more frames; effect !BattleCD_FxEnd84 (BattleCD_RunEndFx); and the wait
 ; again. The wait (.wait): two frames and a BattleCD_FrameTick, again
-; while !Battle_UnkCE0B is 2 or more or any of !Battle_UnkCE0A,
+; while !BattleFx_GradLevel is 2 or more or any of !BattleFx_GradFading,
 ; !Battle_BgFxEnded, !Battle_ActRunning and !Battle_Unk5D9B is
 ; non-zero.
 ; Callers (1 JSR site): BattleCD_ExitBattle ($CD:03FF).
@@ -2648,9 +2654,9 @@ BattleCD_LayerFx84:
     LDA.l APUIO1
     BNE .wait_apu
     LDA.b #3
-    STA.w !Battle_UnkCE13
+    STA.w !BattleFx_GradTickMask
     LDA.b #!BattleCD_CE0EInit
-    STA.w !Battle_UnkCE0E
+    STA.w !BattleFx_GradForce
     JSR .wait
     LDA.b #!BattleCD_EndFxDelay
 .delay:
@@ -2663,12 +2669,12 @@ BattleCD_LayerFx84:
     JSR BattleCD_WaitFrame
     JSR BattleCD_WaitFrame
     JSL BattleCD_FrameTick
-    LDA.w !Battle_UnkCE0B
+    LDA.w !BattleFx_GradLevel
     CMP.b #2
     BCC .flags
     BRA .wait
 .flags:
-    LDA.w !Battle_UnkCE0A
+    LDA.w !BattleFx_GradFading
     ORA.w !Battle_BgFxEnded
     ORA.w !Battle_ActRunning
     ORA.w !Battle_Unk5D9B
@@ -2724,7 +2730,7 @@ BattleCD_RunLayerFx:
 
 ; $CD:0E23 — BattleCD_RestorePalRows (18 bytes, $0E23–$0E34)
 ; Copies the 16 bytes at !Battle_PalRowSave (colours 24-31, saved by
-; code not matched) back to bytes $30-$3F of both !Battle_PaletteSavedLo
+; BattleFx_Init) back to bytes $30-$3F of both !Battle_PaletteSavedLo
 ; and !Battle_PaletteLiveLo.
 ; Callers (2 JSR sites): BattleCD_EndLayerFx ($CD:049F) and BattleCD_FxRecSetup ($CD:0E35).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
@@ -2865,8 +2871,8 @@ BattleCD_LayerFxSetsScreen:
 ; !Battle_UnkA018 is 7, else becomes +1 when !Battle_UnkA017 is 7, else
 ; +2: a variant by the battle, probably):
 ;   - !Battle_LayerFxId = X; !Battle_UnkCD28 and !Battle_UnkCD3C = 0;
-;     the wave flags !Battle_WaveBg1-3 and the words !Battle_UnkCD38/3A
-;     = 0;
+;     the wave flags !Battle_WaveBg1-3 and the words at
+;     !BattleFx_BoxHalfHeight and !BattleFx_CountA = 0;
 ;   - when the effect sets the screen (BattleCD_LayerFxSetsScreen): with
 ;     !Battle_Unk2A21 bit 0, BattleCD_LoadFxPalB, 31 frames and BG2 off
 ;     the main screen (!Battle_HdmaScreens bit 1 cleared); else when
@@ -2928,8 +2934,8 @@ BattleCD_LoadLayerFx:
     STX.w !Battle_WaveBg1
     STX.w !Battle_WaveBg2
     STX.w !Battle_WaveBg3
-    STX.w !Battle_UnkCD38
-    STX.w !Battle_UnkCD3A
+    STX.w !BattleFx_BoxHalfHeight
+    STX.w !BattleFx_CountA
     JSR BattleCD_LayerFxSetsScreen
     BCC .record
     LDA.w !Battle_Unk2A21
