@@ -630,12 +630,51 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Stubs added: `Menu_UnkB83E` (the HP / MP item's member cursor, in mode 3's range),
    `Menu_VramRecBg3Rows0` ($C2:FC37), `Menu_VramRecDigits` ($C2:FC5A). Open: which register the
    slide HDMA tables feed; what `Menu_ItemInfo0` bit 3, the `$FF:B310` strings, record bytes
-   $2F-$34 (`.StatCounts`) and `Menu_Unk0D7E` mean. Still unmatched in bank $C2: $B35D-$BF34
-   (mode 3), $BF3D-$C510 (mode 4), $C550-$C620, $C627-$C7A5, $C7AC-$CED3, $CEDC-$D155 (modes 5-7),
-   $D32C-$D4EF, $D4F8-$D518, $D52B-$E1E2, $E1ED-$E60A, $E613-$E91A (modes $0B-$0E), $F905-$F90B,
-   $F943-$FC6E (`Menu_UnkFA49` and the VRAM records), $FCA6-$FE09 and $FE0C-$FFFF. Next in reach
-   order: mode 3 from `Menu_UnkB83E` ($B35D on), `Menu_UnkFA49` with the VRAM records, then modes
-   4-7 (`BankFF_UnkF9C4`/`F813`/`F958` are matched: item 9).
+   $2F-$34 (`.StatCounts`) and `Menu_Unk0D7E` mean.
+   Also matched (branch match-c2-modes34): mode 3, the tech screen, $C2:B35D-$BF34 (handlers
+   `Menu_Mode03H0`-`H4`, `Menu_Mode03Init`, `Menu_Icon2Preview`/`Redraw` (were `Menu_UnkB8DA`/
+   `B960`); the member window with its scroll `Menu_TechMemberScroll`/`ScrollAnim` and page
+   (`Menu_TechPage`, Left / Right: tech bytes 0-6, 7-21, 22-36 of `Menu_TechShown` by
+   `Menu_TechPages`, probably single / double / triple); the list `Menu_TechBuildList`
+   (`Menu_TechListBytes`, `Menu_TechListIds`, `Menu_TechFirstIds`), its rows, scroll and names
+   (`$CC:15C4`, 11 bytes); the MP cost `Menu_TechMpCost` (`$CC:253B`, combos through the bytes
+   `BankFF_UnkF813` builds at `Menu_TechMenuArea`) with `Menu_TechCostCut` (accessories $A2 halve,
+   $A3 quarter it); the combo partners `Menu_TechPartners`; the description through
+   `Menu_TechDescText`; the use of a tech with `Menu_TechInfo` (= `Menu_ItemInfo0` by tech id) bit 7
+   as the items' HP / MP restore (`$CC:2140` 12-byte records, `$CC:1ACB` target bit, the caster's
+   `.Derived+3` as the amount, the caster's copy object 7 animating), and `Menu_UseTargetCursor` /
+   `Menu_UseTargetCheck` (was the stub `Menu_UnkB83E`, shared with the items)); mode 4, the
+   settings screen, $C2:BF3D-$C510 (handlers `Menu_Mode04H0`-`H3`, `Menu_Mode04Init`,
+   `Menu_Icon3Preview`/`Redraw` (were `Menu_UnkC2FF`/`C397`), `Menu_CfgEntryRun` with
+   `Menu_CfgEntryTable` and its 12 entry routines over `Menu_CfgA3`-`Menu_CfgBMid`, the button map
+   editor `Menu_CfgMapCursor`/`Assign`/`Set`/`Swap`/`FixPages` with its clash lists, the marks,
+   selectors and entry icon); and $C2:F943-$FC6E: the text threads (`Menu_CfgEntryText` with
+   `Menu_CfgTextThread`/`Menu_CfgValueThread`, `Menu_StartDescText` (was `Menu_UnkFA49`) with
+   `Menu_DescTextThread`, the step loop `Menu_TextStepLoop` and `Menu_TextUpload`), the tile word
+   writers `Menu_PutTextTiles`/`Menu_PutTextTilesAttr` and all 23 VRAM records there (the stubs
+   `Menu_VramRecClock` ... `Menu_VramRecDigits` are real labels now). Found: slot 2 is the text
+   thread (`Menu_TextSlotBit`); `$0D18` in mode 3 is `Menu_RepeatFast`; `Menu_Unk0DC9`/`0DCC`/
+   `0DD0` are the text steps per frame, the text rows' VRAM address and size; `Menu_CfgButtonMap`
+   (`Menu_Unk0408`) is the map `Menu_CfgA4` selects. Quirks recorded: `Menu_TechDrawMembers` draws
+   the empty rows as many times as the rows drawn (not 3 minus them); `Menu_TechTargetRows` reads
+   `Menu_Unk0D38` by member row, not character; `Menu_TechMpCost` stores a word on pages 1-2;
+   `Menu_TechFirstIds`' last end is `Menu_TechPages`' first byte; `Menu_CfgMapClashPtrs` has 7
+   pointers for 8 lists, so an index of 7 reads `$C2:0107` (`Menu_CfgMapClash7` unreferenced);
+   `Menu_CfgToggleInvert`'s 11th byte is only a word's high byte; `Menu_VramRecTechLow`'s last byte
+   is an opcode. Re-review needed (verified headers or sources edited): `Menu_MainPreviewTable`,
+   `Menu_MainRedrawTable` (the icon 2/3 names), `Menu_UseItem`, `Menu_UseHealItem` with
+   `Menu_UseTargets` (the `Menu_UseTargetCursor` name), `Menu_DrawDescText` (the
+   `Menu_StartDescText` name; its Entry DP is $0000, needed by `Menu_StartThread`) and
+   `BankFF_CharBits` (two readers now matched). Stubs added: `Menu_UnkC54F` (its first byte is
+   `Menu_WindowVramRec`'s last: the map applied to `Menu_ButtonMap` and drawn), `Menu_UnkC57A`,
+   `Menu_UnkC5C7`. Open: what the settings bytes do in the game, sound command $F3 (probably
+   stereo / mono), `Menu_CfgEntryByte` entry 5 ($0D91), `Menu_TechUnk0F4E/0F51/0F73`, the draw
+   lists of modes 3 and 4, `MenuRom_TechData`'s other bytes, the unreferenced VRAM records' users.
+   Still unmatched in bank $C2: $C550-$C620 (mode 4's button map drawing), $C627-$C7A5,
+   $C7AC-$CED3, $CEDC-$D155 (modes 5-7), $D32C-$D4EF, $D4F8-$D518, $D52B-$E1E2, $E1ED-$E60A,
+   $E613-$E91A (modes $0B-$0E), $F905-$F90B, $FCA6-$FE09 and $FE0C-$FFFF. Next in reach order:
+   `Menu_UnkC54F`-`C5C7` (the routine at $C54F starts on `Menu_WindowVramRec`'s last byte), then
+   modes 5-7.
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:
