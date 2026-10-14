@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$12DD,Spc_NullCommand,2026-10-09,rev172a,approved,7b6cac221e8c,"Lone RET; fix verified: $073D does sbc #$C4 (C=1 after cmp/bcc at $050A), pushes $1554+2n; $1596/$159A=$12DD ($E5,$E7, 0 arg bytes); 10+9 table entries match; no other $12DD words"
