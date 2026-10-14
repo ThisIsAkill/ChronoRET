@@ -47,7 +47,7 @@ if !ram_menu_inc == 0
                                          ; from Menu_BuildPartyLists
 !Menu_Config = $2990                     ; 32 B $2990-$29AF zeroed by Menu_ClearConfigAndFlags; the first
                                          ; 12 get MenuRom_DefaultConfig
-!Menu_ButtonMap = $2993                  ; 8 B: the JOY1 mask behind each mapped button bit (Menu_MapButtons)
+!Menu_ButtonMap = $2993                  ; 8 B: the mask (Pad_Pressed layout) behind each mapped button bit (Menu_MapButtons)
 !Menu_Config01 = $7E2991                 ; 8-bit; Menu_Config+1 as a long address; bits 0-2 pick the
                                          ; colour set Pal_LoadUnkRow0 loads and Field_UploadUnk1F00's graphics set
 !Menu_Config1E = $7E29AE                 ; 8-bit; Menu_Config+$1E as a long address; C2Scene_LoadScene copies it
@@ -56,8 +56,8 @@ if !ram_menu_inc == 0
                                          ; character n is recruited, probably (Menu_CmdJoin sets the
                                          ; character's BankFF_CharBits bit; BattleSys_AwardReserveExp reads it)
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs);
-                                         ; probably the gold (the C0 opcodes' gold sum; unmatched code at
-                                         ; $C2:FDF1 caps it at 9,999,999)
+                                         ; probably the gold (the C0 opcodes' gold sum; Menu_ShopCapGold
+                                         ; caps it at 9,999,999)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
 
 ; --- Joypad (Menu_PollPad / Menu_MapButtons), dp $F0-$FF with DP=$0000 ---
@@ -298,12 +298,12 @@ endstruct align 8
 !C2Scene_Unk02B1 = $02B1                 ; 3 B $02B1-$02B3 zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1B32 = $1B32                 ; 3 words $1B32-$1B37 set to $FFFF by C2Scene_LoadScene; the first
                                          ; is the byte offset of the C2Scene_ListA entry C2Scene_Mode3
-                                         ; acts on (who sets it is not matched)
+                                         ; acts on (set by C2Scene_ObjWatchIdle and C2Scene_FindTrigEntries)
 !C2Scene_Unk1B43 = $1B43                 ; 8-bit; zeroed by C2Scene_Mode3 and C2Scene_TrigListAB before a
                                          ; ListD script; C2Scene_TrigWatchWait waits for it to be non-zero
                                          ; (probably set by the script when it ends; not traced)
 !C2Scene_Unk1B45 = $1B45                 ; 16-bit; the address of the ListD script C2Scene_Mode3 started
-                                         ; (also read by unmatched code); use unknown
+                                         ; (also read by C2Scene_TrigListB and C2Scene_TrigListAB); use unknown
 !C2Scene_Unk027E = $027E                 ; 8-bit; non-zero keeps the zone task from changing the song
                                          ; (C2Scene_ZoneSoundWatch); use unknown
 !C2Scene_Unk027F = $027F                 ; 8-bit; C2Scene_ObjWatch copies C2Scene_Unk027E here before each
@@ -1016,6 +1016,7 @@ endstruct
                                          ; probably set per shop by the caller; not traced)
 !Menu_ShopQuot = $0036                   ; 3 B: the quotient Menu_ShopBuyQtyInit / SellQtyInit leave (the most
                                          ; the gold pays for / can still take)
+!Menu_ShopRem = $003A                    ; 4 B: Menu_ShopDivide's remainder
 !Menu_ShopProduct = $003E                ; 4 B: Menu_UnkFD58 / Menu_UnkFD68's product (probably)
 !Menu_ShopMulArg = $0004                 ; 3 B: the multiplicand of Menu_UnkFD68 (a price)
 !Menu_ShopMulLen = $0002                 ; 8-bit; its byte count (2 or 3)
@@ -1451,6 +1452,45 @@ endif
                                          ; character with its bit set without BankFF_TechStepLimit's check
 !Menu_Unk7F01CF = $7F01CF                ; 8-bit; set to $10 by BankFF_LoadSlotPart
 
+; --- Menu modes 5 and 7: the party order (Menu_Mode05H0 ...) ---
+!Menu_XchgPick = $0F00                   ; 8-bit; the first row picked: its Menu_XchgRows entry (the
+                                         ; position); Menu_XchgNoPick for none
+!Menu_XchgPick2 = $0F01                  ; 8-bit; the second (Menu_XchgSwap swaps the two positions)
+!Menu_XchgRows = $0F02                   ; 9 B: per row an entry: bits 0-3 the Menu_PartyOrder position,
+                                         ; bit 6 locked (Menu_XchgLockedBit), $80 empty; rows 0-2 the party
+!Menu_XchgReserveRows = $0F05            ; 6 B: the reserve rows (positions 3-8 with a character, in order)
+!Menu_XchgPartyCount = $0F0B             ; 8-bit; party rows that can be picked (not locked)
+!Menu_XchgReserveCount = $0F0C           ; 8-bit; reserve rows (0 with Menu_Unk0D36 set: Menu_XchgBuildRows' 16-bit STZ)
+!Menu_XchgCurEntry = $0F0D               ; 8-bit; the Menu_XchgRows entry under the cursor
+!Menu_XchgSong = $0F0E                   ; 8-bit; mode 7: the song to play again on leaving
+!Menu_XchgMusicOn = $0F0F                ; 8-bit; mode 7: non-zero when Menu_XchgMusic changed the music
+!Menu_XchgUnk0F12 = $0F12                ; 12 B copied from MenuRom_XchgUnkD57A (reader not traced)
+!Menu_XchgLastRow = $007F                ; 8-bit; the cursor's row at the last Menu_XchgCursor (the
+                                         ; Menu_Unk7F byte the main menu zeroes)
+!Menu_XchgSprIdx = $0022                 ; 16-bit; table entry x 2 of Menu_XchgRowMaps / Menu_XchgSprPos
+                                         ; (Menu_XchgAddSprite reads it as a word)
+!Menu_XchgRowIdx = $0024                 ; 8-bit; Menu_XchgPlaceSprites' row
+!Menu_XchgScrollPos = $0024              ; 16-bit; Menu_XchgScroll's draw position (column, row) of the
+                                         ; scrolling block
+!Menu_Unk7F01DF = $7F01DF                ; 8-bit; a BankFF_CharBits bit set: that character cannot be
+                                         ; moved in the party order (Menu_XchgBuildRows; writer not traced)
+!Menu_CharPalettes = $95A2               ; Menu_PalBuf colour $91: sprite palettes 1-7 from colour 1, $20 B a
+                                         ; character (Menu_LoadCharPalettes; Menu_XchgDimChar halves them)
+!Menu_Config1EAbs = $29AE                ; Menu_Config1E's byte, read absolute (Menu_XchgMusic)
+!Menu_Unk04FB = $04FB                    ; 8-bit; Menu_XchgLeave's last sound argument when non-zero
+                                         ; (writer not traced)
+
+; --- Save slot details (Menu_UnkD36C) and mode 6 ---
+!Menu_SlotDetail = $9890                 ; $40 B: the shown slot's Menu_SlotSummaries block (the
+                                         ; Menu_SprScratch RAM)
+!Menu_SlotHiliteBuf = $9720              ; 33 B: Menu_UnkCFFB's copy of Menu_SlotHiliteData
+!Menu_SlotMemberIdx = $0024              ; 16-bit; Menu_UnkD36C's party entry 0-2 (Menu_SlotMemberIcon reads
+                                         ; its low byte)
+!Menu_SlotTextWidth = $0026              ; 8-bit; TextWin_PenX after the slot's era string (its width in
+                                         ; pixels; reused while the string is unchanged)
+!C2Scene_Unk0299 = $0299                 ; 8-bit; Menu_Mode06H0 tests bit 6 with C2Scene_Unk0294 and
+                                         ; C2Scene_ObjBFlags (probably a third object's flags; use unknown)
+
 ; --- Menu mode 3: the tech screen ---
 !Menu_TechPage = $0418                   ; 8-bit; mode 3's page 0-2 (Left / Right; Menu_TechPages: probably single,
                                          ; double and triple techs); the last byte of Menu_Unk0415
@@ -1503,6 +1543,7 @@ endif
 !Menu_CfgSubOpen = $0F0E                 ; 8-bit; 1 while the cursor is on entries 10-11 (opened from entry 5)
 !Menu_CfgStyleEdit = $0F0F               ; 8-bit; bit 0: entry 6 steps the window style (the cursor held)
 !Menu_CfgMapEdit = $0F00                 ; 9 B: the button map handler 2 edits (a copy of Menu_CfgButtonMap)
+!Menu_CfgMapOld = $9890                  ; 8 B: Menu_UnkC5C7's copy of Menu_CfgButtonMap (the Menu_SprScratch RAM)
 !Menu_CfgButtonMap = $0408               ; 9 B: the button map Menu_CfgA4 selects (the Menu_Unk0408 bytes;
                                          ; Menu_UnkC54F takes it for Menu_ButtonMap when Menu_CfgA4 is set)
 !Menu_CfgIconMap = $3446                 ; 2 x 2 tile words: the cursor entry's icon (Menu_CfgEntryIcon)

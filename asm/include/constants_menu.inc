@@ -7,10 +7,11 @@
 if !constants_menu_inc == 0
 !constants_menu_inc = 1
 
-; --- ROM data read by matched bank-$C2 code (not matched itself yet) ---
-!MenuRom_DefaultConfig = $C2FCA6         ; 12 B copied to Menu_Config for a new game
-!MenuRom_DefaultButtonMap = $C2FCA9      ; = MenuRom_DefaultConfig+3: the 9 B from the button map on,
-                                         ; copied to Menu_Unk0408
+; --- ROM data read by bank-$C2 code (the first two are labels in bank $C2 now) ---
+!MenuRom_DefaultConfig = MenuRom_DefaultConfig ; $C2:FCA6, 12 B copied to Menu_Config for a new game
+                                         ; (the label in bank $C2)
+!MenuRom_DefaultButtonMap = MenuRom_DefaultButtonMap ; $C2:FCA9 = MenuRom_DefaultConfig+3: the 9 B from
+                                         ; the button map on, copied to Menu_Unk0408 (the label)
 !MenuRom_CharRecordInit = $CC0000        ; $280 B copied to Menu_CharRecords for a new game
 
 ; --- DMA ---
@@ -933,6 +934,7 @@ if !constants_menu_inc == 0
 !Menu_LabelTileC = $0100                 ; ... and of the row below
 !Menu_LabelTileD = $0110
 !Menu_TextWinMode = $80                  ; TextWin_Mode of Menu_DrawText (bit 7: pen X from 0; 2bpp)
+!Menu_TextWinMode4bpp = $81              ; ... of Menu_DrawText4bpp (low nibble 1: 4bpp)
 !Menu_TextStepCount = $20                ; TextWin_StepCount per TextWin_Step
 !Menu_TextLineBreak = 5                  ; TextWin_Status at which Menu_DrawText moves on $400 bytes
 
@@ -1780,6 +1782,149 @@ if !constants_menu_inc == 0
 !Menu_CfgCLowMap = $3064                 ; tilemap address of Menu_CfgCLow's row
 !Menu_CfgCLowAttr = $0C09                ; Menu_SetAttr2Rows: 9 tiles, $0C ...
 !Menu_CfgCLowLitAttr = $0003             ; ... the chosen value's 3 tiles, 0
+!MenuRom_ButtonLetters = $FFD554        ; 7 tile words: font letters A, X, L, R, B, Y, S for Pad_Pressed bits 7-1
+!Menu_CfgMapRowMap = $2E00               ; the map (VRAM $5800) Menu_CfgMapRowOfs offsets point into
+!Menu_CfgMapRows = $0006                 ; button map rows drawn (Menu_UnkC57A / Menu_UnkC5C7)
+!Menu_CfgMapBlank = $00FF                ; tile word after a row's letter (tile $FF, probably blank)
+!Menu_CfgMapNoMark = $FFFF               ; ... after an unchanged row's letter (Menu_UnkC5C7)
+!Menu_CfgMapMarkTile = $0031             ; ... before a changed row's new letter (tile $31, probably an arrow)
+!Menu_CfgMapOldBytes = $0008             ; bytes of Menu_CfgButtonMap copied to Menu_CfgMapOld
+!Menu_CfgMapForceMark = $FF              ; Menu_CfgMapOld entry of the cursor's row: always differs
+
+; --- Menu modes 5 and 7: the party order ---
+!MenuRom_XchgList = $FFBF7B              ; Menu_XchgInit's draw list
+!MenuRom_XchgListA = $FFBF05             ; Menu_XchgPreviewA's draw list
+!MenuRom_XchgListB = $FFBF48             ; Menu_XchgPreviewB's draw list
+!MenuRom_XchgPal = $FFCC64               ; 8 colours -> $60-$67
+!MenuRom_XchgUnkD57A = $FFD57A           ; 12 B copied to Menu_XchgUnk0F12
+!Menu_XchgPartyRows = 3                  ; rows 0-2: the party (positions 0-2); the reserve rows follow
+!Menu_XchgShownRows = 4                  ; reserve rows shown at a time (rows 3-6)
+!Menu_XchgObjects = 7                    ; objects 0-6: one per character (object = character)
+!Menu_XchgEmpty = $80                    ; Menu_XchgRows entry: no character
+!Menu_XchgLockedBit = $40                ; ... bit 6: the character cannot be picked
+!Menu_XchgNoPickMask = $C0               ; ... either
+!Menu_XchgPosMask = $BF                  ; ... without the locked bit
+!Menu_XchgNoPick = $FF                   ; Menu_XchgPick / Pick2: nothing picked
+!Menu_XchgRowsBytes = 9
+!Menu_XchgRecMask = $0F                  ; a Menu_CursorPos neighbour without the edge bit
+!Menu_XchgPoseStand = 0                  ; .Anim of a character's object ...
+!Menu_XchgPoseCursor = 1                 ; ... under the cursor ...
+!Menu_XchgPosePicked = $0B               ; ... picked
+!Menu_XchgPartyX = $03                   ; map column of the party's blocks ...
+!Menu_XchgReserveX = $13                 ; ... of the reserve's ...
+!Menu_XchgAloneX = $09                   ; ... and of the party's with only the party shown
+!Menu_XchgTopRow = 2                     ; map row of the first block (6 rows a block)
+!Menu_XchgMap = $2E00                    ; the map the blocks are on (Menu_VramRecClock sends it from $2E80)
+!Menu_XchgSavedPos = $2002               ; column 2, row 32: where the first pick's block is kept
+!Menu_XchgBlockSize = $060A              ; Menu_DrawArg4/5: a member's block, 10 tiles by 6 rows ...
+!Menu_XchgSwapSize = $050A               ; ... the 10 by 5 Menu_XchgSwap exchanges
+!Menu_XchgListPos = $0213                ; column $13, row 2: the reserve list's first block ...
+!Menu_XchgListSize = $180A               ; ... and the four shown, 10 by 24
+!Menu_XchgScratchUp = $2613              ; column $13, row 38: the list's copy for a scroll up ...
+!Menu_XchgScratchDown = $2013            ; ... row 32 for a scroll down
+!Menu_XchgScrollPx = $0008               ; Menu_ScrollStep (lines a frame)
+!Menu_XchgScrollFrames = $0006           ; frames of a scroll (6 x 8 = one 48-line block)
+!Menu_XchgUpYOfs = $D0                   ; Menu_CursorYOfs at a scroll's start: -48 ...
+!Menu_XchgDownYOfs = $30                 ; ... or 48
+!Menu_XchgSprAbove = $000E               ; Menu_XchgSprIdx of the row coming in from above (entry 7) ...
+!Menu_XchgSprBelow = $0010               ; ... from below (entry 8)
+!Menu_XchgReserveIdx = $0006             ; ... of the first reserve row (entry 3)
+!Menu_XchgSprIdxEnd = $0E                ; ... past the last shown reserve row
+!Menu_XchgAloneIdx = $0012               ; ... of party row 0 with only the party shown (entry 9)
+!Menu_XchgBlockRows = $0006              ; map rows of a member's block
+!Menu_XchgDimMap = $2E84                 ; Menu_XchgDimLocked: first map address ...
+!Menu_XchgDimAttr = $100E                ; ... and Menu_SetRowsAttr's A: 14 tiles, attribute bits $10
+!Menu_XchgAloneDimMap = $2E90            ; ... with only the party shown ...
+!Menu_XchgAloneDimAttr = $1010           ; ... 16 tiles
+!Menu_XchgAloneCursorX = $38             ; .X of cursor records 0-2 with only the party shown
+!Menu_XchgAloneWindow = $BF40            ; WH0 $40 / WH1 $BF then
+!Menu_XchgDimColours = $000F             ; colours Menu_XchgDimChar halves
+!Menu_XchgUnk0D0E = $01F0                ; Menu_Unk0D0E on this screen (as on the name screen)
+!Menu_XchgArrowDividend = $A400          ; divided by Menu_ListRows for Menu_ArrowMulA / MulB
+!Menu_XchgArrowXY = $12EC                ; Menu_ArrowX $EC, Menu_ArrowY $12
+!Menu_XchgHdmaBits = $01                 ; Menu_HdmaenShadow on this screen (not traced)
+!Menu_XchgWaveHdmaBit = $10              ; ... bit 4, set by Menu_XchgWaveThread
+!Menu_XchgPreviewBit = $02               ; Menu_Unk0D36 bit picking Menu_XchgPreviewTable's entry
+!Menu_XchgStringA = 4                    ; MenuRom_NameStrings string of Menu_XchgPreviewA ...
+!Menu_XchgStringB = 5                    ; ... with Menu_Unk0D7C set
+!Menu_XchgIconSpr = $48                  ; .Id of object 7 there ...
+!Menu_XchgIconYX = $20CA                 ; ... .ScreenY $CA, .ScreenX $20 ...
+!Menu_XchgIconAttr = $20                 ; ... .TileAttr's high byte
+!Menu_XchgStripMapA = $334C              ; Menu_PutTextTilesAttr's two strips: map addresses ...
+!Menu_XchgStripMapB = $33CC
+!Menu_XchgStripTiles = $0008             ; ... tiles ...
+!Menu_XchgStripA = $0100                 ; ... and first tile words
+!Menu_XchgStripB = $0121
+!Menu_XchgTextVram = $1000               ; Menu_XchgTextVramRec: VRAM word address ...
+!Menu_XchgTextVramBytes = $1000          ; ... and bytes
+!Menu_XchgScreenVram = $7000             ; Menu_XchgScreenVramRec: VRAM word address ...
+!Menu_XchgScreenVramBytes = $0600        ; ... and bytes
+!Menu_XchgSlot = $0010                   ; thread slot 2 (byte offset): mode 7's music and wave threads
+!Menu_XchgSongId = $3E                   ; the song mode 7 plays
+!Menu_XchgKeepMusicBit = $40             ; Menu_Unk7F01CF bit 6: keep the music
+!Menu_XchgFadeArgs = $0108               ; Menu_Tmp02 / Tmp03 for Audio_CmdUnk81 before the song: $08, $01
+!Menu_XchgVolumeArgs = $FF01             ; ... after it: $01, $FF
+!Menu_XchgCmdArg = $80                   ; Audio_CmdArg1 / Arg2 of Menu_XchgSendSound's first command
+!Menu_XchgResumeArg = $10                ; Menu_Tmp02 of Audio_CmdUnk81 after the field's song ...
+!Menu_XchgResumeFull = $FF               ; ... Tmp03 when Menu_Unk04FB is 0
+!Menu_XchgMainLayers = $17               ; TM in mode 7: BG1, BG2, BG3 and sprites
+!Menu_XchgBg3sc = $68                    ; BG3SC in mode 7 (map at VRAM $6800, 32 x 32)
+!Menu_XchgUnk0F12Bytes = $000C
+
+; --- Menu mode 6: the save screen, and the slot windows and details ---
+!MenuRom_SaveList = $FFC138              ; Menu_UnkD0E5's draw list
+!MenuRom_SaveAskList = $FFC16F           ; Menu_SaveAskOpen's draw list (the overwrite question)
+!MenuRom_SlotDetailList = $FFC15E        ; Menu_UnkD36C's draw lists: the details ...
+!MenuRom_SlotMemberList = $FFC168        ; ... and a member's row
+!MenuRom_SlotEraNibbles = $FFD296        ; a nibble per location (word +$32 of a summary): the string of
+                                         ; MenuRom_SlotEraStrings (probably the era)
+!MenuRom_SlotEraStrings = $FFD396        ; string table (TextWin_StrTable) of those strings
+!MenuRom_SlotIconPals = $FFCC84          ; 16 colours per character for its slot icon
+!Menu_SaveHdmaBits = $19                 ; Menu_HdmaenShadow on the save screen (not traced) ...
+!Menu_SaveAskHdmaBits = $75              ; ... under the overwrite question ...
+!Menu_SaveHdmaBitsB = $59                ; ... after it
+!Menu_SaveRecYes = 3                     ; the question's first cursor record (a confirm on it saves:
+                                         ; probably yes)
+!Menu_SaveSfx = $8A                      ; sound effect of a save (Audio_CmdPlaySfx) ...
+!Menu_SaveSfxArg = $80                   ; ... and its Audio_CmdArg1
+!Menu_SlotSaved = $FF                    ; Menu_SlotValid after a save
+!Menu_SaveClearMap = $3000               ; Menu_UnkD065 zeroes $600 bytes from here ...
+!Menu_SaveClearBytes = $0600
+!Menu_SaveUnk0D0E = $FFFF                ; ... and sets Menu_Unk0D0E to this
+!Menu_SlotHiliteBytes = $0021            ; bytes of Menu_SlotHiliteData
+!Menu_SlotHiliteMoveBytes = $0010        ; bytes of Menu_ScrollSaved copied and moved by the NMI
+!Menu_SlotHiliteLines = $20              ; line count of the highlighted entry
+!Menu_SlotHiliteHdmaBits = $C0           ; Menu_HdmaenShadow bits set: Menu_NmiMoveReq and channel 6
+!Menu_SlotWinMap = $4EC6                 ; Menu_DrawSlotWindows: slot 0's map address ($100 a slot)
+!Menu_SlotLabelAttr = $30                ; the label's attribute byte ...
+!Menu_SlotLabelTiles = $0002             ; ... its tiles
+!Menu_SlotTextTiles = $0010              ; tiles of a slot's text
+!Menu_SlotTextTile0 = $20                ; slot 0's first text tile (and the step to the next slot's)
+!Menu_SlotWinMapA = $3E8C                ; Menu_UnkD32C: slot 0's window address ($100 a slot) ...
+!Menu_SlotWinSize = $0418                ; ... its window, 24 x 4 tiles ...
+!Menu_SlotBoxCol = $0004                 ; ... and the box at column 2 of its first row ...
+!Menu_SlotBoxSize = $0404                ; ... 4 x 4 tiles
+!Menu_SlotDetailBytes = $0040
+!Menu_SlotClockMap = $3310               ; tilemap address of the slot's play time
+!Menu_SumTimeOfs = $39                   ; summary offsets: the play-time digits (as Menu_DrawClock reads them) ...
+!Menu_SumLocOfs = $32                    ; ... the location word (SRAM +$05F3 AND $1FF)
+!Menu_SlotEraWordMask = $01FF            ; the AND after the nibble table's word load
+!Menu_SlotEraMask = $0F                  ; a nibble: the string number
+!Menu_SlotEraVram = $7808                ; Menu_SlotEraVramRec: VRAM word address ...
+!Menu_SlotEraVramBytes = $01F0           ; ... and bytes
+!Menu_SlotMemberRowBytes = $00C0         ; three map rows a member
+!Menu_SlotIconOfs = $005E                ; the icon's offset from Menu_MapPtr (row 1, column 15)
+!Menu_SlotIconAttr = $11                 ; its attribute byte: tile bit 8, palette 4 (+ the member)
+
+; --- The unreferenced VRAM record at $C2:E914 ---
+!Menu_VramRecE914Dest = $5840           ; Menu_VramRecUnkE914: VRAM word address ...
+!Menu_VramRecE914Src = $2E80             ; ... WRAM source ...
+!Menu_VramRecE914Bytes = $0080           ; ... and bytes
+
+; --- Shop arithmetic ($C2:FCB2-$C2:FE09) ---
+!Menu_GoldMax = $98967F                  ; 9,999,999: Menu_ShopCapGold's limit of the gold
+!Menu_GoldCapped = $FF                   ; Menu_ShopCapGold's X when it capped
+!Menu_ShopDivBits = $0018                ; Menu_ShopDivide's steps: a 24-bit dividend
 
 ; --- Menu text threads ---
 !MenuRom_CfgTextTable = $FFD3FE          ; string table of the settings texts (entry, then value strings)
