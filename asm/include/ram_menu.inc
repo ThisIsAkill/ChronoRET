@@ -995,6 +995,42 @@ struct C2Scene_SwirlTask $0000
             skip $26
 endstruct
 
+; --- Menu modes $0B-$0E: the shop (mode $0C) ---
+!Menu_ShopIds = $1000                    ; 32 B: the shop's item ids (0 ends the list), from MenuRom_ShopLists
+!Menu_ShopHeld = $1020                   ; 32 B: per shop item, the count of its first inventory slot (0: none)
+!Menu_ShopBuyRow = $1040                 ; 8-bit; the buy list's cursor row (kept with Menu_CfgA5)
+!Menu_ShopBuyTop = $1041                 ; 8-bit; ... and its top entry
+!Menu_ShopSellRow = $1042                ; 8-bit; the same for the sell list
+!Menu_ShopSellTop = $1043                ; 8-bit
+!Menu_ShopPrice = $1044                  ; 24-bit: the price shown in a list row, then the count's total
+!Menu_ShopPriceHi = $1046                ; 8-bit; its third byte
+!Menu_ShopUnitPrice = $1047              ; 16-bit; the price of one (Menu_ShopBuyQtyInit / SellQtyInit)
+!Menu_ShopSellLen = $1049                ; 8-bit; entries of the sell list (Menu_ShopSellBuild)
+!Menu_ShopBuyLen = $104A                 ; 8-bit; entries of the buy list (Menu_ShopCountIds)
+!Menu_ShopMemberCount = $1055            ; 8-bit; members Menu_ShopListMembers put in Menu_EquipChars
+!Menu_ShopBuyPrices = $6E00              ; a word per item id: the buy price (Menu_ShopCalcPrices)
+!Menu_SellIds = $5600                    ; the sell list's ids (Menu_ShopSellBuild; 0 ends it)
+!Menu_SellCounts = $5700                 ; ... and their counts
+!Menu_ShopSavedPos = $9990               ; $48 B: Menu_CursorPos records 0-11 saved by Menu_ShopInit
+!Menu_PriceFactor = $7F01CD              ; 16-bit; the buy prices' factor in 256ths (Menu_ShopCalcPrices;
+                                         ; probably set per shop by the caller; not traced)
+!Menu_ShopQuot = $0036                   ; 3 B: the quotient Menu_ShopBuyQtyInit / SellQtyInit leave (the most
+                                         ; the gold pays for / can still take)
+!Menu_ShopProduct = $003E                ; 4 B: Menu_UnkFD58 / Menu_UnkFD68's product (probably)
+!Menu_ShopMulArg = $0004                 ; 3 B: the multiplicand of Menu_UnkFD68 (a price)
+!Menu_ShopMulLen = $0002                 ; 8-bit; its byte count (2 or 3)
+!Menu_ShopAttrArg = $0002                ; 16-bit; Menu_ShopMemberAttr's A: tiles per row (low byte) and
+                                         ; the attribute bits to set (high byte)
+!Menu_ShopIndex = $0004                  ; 16-bit; Menu_ShopToMembers' member index
+!Menu_ShopRow = $0022                    ; 8-bit; a shop list's row (or member) counter
+!Menu_ShopSlotOfs = $0022                ; 16-bit; Menu_ShopMemberInfo's record offset of the item's slot
+!Menu_ShopInfoOfs = $0061                ; 16-bit; Menu_ShopMemberInfo's map offset of the member (8 a member)
+!Menu_ShopLast = $0083                   ; 8-bit; the list entry shown last (the member info is redrawn on a
+                                         ; change; $FF: none), or the count before a step (Menu_ShopQtyStep)
+!Menu_ShopMemberSel = $0079              ; 8-bit; the member sprites' cursor record, kept for handler 6
+!Menu_ShopMenuSel = $0080                ; 8-bit; the top row's cursor record, kept while handler 6 runs
+!Menu_ShopListSel = $007F                ; 8-bit; the list's cursor record, kept while the count window shows
+
 ; --- The menu's NMI (Menu_Nmi): dp offsets from Menu_NmiDp ($0D00) ---
 !Menu_NmiFrames = $00                    ; 8-bit; +1 every menu NMI
 !Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_NmiUpload) and

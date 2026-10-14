@@ -37,7 +37,7 @@ org $FFF548
 ;     traced); then zeroes the first 16 bytes of Menu_TileSetC.
 ; Menu_Unk51 is the start offset of both output loops, and of the glyph
 ; reads of the second (the caller keeps it 0, probably; not traced).
-; Callers (1 JSL site): unmatched ($C2:DB5B).
+; Callers (1 JSL site): Menu_ShopInit ($C2:DB5B).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_Tmp00-07,
 ;        Menu_Unk51), DB any (the first MVN sets $7E before the absolute
 ;        accesses)
@@ -168,7 +168,7 @@ BankFF_BuildTileSets:
 ; AND #$0700; DP $01 is not used): Menu_PalBuf + $122 + n * 32 (colours
 ; $91-$9C of palette 9 + n). When DP $02's high byte is non-zero each colour is
 ; halved first ((colour >> 1) & $3DEF).
-; Callers (2 JSL sites): unmatched ($C2:E038, $C2:E093).
+; Callers (2 JSL sites): Menu_ShopToMembers ($C2:E038) and Menu_ShopDimMembers ($C2:E093).
 ; Entry: M, X any (P and X saved; REP #$30 here), DP=0 (Menu_Tmp00 and
 ;        Menu_Tmp02: the arguments), DB=$7E (Menu_PalDirty; the halved
 ;        path stores with STA abs,Y)
