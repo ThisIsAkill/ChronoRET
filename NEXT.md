@@ -567,8 +567,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `EngFD_UnkD52D`; the HDMA table builders behind its tables, `FieldHdma_*` (`$FD:C2EB`-`$FD:D52C`:
    plain screen, top band and bottom band for each table set, the channel 2/7 helpers, the data
    fill with the BG3 wave, the wave run adders); the palette animation ticker `PalAnim_TickAll`
-   (`$FD:E39C`-`$FD:E806`: kinds 1, 2, 3, 5, 7, 8 and the seven channel scalers); the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and
-   `FieldFD_LoadAnimSetB` (`$FD:E292`) and the vectors `FdVec_FFF4`/`FFF7`/`FFFA`. The `BattleFD_Unk*`
+   (`$FD:E39C`-`$FD:EAA5`: all eight kinds, the seven darkening scalers `PalAnim_Scale*` and the
+   seven lightening ones `PalAnim_Whiten*` of kinds 4/6, `PalAnim_FadeWhite`/`PalAnim_PulseWhite`);
+   the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and `FieldFD_LoadAnimSetB`
+   (`$FD:E292`), the field IRQ's tile-animation upload `FieldFD_UploadTileAnims` (`$FD:E022`) and
+   `PalAnim_StopAll` (`$FD:E275`); the Mode 7 scene of event `$FF $80-$8F` (`M7Scene_*`,
+   `$FD:DA00`-`$FD:DE97` and `$FD:EAA6`-`$FD:F28F`: the four run loops, init, own NMI/IRQ, iris
+   window, per-line Mode 7 scale, ray-drawn sprite bitmap, palette cycling); and all the vectors
+   `FdVec_FFE5`-`FdVec_FFFD`. The `BattleFD_Unk*`
    and `EngFD_Unk*` routines keep their names because verified code calls them by name; better names
    once those callers are re-reviewed: `BattleFD_UnkA982` ClearWorkRam, `UnkAA98` KoAllEnemies,
    `UnkACFD` ClearUnkB328, `UnkAD09` ClearTechEntries, `UnkAD17` ShowEndMessages, `UnkAE52`
@@ -588,9 +594,16 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    out), the band builders' extra 41-n TM run and the TM table ending at the band when
    Field_Unk27 = 1, PalAnim_Pulse's level 0 (black) where 256 was meant, PalAnim_Fade storing
    .Unk5 as the level when it is $80 or more. Better names once the verified callers are
-   re-reviewed: `EngFD_UnkC2C1` FieldHdma_RunFrame. Next, in reach order: `PalAnim_UnkE82C` (kind 4,
-   `$FD:E82C`, with its callees up to about `$FD:EAA0`) and `PalAnim_UnkE807` (kind 6, which
-   branches into it at `$FD:E869`); who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
+   re-reviewed: `EngFD_UnkC2C1` FieldHdma_RunFrame. Re-review needed from the palette/Mode 7
+   batch (verified headers edited): `PalAnim_TickAll` (banner and dispatch names), `FdVec_FFF4`
+   (its "three JMPs" text), `FieldFD_LoadAnimSetA` (banner: the $05B0 records are now traced),
+   `Evt_OpFF_Misc` and `IrqHandler` ("unmatched" vectors). Quirks recorded there: kind 4/6's
+   `PalAnim_WhitenR`/`WhitenB` write one byte of the colour (the other stays as Pal_CgramBuf had
+   it), `WhitenRG` drops blue and `WhitenGB` drops red; `M7Scene_Init` fills window buffer 1 twice;
+   `M7Scene_IrisRadii` has 31 entries (entry 31 is the next table's 0); `M7Scene_UpdateScroll`'s
+   dead BG colour rotation. Open: which scene `$FF $80-$8F` is, who calls `FdVec_FFEE`
+   (`$C3:4D46` looks like a JSL in unmatched code), and the pointer table after `$FD:F28F`
+   (no confirmed reader). Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
    `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
    BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967) and the data at `$FD:B957` (pointer table and
    records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
