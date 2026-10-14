@@ -772,9 +772,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Menu_DrawClock` (the D3AA caller), `Menu_VramRecBg1Big` (the banner's loader note),
    `C2Script_IfRamByteNe` (its $FFB4 note) and `BankFF_CharBits` (its $CD59 reader), and the bank
    header line of bank $C2 (now "all from source") and the menu setup banner before
-   `Menu_Expand3bppTiles`. Stale, left for the branch that owns them (headers in $D4F8-$E913): the
-   `Menu_Mode0BH0` header ("both not matched": `Menu_UnkD065`, `Menu_UnkD0E5`) and the
-   `Menu_LoadCursor` header (`Menu_UnkCFFB` "not matched"); the mode 3/4 lists' "not analysed". Open:
+   `Menu_Expand3bppTiles`. After merging main (with the round-158 fixes) these were fixed as well
+   and need review again: `Menu_Mode0BH0` (its preview and `Menu_UnkD0E5` no longer "not matched"),
+   `Menu_LoadCursor` (`Menu_UnkCFFB`), `Menu_Mode03List` and `Menu_Mode04List` ("not analysed"
+   gone), `Menu_VramRecUnkFC53` (its $C2:D071 loader named), `BankC2_OldBuildLeftovers` (its xref
+   note: the JSRs inside it are data now), `C2Scene_Mode3` (the scene mode banner: who sets each
+   mode), `C2Scene_Mode4` (`C2Scene_TrigListC` sets mode 4), `C2Scene_TrigListA` ("not traced"
+   for "not matched"), `TextWin_StateTable` (its states named) and, in bank $C0,
+   `Scene_PostLoadInit` (command $0B is `Menu_RunCommand`'s RTS: only `Menu_Unk834D` runs). Open:
    what `Menu_XchgUnk0F12`, `Menu_Unk04FB` and `C2Scene_Unk0299` are; what the strings of
    `MenuRom_NameStrings` 4/5 and `MenuRom_SlotEraStrings` say; what `Menu_UnkCFFB`'s HDMA table
    drives; who calls `$C2:FF00` (a JSL at $C9:6E49, unmatched bank) and what the 277 leftover bytes

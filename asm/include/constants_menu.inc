@@ -7,7 +7,7 @@
 if !constants_menu_inc == 0
 !constants_menu_inc = 1
 
-; --- ROM data read by matched bank-$C2 code (not matched itself yet) ---
+; --- ROM data read by bank-$C2 code (the first two are labels in bank $C2 now) ---
 !MenuRom_DefaultConfig = MenuRom_DefaultConfig ; $C2:FCA6, 12 B copied to Menu_Config for a new game
                                          ; (the label in bank $C2)
 !MenuRom_DefaultButtonMap = MenuRom_DefaultButtonMap ; $C2:FCA9 = MenuRom_DefaultConfig+3: the 9 B from

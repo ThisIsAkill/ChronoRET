@@ -33585,13 +33585,14 @@ Obj_SetStandAnim:
 ; Evt_InitObjects (object tables and init functions; it ends with
 ; Map_InitEntryTile) and Evt_RunObj0Func1 (object 0's function 1); and
 ; last BankC2_Entry8004 with A = BankC2_PostLoadArg ($0B; B = 0 from
-; TDC/XBA), a bank-$C2 command that is not traced.
+; TDC/XBA): bank $C2's command $0B, whose table entry is Menu_RunCommand's
+; own RTS, so it only runs Menu_Unk834D.
 ; Callers (1 JSR site): GameLoop_LoadField ($C0:008E).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00
 ; (VramQ_Valid absolute; the callees assume the same).
-; Exit: M=1, X=0, DP=$0100 and DB=$00 unchanged as far as is known
-; (the bank-$C2 command is not matched); A, X, Y clobbered, Obj_Cur and
-; what the callees change.
+; Exit: M=1, X=0, DP=$0100 and DB=$00 unchanged (Menu_RunCommand
+; restores P, DP and DB); A, X, Y clobbered, Obj_Cur and what the
+; callees change.
 ; ------------------------------------------------------------
 org $C056A6
 Scene_PostLoadInit:

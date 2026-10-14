@@ -7434,8 +7434,9 @@ C2Scene_ModeIdle:
 ; Scene mode handlers ($C2:2402–$C2:26A7)
 ; ============================================================
 ; C2Scene_MainLoop jumps to one of these through C2Scene_ModeTable when
-; C2Scene_Mode is 2-6, 8 or 9 (who sets the mode is mostly unmatched;
-; script op $05 sets 2). Each runs to its end inside one pass of the
+; C2Scene_Mode is 2-6, 8 or 9 (C2Script_GoToLocation, op $05, sets 2;
+; C2Scene_LeaderInput 3, 5, 6 and 9; object A's task 5, 6 and 8, and
+; its scripts through C2Script_SetRamByte; C2Scene_TrigListC 4). Each runs to its end inside one pass of the
 ; loop: the ones that come back set C2Scene_ModeIdle1 and JMP to
 ; C2Scene_MainLoop; modes 2 and 4 never come back. All are entered with
 ; M=1, X=0, DP=$0000, DB=$00 (C2Scene_Main's state), A = X = the mode *
@@ -7598,7 +7599,7 @@ C2Scene_TurnAround:
 ; $C2:250D — C2Scene_Mode4 (17 bytes, $250D–$251D)
 ; Mode 4: interrupts, NMI, DMA and HDMA off, the flag tail copied back
 ; (C2Scene_RestoreFlagTail), and again, for good: it never leaves
-; (probably waits for a reset; who sets mode 4 is not matched).
+; (probably waits for a reset; C2Scene_TrigListC sets mode 4).
 ; Callers note: none direct (C2Scene_ModeTable entry 4); its own JMP at
 ;   $C2:251B.
 ; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers)
@@ -10248,7 +10249,7 @@ C2Scene_TrigNone:
 ; A ListA entry (and no ListB one): the current task's .Unk02
 ; (C2Scene_TaskCur) = C2Scene_TrigTaskState1, and the entry's .Unk02
 ; to C2Scene_Unk1B58 (C2Scene_GetListAUnk02). What reads that task
-; byte is not matched.
+; byte is not traced.
 ; Callers note: none direct (C2Scene_TrigActions).
 ; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (the task record
 ;        and C2Scene_Unk1B32 absolute)
@@ -16918,7 +16919,7 @@ TextWin_Step:
     RTL
 
 ; $C2:5842 — TextWin_StateTable (4 words, $5842–$5849)
-; TextWin_Step's handler for each TextWin_State (unmatched). State 0
+; TextWin_Step's handler for each TextWin_State (TextWin_State0-3). State 0
 ; reads the next byte of the string at TextWin_TextPtr; $C2:58F6 sets
 ; state 1 after it points the 24-bit $0237 into a bank-$DE table, which
 ; state 1 reads from (the meaning of states 2 and 3 is not traced).
@@ -33117,7 +33118,7 @@ Menu_AfterItemUse:
 org $C2B353
 ; $C2:B353 — Menu_Mode03List (10 bytes, $B353–$B35C)
 ; Menu_ModeLists entry $03: the handlers Menu_MainThread runs by
-; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+; Menu_ThreadVar (the tech screen, Menu_Mode03H0-H4).
 Menu_Mode03List:
     dw Menu_Mode03H0, Menu_Mode03H1, Menu_Mode03H2, Menu_Mode03H3, Menu_Mode03H4
 
@@ -35238,7 +35239,7 @@ Menu_TechTargetSprYX:
 org $C2BF35
 ; $C2:BF35 — Menu_Mode04List (8 bytes, $BF35–$BF3C)
 ; Menu_ModeLists entry $04: the handlers Menu_MainThread runs by
-; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+; Menu_ThreadVar (the settings screen, Menu_Mode04H0-H3).
 Menu_Mode04List:
     dw Menu_Mode04H0, Menu_Mode04H1, Menu_Mode04H2, Menu_Mode04H3
 
@@ -39451,7 +39452,8 @@ Menu_Mode0BList:
 
 ; $C2:D4F8 — Menu_Mode0BH0 (14 bytes, $D4F8–$D505)
 ; Handler 0: the main menu's tilemaps (Menu_MainMenuMaps), mode 6's
-; preview (Menu_UnkD065) and Menu_UnkD0E5 (both not matched), then
+; preview (Menu_UnkD065: the slot windows and the last saved slot's
+; details) and the save screen over it (Menu_UnkD0E5), then
 ; Menu_ThreadVar + 1 (handler 1) and a tail jump to Menu_StartFadeIn.
 ; Callers note: Menu_Mode0BList entry 0 (run by Menu_MainThread).
 ; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E; a menu
@@ -42922,8 +42924,8 @@ Menu_Mode0EH3:
 ; Menu_SramUnk7FE2 set, on row 3, a Left or Right move toggles record
 ; 3's .X between Menu_LoadRow3Left and Menu_LoadRow3Right (EOR
 ; Menu_LoadRow3Toggle) with Menu_PlaySound0. Then Menu_SlotIdx = the row,
-; Menu_LoadHiliteRow = row + 1 AND 3, Menu_UnkCFFB (not matched;
-; probably the highlight of that row, as mode 6's slot list uses it);
+; Menu_LoadHiliteRow = row + 1 AND 3, Menu_UnkCFFB (probably the
+; highlight of that row: an HDMA table entry; mode 6 uses it too);
 ; Menu_LoadDetailRows ($240 bytes) zeroed and from there 18 bytes each
 ; to Menu_LoadLineA and Menu_LoadLineB; the slot's details
 ; (Menu_UnkD36C); Menu_VramRecBg1Rows16, Menu_VramRecBg2Rows2 and

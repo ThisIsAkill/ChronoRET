@@ -298,12 +298,12 @@ endstruct align 8
 !C2Scene_Unk02B1 = $02B1                 ; 3 B $02B1-$02B3 zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1B32 = $1B32                 ; 3 words $1B32-$1B37 set to $FFFF by C2Scene_LoadScene; the first
                                          ; is the byte offset of the C2Scene_ListA entry C2Scene_Mode3
-                                         ; acts on (who sets it is not matched)
+                                         ; acts on (set by C2Scene_ObjWatchIdle and C2Scene_FindTrigEntries)
 !C2Scene_Unk1B43 = $1B43                 ; 8-bit; zeroed by C2Scene_Mode3 and C2Scene_TrigListAB before a
                                          ; ListD script; C2Scene_TrigWatchWait waits for it to be non-zero
                                          ; (probably set by the script when it ends; not traced)
 !C2Scene_Unk1B45 = $1B45                 ; 16-bit; the address of the ListD script C2Scene_Mode3 started
-                                         ; (also read by unmatched code); use unknown
+                                         ; (also read by C2Scene_TrigListB and C2Scene_TrigListAB); use unknown
 !C2Scene_Unk027E = $027E                 ; 8-bit; non-zero keeps the zone task from changing the song
                                          ; (C2Scene_ZoneSoundWatch); use unknown
 !C2Scene_Unk027F = $027F                 ; 8-bit; C2Scene_ObjWatch copies C2Scene_Unk027E here before each
