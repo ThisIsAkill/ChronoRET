@@ -1353,3 +1353,44 @@ endif
                                          ; Battle_Unk7F01E0); BankFF_UnkF813 marks the next single tech of a
                                          ; character with its bit set without BankFF_TechStepLimit's check
 !Menu_Unk7F01CF = $7F01CF                ; 8-bit; set to $10 by BankFF_LoadSlotPart
+
+; --- Menu mode 3: the tech screen ---
+!Menu_TechPage = $0418                   ; 8-bit; mode 3's page 0-2 (Left / Right; Menu_TechPages: probably single,
+                                         ; double and triple techs); the last byte of Menu_Unk0415
+!Menu_TechMemberRow = $0419              ; 8-bit; the member window's cursor row 0-2 (the Menu_Unk0419 byte)
+!Menu_TechMemberTop = $041A              ; 8-bit; the member in its top row (the Menu_Unk041A byte)
+!Menu_TechList = $0F00                   ; the listed tech ids (Menu_TechListIds), $FF after the last
+!Menu_TechByteOf = $0F30                 ; per Menu_TechList entry: its Menu_TechShown byte
+!Menu_TechListRow = $0F48                ; 8-bit; the list cursor's row 0-7 (Menu_CursorSel in handler 3),
+                                         ; kept for the next visit
+!Menu_TechCount = $0F49                  ; 8-bit; techs in Menu_TechList
+!Menu_TechListTop = $0F4A                ; 8-bit; the Menu_TechList entry in list row 0
+!Menu_TechId = $0F4C                     ; 8-bit; the tech under the list cursor (or the row being drawn)
+!Menu_TechCaster = $0F4D                 ; 8-bit; the member using the tech (Menu_Mode03H3)
+!Menu_TechUnk0F4E = $0F4E                ; 8-bit; set to $FF by Menu_Mode03H3 (no reader in mode 3's code)
+!Menu_TechUnk0F51 = $0F51                ; 16-bit; Menu_TechMembers+1/+2 copied by Menu_TechDrawRows (no reader
+                                         ; in mode 3's code)
+!Menu_TechCostIdx = $0F6F                ; 3 B: per member window row, the Menu_TechMpCost index of its member
+!Menu_TechUnk0F73 = $0F73                ; 16-bit; set to $0F75 by Menu_TechDescText (no reader in mode 3's code)
+!Menu_TechBytesList = $9890              ; the tech bytes (Menu_TechShown indexes) Menu_TechListBytes lists, $FF
+                                         ; after (the Menu_SprScratch RAM)
+!Menu_TechCost = $9890                   ; 8-bit (a word on pages 1-2); the MP cost Menu_TechMpCost found last
+                                         ; (the same RAM, after the list is built)
+!Menu_TechInfo = $7700                   ; Menu_ItemInfo0 indexed by tech id (mode 3): bit 7 usable in the menu
+                                         ; (Menu_ItemInfo0Unk80), bit 6 BankFF_UnkF813's mark (Menu_TechInfoLearnt)
+!Menu_TechCostIdxs = $1607               ; Menu_TechMenuArea ($1640) - $39: per character ($40 B) and double /
+                                         ; triple tech id ($39 on), its MenuRom_TechCosts index (Menu_TechMpCost)
+!Menu_TechMembers = $0016                ; 3 B: [0] the caster's character, [1]-[2] the partners a tech needs ($FF:
+                                         ; none); Menu_ListPtr's bytes (Menu_TechPartners)
+!Menu_TechSprRow = $0022                 ; 16-bit; the member row Menu_TechRowSprite places a sprite in (0-2; 3
+                                         ; above the window, 4 below)
+!Menu_TechScrollWord = $0024             ; 16-bit; the word Menu_TechMemberScrollAnim steps (as
+                                         ; Menu_RowScrollWord in mode 1)
+!Menu_TechRowsLeft = $0024               ; 16-bit; Menu_TechDrawMembers' row count
+!Menu_TechRowIdx = $0071                 ; 16-bit; Menu_TechDrawRows' row 0-2 (the Menu_CurMember byte and the next)
+!Menu_Unk0D5E = $0D5E                    ; 8-bit; Menu_TechDrawMemberRow: 4 when the member's MP is below
+                                         ; Menu_TechCost, else 0 (probably a colour byte for MenuRom_TechRowList)
+!Menu_TechTargetsBg3 = $5DE0             ; 12 tile words (Menu_Unk5DC2+$1E): $20C7 while the target window is
+                                         ; open, zeroed when it closes
+!Menu_TechUseCost = $0F4F                ; 8-bit; the MP cost of the tech being used (Menu_Mode03H3), taken from
+                                         ; the caster's MP after each use (Menu_Mode03H4)
