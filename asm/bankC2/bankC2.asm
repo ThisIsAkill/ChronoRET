@@ -721,7 +721,7 @@ C2Scene_VramQFlush:
 ; Entry: M=1 (8-bit flag loads), X=0 with X = the number of frames (0
 ;        waits 65536), DP=$0000, DB with low WRAM at $0000-$1FFF; NMI on
 ; Exit:  M=1, X=0, X = 0; A clobbered; Y, DP and DB as Audio_DriverCommand
-;        leaves them (not traced)
+;        leaves them (it keeps them)
 ; Calls: C2Scene_WaitFrame, Audio_DriverCommand (JSL).
 C2Scene_WaitFrames:
     PHX
@@ -9297,8 +9297,8 @@ C2Scene_QueueSoundCmd:
 ;   traced).
 ; Entry: M=1 (8-bit loads), X=0, DP=$0000 (C2Tmp_00/$01), DB=$00
 ;        (DP_Field, low WRAM and the driver block, absolute)
-; Exit:  M=1, X=0; A, X, Y as Audio_DriverCommand leaves them (not
-;        traced); C2Tmp_00/$01 and $10-$12 changed when the zone is
+; Exit:  M=1, X=0; A, X, Y as Audio_DriverCommand leaves them (it
+;        keeps them); C2Tmp_00/$01 and $10-$12 changed when the zone is
 ;        looked up
 ; Calls: C2Scene_GetSoundZone, Audio_DriverCommand (JSL).
 C2Scene_ZoneSoundAtEntry:
