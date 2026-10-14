@@ -136,10 +136,21 @@ BattleSys_SceneSetup:
 ;        DB=$7E (what the services expect); A = the service number
 ;        (0-9), B = 0 (the 16-bit TAX)
 ; Exit:  A, X, Y as on entry (8-bit A, 16-bit X and Y pulled back; this
-;        holds only while the service returns with the same M and X:
-;        checked for services 1-5 and 7-9; for services 0 and 6 it is
-;        assumed, since their callees in banks $CC, $CD and $CF are not
-;        analysed); P, DP, DB and memory as the service leaves them
+;        holds only while the service returns with the same M and X).
+;        Checked only for services 2, 5 and 7, whose callees are all
+;        matched bank-$C1 code. The other seven reach code that is not
+;        analysed, so for them it is assumed: 0 (bank-$CC/$CD JSLs, see
+;        BattleSys_SceneSetup), 1 (Audio_ProcessEntry, $C7:0004),
+;        3 (BattleSys_FrameTickVec $CD:0009,
+;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
+;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
+;        through the menu code), 4 (BattleSys_PumpFrames,
+;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
+;        6 (BattleCF_UnkFE20), 8 (BattleSys_FrameTickVec,
+;        BattleSys_PumpFrames and the $CD/$CF JSLs of
+;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
+;        BattleSys_PumpFrames). B, P (N and Z from the PLA), DP, DB and
+;        memory as the service leaves them
 BattleSys_RunService:
     PHA
     PHX
@@ -27529,13 +27540,20 @@ BattleAi_AddStatByteAtY:
 ; BattleAi_ReadTargets_Code ran BattleAi_ClearTargets first, so the list
 ; starts all $FF) and !BattleAi_TargetCount. "Self" is the acting enemy:
 ; slot !Battle_UnkB252 + 3 in some handlers, slot !Battle_UnkB18B in
-; others. On the enemy's own turn the two agree: BattleAi_EnemyTurn sets
-; !Battle_UnkB252 = !Battle_UnkAEC8 and !Battle_UnkB18B = that + 3
-; ($C1:8D01-$8D07). In BattleSys_Unk8461's reaction tests they differ:
+; others. On the enemy's own turn the two agree (but see handler $05
+; below): BattleAi_EnemyTurn sets !Battle_UnkB252 = !Battle_UnkAEC8 and
+; !Battle_UnkB18B = that + 3 ($C1:8D01-$8D07). In BattleSys_Unk8461's reaction tests they differ:
 ; !Battle_UnkB252 is the reacting enemy, while !Battle_UnkB18B still
 ; holds the battler that last acted (!Battle_UnkB3B7), or, once an
 ; earlier reaction in the same pass has run BattleAi_EnemyTurn, that
-; enemy's slot. Kinds:
+; enemy's slot, or a PC's slot: after each reaction's
+; BattleAi_EnemyTurn the loop runs BattleSys_UnkB223 (JSR at $C1:8787),
+; whose BattleSys_UpdateKo sets !Battle_UnkB18B = the slot of a PC
+; that is KO'd and whose BattleCmd.Kind has bit 4 (the last such PC,
+; slots 0-2 in order). Handler $05 (BattleAi_TargetRandomPc) also runs
+; BattleSys_UpdateKo for PCs 0-2, so the same write can come from an
+; earlier target read, on the enemy's own turn too (whether it occurs
+; is not traced). Kinds:
 ;   - fixed lists: nothing ($00), the present PCs ($01), all present
 ;     battlers ($02), the present enemies ($16) or those but self ($15),
 ;     self ($03), one fixed slot ($27-$2E: 3-10, $30-$36: 0-6);
@@ -29304,8 +29322,10 @@ BattleAi_TargetRandomOtherEnemy:
 ; Either way !Battle_UnkB2AE = !BattleAi_Targets[0].
 ; Sub-entry BattleAi_ReadTargets_Code ($C1:AC2C): the second step alone,
 ; with the target code in A (called from $C1:8F39, in the test handler
-; BattleAi_TestStatusBits, which picks the code itself); !BattleAi_Targets is
-; not cleared first there. BattleAi_ReadTargets_Done ($C1:AC3F) is the
+; BattleAi_TestStatusBits, which picks the code itself); the sub-entry
+; does not clear !BattleAi_Targets itself, but its one caller has run
+; BattleAi_ClearTargets just before (JSR at $C1:8F2D), so the list
+; starts all $FF there too. BattleAi_ReadTargets_Done ($C1:AC3F) is the
 ; shared tail (global only because the sub-entry splits the routine).
 ; Callers (24 JSR sites): BattleAi_TestHpHalfOrLess ($C1:8EAB), BattleAi_TestTargetId ($C1:8F87),
 ;   BattleAi_TestHpAtMost ($C1:90BE), BattleAi_TestStatByteAtLeast ($C1:9130),
