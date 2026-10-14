@@ -2250,9 +2250,12 @@ BattleFx_RandomShake:
 ; BattleCD_WaitNmiAck waits (and the instructions between the install
 ; and the first wait) those stores land in WRAM ($7E:420C, $7E:420B,
 ; $7E:2121, $7E:4370-$4377), not on the registers. So there the palette
-; is not uploaded and HDMA stays off (the STA.l above zeroed HDMAEN);
-; only NMITIMEN, INIDISP and the scroll registers (all written long)
-; reach the hardware. An NMI that lands in AudioFadeDispatch, or after
+; is not uploaded and HDMA stays off (the STA.l above zeroed HDMAEN).
+; This handler's own long stores (NMITIMEN, INIDISP, the scroll
+; registers) still reach the hardware, as do the callees' writes that
+; do not depend on DB (Hdma_InitChannelsFD's direct-page writes to the
+; HDMA channel registers; PalAnim_TickAll, which sets DB=$00 itself).
+; An NMI that lands in AudioFadeDispatch, or after
 ; ExitBattle returns while this handler is still installed, gets that
 ; code's DB; not traced.
 ; Callers note: no call site; reached through !NmiTrampoline.
