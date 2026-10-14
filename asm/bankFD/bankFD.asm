@@ -2383,7 +2383,7 @@ BattleFD_ZeroStatBlock:
 ; 10: 60, 11: 120; list 12 (the battlers' turns) gets only its reload
 ; value, 105 (!Battle_AtbBase; the same value BattleFD_UnkB7EB starts
 ; from).
-; Callers (2 JSL sites): Battle_SetupBattle ($C1:FD02) and unmatched ($C1:FE96).
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FD02).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 120 (B = 0); X = 11; Y unchanged
 org $FDB4E7

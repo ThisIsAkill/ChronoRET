@@ -30036,7 +30036,7 @@ BattleAi_NoteFirstTest:
 ; routine sets only !Battle_MathA, so whatever !Battle_MathHi holds
 ; takes part (the result stays below high - low all the same). A high
 ; bound below the low one is not handled (the subtraction wraps).
-; Callers (38 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8),
+; Callers (37 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8),
 ;   BattleAi_TestChance ($C1:95E8), BattleAi_ChooseByChance ($C1:98D5), BattleAi_TargetRandomPc
 ;   ($C1:A48A), BattleAi_TargetRandomUnkAF15 ($C1:AB30), BattleAi_TargetRandomOtherEnemy ($C1:ABF6),
 ;   BattleSys_UnkC1DD ($C1:C486, $C1:C867, $C1:C8D0), BattleSys_Effect02 ($C1:D29E),
@@ -30046,8 +30046,8 @@ BattleAi_NoteFirstTest:
 ;   ($C1:E7BB), BattleSys_UnkE976 ($C1:E97A), BattleSys_StealItem ($C1:E9F0),
 ;   BattleSys_HitModUnk47Status ($C1:EED8), BattleSys_HitModChanceStatus ($C1:EEFF),
 ;   BattleSys_HitModLeaveOneHp ($C1:EF18), BattleSys_HitModRollDp1A ($C1:EFC9),
-;   BattleSys_HitModHalveHp ($C1:F0A4), BattleSys_HitModKoOrDrop ($C1:F141), Battle_RandRangeLong
-;   ($C1:FDCB) and unmatched ($C1:FDDA).
+;   BattleSys_HitModHalveHp ($C1:F0A4), BattleSys_HitModKoOrDrop ($C1:F141) and Battle_RandRangeLong
+;   ($C1:FDCB).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
@@ -31380,8 +31380,8 @@ BattleSys_UnkB575:
 ; gets .Quantity + 1 (BattleMenu_CommitAction took one off when the
 ; command was committed). The byte after the RTS is a second RTS that
 ; nothing reaches.
-; Callers (6 JSR sites): BattleSys_UnkB3F9 ($C1:B43E), BattleSys_UnkB4E9 ($C1:B4ED, $C1:B4F4,
-;   $C1:B4FB), BattleSys_RefundItemLong ($C1:FDCF) and unmatched ($C1:FDDE).
+; Callers (5 JSR sites): BattleSys_UnkB3F9 ($C1:B43E), BattleSys_UnkB4E9 ($C1:B4ED, $C1:B4F4,
+;   $C1:B4FB) and BattleSys_RefundItemLong ($C1:FDCF).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $14 = PC slot (0-2)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X preserved (PHX/PLX); A clobbered
 ;        (B = 0); Y = the record number when the item was found, 256
@@ -32889,8 +32889,7 @@ BattleSys_UnkBFA4:
 ; Quirk: !Battle_ActFlags is stored twice, the second time with
 ; BattleAi_SetMainMask's A (0 when the target is a slot, $FF when it is
 ; empty).
-; Callers (3 JSR sites): BattleSys_UnkB967 ($C1:BA7D), BattleSys_RunPcAttackLong ($C1:FDC7) and
-;   unmatched ($C1:FDD6).
+; Callers (2 JSR sites): BattleSys_UnkB967 ($C1:BA7D) and BattleSys_RunPcAttackLong ($C1:FDC7).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18B = the attacker,
 ;        !Battle_UnkAD8E = the target
 ; Exit:  M=1, X=0 (as assumed after the unanalysed callees), DP=0,
@@ -43741,6 +43740,80 @@ org $C1FDCF
 BattleSys_RefundItemLong:
     JSR BattleSys_RefundItem
     RTL
+
+; ==================================================================
+; BankC1_OldBuildTail ($C1:FDD3–$C1:FFFE, 556 bytes) and
+; BankC1_DebugFlag ($C1:FFFF)
+; ==================================================================
+; Not code and, as far as found, never read: nothing calls or jumps
+; here, and the JSR byte patterns inside (e.g. $C1:FDDA, $C1:FDDE, a
+; copy of the veneers above) are data, not calls. Like
+; BankC1_OldBuildLeftovers at $C1:7C3D, these are the remains of
+; earlier, longer assemblies of the end of the bank: each later build
+; wrote over the start of the one before, so every copy is cut off at
+; the front. Each copy is the current Battle_SetupBattle tail /
+; Battle_CalcUnk56 (ending LDA $2C, CLC, ADC #$44, RTS) / the long
+; veneers (Battle_Mul16Long, BankC1_AddItemLong,
+; BattleSys_RunPcAttackLong, Battle_RandRangeLong and, in the newer
+; ones, BattleSys_RefundItemLong), shifted higher, with the call
+; operands of that build (for instance the $18C copy calls Battle_Mul16
+; at $CA81 and BankC1_AddItem at $D191; the current ones are $C90B and
+; $D005). Checked by comparing the bytes with the current code at each
+; shift; the order newest to oldest is probably the order below. Kept
+; as bytes; the code copies are given as db since they never run.
+; Entry/Exit: not code (data; never executed).
+org $C1FDD3
+BankC1_OldBuildTail:
+.veneers_f:                             ; $C1:FDD3-$C1:FDE1: the current $FDC4-$FDD2 $F higher (BankC1_AddItem then at $D014)
+    db $14,$D0,$6B,$20,$AA,$BF,$6B,$20,$22,$AF,$6B,$20,$D1,$B6,$6B
+.setup_18c:                             ; $C1:FDE2-$C1:FF5E: Battle_SetupBattle from the current $FC56 on, Battle_CalcUnk56 and the five veneers, $18C higher
+    db $28,$85,$2A,$85,$2C,$E2,$20,$B9,$37,$00,$85,$28,$B9,$48,$00,$85
+    db $2A,$B9,$70,$00,$C2,$20,$18,$65,$28,$65,$2A,$C9,$FF,$00,$90,$03
+    db $A9,$FF,$00,$E2,$20,$99,$3E,$00,$7B,$B9,$4C,$00,$89,$40,$F0,$12
+    db $B9,$4D,$00,$F0,$0D,$84,$00,$A0,$94,$26,$84,$0E,$22,$DF,$B0,$FD
+    db $A4,$00,$7B,$A6,$12,$BD,$29,$00,$AA,$86,$28,$A9,$06,$AA,$86,$2A
+    db $20,$81,$CA,$C2,$20,$A5,$2C,$18,$69,$62,$02,$AA,$A5,$10,$4A,$A8
+    db $7B,$85,$28,$85,$2A,$E2,$20,$B9,$FF,$AE,$C9,$01,$F0,$0D,$C9,$02
+    db $F0,$09,$A6,$12,$BD,$36,$00,$85,$28,$80,$07,$A6,$12,$BD,$3A,$00
+    db $85,$28,$BF,$00,$00,$CC,$85,$2A,$C2,$20,$A5,$28,$18,$65,$2A,$90
+    db $03,$A9,$FF,$00,$E2,$20,$9D,$3D,$00,$7B,$A6,$10,$E8,$E8,$86,$10
+    db $E0,$06,$00,$B0,$03,$4C,$D7,$FD,$22,$67,$B0,$FD,$22,$79,$B4,$FD
+    db $22,$7D,$B7,$FD,$22,$E7,$B4,$FD,$22,$C4,$B6,$FD,$22,$8F,$AC,$FD
+    db $7B,$AA,$20,$5E,$B0,$A2,$80,$00,$20,$5E,$B0,$A2,$00,$01,$20,$5E
+    db $B0,$C2,$20,$AD,$32,$5E,$8D,$16,$B3,$AD,$B2,$5E,$8D,$18,$B3,$AD
+    db $32,$5F,$8D,$1A,$B3,$7B,$E2,$20,$A0,$00,$00,$22,$F5,$B2,$FD,$A0
+    db $01,$00,$22,$F5,$B2,$FD,$A0,$02,$00,$22,$F5,$B2,$FD,$7B,$AA,$8E
+    db $C0,$B3,$8E,$C2,$B3,$8E,$C4,$B3,$86,$00,$7B,$A6,$00,$9D,$5D,$AE
+    db $BD,$02,$AF,$C9,$FF,$F0,$30,$AA,$86,$28,$A2,$07,$00,$86,$2A,$20
+    db $81,$CA,$A6,$2C,$86,$02,$A6,$02,$BF,$05,$60,$CC,$F0,$07,$A6,$00
+    db $A9,$80,$9D,$5D,$AE,$A6,$02,$BF,$04,$60,$CC,$F0,$0A,$A6,$00,$BD
+    db $5D,$AE,$09,$40,$9D,$5D,$AE,$E6,$00,$A5,$00,$C9,$08,$90,$BB,$22
+    db $B5,$B1,$FD,$22,$56,$AE,$FD,$60,$AA,$86,$28,$A2,$18,$00,$86,$2A
+    db $20,$A0,$CA,$A5,$2C,$18,$69,$44,$60,$20,$81,$CA,$6B,$20,$91,$D1
+    db $6B,$20,$20,$C1,$6B,$20,$ED,$AE,$6B,$20,$68,$B8,$6B
+.refund_tails:                          ; $C1:FF5F-$C1:FF64: the ends of two more RefundItem veneers (JSR $B86B / $B86E, RTL)
+    db $6B,$B8,$6B,$6E,$B8,$6B
+.setup_1e7:                             ; $C1:FF65-$C1:FFB5: a Battle_SetupBattle end, CalcUnk56 and four veneers, $1E7 higher
+    db $BF,$05,$60,$CC,$F0,$07,$A6,$00,$A9,$80,$9D,$5D,$AE,$A6,$02,$BF
+    db $04,$60,$CC,$F0,$0A,$A6,$00,$BD,$5D,$AE,$09,$40,$9D,$5D,$AE,$E6
+    db $00,$A5,$00,$C9,$08,$90,$BB,$22,$39,$B1,$FD,$22,$DA,$AD,$FD,$60
+    db $AA,$86,$28,$A2,$18,$00,$86,$2A,$20,$FB,$CA,$A5,$2C,$18,$69,$44
+    db $60,$20,$DC,$CA,$6B,$20,$EC,$D1,$6B,$20,$49,$C1,$6B,$20,$F0,$AE
+    db $6B
+.calc_older:                            ; $C1:FFB6-$C1:FFD3: the end of an older CalcUnk56 ($205 higher) and four veneers
+    db $A2,$18,$00,$86,$2A,$20,$06,$CB,$A5,$2C,$18,$69,$44,$60,$20,$E7
+    db $CA,$6B,$20,$F7,$D1,$6B,$20,$94,$C1,$6B,$20,$BB,$AF,$6B
+.setup_oldest:                          ; $C1:FFD4-$C1:FFFE: the oldest ($22E higher): a Battle_SetupBattle end, CalcUnk56, four veneers and the last bytes of a fifth
+    db $37,$B1,$FD,$22,$DA,$AD,$FD,$60,$AA,$86,$28,$A2,$18,$00,$86,$2A
+    db $20,$49,$CB,$A5,$2C,$18,$69,$44,$60,$20,$2A,$CB,$6B,$20,$3A,$D2
+    db $6B,$20,$D7,$C1,$6B,$20,$1E,$B0,$6B,$B0,$6B
+
+; $C1:FFFF — BankC1_DebugFlag (1 byte, $FFFF–$FFFF)
+; The last byte of the bank, read as !BattleRom_DebugFlag (LDA.l) by
+; BattleSys_Main: non-zero enables its pad-2 Select win. It is 0 here,
+; so that path never runs.
+BankC1_DebugFlag:
+    db $00
 
 
 ; ==================================================================
