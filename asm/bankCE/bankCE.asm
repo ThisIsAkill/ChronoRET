@@ -11,9 +11,11 @@
 ;
 ; $CE:E000-$CE:EF10 and $CE:F066-$CE:F0E5 are code with one table
 ; (BattleCE_WaveTable) inside it. The calls found are JSLs from banks
-; $CD and $D1: four of the entries are called from bank-$CD code past
-; $CD:16B4 (not matched; layer-effect script command handlers and a
-; helper of theirs), the others from BattleCD_NmiMain,
+; $CD and $D1: two of the entries are called from bank-$CD code in
+; $CD:2A4A-$CD:3B5E (not matched; layer-effect opcode $97's handler and
+; the helper at $CD:3616 that BattleCD_Unk35A5 calls), two from matched
+; layer-effect code (BattleCD_FxOpCopyWindowEdges, opcode $B2, and
+; BattleCD_CalcAngle, part of opcode $CC's handler), the others from BattleCD_NmiMain,
 ; BattleCD_StepWipe, BattleFx_Init and BattleFx_ReloadCeSet.
 ; (tools/xref.py's other hits into this range, from $C7:CCEA, $C7:E0CC,
 ; $C8:151E and $CA:81BB, sit in data, by symbols/code_survey.csv, and
@@ -57,11 +59,12 @@ org $CEE000
 ; script bytes used are not traced. The ASL drops bit 7 of the byte.
 ; Lines 216-223 are not copied.
 ; Callers note: the JSL at $CD:20D3 is the whole handler of layer-effect
-;   script opcode $B2 (BattleCD_FxOpTable entry $32; JSL, RTS).
-; Callers (1 JSL site): unmatched ($CD:20D3).
+;   script opcode $B2 (BattleCD_FxOpCopyWindowEdges, BattleCD_FxOpTable
+;   entry $32; JSL, RTS).
+; Callers (1 JSL site): BattleCD_FxOpCopyWindowEdges ($CD:20D3).
 ; Entry: M=1, X=0, DP=0 (DP operands; TDC as zero), DB=$7E (the tables
-;        .w); the script pointer at DP $40; read from this code, the
-;        bank-$CD caller is not matched
+;        .w); the script pointer at DP $40, at the operand byte
+;        (BattleCD_FxOpCopyWindowEdges calls it so)
 ; Exit:  M=1, X=0; A = 0; X = (s + $6C) & $FF; Y's low byte kept, high
 ;        byte cleared (SEP #$10); DP $45-$46 = s + $6C; DB unchanged
 BattleCE_CopyWindowEdges:
@@ -771,14 +774,16 @@ BattleCE_RunCopyWords:
 ;   - the result is left in DP $45.
 ; A difference of 252 or more rounds to 32 eighths: the run then reads
 ; into the next row of the table, the rise past its end (not guarded).
-; Callers note: the JSL at $CD:1B37 is in layer-effect script opcode
-;   $CC's handler ($CD:1B1F, not matched), which loads the two points
-;   from a 4-byte record at $7E:5DA0 + X and stores DP $45 in $CD08.
-; Callers (1 JSL site): unmatched ($CD:1B37).
+; Callers note: the JSL at $CD:1B37 is in BattleCD_CalcAngle (the
+;   sub-entry of BattleCD_ClampCalcAngle, $CD:1B1F, which is also
+;   layer-effect script opcode $CC's handler); it loads the two points
+;   from the 4-byte entry !Battle_ActCalcResult + X ($7E:5DA0 + X) and
+;   stores DP $45 in !Battle_FxAngle ($CD08).
+; Callers (1 JSL site): BattleCD_CalcAngle ($CD:1B37).
 ; Entry: M=1, X=0 (16-bit index), DP=0 (DP operands; TDC as zero), DB
-;        any (the table read long); !BattleCE_AngleAX/AY and
-;        !BattleCE_AngleBX/BY; read from the code, the caller is not
-;        matched
+;        any (the table read long; BattleCD_CalcAngle has DB=$7E);
+;        !BattleCE_AngleAX/AY and !BattleCE_AngleBX/BY (BattleCD_CalcAngle
+;        sets them)
 ; Exit:  M=1, X=0; !BattleCE_Angle (DP $45) = the angle; A = the angle
 ;        too, except with dx and dy both negative (A = $FF, dy's sign
 ;        byte); X = the table index; Y and DB unchanged; DP $23-$2A and
