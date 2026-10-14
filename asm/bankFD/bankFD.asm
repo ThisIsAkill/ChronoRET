@@ -8740,11 +8740,13 @@ M7Scene_InitPpu:
 ; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (its variables; TDC needs the
 ;        low byte 0), DB=$00 (WMADD, the divider and multiplier); B = 0
 ;        (radius 0: the 16-bit TAX of the count in IrisEmptyLines)
-; Exit:  M=1, X=0 (it runs with X=1 inside, so X and Y return with their
-;        high bytes cleared); A clobbered, B = 0 ($05 if the TDC ran);
-;        X and Y clobbered; M7Scene_IrisX/Y, IrisBuf, Tmp, PosX, PosY,
-;        Ofs and M7Scene_IrisWidths (and IrisWidths[r+1]) written; WMADD
-;        left past the buffer
+; Exit:  M=1, X=0; radius 0: A = $FF, X = the buffer address ($70AC or
+;        $72AC), Y unchanged; radius > 0: it runs with X=1 inside, so X
+;        and Y come back clobbered with their high bytes cleared, A
+;        clobbered, B = 0 ($05 if the TDC ran), and PosX, PosY, Ofs and
+;        M7Scene_IrisWidths (and IrisWidths[r+1]) written; either way
+;        M7Scene_IrisX/Y, IrisBuf and Tmp are written and WMADD is left
+;        past the buffer
 org $FDEB8B
 M7Scene_BuildIris:
     LDA.b #!M7Scene_IrisCentre
