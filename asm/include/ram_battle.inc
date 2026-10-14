@@ -1472,7 +1472,7 @@ endstruct
                                     ; address (probably the enemy behaviour scripts, from the $CC:8B08 pointer table)
 !BattleRom_AiScriptPtrs   = $CC8B08 ; 2 B per enemy id: address in bank $CC of its script (BattleAi_RunMainPart,
                                     ; BattleAi_FindReactPart)
-!BattleRom_AiActLength    = $FDBA4A ; 1 B per action code $00-$16: bytes in its record (BattleAi_EnemyTurn steps
+!BattleRom_AiActLength    = $FDBA4A ; BattleFD_AiActLength: 1 B per action code $00-$16: bytes in its record (BattleAi_EnemyTurn steps
                                     ; !Battle_UnkB1D4 on by it); codes 4 and 5 hold $FF, code 3 holds 0
 !BattleRom_EnemyUnk5E04   = $CC5E04 ; 7 B per enemy id: Battle_SetupBattle tests byte 0 (-> !Battle_UnkAE5D bit 6)
 !BattleRom_EnemyUnk5E05   = $CC5E05 ; ... and byte 1 (-> bit 7); what the records hold is not traced
@@ -1573,7 +1573,7 @@ endstruct
 !Battle_UnkAE65           = $AE65 ; 8 B per enemy: !Battle_UnkAEB3 kept over BattleSys_UnkB762 (and put back)
 !Battle_Unk29AC           = $29AC ; 1 B: picks the !BattleRom_FixedCmdPtrs entry (BattleSys_UnkB725); one of the
                                   ; $2990-$29AF Menu_Config bytes; who sets it is not traced
-!BattleRom_FixedCmdPtrs   = $FDB957 ; 2 B per !Battle_Unk29AC value (3 entries: $B95D, $B972, $B987): address in bank
+!BattleRom_FixedCmdPtrs   = $FDB957 ; BattleFD_FixedCmdPtrs: 2 B per !Battle_Unk29AC value (3 entries: $B95D, $B972, $B987): address in bank
                                     ; $FD of 21 bytes copied over the three BattleCmd records (BattleSys_UnkB725)
 !BattleRom_FixedCmdBank   = $FD0000 ; bank of those records (LDA.l this,X with X = the address)
 
@@ -1684,7 +1684,7 @@ endstruct
 !BattleRom_BankCC         = $CC0000 ; bank $CC base for LDA.l this,X with X an address in bank $CC (item records,
                                     ; the stat-boost tables)
 !BattleRom_BankFD         = $FD0000 ; bank $FD base, the same for the lists BattleFD_UnkB2DE reads
-!BattleRom_UnkFDB99C      = $FDB99C ; 2 B per !Menu_Config+28 value: address in bank $FD of BattleFD_UnkB2DE's
+!BattleRom_UnkFDB99C      = $FDB99C ; BattleFD_FixedPartyPtrs: 2 B per !Menu_Config+28 value: address in bank $FD of BattleFD_UnkB2DE's
                                     ; 8 x 4 words for the character records
 !BattleRom_ItemUseFlags   = $CC0ABC ; 3 B per item id - $BC: byte 0 bit 7 set = the battle item list takes the item;
                                     ; the other bits become Item_BattleList.Flags

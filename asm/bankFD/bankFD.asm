@@ -3054,6 +3054,101 @@ BattleFD_UnkB7EB:
     RTL
 
 ; ============================================================
+; Battle data ($FD:B957–$FD:BA60)
+; Read by the battle code with LDA.l: the fixed commands and the fixed
+; party values of the !Battle_Unk2989 bit-5 battle (each through a
+; three-entry pointer table), and the enemy script action lengths. The bank $C1 and BattleFD_UnkB2DE reads
+; go through the !BattleRom_* defines named below, which hold these
+; addresses.
+; ============================================================
+
+; $FD:B957 — BattleFD_FixedCmdPtrs (6 bytes, $B957–$B95C)
+; !BattleRom_FixedCmdPtrs: one word per !Battle_Unk29AC value (0-2), the
+; bank-$FD address of the 21 bytes BattleSys_UnkB725 copies over the
+; three BattleCmd records ($93EE-$9402) in the bit-5 battle.
+org $FDB957
+BattleFD_FixedCmdPtrs:
+    dw BattleFD_FixedCmds_set0          ; 0
+    dw BattleFD_FixedCmds_set1          ; 1
+    dw BattleFD_FixedCmds_set2          ; 2
+
+; $FD:B95D — BattleFD_FixedCmds (63 bytes, $B95D–$B99B)
+; The three sets, 21 bytes each: a BattleCmd record (.State, .Kind,
+; .Menu, .Target, .Unk4, .Partners, .ActionId) for PCs 0, 1 and 2. In
+; each set one PC has a queued tech command (.State = queued | armed,
+; .Menu = the tech menu) and the other two only .State = armed. The
+; tech ids $42 and $3A with partner nibbles $F1 / $F2 are probably
+; double techs (the single techs are ids 1-$38, per
+; !BattleRom_CharFirstTech); $28 with partners $FF a single tech. What
+; .Kind's low nibble ($0F in sets 0 and 1) stands for is not traced.
+BattleFD_FixedCmds:
+.set0:
+    db !BattleCmd_StateQueued|!BattleCmd_StateArmed,!BattleCmd_KindTech|$0F,!BattleCmd_MenuTech,$05,$00,$F1,$42 ; PC 0
+    db !BattleCmd_StateArmed,$00,$00,$00,$00,$00,$00 ; PC 1
+    db !BattleCmd_StateArmed,$00,$00,$00,$00,$00,$00 ; PC 2
+.set1:
+    db !BattleCmd_StateQueued|!BattleCmd_StateArmed,!BattleCmd_KindTech|$0F,!BattleCmd_MenuTech,$09,$00,$F2,$3A ; PC 0
+    db !BattleCmd_StateArmed,$00,$00,$00,$00,$00,$00 ; PC 1
+    db !BattleCmd_StateArmed,$00,$00,$00,$00,$00,$00 ; PC 2
+.set2:
+    db !BattleCmd_StateArmed,$00,$00,$00,$00,$00,$00 ; PC 0
+    db !BattleCmd_StateArmed,$00,$00,$00,$00,$00,$00 ; PC 1
+    db !BattleCmd_StateQueued|!BattleCmd_StateArmed,!BattleCmd_KindTech,!BattleCmd_MenuTech,$03,$00,$FF,$28 ; PC 2
+
+; $FD:B99C — BattleFD_FixedPartyPtrs (6 bytes, $B99C–$B9A1)
+; !BattleRom_UnkFDB99C: one word per !Menu_Config+28 value (0-2), the
+; bank-$FD address BattleFD_UnkB2DE reads its 8 x 4 words from.
+BattleFD_FixedPartyPtrs:
+    dw BattleFD_FixedParty_set0         ; 0
+    dw BattleFD_FixedParty_set1         ; 1
+    dw BattleFD_FixedParty_set2         ; 2
+
+; $FD:B9A2 — BattleFD_FixedParty (168 bytes, $B9A2–$BA49)
+; BattleFD_UnkB2DE's four words per character record: Menu_CharRec
+; .Word3, .Word5, .Word7 and .Word9 (probably current HP, maximum HP,
+; MP and maximum MP: 800, 800, 80, 80 in every entry but one). Each set
+; is read for all 8 records (64 bytes), but the sets start only 7
+; entries (56 bytes) apart, so record 7 of set 0 and 1 takes the next
+; set's first entry, and record 7 of set 2 takes the first 8 bytes of
+; BattleFD_AiActLength (words $0404, $0006, $FFFF, $0404) as found.
+; The one other value: set 2's record 4 has .Word3 = 50.
+BattleFD_FixedParty:
+.set0:
+    dw 800,800,80,80                    ; record 0
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80                    ; record 6
+.set1:                                  ; also set 0's record 7
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+.set2:                                  ; also set 1's record 7
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 800,800,80,80
+    dw 50,800,80,80                     ; record 4
+    dw 800,800,80,80
+    dw 800,800,80,80
+
+; $FD:BA4A — BattleFD_AiActLength (23 bytes, $BA4A–$BA60)
+; !BattleRom_AiActLength: one byte per enemy script action code $00-$16,
+; the bytes of its action record; BattleAi_EnemyTurn and
+; BattleAi_ChooseByChance step through an action part by it. Codes 4
+; and 5 hold $FF and code 3 holds 0.
+BattleFD_AiActLength:
+    db $04,$04,$06,$00,$FF,$FF,$04,$04  ; $00-$07
+    db $04,$02,$03,$05,$04,$03,$02,$02  ; $08-$0F
+    db $04,$0A,$10,$03,$0A,$10,$0C      ; $10-$16
+
+; ============================================================
 ; $FD:BA61 — RandomTableFD (256 bytes, $FD:BA61–$BB60)
 ; A byte-identical copy of RandomTable ($C0:FE00): the same shuffle of
 ; 0-255. Read with LDA.l $FDBA61,X by battle code in bank $C1: at
@@ -3064,10 +3159,9 @@ BattleFD_UnkB7EB:
 ; otherwise they step the counter and reduce the entry with Battle_Div32,
 ; using the remainder plus !Battle_RandMin (entry mod range, plus the low
 ; bound). The second copy's one caller is BattleSys_HitModChanceMul's
-; roll against the caster's .Unk72. The 6 bytes
-; after the table
-; ($FD:BB61–$BB66) repeat its last 6 entries; nothing reads them that
-; xref finds, and they are left unmatched.
+; roll against the caster's .Unk72. The 6 bytes after the table
+; ($FD:BB61–$BB66) repeat its last 6 entries and nothing reads them that
+; xref finds (BankFD_RandomTableTail).
 ; ============================================================
 org $FDBA61
 
@@ -3088,6 +3182,18 @@ RandomTableFD:
     db $3A,$E4,$7C,$E0,$69,$A1,$B7,$05,$39,$74,$01,$9F,$BD,$C3,$84,$FC ; $D0
     db $77,$86,$13,$4E,$BF,$F2,$53,$5B,$ED,$21,$8B,$6D,$C2,$41,$B6,$DB ; $E0
     db $3C,$D3,$28,$EC,$2D,$E2,$9B,$A6,$42,$52,$57,$5F,$E5,$AB,$B0,$0C ; $F0
+
+; $FD:BB61 — BankFD_RandomTableTail (1183 bytes, $BB61–$BFFF)
+; Nothing found reads it: no matched code refers to it and xref finds no
+; call or jump into it. The first 6 bytes repeat
+; RandomTableFD's last 6 entries ($57, $5F, $E5, $AB, $B0, $0C), probably
+; what is left of an earlier build of the table placed 6 bytes higher;
+; then $00 fill up to MainInit at $FD:C000.
+org $FDBB61
+BankFD_RandomTableTail:
+    db $57,$5F,$E5,$AB,$B0,$0C
+    fillbyte $00
+    fill $FDC000-$FDBB67
 
 ; ============================================================
 ; MainInit ($FD:C000)
