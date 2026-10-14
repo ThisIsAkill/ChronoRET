@@ -47782,9 +47782,11 @@ Menu_Mode0FList:
 ; Menu_CfgMapButtons). The first 223 bytes ($FE0C-$FEEA: segments of 6,
 ; 72, 48 and 97) are tails of the code just before them, as with
 ; BankC0_OldBuildLeftovers: each segment repeats the bytes of a stretch
-; of the current code that ends at $C2:FE0B (Menu_ShopPayGold,
-; Menu_ShopCapGold and Menu_Mode0FList), with the JSR to
-; Menu_ShopCapGold pointing where that copy's own Menu_ShopCapGold lies
+; of the current code that ends at $C2:FE0B (the longest, the + $DF
+; copy of $FDAB-$FE0B, runs from inside Menu_ShopGainGold through
+; Menu_ShopPayGold, Menu_ShopCapGold and Menu_Mode0FList), with each
+; JSR to Menu_ShopCapGold (two in the + $DF copy) pointing where that
+; copy's own Menu_ShopCapGold lies
 ; (the copy's offset added: $FE2D = $FDDF + $4E, $FEBE = $FDDF + $DF;
 ; of the + $7E copy only the operand's high byte is left). Probably what
 ; earlier, longer assemblies of the end of the bank left behind, each
