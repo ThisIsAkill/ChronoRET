@@ -106,6 +106,11 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-14 (SPC700): STYLE.md gains an "SPC700 (the sound driver)" section: the same
+  readability rules for `asm/spc700/`, the Entry line stating P instead of DP and DB, `DSP:` and
+  `Ports:` header lines, titles with ARAM and ROM ranges, and hand-written callers checked
+  against the driver trace. Approved by the maintainer with the SPC700 review path
+  (`symbols/spc700_functions.csv`, `tools/lint_spc700.py`, a separate progress figure).
 - 2026-10-14 (re-survey): `symbols/code_survey.csv` re-run with the current source, now that all
   known 65816 code is matched. Same method (matched data, the `*OldBuildLeftovers` among it, was
   already not code); the trace and the allowance find no unmatched code, so each bank's code
