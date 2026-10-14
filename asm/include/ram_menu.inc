@@ -1249,6 +1249,37 @@ endstruct
 !Menu_SramUnk0603 = $300603
 !Menu_SramUnk0793 = $300793
 
+; --- Bank $C6 scene routines (bankC6.asm) ---
+!C6Scene_FadeGrad = $7E8B56              ; C6Scene_FadeGradInit's COLDATA lines: 224 white (C2Scene_HandBufA's
+                                         ; area), ...
+!C6Scene_FadeGradSteps = $7E8C36         ; ... 30 steps of 8 lines, ...
+!C6Scene_FadeGradDark = $7E8D26          ; ... 224 at 0 (to $7E:8E05)
+!C6Scene_Grad2 = $7E9176                 ; C6Scene_Grad2Init's COLDATA lines (C2Scene_SwirlCosA's area): 112
+                                         ; white, 112 dark with the ramp at their start
+!C6Scene_Unk7F0062 = $7F0062             ; 8-bit in Menu_FlagBlock7F; zeroed by C6Scene_ClearUnk7F0062; reader
+                                         ; not traced
+!C6Scene_PerspM7A = $7E9176              ; C6Scene_PerspStep's line buffers, a word a line (buffer A; B is
+!C6Scene_PerspM7B = $7E9796              ; C6Scene_PerspBufBOfs on): M7A (C2Scene_SwirlCosA), M7B
+!C6Scene_PerspM7C = $7E9DB6              ; (C2Scene_SwirlSinA), M7C and M7D
+!C6Scene_PerspM7D = $7EA3D6
+
+; The Mode 7 view's task (C6Scene_PerspInit / C6Scene_PerspStep): its fields
+; after C2Scene_Task's motion words (the .XVelFrac word holds .Tilt).
+struct C6Scene_PerspTask $0000
+            skip $1A   ; +$00-$19: as C2Scene_Task
+.Tilt:      skip 2     ; +$1A byte offset into C6Scene_PerspTiltSteps (= C2Scene_Task.XVelFrac)
+            skip 6
+.Angle:     skip 2     ; +$22 turn, Trig_Sin1024 units (C6Scene_AddAngle adds to it)
+.Scale:     skip 2     ; +$24 the cos/sin multiplier (low byte used)
+.DepthA:    skip 2     ; +$26 M7A/M7B divisor at the middle line (low byte: the whole part)
+.DepthB:    skip 2     ; +$28 M7C/M7D divisor
+.CenterX:   skip 2     ; +$2A M7X before the .Ahead offset
+.CenterY:   skip 2     ; +$2C M7Y before it
+.Unk2E:     skip 2     ; +$2E zeroed by C6Scene_PerspInit; read by C6Scene_PerspTail, not used
+.Ahead:     skip 2     ; +$30 distance of the turning point ahead of the centre (low byte used)
+            skip $0E
+endstruct
+
 endif
 
 ; --- Draw lists, windows, strings and numbers (Menu_RunDrawList ...) ---

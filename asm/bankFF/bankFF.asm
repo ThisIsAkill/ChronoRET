@@ -8,7 +8,7 @@
 ; the save-slot code (save, load, check), the wave step and an HDMA
 ; table builder, reached by JSL from bank $C2. The bytes from $FF:FC67
 ; to the end are not reached (fragments of older builds of this code,
-; by their look) and stay as ROM bytes.
+; by their look): BankFF_OldBuildLeftovers, kept as db.
 ; ============================================================
 
 arch snes.cpu
@@ -32,7 +32,7 @@ org $FFF548
 ;   - zeroes Menu_SprScratch $9890-$989F and copies glyphs 1 and 2 after
 ;     it ($98A0-$98BF); then builds three groups of ten tiles at
 ;     Menu_TileSetC: each byte is the Menu_SprScratch byte (0, glyph 1 or
-;     glyph 2, by group) shifted left 2 with bits 4-3 of glyph t's byte
+;     glyph 2, by group) shifted left 2 with bits 3-2 of glyph t's byte
 ;     below (probably 0-9, 10-19 and 20-29 in a narrower layout; not
 ;     traced); then zeroes the first 16 bytes of Menu_TileSetC.
 ; Menu_Unk51 is the start offset of both output loops, and of the glyph
@@ -109,7 +109,7 @@ BankFF_BuildTileSets:
     LDY.w #!Menu_SprScratch+!BankFF_ScratchClearBytes
     LDA.w #!BankFF_ScratchTableBytes-1
     MVN !Bank7E,!BankFF                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    ; Menu_TileSetC: three groups of ten tiles, (Menu_SprScratch byte << 2) | glyph bits 4-3.
+    ; Menu_TileSetC: three groups of ten tiles, (Menu_SprScratch byte << 2) | glyph bits 3-2.
     LDY.b !Menu_Unk51
     STZ.b !Menu_Tmp00
 .row_group:
@@ -1151,3 +1151,130 @@ BankFF_BuildGradHdma:
 ; feeds is not set here).
 BankFF_GradValues:
     db $E8,$E7,$E6,$E5,$E4,$E3,$E2,$E1,$E0,$E1,$E2,$E3,$E4,$E5,$E6,$E7
+
+; ============================================================
+; BankFF_OldBuildLeftovers ($FF:FC67–$FF:FFFF, 921 bytes)
+; ============================================================
+; Not code that runs: tools/xref.py finds no call or jump into
+; $FF:FC67-$FFFF from code. The patterns it lists sit in the data before
+; $FF:F548, in these bytes themselves, inside two instructions of
+; BankFF_BuildGradHdma (operand bytes at $FF:FC1E and $FC4E, DOUBTFUL),
+; or (JSL/JML byte patterns) in data banks $C4, $C5, $C7, $C9, $CA, $D4,
+; $E5, $E9, $EF and $F5; four of the last are marked CONFIRMED ($C4:00E1,
+; $C7:D0B8, $C7:EC99, $CA:0F21), all inside data (bank $C7's past its
+; matched code and tables, $0000-$0E10). By their look they are what
+; older, longer assemblies of the end of the bank left behind, two
+; layers of them; kept as bytes (db), since they never run. The segments
+; (code read by eye, not traced):
+; - .grad_values_tail $FC67-$FC6D: $E1-$E7, the end of a copy of
+;   BankFF_GradValues.
+; - .sound_tail $FC6E-$FC9B: the end of a routine, from inside an LDA
+;   $0F0B: two commands through the sound block at $1E00, each sent with
+;   JSL $C7:0004 (Audio_DriverCommand), then RTS. The same bytes
+;   as .sound_tail2 from $FF10 on (its $FF0F is the LDA's opcode).
+; - .copy_e4 $FC9C-$FD3F: a routine (PHP ... PLP, RTL) that takes a word
+;   through the table at $FD40 (JSR (abs,X)), copies with MVN from bank
+;   $E4 and calls $C2:FE92 (JSL); .copy_e4_2 is the same but for the
+;   table ($FFE2) and the call ($C2:FED9).
+; - .copy_e4_table $FD40-$FD52: its four words and the short handlers
+;   they point at.
+; - .slot_checksum $FD53-$FD79: an older copy of the end of
+;   BankFF_SetSlotOfs, BankFF_SlotSramOfs and BankFF_SlotChecksum
+;   ($FF:FBDD-$FC03; byte-identical, ending PLB, PLP, RTS).
+; - .startup $FD7A-$FDC0: SEP #$30, DB = 0, screen off, NMITIMEN = 1, DMA and HDMA
+;   off, colour 0 = $001F (red), TM = 0, screen on at full brightness,
+;   30 frames waited on HVBJOY, then JML $00:0500.
+; - .grad_hdma $FDC1-$FE23: an older BankFF_BuildGradHdma and its table
+;   (the same bytes but for the table address, $FF:FE14 here).
+; - .unk_fe24 $FE24-$FED2: one routine (a single PHP at $FE24; its JMP
+;   $FEA7 leads to a second exit, also PLP, RTL) on DP $54 and $F4, $0100,X and $2993/$2995, calling $C2:FF42 and $C2:FECA, with
+;   byte tables at $FE8C-$FEA6 and a JSR (abs,X) table at $FED3; no
+;   matched routine was found that looks like them.
+; - .unk_fed3 $FED3-$FF0E: that table and code on $0F0A, $0D1C and the
+;   sound block at $1E00.
+; - .sound_tail2 $FF0F-$FF3D, .copy_e4_2 $FF3E-$FFE1, .copy_e4_table2
+;   $FFE2-$FFF4: the second layer's copies of the three segments above
+;   (the table words differ), each complete.
+; - .tail_fff5 $FFF5-$FFFF: 11 bytes (D5 01 16 03 01 A9 00 08 23 00 00)
+;   that match none of the segments above.
+; symbols/code_survey.csv counts part of these bytes as code (its
+; allowance for $FF); they are data here.
+; Entry/Exit: not code (data; never executed).
+BankFF_OldBuildLeftovers:
+.grad_values_tail:
+    db $E1,$E2,$E3,$E4,$E5,$E6,$E7
+.sound_tail:
+    db $0B,$0F,$A2,$00,$80,$05,$AD,$0C,$0F,$A2,$FF,$48,$8E,$01,$1E,$A9
+    db $70,$8D,$00,$1E,$22,$04,$00,$C7,$68,$8D,$01,$1E,$A9,$18,$8D,$00
+    db $1E,$A9,$80,$8D,$02,$1E,$8D,$03,$1E,$22,$04,$00,$C7,$60
+.copy_e4:
+    db $08,$E2,$30,$AD,$17,$18,$0A,$AA,$C2,$30,$AD,$14,$18,$FC,$40,$FD
+    db $85,$00,$AD,$11,$18,$29,$FF,$00,$0A,$0A,$85,$02,$6D,$0A,$18,$65
+    db $00,$AA,$A0,$90,$99,$A9,$0F,$00,$54,$7E,$E4,$A5,$02,$18,$6D,$0C
+    db $18,$AA,$A0,$A0,$99,$A9,$0F,$00,$54,$7E,$E4,$9C,$90,$98,$A2,$90
+    db $98,$A0,$92,$98,$A9,$07,$00,$54,$7E,$7E,$A9,$4C,$52,$85,$61,$64
+    db $00,$A9,$01,$00,$85,$8E,$E2,$20,$A4,$61,$A6,$00,$BD,$A0,$99,$F0
+    db $23,$BD,$90,$99,$85,$8A,$22,$92,$FE,$C2,$C8,$C8,$A6,$00,$BD,$A0
+    db $99,$85,$8A,$22,$92,$FE,$C2,$E6,$00,$C2,$21,$A5,$61,$69,$40,$00
+    db $85,$61,$80,$D2,$C2,$30,$A4,$61,$A2,$90,$98,$A9,$09,$00,$54,$7E
+    db $7E,$A5,$61,$18,$69,$40,$00,$85,$61,$E6,$00,$A5,$00,$C9,$09,$00
+    db $90,$E4,$28,$6B
+.copy_e4_table:
+    db $48,$FD,$4B,$FD,$4C,$FD,$4E,$FD,$A9,$00,$00,$60,$0A,$60,$0A,$6D
+    db $14,$18,$60
+.slot_checksum:
+    db $FF,$85,$7B,$60,$00,$60,$00,$6A,$00,$74,$08,$8B,$C2,$30,$F4,$30
+    db $30,$AB,$AB,$A5,$7B,$85,$00,$A0,$FE,$09,$A9,$00,$00,$18,$71,$00
+    db $88,$88,$10,$FA,$AB,$28,$60
+.startup:
+    db $E2,$30,$F4,$00,$00,$AB,$AB,$A9,$80,$8D,$00,$21,$A9,$01,$8D,$00,$42
+    db $A9,$00,$8D,$0B,$42,$8D,$0C,$42,$A9,$00,$8D,$21,$21,$A9,$1F,$8D
+    db $22,$21,$A9,$00,$8D,$22,$21,$A9,$00,$8D,$2C,$21,$A9,$0F,$8D,$00
+    db $21,$A2,$00,$AD,$12,$42,$10,$FB,$AD,$12,$42,$30,$FB,$E8,$E0,$1E
+    db $90,$F1,$5C,$00,$05,$00
+.grad_hdma:
+    db $08,$C2,$30,$A9,$00,$6E,$8F,$12,$43,$00,$A2,$60,$00,$8E,$00,$6E
+    db $A9,$E0,$00,$8D,$02,$6E,$9C,$93,$6E,$E2,$30,$64,$02,$A9,$02,$85
+    db $00,$A0,$03,$A9,$03,$85,$01,$A9,$01,$99,$00,$6E,$C8,$A5,$00,$99
+    db $00,$6E,$C8,$A6,$02,$BF,$14,$FE,$FF,$99,$00,$6E,$C8,$C6,$01,$D0
+    db $E6,$E6,$02,$A5,$02,$C9,$08,$90,$04,$A2,$82,$86,$00,$C9,$10,$90
+    db $D2,$28,$6B,$E8,$E7,$E6,$E5,$E4,$E3,$E2,$E1,$E0,$E1,$E2,$E3,$E4
+    db $E5,$E6,$E7
+.unk_fe24:
+    db $08,$E2,$30,$A5,$54,$C9,$13,$90,$03,$4C,$A7,$FE,$A6,$54,$BF,$9E
+    db $FE,$FF,$AA,$BD,$00,$01,$85,$00,$A5,$54,$4A,$B0,$0A,$A9,$F0,$85
+    db $02,$A9,$01,$85,$03,$80,$08,$A9,$0F,$85,$02,$A9,$10,$85,$03,$A5
+    db $02,$25,$00,$85,$01,$A5,$02,$49,$FF,$85,$02,$A5,$F4,$2C,$93,$29
+    db $F0,$09,$A5,$00,$18,$65,$03,$85,$00,$80,$0E,$A5,$F4,$2C,$95,$29
+    db $F0,$07,$A5,$00,$38,$E5,$03,$85,$00,$A5,$00,$25,$02,$05,$01,$9D
+    db $00,$01,$22,$42,$FF,$C2,$28,$6B,$62,$02,$64,$02,$66,$02,$E4,$02
+    db $E6,$02,$64,$03,$66,$03,$E4,$03,$E6,$03,$01,$00,$00,$02,$02,$03
+    db $03,$04,$04,$A9,$01,$85,$00,$AD,$F2,$00,$29,$01,$F0,$04,$A9,$10
+    db $85,$00,$A5,$54,$38,$E9,$13,$85,$02,$AA,$20,$D9,$FE,$2C,$1C,$0D
+    db $10,$07,$A5,$02,$0A,$AA,$FC,$D3,$FE,$22,$CA,$FE,$C2,$28,$6B
+.unk_fed3:
+    db $FD,$FE,$0F,$FF,$16,$FF,$A5,$5A,$29,$03,$F0,$1D,$29,$02,$D0,$0B
+    db $BD,$0A,$0F,$18,$65,$00,$9D,$0A,$0F,$80,$09,$BD,$0A,$0F,$38,$E5
+    db $00,$9D,$0A,$0F,$A9,$80,$8D,$1C,$0D,$60,$A9,$10,$8D,$00,$1E,$AD
+    db $0A,$0F,$8D,$01,$1E,$AD,$00,$0D,$85,$00,$80,$22
+.sound_tail2:
+    db $AD,$0B,$0F,$A2,$00,$80,$05,$AD,$0C,$0F,$A2,$FF,$48,$8E,$01,$1E
+    db $A9,$70,$8D,$00,$1E,$22,$04,$00,$C7,$68,$8D,$01,$1E,$A9,$18,$8D
+    db $00,$1E,$A9,$80,$8D,$02,$1E,$8D,$03,$1E,$22,$04,$00,$C7,$60
+.copy_e4_2:
+    db $08,$E2,$30,$AD,$17,$18,$0A,$AA,$C2,$30,$AD,$14,$18,$FC,$E2,$FF
+    db $85,$00,$AD,$11,$18,$29,$FF,$00,$0A,$0A,$85,$02,$6D,$0A,$18,$65
+    db $00,$AA,$A0,$90,$99,$A9,$0F,$00,$54,$7E,$E4,$A5,$02,$18,$6D,$0C
+    db $18,$AA,$A0,$A0,$99,$A9,$0F,$00,$54,$7E,$E4,$9C,$90,$98,$A2,$90
+    db $98,$A0,$92,$98,$A9,$07,$00,$54,$7E,$7E,$A9,$4C,$52,$85,$61,$64
+    db $00,$A9,$01,$00,$85,$8E,$E2,$20,$A4,$61,$A6,$00,$BD,$A0,$99,$F0
+    db $23,$BD,$90,$99,$85,$8A,$22,$D9,$FE,$C2,$C8,$C8,$A6,$00,$BD,$A0
+    db $99,$85,$8A,$22,$D9,$FE,$C2,$E6,$00,$C2,$21,$A5,$61,$69,$40,$00
+    db $85,$61,$80,$D2,$C2,$30,$A4,$61,$A2,$90,$98,$A9,$09,$00,$54,$7E
+    db $7E,$A5,$61,$18,$69,$40,$00,$85,$61,$E6,$00,$A5,$00,$C9,$09,$00
+    db $90,$E4,$28,$6B
+.copy_e4_table2:
+    db $EA,$FF,$ED,$FF,$EE,$FF,$F0,$FF,$A9,$00,$00,$60,$0A,$60,$0A,$6D
+    db $14,$18,$60
+.tail_fff5:
+    db $D5,$01,$16,$03,$01,$A9,$00,$08,$23,$00,$00

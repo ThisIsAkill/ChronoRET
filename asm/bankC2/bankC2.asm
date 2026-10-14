@@ -6988,11 +6988,11 @@ C2Scene_MosaicInStep:
 ; table and the same negate, but the angle is used as given (no × 4) and
 ; the signed value is returned in A instead of being multiplied.
 ; Callers (5 JSL sites): C2Scene_MapZoomMatrix ($C2:6752), C2Scene_DialDrawHand ($C2:6D10),
-;   C2Scene_SwirlInit ($C2:704F), C2Scene_SwirlStep ($C2:711D) and unmatched ($C6:E9FF).
+;   C2Scene_SwirlInit ($C2:704F), C2Scene_SwirlStep ($C2:711D) and C6Scene_PerspStep ($C6:E9FF).
 ; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_MapZoomMatrix ($C2:673B), C2Scene_DialDrawHand
 ;   ($C2:6D17), C2Scene_SwirlInit ($C2:7062), C2Scene_SwirlStep ($C2:712D), C2Scene_TaskBg3Wave
 ;   ($C2:76CB), C2Scene_TaskBg3LineWave ($C2:77D9), C2Scene_Bg2HWaveStep ($C2:7D33),
-;   C2Scene_Bg2VWaveStep ($C2:7DB9) and unmatched ($C6:EA17).
+;   C2Scene_Bg2VWaveStep ($C2:7DB9) and C6Scene_PerspStep ($C6:EA17).
 ; Callers note: each matched caller of the cosine (C2Scene_MapZoomMatrix,
 ;   C2Scene_DialDrawHand, C2Scene_SwirlInit, C2Scene_SwirlStep) takes the
 ;   sine too, e.g. C2Scene_DialDrawHand the cosine and the sine of the same
@@ -7038,8 +7038,9 @@ Trig_Sin1024:                   ; header: see Trig_Cos1024
 ; directions $40 and $C0, which give +128 and -128 ($0080 / $FF80)
 ; instead of the table's +127 / -127. Only the low byte of the direction
 ; counts.
-; Callers (2 JSL sites): C2Scene_ObjBMateAim ($C2:53A6) and unmatched ($C6:E6EE).
-; Callers of C2Scene_Unk2277 (2 JSL sites): C2Scene_ObjBMateAim ($C2:53B1) and unmatched ($C6:E71F).
+; Callers (2 JSL sites): C2Scene_ObjBMateAim ($C2:53A6) and C6Scene_NudgeRandomDir ($C6:E6EE).
+; Callers of C2Scene_Unk2277 (2 JSL sites): C2Scene_ObjBMateAim ($C2:53B1) and
+;   C6Scene_NudgeRandomDir ($C6:E71F).
 ; Entry (both): M=0 (16-bit A: the .w immediates), X=0 (16-bit index;
 ;        the index is below $100, so X=1 would read the same),
 ;        DP any (no direct page), DB=$00 (the table is read absolute
@@ -39491,9 +39492,9 @@ Menu_Mode0BH1:
 ; ============================================================
 ; Menu mode $0C: the shop ($C2:D519–$C2:E1E2)
 ; ============================================================
-; Menu_EntryModes gives mode $0C to BankC2_MenuEntry argument 2; the
-; low byte of Menu_EntryX (Menu_CurMember) picks the item list: entry n
-; of MenuRom_ShopLists, 32 ids copied to Menu_ShopIds. Cursor record
+; Menu_EntryModes gives mode $0C to BankC2_MenuEntry argument 2; the low
+; byte of Menu_EntryX (Menu_CurMember) picks the item list: entry n of
+; MenuRom_ShopLists, 32 ids copied to Menu_ShopIds. Cursor record
 ; Menu_ShopRecBuy opens that list (handler 2): a confirm takes a count
 ; (handler 5) and buys it, Menu_Unk2C53 (probably the gold, as the
 ; 9,999,999 cap at $C2:FDDF suggests) going down by Menu_ShopPrice.
@@ -39501,11 +39502,11 @@ Menu_Mode0BH1:
 ; (handler 4) for half the Menu_ItemInfo1 word. So the Menu_ItemInfo1
 ; word is probably an item's price, and mode $0C the shop. Up or Down on
 ; the top row moves to the member sprites (handler 6); a confirm there
-; shows that member's equipment (handler 7, Left / Right for the next
-; member), a confirm on a slot its item list (handler 8), where a
-; confirm equips the item. In the lists the members' sprites take a
-; pose and numbers show for each the item's attack or defence against
-; theirs (Menu_ShopMemberInfo).
+; shows that member's equipment (handler 7, L / R with the default
+; button map for the other members), a confirm on a slot its item list
+; (handler 8), where a confirm equips the item. In the lists the
+; members' sprites take a pose and numbers show for each the item's
+; attack or defence against theirs (Menu_ShopMemberInfo).
 
 org $C2D519
 ; $C2:D519 — Menu_Mode0CList (18 bytes, $D519–$D52A)
@@ -39566,7 +39567,7 @@ Menu_Mode0CH1:
     BEQ .moved
     STZ.b Menu_Thread[6].State
     JSR Menu_ShopToMembers
-.moved:
+.moved:                                 ; (also the path with no Up / Down)
     LDA.b !Menu_Unk81
     CMP.b !Menu_CursorSel
     BEQ .done
@@ -39895,8 +39896,10 @@ Menu_Mode0CH6:
 
 ; $C2:D715 — Menu_Mode0CH7 (99 bytes, $D715–$D777)
 ; Handler 7, every frame, the member's equipment slots: Menu_PadInput.
-; Neither button: Left / Right change the member (Menu_ShopEquipNext),
-; the slot rows highlighted again (Menu_ShopSlotRows), Menu_PlaySound0
+; Neither button: the page bits of Menu_PadAction (Menu_ButtonMap
+; entries 6 / 7 on Menu_PadRepeat's low byte, not the D-pad: R / L
+; with the default map) change the member (Menu_ShopEquipNext), the slot
+; rows highlighted again (Menu_ShopSlotRows), Menu_PlaySound0
 ; when the cursor moved. Confirm: Menu_CursorSel = Menu_Unk81; when the
 ; slot's item list (Menu_EquipListLen, from Menu_ShopSlotRows'
 ; Menu_EquipListSetup) is empty a tail jump to Menu_PlaySound1; else
@@ -40424,8 +40427,10 @@ Menu_ShopQtyDirs:
 ;        (Menu_Tmp00, Menu_ShopMulArg), DB=$7E
 ; Exit:  M=1, X=1; Menu_Tmp00 = the step size; when a step is taken
 ;        also Menu_ItemCount, Menu_ShopPrice and Menu_ShopProduct (and
-;        Menu_ShopMulArg on a step down) changed, A, X, Y as Menu_UnkFD68
-;        leaves them; else A = the count refused
+;        Menu_ShopMulArg on a step down) changed, A = the new
+;        Menu_ShopPriceHi and B = the new price word's high byte
+;        (.add_price reloads A), X, Y as Menu_UnkFD68 leaves them; else
+;        A = the count refused
 ; Calls: Menu_UnkFD68.
 Menu_ShopQtyRight:
     LDA.b #1
@@ -40511,8 +40516,11 @@ Menu_ShopQtyDown:                       ; header: see Menu_ShopQtyRight
 ; Menu_ShopBuyRow/Top and Menu_ShopSellRow/Top = 0; the cursor records
 ; 0-11 saved to Menu_ShopSavedPos; the shop's ids: entry Menu_CurMember
 ; of MenuRom_ShopLists (a bank-$CC address) to Menu_ShopIds, 32 bytes,
-; then Menu_ShopCountIds; Menu_Unk0D77 = 0 and the description line of
-; nothing (Menu_ShopDescNone); colours $20-$23 and $24-$27 =
+; then Menu_ShopCountIds; Menu_Unk0D77 = 0 (a 16-bit STZ: M=0 again
+; after Menu_ShopCountIds' PLP, so Menu_Unk0D78 = 0 too) and
+; Menu_ShopDescNone, which then draws nothing when Menu_Unk51's low
+; byte is 0 (Menu_DrawDescText: string 0 = Menu_Unk0D77 and
+; Menu_Unk0D78 bit 7 clear); colours $20-$23 and $24-$27 =
 ; MenuRom_Icon0Pal, $70-$73 and $74-$77 = MenuRom_Mode01Pal (4 colours
 ; each); colours 0-23 dimmed into Menu_DimPalBuf; the 11 tile words at
 ; Menu_Unk5D42 = Menu_Icon0BlankTile; BankFF_BuildTileSets; the member
@@ -40612,7 +40620,9 @@ Menu_ShopInit:
 ; $C2:DB98 — Menu_ShopVramRec (7 bytes, $DB98–$DB9E)
 ; Menu_VramRec queued by Menu_ShopInit: VRAM $1000 = $7E:B000
 ; (Menu_SprUnpackBuf, where BankFF_BuildTileSets builds its tiles),
-; $1100 bytes. Its unused eighth byte is Menu_ShopCalcPrices' PHP ($08).
+; $1100 bytes. Its eighth byte (Menu_VramRec.Unk7, use not traced;
+; Menu_QueueVramRom copies all 8 bytes) is Menu_ShopCalcPrices' PHP
+; ($08).
 Menu_ShopVramRec:
     dw !Menu_ShopTilesVram, !Menu_SprUnpackBuf
     db !Bank7E
@@ -40722,9 +40732,10 @@ Menu_ShopListMembers:
 ; $C2:DC1E — Menu_ShopMemberSprites (86 bytes, $DC1E–$DC73)
 ; Menu_SprHideAll, Menu_SprUploadMax = 7; then for each member of
 ; Menu_EquipChars (Menu_CurMember counting from 0, the 16-bit LDX also
-; reading $0072; until the $FF): Menu_LoadCharRec, and sprite object
-; Menu_Tmp02 gets the record's character id as .Id at .ScreenX =
-; Menu_ShopSprX[n] and .ScreenY = Menu_ShopSprY; at
+; reading $0072; until the $FF): Menu_LoadCharRec; the sprite object
+; is picked by Menu_Times64 of Menu_CurCharRec (object = the character
+; id), and gets that id as .Id, .ScreenX = Menu_ShopSprX[n] (n =
+; Menu_Tmp02, the member index) and .ScreenY = Menu_ShopSprY; at
 ; Menu_ShopMarkMap + 8n go the tile word ($20 + the id, attribute $20:
 ; priority) and below it (+$40) the low byte $2E (probably a name or
 ; mark of the member over its sprite). The loop's BCC is always taken
@@ -40781,8 +40792,8 @@ Menu_ShopMemberSprites:
     RTS
 
 ; $C2:DC74 — Menu_ShopSprX (7 bytes, $DC74–$DC7A)
-; The member sprites' .ScreenX, one per sprite object 0-6, 32 pixels
-; apart.
+; The member sprites' .ScreenX, one per member 0-6 (indexed by
+; Menu_Tmp02 in Menu_ShopMemberSprites), 32 pixels apart.
 Menu_ShopSprX:
     db $20, $40, $60, $80, $A0, $C0, $E0
 
@@ -40837,8 +40848,10 @@ Menu_ShopBuyOpen:
 ; Menu_ShopIds; the bytes from that 0 to the end of its 32 are zeroed.
 ; Callers (1 JSR site): Menu_ShopInit ($C2:DB0A).
 ; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E
-; Exit:  P restored; A = 0; Y = $20; X's low byte kept (the SEP #$30
-;        clears both high bytes)
+; Exit:  P restored; A = 0; Y = $20 when the 0 lies in the 32 bytes
+;        (with none, the count runs on to the first 0 after them, that
+;        byte is zeroed again and Y = the count + 1); X's low byte kept
+;        (the SEP #$30 clears both high bytes)
 ; No calls.
 Menu_ShopCountIds:
     PHP
@@ -40863,7 +40876,11 @@ Menu_ShopCountIds:
 ; $C2:DCDA — Menu_ShopCountHeld (40 bytes, $DCDA–$DD01)
 ; For each shop item until the id 0: Menu_ShopHeld = the count of the
 ; first inventory slot (Menu_InvIds / Menu_InvCounts) holding that id
-; with a count other than 0, or 0 when there is none.
+; with a count other than 0, or 0 when there is none. Quirk (kept): at
+; .found the LDA Menu_InvCounts,X overwrites A, so after a slot holding
+; the id with a count of 0 the BEQ .next_slot goes on searching for id
+; 0 (a later slot with id 0 and a count other than 0 would give its
+; count), not for the item.
 ; Callers (2 JSR sites): Menu_Mode0CH5 ($C2:D630) and Menu_ShopBuyOpen ($C2:DCB0).
 ; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E
 ; Exit:  P restored; A = 0; Y = the list length; X clobbered (high bytes
@@ -41029,7 +41046,9 @@ Menu_ShopDrawRow:
 ;        (Menu_CurMember, Menu_ShopInfoOfs, Menu_ShopSlotOfs; the TDC: B
 ;        = 0 for the TAX), DB=$7E
 ; Exit:  P restored; A, X, Y clobbered; Menu_CurMember = the member
-;        count; the record copy holds the last member (with the item)
+;        count; the record copy holds the last member (with the item
+;        only when that member can equip it); Menu_Tmp00-02 clobbered
+;        (Menu_CountEquippedBy, Menu_ShopMemberNums)
 ; Calls: Menu_ItemCategory, Menu_CountEquippedBy, Menu_DrawNumber,
 ;   Menu_LoadCharRec, Menu_Times64, Menu_CanEquip, Menu_CharCalcStats,
 ;   Menu_ShopMemberNums.
@@ -41255,8 +41274,9 @@ Menu_ShopSellOpen:
 ; list may have shrunk); Menu_PageTop and Menu_ListTop =
 ; Menu_ShopSellTop.
 ; Callers (2 JSR sites): Menu_Mode0CH4 ($C2:D6BD) and Menu_ShopSellOpen ($C2:DEB7).
-; Entry: M, X any (P saved; REP #$20 / SEP #$30 here), DP=$0000
-;        (Menu_CursorSel, Menu_ListMaxTop), DB=$7E
+; Entry: M any (P saved; REP #$20 / SEP #$30 here), X=0 (the 3-byte
+;        LDX/LDY immediates before the SEP #$30; the REP #$20 leaves X
+;        as given), DP=$0000 (Menu_CursorSel, Menu_ListMaxTop), DB=$7E
 ; Exit:  P restored; A, X, Y clobbered (high bytes cleared by the SEP
 ;        #$30); Menu_Tmp00/01 as Menu_ListPageSetup leaves them
 ; Calls: Menu_ShopListPaging.
@@ -41434,7 +41454,7 @@ Menu_ShopQtyLists:
 ; Closes the count window: Menu_CursorSel = Menu_ShopListSel; the 32
 ; bytes from Menu_ShopQtyRowMap zeroed; Menu_ShopLast (and $0084) =
 ; $FF from the A the MVN leaves (the next list frame redraws the member
-; info); the gold (Menu_Unk2C53, 3 bytes, 7 digits) drawn at
+; info); Menu_Unk2C53 (probably the gold; 3 bytes, 7 digits) drawn at
 ; Menu_ShopGoldMap; Menu_VramRecBg3Rows60 and Menu_VramRecClock queued.
 ; Callers (2 sites: 1 JSR, 1 JMP): Menu_Mode0CH5 (JMP $C2:D642) and Menu_Mode0CH4 (JSR $C2:D6BA).
 ; Entry: M=1 (the 8-bit store of Menu_CursorSel), X any, DP=$0000, DB=$7E
@@ -41932,8 +41952,8 @@ Menu_Mode0DH3:
 ; Menu_NameFirstHdmaBits and Menu_ArrowsOff - 1: probably a help window
 ; shown until the button.)
 ; Callers note: Menu_Mode0DList entry 4 (run by Menu_MainThread).
-; Entry: M=1 (8-bit stores), X=0 (the 16-bit LDX), DP any (Pad_Pressed
-;        is read absolute), DB=$7E
+; Entry: M=1 (8-bit stores), X=0 (the 16-bit LDX), DP=$0000 (the
+;        STA.b Menu_ThreadVar; Pad_Pressed is read absolute), DB=$7E
 ; Exit:  M=1; no button: X = 0 and nothing else done; else A = 1, X
 ;        and Y as Menu_PlaySound0 leaves them
 ; Calls: Menu_PlaySound0.
@@ -42017,8 +42037,8 @@ Menu_Mode0DH2:
     JMP Menu_FadeOut
 
 ; $C2:E267 — Menu_NameGridStep (49 bytes, $E267–$E297)
-; The grid's frame: Menu_Tmp7F (a word) = cursor record 0's X and Y;
-; WRMPYA = 16 (the grid's cell size, used by the steps); for a
+; The grid's frame: Menu_NamePrevPos (a word) = cursor record 0's X
+; and Y; WRMPYA = 16 (the grid's cell size, used by the steps); for a
 ; direction (Menu_CursorDir not negative) its step from
 ; Menu_NameGridDirs (which moves Menu_NameCol / Menu_NameRow and the
 ; record), and Menu_PlaySound0 when the record moved. Then the confirm
@@ -42026,7 +42046,7 @@ Menu_Mode0DH2:
 ; (Menu_NameCursorX) and Menu_VramRecClock queued.
 ; Callers (1 JSR site): Menu_Mode0DH1 ($C2:E221).
 ; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP=$0000
-;        (Menu_Tmp7F; the TDC: B = 0 for the TAX), DB=$7E
+;        (Menu_NamePrevPos; the TDC: B = 0 for the TAX), DB=$7E
 ; Exit:  P restored; DB=$7E; A, X, Y clobbered
 ; Calls: Menu_NameGridDirs' routines (JSR (abs,X)), Menu_PlaySound0,
 ;   Menu_NameEdit, Menu_NameCursorX, Menu_QueueVramRom.
@@ -42219,7 +42239,11 @@ Menu_NameCursorX:
 ; (Menu_NameTrim); then A = $FF (kept) when it equals one of the 8
 ; names (Menu_NameTaken, with the refusal sound) or is empty; else its
 ; 6 bytes go to Menu_NameDest and A = 0. A refused name leaves the old
-; one's first byte 0 until a name is taken.
+; one's first byte 0 until a name is taken. The empty-name test is in
+; effect dead: an empty entry already matches the own name's zeroed
+; first byte in Menu_NameTaken (with the sound), as Menu_NameDest is one
+; of the 8 names (Menu_NameInit: + 6 x Menu_CurMember, for a member
+; 0-7).
 ; Callers (1 JSR site): Menu_Mode0DH1 ($C2:E22C).
 ; Entry: M any (P saved; SEP #$20 / REP #$20 here), X=0 (16-bit LDX and
 ;        Menu_NameTaken's loops), DP=$0000, DB=$7E
@@ -42314,8 +42338,10 @@ Menu_NameTrim:
 ; Entry: M=1 (8-bit compares and the ADC on Menu_Tmp00), X=0 (16-bit
 ;        offsets), DP=$0000 (Menu_Unk51, expected 0; Menu_Tmp00), DB=$7E
 ; Exit:  M=1, X=0; A = $FF (taken, B as Menu_PlaySound1 leaves it) or
-;        $0000; X, Y the last offsets compared; Menu_Tmp00 the last name's
-;        offset
+;        $0000; X, Y the last offsets compared (X = 5 after a 5-byte
+;        match, the offset of the 0 after a shorter one); Menu_Tmp00 =
+;        the matched name's offset, or 48 (8 x 6) when none matches;
+;        Menu_Tmp01 = 0 (with Menu_Unk51 = 0)
 ; Calls: Menu_PlaySound1.
 Menu_NameTaken:
     LDX.b !Menu_Unk51
@@ -42708,8 +42734,9 @@ Menu_Mode0EH0:
 ; Callers of Menu_Mode0EH1_start (1 JMP site): Menu_Mode0EH2 ($C2:E6DC).
 ; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E; a menu
 ;        thread; the sub-entries with M=1, X=1, DP=$0000, DB=$7E
-; Exit:  M=1; A, X, Y clobbered; or as Menu_LoadEraseOpen or
-;        Menu_ExitToGame (no return)
+; Exit:  M=1; A, X, Y clobbered (the slot question's path returns
+;        with X=1, from the confirm's SEP #$30); or as
+;        Menu_LoadEraseOpen or Menu_ExitToGame (no return)
 ; Calls: Menu_PlaySound0, Menu_PadInput, Menu_LoadCursor,
 ;   BankFF_LoadSlot (JSL), Menu_InitNewGameData, Menu_LoadAskSlot,
 ;   Audio_DriverCommand (JSL); jumps to Menu_LoadEraseOpen or
@@ -42791,8 +42818,9 @@ Menu_Mode0EH1_start:                    ; header: see Menu_Mode0EH1
 ; Menu_Unk0414 = it, BankFF_LoadSlotPart and a jump to
 ; Menu_Mode0EH1_start. Cancel: Menu_PlaySound0, Menu_ThreadVar - 1,
 ; Menu_Unk0D4C - 1 (back to $FF), Menu_CursorSel = 3, Menu_LoadMsgRows
-; ($100 bytes) zeroed, Menu_LoadMsgShown = 0 and a tail jump to
-; Menu_QueueVramRom with Menu_VramRecBg3.
+; ($100 bytes) zeroed, Menu_LoadMsgShown = 0 (a 16-bit STZ: $0D85 is
+; zeroed too) and a tail jump to Menu_QueueVramRom with
+; Menu_VramRecBg3.
 ; Callers note: Menu_Mode0EList entry 2 (run by Menu_MainThread).
 ; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E; a menu
 ;        thread
@@ -43039,11 +43067,16 @@ Menu_LoadInit:
 
 ; $C2:E841 — Menu_LoadAskSlot (73 bytes, $E841–$E889)
 ; The question of handler 2: Menu_LoadMsgShown + 1 (Menu_UnkD36C then
-; draws no slot details); string 3 of MenuRom_NameStrings drawn into
-; Menu_TextGfxA (Menu_DrawText; TextWin_StrIndex, StrTable and
+; skips only $C2:D39E-$D403, after its test at $C2:D399: its draw list
+; ($FF:C15E), Menu_DrawClock, a text line (Menu_DrawText of a string
+; picked through $FF:D296, probably the location; Menu_PutTextTiles) and
+; the record at $C2:D45F queued; before the test it still copies $40
+; bytes from $7E:7600 + $40 x $79 to $7E:9890, and it still draws the
+; member rows from $C2:D404 on); string 3 of MenuRom_NameStrings drawn
+; into Menu_TextGfxA (Menu_DrawText; TextWin_StrIndex, StrTable and
 ; Menu_TextDest set as Menu_NameInit sets them) and put as two tile
-; strips with their attribute bytes (Menu_PutTextTilesAttr: 8 tiles
-; from tile $21 at Menu_LoadMsgMapA, 9 from $62 at Menu_LoadMsgMapB,
+; strips with their attribute bytes (Menu_PutTextTilesAttr: 8 tiles from
+; tile $21 at Menu_LoadMsgMapA, 9 from $62 at Menu_LoadMsgMapB,
 ; attribute $30); Menu_LoadMsgVramRec and Menu_VramRecBg3 queued.
 ; Callers (1 JSR site): Menu_Mode0EH1 ($C2:E67D).
 ; Entry: M any (P saved; REP #$30 / SEP #$20 here), X any, DP any, DB=$7E
@@ -47290,8 +47323,8 @@ Menu_VramRecBg3Rows48:
 ; $C2:FC53 — Menu_VramRecUnkFC53 (7 bytes, $FC53–$FC59)
 ; VRAM $7800 = $7E:6E00 (Menu_SlotLabelArea), $800 bytes: the slot
 ; labels and the three Menu_SlotTextBufs after them (queued by
-; Menu_LoadInit; the text threads send their glyph tiles to VRAM $7800
-; / $7A00 from elsewhere).
+; Menu_LoadInit and by Menu_UnkD065 at $C2:D071; the text threads send
+; their glyph tiles to VRAM $7800 / $7A00 from elsewhere).
 Menu_VramRecUnkFC53:
     dw $7800, !Menu_SlotLabelArea
     db !Bank7E
@@ -47703,9 +47736,9 @@ Menu_Mode0FList:
 ; ==================================================================
 ; Not code and, as far as found, never read: tools/xref.py, run on every
 ; address of $C2:FE0C-$FFFF, finds no call or jump from matched code.
-; Its CONFIRMED hits are the JSRs inside these bytes ($C2:FE28,
-; $C2:FE95, $C2:FEB9, $C2:FF35) and JSLs in unmatched banks ($C7, $C9,
-; $E8, $E9, $FF at $FF:FD02 and on), not checked; its DOUBTFUL ones are
+; Its CONFIRMED hits are five JSLs into these bytes from banks $C7,
+; $C9, $E8 and $E9 (sites $C7:C93E, $C9:6E49, $C9:7E94, $E8:5D33,
+; $E9:E00A, bytes not matched there), not checked; its DOUBTFUL ones are
 ; operand bytes of matched code or sweeps of unmatched bytes. The first
 ; 225 bytes are tails of the code just before them, as with
 ; BankC0_OldBuildLeftovers: each segment repeats the bytes of a stretch

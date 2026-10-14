@@ -500,7 +500,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    same song either way. Stubs added: `C2Scene_Unk2273`/`Unk2277` (probably cos/sin of a
    256-step direction) and `C2Scene_Unk229D` (probably the direction between two points), in the
    unmatched $C2:2273-$C2:232C; `BankC6_UnkE74E` (tile-in-rectangle test) and `BankC6_UnkE797`
-   (per-location landing check of object A). Also matched (branch match-c2-modes2): the map
+   (per-location landing check of object A; both matched since the C6 batch, item 13, names kept). Also matched (branch match-c2-modes2): the map
    view of mode 6, `C2Scene_MapView` with its picture builders (`C2Scene_MapViewBuild`,
    `MapTileColors`, `MapDrawPixels`, `MapCellPixels`, `MapFilterColor`, `MapBuildTilemap`), the
    zoom task `C2Scene_TaskMapZoom` and its states and matrix (`C2Scene_MapZoomMatrix`/
@@ -741,7 +741,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    name them); the shop's arithmetic $C2:FCB2-$FE09 (`Menu_ShopBuyQtyInit`/`SellQtyInit`,
    `Menu_ShopDivide` (24 by 16 bits), `Menu_UnkFD58`/`FD68` (multiply), `Menu_ShopGainGold`/
    `PayGold`, `Menu_ShopCapGold`); and `BankC2_OldBuildLeftovers` ($C2:FE0C-$FFFF: three tails of the
-   shop code from earlier builds, then 277 bytes not in the current code). The stub names kept their
+   shop code from earlier builds, then 277 bytes not in the current code; the old-build routines
+   in `BankFF_OldBuildLeftovers` call $C2:FE92 / $C2:FED9, inside the copy at $C2:FE8A, so the two
+   are probably of the same earlier builds). The stub names kept their
    `Unk` names (`Menu_UnkC54F`/`C57A`/`C5C7`/`C9E5`/`CAE6`/`CFA2`/`CFFB`/`D065`/`D0DB`/`D0E5`/`D32C`/
    `D36C`/`FD58`/`FD68`) because verified headers name them; better names once those are next edited:
    `Menu_CfgMapApply`/`CfgMapDraw`/`CfgMapMarks`, `Menu_Icon4Preview`/`Redraw`, `Menu_SaveCursor`,
@@ -846,7 +848,12 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    BattleFD_UnkB7EB; `!BattleRom_CmdPtr` `$A849`; `!BattleRom_TechEntryPtr` `$A84F`;
    `!BattleRom_CharFirstTech` `$A89D`; `$A800`-`$A80A`, `$A821`-`$A848` and `$A855`-`$A89C` have
    no named reader yet). Those tables are the next cheap step; the credits need a text/graphics
-   format, not hand-written db. Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
+   format, not hand-written db. Survey note (C6 batch): no unmatched $FD byte is code any more:
+   tools/code_survey.py's trace and allowance count none of `$FD:0000`-`$A8A4` today, so the 481
+   "unmatched code" bytes progress.json shows ($FD's surveyed 16,149 less the 15,668 matched) are the
+   survey's allowance for bytes later matched as data (the old-build leftovers, animation lists and
+   tables), not code still to match; `symbols/code_survey.csv` is high for $FD by that much (left
+   as is; re-surveying is a separate step). Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
    `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
    BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967);
    which LocRom.Palette values occur (FieldAnimListBPtrs is taken as 88 entries because the lists start
@@ -1042,10 +1049,18 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BankFF_BuildTileSets` / `WidenTiles` and the `$7E:1640` bytes of `BankFF_UnkF813` show, the
    `Menu_ItemInfo0` entries it marks, `BankFF_UnkF9C4` writing its result to `$0400` under
    `Menu_CmdBootCheckSaves`, and which registers HDMA channel 1 feeds. Not matched: `$FF:F540`-
-   `$F547` (8 data bytes before the code) and `$FF:FC67`-`$FFFF` (unreached fragments of older
-   builds, by their look). Headers edited (back to review): Menu_CmdBootCheckSaves,
+   `$F547` (8 data bytes before the code). Headers edited (back to review): Menu_CmdBootCheckSaves,
    Menu_InitNewGameData, Menu_BuildItemTables, Menu_LoadSlotSummaries (the slot-layout note above
-   it).
+   it). Since the C6 batch (item 13) `$FF:FC67`-`$FFFF` is matched as data,
+   `BankFF_OldBuildLeftovers` (921 bytes of db in named segments): xref finds no call or jump into
+   it from code; it holds two layers of older assemblies (a copy of the end of BankFF_GradValues,
+   older copies of BankFF_SlotChecksum's end and of BankFF_BuildGradHdma with its table, a start-up
+   fragment ending JML $00:0500, routines that copy from bank $E4 and call $C2:FE92 / $C2:FED9,
+   and two routines on DP $54/$F4 no matched code resembles). Survey note: `symbols/code_survey.csv`
+   counts 640 of these bytes ($FF:FC80-$FFDF, allowance blocks) as code; they are data, so the 232
+   "unmatched code" bytes progress.json shows for $FF are not code and $FF's code is fully matched
+   (left as is; the survey is not edited by hand). Header edited by it (back to review):
+   BankFF_BuildTileSets (the bank banner above it, which said these bytes stay as ROM bytes).
 
 10. Bank $CD (new file `asm/bankCD/bankCD.asm`; the survey puts code at `$CD:0000`-`$3FE5` with
    tables inside, data from `$CD:4000`): `$CD:0000`-`$CD:3FFF` is matched in full (three batches).
@@ -1312,6 +1327,51 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    bank $CD, still defines) and `$CE:F0E6`-`$CE:FFFF` (opcode $80's tables, `$CE:F24E` /
    `$CE:F28E` / `$CE:F58E` and the HDMA tables, `!BattleRom_AbsSine`). These could become labelled
    data once bank $CD's readers can use labels.
+
+13. Bank $C6 code (branch match-ff-tail; new file `asm/bankC6/bankC6.asm`): `$C6:E000`-`$C6:EE42`
+   is matched (code, with two small tables inside), and the $00 fill after it
+   (`BankC6_CodeEndFill`, `$EE43`-`$EFFF`); the rest of the bank is data, left as ROM bytes. Two
+   entries are JSL targets from bank $C2 and keep their stub names because verified bank-$C2 code
+   calls them so: `BankC6_UnkE74E` (tile outside a rectangle: bits left/right/above/below; better
+   `C6Scene_TileOutsideRect`) and `BankC6_UnkE797` (object A's landing check by Loc_Id $1F0-$1F7
+   rectangles; better `C6Scene_ObjANoLandHere`). All the others are scene script routines called
+   by op $4E (C2Script_CallLong): their sites were found by unpacking the scene scripts
+   (C2SceneRom_ScriptPacks entries 0-7 with a Python copy of Decomp_ToWram's format) and
+   searching for `$4E lo hi $C6`; each header cites "pack n +$offset". Matched: the HDMA set-ups
+   `C6Scene_Win1HdmaOn` (+ byte-identical copies `Win1HdmaOnB`/`C`), `Win2HdmaOn` (+ copy
+   `Win2HdmaOnB`); the window shapes built with WinFx_BuildCircle and reshaped in place
+   (`C6Scene_Win1/Win2EllipseStep` + `EllipseBuild`: the circle squeezed to half height;
+   `C6Scene_Win1/Win2CapsuleStep` + `CapsuleBuild`: the circle cut at its middle line and stretched)
+   and the WH1 wipe through WinFx_StepWipe (`C6Scene_WipeWinInit`/`WipeWinStep`); the COLDATA
+   gradients (`C6Scene_FadeGradInit`/`FadeGradStep`, a white fade that climbs the screen;
+   `C6Scene_Grad2Init`/`Grad2Ramp`); a BG1 vertical line wave (`C6Scene_Bg1WaveInit`/`Bg1WaveStep`,
+   HDMA channel 3); the unpacks `C6Scene_UnpackObjPackA/B`, `UnpackPalPackA/B`; the moves
+   `C6Scene_Bg3Accel`, `AddYAccel`, `PlaceOnEdgeRandom`, `PlaceInViewRandom`, `NudgeRandomDir`,
+   the unreferenced `Bg2VNudge`; the flag routines `GetFlagF2Bits`, `ClearUnk7F0062`,
+   `Set/ClearUnk7F01ED`, `SetUnk7F00CD`, `ClearUnk7F01F5Bit0`; and pack 0's Mode 7 view:
+   `C6Scene_MapPicture` with `C6Scene_MapCellPixels` (the map picture as C2Scene_MapDrawPixels
+   draws it, whole, without the colour filter) and the per-line Mode 7 matrix
+   `C6Scene_PerspInit`/`PerspStep` (HDMA channels 2-5 to M7A-M7D), the quadrant fills
+   `C6Scene_PerspQuad0-3` with `C6Scene_PerspTail`, `C6Scene_PerspDivide`, the tables
+   `C6Scene_PerspQuadrants` / `C6Scene_PerspTiltSteps`, and `C6Scene_AddAngle`; the task fields
+   are the struct `C6Scene_PerspTask`. New names are `C6Scene_*` (defines in their own blocks of
+   `constants_menu.inc` / `ram_menu.inc`; `!BBAD_WH1` and `!BBAD_BG1VOFS` in hardware.inc), so they
+   cannot collide with the bank-$C2 branches' `C2Scene_*` names. Quirks recorded: the missing CLCs
+   before the line-address ADCs (carry from an ASL, 0 on screen) and in PlaceInViewRandom (as
+   C2Scene_PlaceBelowView); the ellipse loops' 16-bit count (r below 2 runs them 65,536 times) and
+   the capsule's unchecked MVN counts (n below 2); Grad2Init's MVNs one byte long; Bg1WaveStep's
+   -256 at sine index $200; PerspInit's HDMA words overwritten by the step it falls into; the
+   tail's unused `.Unk2E` read; BankC6_UnkE797's unchecked Loc_Id; PerspStep's STA.w to C2Tmp_00.
+   Entry states come from op $4E (M=1, X=0) inside C2Scene_TaskRunAll (DP=$0000, DB=$00); the
+   script values (.Var22/.Var24 counts and radii) were not traced. Survey note: the survey's $C6
+   note puts the code at `$C6:E000`-`$EE3F`; it ends at `$EE42`, and the survey's 2,673 code bytes
+   are low (3,619 matched; progress.py flags it). Headers edited: none verified in bank $C6 (all
+   new); the generated Callers blocks of Trig_Cos1024, C2Scene_Unk2273, BankC3_Entry0000 and
+   Audio_DriverInit changed (not hashed). Open: what the scenes are (pack 0's Mode 7 flight, pack
+   4's window and gradient effects), who reads `!C6Scene_Unk7F0062`, `!C2Scene_Unk7F00CD`, the
+   `C6Scene_PerspTiltSteps` values' origin, and what `.Unk2E` was meant for. Not matched in $C6:
+   the data, `$C6:0000`-`$DFFF` and `$C6:F000`-`$FFFF` (packs, headers, the tables the bank-$C2
+   code reads by define).
 
 ## Tables
 
