@@ -110,6 +110,20 @@ if !hardware_inc == 0
 !HDMAEN_Ch2To5         = $3C  ; bits 2-5: HDMA channels 2, 3, 4 and 5
 !CGWSEL_MathInWinFixed = $10  ; bits 5-4 = 01 (no colour math outside the colour window), fixed colour
 !OBSEL_Size8And16_Base6000 = $03 ; size %000 = 8x8 and 16x16 sprites, sprite tiles at VRAM word $6000
+!BBAD_M7X              = $1F  ; B-bus address of M7X ($211F)
+!HDMAEN_Ch1To5         = $3E  ; bits 1-5: HDMA channels 1 to 5
+!OBSEL_Size32And64_Base4000 = $82 ; size %100 = 32x32 and 64x64 sprites, sprite tiles at VRAM word $4000
+!BGMODE_Mode7          = $07  ; BG mode 7
+!BG1SC_Map4800         = $48  ; BG1 map at VRAM word $4800, 32x32 (ignored in mode 7)
+!W12SEL_Bg1Win1        = $02  ; BG1 window 1 enable
+!W12SEL_Bg1Win1Inv     = $03  ; BG1 window 1 enable + invert
+!W12SEL_Bg1Win2        = $08  ; BG1 window 2 enable
+!WH_RightEdge          = $FF  ; WH1/WH3: a window reaching the right edge
+!TM_Bg1                = $01  ; TM/TS/TMW/TSW: BG1
+!TM_Obj                = $10  ; TM/TS/TMW/TSW: sprites
+!CGADSUB_HalfAddBg1    = $41  ; colour math on BG1 only, add, result halved
+!INIDISP_ForceBlank    = $80  ; bit 7: forced blank (brightness 0)
+!INIDISP_BlankFull     = $8F  ; forced blank, brightness 15
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)

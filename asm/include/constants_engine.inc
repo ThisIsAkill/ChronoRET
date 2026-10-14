@@ -761,6 +761,9 @@ if !constants_engine_inc == 0
 !FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
 !FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
 !FieldAnimB_Bytes = $0C                  ; bytes per FieldAnimB record
+!FieldAnimA_FrameMask = $0E00            ; FieldAnimA .Unk0/.Unk1 bits 9-11: the frame (x 2 after XBA)
+!FieldAnimA_TileBytes = $80              ; bytes per tile-animation upload (4 tiles); the same
+                                         ; register value is MDMAEN's channel-7 bit
 ; --- Palette animation (PalAnim_TickAll and its kinds) ---
 !PalAnim_KindMask = $F0                  ; FieldAnimB.Unk0 high nibble: the kind (0 = none)
 !PalAnim_LenMask = $0F                   ; FieldAnimB.Unk0 low nibble: frames - 1 (kinds 1 and 8)
@@ -775,6 +778,66 @@ if !constants_engine_inc == 0
 !Col_GreenBlueMask = $7FE0               ; green and blue
 !Col_BlueHiMask = $7C                    ; blue in a colour's high byte (blue x 4)
 !Col_GreenScaledMask = $F8               ; green x 8 (as the scalers shift it) without the fraction bits
+!Col_GreenLoMask = $E0                   ; green bits 0-2 in a colour's low byte (PalAnim_WhitenR)
+!Col_GreenHiMask = $03                   ; green bits 3-4 in a colour's high byte (PalAnim_WhitenB)
+
+; --- Bank-$FD Mode 7 scene (M7Scene_*) ---
+!M7Scene_OpenFrames = $0020              ; frames the iris takes to open (M7Scene_Run80-83)
+!M7Scene_Run80Close = $02A0              ; M7Scene_Run80/83: the frame the iris starts closing
+!M7Scene_Run80Shut = $02C0               ; ... the frame window 2 masks BG1 from
+!M7Scene_Run80Last = $02FF               ; ... the last frame
+!M7Scene_Run81Close = $00A0              ; M7Scene_Run81: as above
+!M7Scene_Run81Shut = $00C0
+!M7Scene_Run81Last = $00FF
+!M7Scene_Run82Close = $0040              ; M7Scene_Run82: as above
+!M7Scene_Run82Shut = $0060
+!M7Scene_Run82Last = $009F
+!M7Scene_UnusedRotBytes = $007A          ; M7Scene_UpdateScroll's dead code: 61 colours shifted
+!M7Scene_SprRotBytes = $001A             ; M7Scene_UpdateScroll: 13 sprite colours shifted
+!M7Scene_IrisStepMask = $1F              ; M7Scene_Frame bits that index M7Scene_IrisRadii
+!M7Scene_FlickerSpeed = $98              ; M7Scene_FlickerFrac step per frame (M7Scene_Run83)
+!M7Scene_FlickerMask = $1F               ; M7Scene_FlickerIdx wraps at 32
+!M7Scene_TilePixels = $0040              ; pixels (VRAM words) of a Mode 7 tile
+!M7Scene_Tiles = $0100                   ; Mode 7 tiles
+!M7Scene_OamInitBytes = $0040            ; M7Scene_OamInit: 16 sprites x 4 bytes
+!M7Scene_OamHiLarge = $AA                ; Oam_HighTable byte: four sprites large, X bit 8 clear
+!M7Scene_QuarterTurn = $40               ; Rom_SineTable256 steps per quarter turn (sin -> cos)
+!M7Scene_SineBias = $80                  ; added to a signed sine to make it 0-255
+!M7Scene_RayColourStart = $0100          ; M7Scene_Acc at a ray's start (colour 1)
+!M7Scene_ColourMask = $0F                ; a 4bpp colour
+!M7Scene_Invert = $FF                    ; EOR mask (one's complement)
+!M7Scene_Rays = $0041                    ; rays M7Scene_Init draws (0-64, a quarter turn)
+!M7Scene_CentreX = $80                   ; M7X (low byte) of both halves
+!M7Scene_CentreY = $0070                 ; M7Y - BG1VOFS; also the bottom half's VOFS offset
+!M7Scene_ScrollMask = $01FF              ; BG1VOFS range used (9 bits)
+!M7Scene_SkipLines = 16                  ; lines skipped at the top of the per-line tables
+!M7Scene_HalfLines = $70                 ; 112: lines per HDMA run (two runs, 224 lines)
+!M7Scene_HdmaRepeat112 = $F0             ; HDMA line count: repeat mode, 112 lines
+!M7Scene_SaveBytes = $0200               ; bytes of $7F0000 saved and restored
+!M7Scene_IrisCentre = $80                ; M7Scene_IrisX / IrisY
+!M7Scene_IrisLines = $FF                 ; window lines BuildIris writes per buffer
+!M7Scene_IrisLastLine = $FF              ; BuildIris's limit for IrisY + r
+!M7Scene_IrisUnit = $0100                ; dividend: 256 / r gives the circle's step
+!M7Scene_IrisHalf = $80                  ; 1/2 in 8.8: the start x is r + 1/2
+!M7Scene_SprGfxBytes = $2000             ; bytes of M7Scene_SprGfx
+!M7Scene_VramSprites = $4000             ; VRAM word of the sprite tiles (OBSEL)
+!M7Scene_InTileMask = $07                ; a coordinate's pixel within its tile
+!M7Scene_TileMask = $F8                  ; a coordinate's tile x 8
+!M7Scene_Dividend = $FFFF                ; InitHdma's dividend
+!M7Scene_DepthScale = $E0                ; InitHdma: 2m x $E0 / 256
+!M7Scene_DepthBase = $F0                 ; InitHdma: the divisor is $F0 minus that
+!M7Scene_ScaleFactor = $FF               ; InitHdma's factor for WriteScale
+!M7Scene_Lines = $0100                   ; lines in the per-line Mode 7 tables
+!M7Scene_BgColours = $0040               ; BG colours set from M7Scene_PalRed/PalBlue
+!M7Scene_SprColours = $0080              ; sprite colours (128-255)
+!M7Scene_SprRamp = $0010                 ; entries of M7Scene_PalSprBlue read
+!M7Scene_CycleBytes = $0040              ; CyclePalette: 32 colours x 2 bytes
+!M7Scene_TilemapBytes = $4000            ; 128 x 128 tiles
+!M7Scene_MapSide = $80                   ; tiles per Mode 7 map row (and tile numbers used)
+!M7Scene_OamLowBytes = $0200             ; Oam_LowTable bytes
+!M7Scene_OamHighBytes = $0020            ; Oam_HighTable bytes
+!M7Scene_HiddenY = $F0                   ; a sprite Y below the screen
+!M7Scene_OamHiOffscreen = $55            ; Oam_HighTable byte: four sprites small, X bit 8 set
 !FieldAnimA_Size = 5                     ; bytes per FieldAnimA record
 !FieldAnim_EndRecord = $80               ; FieldFD_LoadAnimSetA list byte: the record only gets .Unk3 = $80
 !FieldAnim_Kind2 = 2                     ; FieldFD_LoadAnimSetA record kinds with their own copy loops
