@@ -658,12 +658,33 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `PalAnim_WhitenR`/`WhitenB` write one byte of the colour (the other stays as Pal_CgramBuf had
    it), `WhitenRG` drops blue and `WhitenGB` drops red; `M7Scene_Init` fills window buffer 1 twice;
    `M7Scene_IrisRadii` has 31 entries (entry 31 is the next table's 0); `M7Scene_UpdateScroll`'s
-   dead BG colour rotation. Open: which scene `$FF $80-$8F` is, who calls `FdVec_FFEE`
-   (`$C3:4D46` looks like a JSL in unmatched code), and the pointer table after `$FD:F28F`
-   (no confirmed reader). Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
+   dead BG colour rotation. Open: which scene `$FF $80-$8F` is, and who calls `FdVec_FFEE`
+   (`$C3:4D46` looks like a JSL in unmatched code). Also matched (the FD-rest batch, all data):
+   the battle tables `$FD:B957`-`$FD:BA60` (`BattleFD_FixedCmdPtrs` / `FixedCmds`, the bit-5
+   battle's three fixed BattleCmd sets; `BattleFD_FixedPartyPtrs` / `FixedParty`, BattleFD_UnkB2DE's
+   four words per character record, probably HP / max HP / MP / max MP; `BattleFD_AiActLength`),
+   `BankFD_RandomTableTail` (`$FD:BB61`-`$BFFF`: 6 old-build bytes of the random table, then $00
+   fill), `FieldHdma_OldBuildLeftovers` (`$FD:D5D4`-`$D9FF`: never-run old copies of the end of
+   FieldHdma_BuildBottomBandB and of EngFD_UnkD52D, then $00 fill), and the location animation
+   lists `$FD:F290`-`$FD:FFE4` (`FieldAnimListAPtrs` / `FieldAnimListA` for FieldFD_LoadAnimSetA,
+   `FieldAnimListBPtrs` / `FieldAnimListB` for FieldFD_LoadAnimSetB, and `FieldAnimListBOldTail`,
+   an unread copy of B's last $BC bytes). With them `$FD:A8A5`-`$FD:FFFF` is all from source.
+   Quirks recorded there: BattleFD_FixedParty's sets are 7 entries apart but read for 8 records
+   (record 7 takes the next set's first entry; set 2's takes BattleFD_AiActLength's first 8
+   bytes); the three $01 bytes after the `$8B,$38,$04,$08` palette records read as empty records.
+   Back to review from it: `RandomTableFD` (its "left unmatched" note now names
+   BankFD_RandomTableTail). Still unmatched in bank $FD: `$FD:0000`-`$FD:A8A4`, all data: the
+   packed credits graphics (`!Credits_GfxPack`, `$FD:0000`), the staff credits text
+   (`!Credits_Text`, `$FD:A000`-`$A7D0`, then $00 to `$A7FF`) and the battle tables at
+   `$FD:A800`-`$A8A4` (`!BattleRom_PcStatBlock` `$A80B`, also read at `$A811` by
+   BattleFD_UnkB7EB; `!BattleRom_CmdPtr` `$A849`; `!BattleRom_TechEntryPtr` `$A84F`;
+   `!BattleRom_CharFirstTech` `$A89D`; `$A800`-`$A80A`, `$A821`-`$A848` and `$A855`-`$A89C` have
+   no named reader yet). Those tables are the next cheap step; the credits need a text/graphics
+   format, not hand-written db. Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
    `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
-   BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967) and the data at `$FD:B957` (pointer table and
-   records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
+   BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967);
+   which LocRom.Palette values occur (FieldAnimListBPtrs is taken as 88 entries because the lists start
+   there); who sets `!Battle_Unk29AC` and `!Menu_Config+28` for the bit-5 battle. Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
    sums, the end messages 4-7 and their bits (`!Battle_UnkB2B0`/`B2B3`), the `BattlerStats.Unk57`
    values ($A0/$A1/$A9/$AB/$B3) and the PcStatBlk stats mean; who fills BattleEnemyInit ($29C4) and
    reads `!Battle_Unk7F01EE`; which records of the $7F:14F0 block the HDMA tables use.
