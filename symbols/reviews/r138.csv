@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev138a,changes,e48289f528c9,"$CD:0027 fix OK. Still lists fully matched trees as unanalysed: svc 4 BattleAct_ResetState $CC:F06B (no calls); svc 8 UpdateWindows' JSLs (CF:FD9E/FD02/FD36, CD:0027). Drop both."

@@ -155,18 +155,18 @@ BattleSys_SceneSetup:
 ;        X=0 kept, and its bank-$CC steps are matched, but the rest of
 ;        its call tree is not checked here); the other five reach code
 ;        that is not analysed:
-;        3 (BattleSys_FrameTickVec $CD:0009, BattleSys_PumpFrames'
-;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
-;        through the menu code; its BattleMsg_ShowFromTableCC3A09Vec
-;        $CD:0027 leads to BattleCD_ShowTechInfo, whose call tree is
-;        all matched),
-;        4 (BattleSys_PumpFrames,
-;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
-;        6 (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies),
-;        8 (BattleSys_FrameTickVec,
-;        BattleSys_PumpFrames and the $CD/$CF JSLs of
-;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
-;        BattleSys_PumpFrames). BattleFx_SetPtrA2FromTable ($CF:FD9E),
+;        3 (BattleSys_FrameTickVec $CD:0009, whose BattleCD_FrameTick
+;        calls $CD:3B5F, $CD:3E44 and $D1:ECF3, also through
+;        BattleMenu_RefreshIfDirtyAndTick; BattleSys_PumpFrames'
+;        BattleSys_IdleVecCD0036 $CD:0036, which calls $CD:3E44), 4
+;        (BattleSys_PumpFrames, and BattleCD_ActOp80 and the layer-effect
+;        code, which reach $D1:F67A, $CD:3E3B, $CD:3E75 and $CD:3ED2), 6
+;        (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies), 8
+;        (BattleSys_FrameTickVec and BattleSys_PumpFrames) and 9
+;        (BattleSys_FrameTickVec, BattleSys_PumpFrames). The call trees
+;        of BattleMenu_UpdateWindows and of
+;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027, BattleCD_ShowTechInfo)
+;        are all matched. BattleFx_SetPtrA2FromTable ($CF:FD9E),
 ;        which services 0 (through Battle_StartPose / Battle_PoseStep)
 ;        and 3 (through BattleMenu_UpdateWindows and
 ;        BattleMenu_ConfirmCommand) reach, is matched and returns M=1,
