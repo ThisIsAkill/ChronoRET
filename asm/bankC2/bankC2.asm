@@ -29020,7 +29020,8 @@ Menu_Mode01H0:
 ; Menu_VramRecBg3 queued (a tail jump). Cancel: back to the main menu
 ; (Menu_ReturnToMainMenu). Else Menu_MemberCursor (a tail jump).
 ; Callers note: Menu_Mode01List entry 1 (run by Menu_MainThread).
-; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E
+; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E; from a
+;        menu thread (it yields)
 ; Exit:  as the routine it ends in
 ; Calls: Menu_PadInput, Menu_PlaySound0, Menu_EquipSlotsSlideIn, Menu_EquipSlotsOpen,
 ;   Menu_Yield, Menu_ListEquipItems, Menu_DrawEquipList; jumps to
@@ -29058,7 +29059,8 @@ Menu_Mode01H1:
 ; tail jump); else Menu_PlaySound0, Menu_ThreadVar + 1 (handler 3) and a
 ; tail jump to Menu_EquipItemsOpen. Else Menu_EquipSlotIdle (a tail jump).
 ; Callers note: Menu_Mode01List entry 2 (run by Menu_MainThread).
-; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E
+; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E; from a
+;        menu thread (it yields)
 ; Exit:  as the routine it ends in
 ; Calls: Menu_PadInput, Menu_PlaySound0, Menu_EquipSlotsSlideOut; jumps to
 ;   Menu_EquipSlotsClose, Menu_PlaySound1, Menu_EquipItemsOpen or Menu_EquipSlotIdle.
@@ -29101,7 +29103,8 @@ Menu_Mode01H2:
 ; Menu_EquipItemsClose, Menu_Unk84 = $FF, Menu_ThreadVar = 2 (handler 2) and
 ; the list arrows' thread killed (Menu_KillThreads, a tail jump).
 ; Callers note: Menu_Mode01List entry 3 (run by Menu_MainThread).
-; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E
+; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E; from a
+;        menu thread (it yields)
 ; Exit:  idle: M=1; A, X, Y clobbered. Else as Menu_KillThreads
 ; Calls: Menu_PadInput, Menu_EquipItemIdle, Menu_EquipPreviewItem,
 ;   Menu_PlaySound0, Menu_AddItem, Menu_RemoveItem, Menu_PlaySound,
@@ -30387,7 +30390,7 @@ Menu_SetSlotRowsAttr:
 ; first row), and a tail jump to Menu_PlaySound0.
 ; Callers (1 JMP site): Menu_Mode01H2 ($C2:9C95).
 ; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP=$0000,
-;        DB=$7E
+;        DB=$7E; from a menu thread (it yields)
 ; Exit:  P restored; as Menu_PlaySound0
 ; Calls: Menu_EquipItemsSlideIn, Menu_RunDrawList, Menu_QueueVramRom,
 ;   Menu_EquipListSetup, Menu_DrawDescText; jumps to Menu_PlaySound0.
@@ -30786,7 +30789,9 @@ Menu_EquipCompareStats:
 ; Menu_EquipCompareStats' order: Menu_CharRec offsets of attack,
 ; defence and stats 0, 2, 5, 3, 1, 4, 6 (.Derived + 7, + 8, + 0 ...);
 ; its loop reads the first 9. The last two bytes ($03, $3F) are not
-; read by it (no reader found).
+; read by it (no reader found); they equal the .Word3 and .Unk3F
+; offsets (probably current and maximum HP), the HP pair it compares
+; separately.
 Menu_EquipCompareOfs:
     db Menu_CharRec.Derived+7, Menu_CharRec.Derived+8, Menu_CharRec.Derived+0
     db Menu_CharRec.Derived+2, Menu_CharRec.Derived+5, Menu_CharRec.Derived+3
@@ -30955,7 +30960,7 @@ Menu_DrawEquipNames:
 ;        (Menu_BandA-C), DB=$7E; from a menu thread (it yields)
 ; Exit:  P restored; DB=$7E; A, X, Y clobbered; Menu_ScrollFrames =
 ;        $18 and its high byte the first limit; Menu_ScrollOfs = 6;
-;        Menu_ArrowsOff = Menu_SlideHdmaBits
+;        Menu_ArrowsOff = its entry value - 1 (only DEC'd here)
 ; Calls: Menu_RunDrawList, Menu_QueueVramRom, Menu_Yield,
 ;   Menu_EquipSlotsSlideStep.
 Menu_EquipSlotsSlideIn:
@@ -31349,8 +31354,10 @@ Menu_MemberListHdma:
 ; $C2:AA19 — Menu_PutHdmaEntry (27 bytes, $AA19–$AA33)
 ; Writes HDMA entries of A lines with the value Menu_Tmp00/01 through
 ; WMDATA (the caller has set WMADDL/H): one entry for A below $80; for
-; A = $80-$FF two, A - $7F lines then $7F lines (a count byte with bit 7
+; A = $80-$FE two, A - $7F lines then $7F lines (a count byte with bit 7
 ; set would mean repeat mode). A = 0 writes a 0 count: the table's end.
+; Quirk: A = $FF wraps (INC gives 0), so it writes a 0 count (a table
+; end) then $7F lines; no caller passes it (the most is $C0).
 ; Callers (8 JSR sites): Menu_EquipSlotsSlideStep ($C2:A824, $C2:A830, $C2:A83A, $C2:A851) and
 ;   Menu_EquipSlotsBackStep ($C2:A9DA, $C2:A9E4, $C2:A9F1, $C2:A9FB).
 ; Entry: M=1 (8-bit A; N from the caller's load of A), X any, DP=$0000
@@ -31781,15 +31788,16 @@ Menu_Mode02H5:
 ; 8-bit STZ: when the frames were skipped going up, the word is left
 ; $FF00), the VRAM queue emptied, Menu_ItemListSelect, the NMI move set
 ; back to the saved table (Menu_ScrollSaved, Menu_NmiMoveReq), the map
-; rows shifted (Menu_ShiftInvListMap) and Menu_ScrollStep's low byte
-; = 0. Every path but the scroll ends with Menu_ItemsCursor =
+; rows shifted (Menu_ShiftInvListMap, which leaves M=0) and so the whole
+; Menu_ScrollStep word = 0. Every path but the scroll ends with Menu_ItemsCursor =
 ; Menu_CursorSel, Menu_PlaySound0 when it moved (Menu_Unk81) and
 ; Menu_VramRecClock queued; the scroll does so inside, through its
 ; Menu_ItemListSelect call.
 ; Callers (2 JMP sites): Menu_Mode02H2 ($C2:AA96) and Menu_Mode02H3 ($C2:AAD2).
 ; Entry: M any (SEP #$20 here), X=0 (16-bit LDX/STX), DP=$0000,
 ;        DB=$7E; a menu thread (the scroll yields)
-; Exit:  M=1 (the scroll: X=0 too); A, X, Y clobbered
+; Exit:  M=1, X=0 (the scroll: M=0, X=0, from
+;        Menu_ShiftInvListMap's REP #$20); A, X, Y clobbered
 ; Calls: Menu_PageScroll, Menu_DrawItemList, Menu_ListCursorEdge,
 ;   Menu_ItemListSelect, Menu_PlaySound0, Menu_QueueVramRom,
 ;   Menu_ListScrollInit, Menu_DrawItemRow, Menu_ListScrollStep,
@@ -32206,15 +32214,16 @@ Menu_ShowEquipInfo:
 ; $C2:AEB6 — Menu_ListEquipChars (85 bytes, $AEB6–$AF0A)
 ; Menu_EquipCharNames (42 bytes, seven 6-byte entries) zeroed, then
 ; for each character bit of Menu_ItemEquipChars[Menu_ItemId] AND
-; Menu_Unk29AF (the joined characters), from bit 7 (character 0) on,
-; that character's 6-byte Menu_Unk2C23 entry (probably its name; the
-; record copy takes the same entry) is appended. Ends when no bit is
-; left.
+; Menu_Unk29AF (probably the recruited characters), from bit 7
+; (character 0) on, that character's 6-byte Menu_Unk2C23 entry
+; (probably its name; the record copy takes the same entry) is
+; appended. Ends when no bit is left.
 ; Callers (1 JSR site): Menu_ShowEquipInfo ($C2:AE97).
 ; Entry: M, X any (P saved; REP #$30 / SEP #$30 / REP #$10 here),
 ;        DP=$0000 (Menu_Tmp00/01), DB=$7E
 ; Exit:  P restored; DB=$7E; A, X, Y clobbered; Menu_Tmp00 = 0,
-;        Menu_Tmp01 = the last character
+;        Menu_Tmp01 = the last listed character + 1 (the loop's INC
+;        before its final test), or 0 when none is listed
 ; No calls.
 Menu_ListEquipChars:
     PHP
@@ -32290,7 +32299,9 @@ Menu_EquipValueLabel:
 
 ; $C2:AF3A — Menu_EquipLabelPtrs (8 bytes, $AF3A–$AF41)
 ; Per item category 0-3: the bank-$FF address of the 11-byte label
-; Menu_EquipValueLabel copies (categories 1 and 2 share one).
+; Menu_EquipValueLabel copies (categories 1 and 2 share one). Category 0
+; reads "Attack:", 1-2 "Defense:"; category 3's (accessories, $FF:C96A)
+; is not text: 08 0B 01 01 08 0B 00, then the start of "Attack:".
 Menu_EquipLabelPtrs:
     dw !MenuRom_EquipLabel0&$FFFF, !MenuRom_EquipLabel12&$FFFF
     dw !MenuRom_EquipLabel12&$FFFF, !MenuRom_EquipLabel3&$FFFF
@@ -32407,7 +32418,8 @@ Menu_ClearInfoRows:
 ; $C2:AFED — Menu_PlaceMemberSprites (88 bytes, $AFED–$B044)
 ; The member rows of the use window: Menu_TextWord = 0; for each active
 ; member (Menu_CurMember 0 up to Menu_PartyActive, stopping at one
-; Menu_LoadPartyCharRec does not load): Menu_MemberRowFlags and the
+; Menu_LoadPartyCharRec does not load, or when the word at Menu_Unk51,
+; ORed into its result, is non-zero): Menu_MemberRowFlags and the
 ; member row's draw list MenuRom_MemberRowList at Menu_MapPtr (from
 ; $7E:3580, $140 bytes a row); the character's sprite object (page
 ; Menu_Times64 of its id): .ScreenY / .ScreenX low byte =
@@ -32618,7 +32630,9 @@ Menu_FirstSetBit:
 ; Menu_UseKindTable entry 3: Menu_RollRandomItem, then a tail jump to
 ; Menu_UseHealItem.
 ; Callers note: Menu_UseKindTable entry 3 (Menu_UseItem).
-; Entry: M any, X any (Menu_RollRandomItem saves P), DP=$0000, DB=$7E
+; Entry: M=1, X=0 (as Menu_UseHealItem needs; Menu_RollRandomItem's
+;        PLP gives P back unchanged), DP=$0000, DB=$7E; a menu thread
+;        (Menu_UseHealItem yields)
 ; Exit:  as Menu_UseHealItem
 ; Calls: Menu_RollRandomItem; jumps to Menu_UseHealItem.
 Menu_UseRandomItem:
@@ -32756,10 +32770,11 @@ Menu_RandomItemSetD:
 ; Callers note: Menu_UseStatItem branches to Menu_UseLeave (BVS $C2:B234).
 ; Callers (1 JMP site): Menu_UseRandomItem ($C2:B10A).
 ; Callers of Menu_UseTargets (1 JMP site): Menu_UseFullItem ($C2:B1FD).
-; Entry: M=1 (8-bit stores; Menu_UseLeave: any, the SEPs are its
-;        callees'), X=0 (16-bit LDX after), DP=$0000, DB=$7E; a menu
-;        thread (it yields)
-; Exit:  as Menu_QueueVramRom (P as the caller's); A, X, Y clobbered
+; Entry (all): M=1 (8-bit loads and stores; Menu_UseLeave's LDA #imm
+;        too), X=0 (16-bit LDX after), DP=$0000, DB=$7E; a menu thread
+;        (it yields)
+; Exit (all):  M=0, X=0 (the REP #$30 before the tail jump;
+;        Menu_QueueVramRom restores that P); A, X, Y clobbered
 ; Calls: Menu_UseTargetsOpen, Menu_StartCursorD, Menu_Yield,
 ;   Menu_PadInput, Menu_UnkB83E, Menu_PlaySound1, Menu_UseHealOn,
 ;   Menu_AfterItemUse, Menu_PlaySound0, Menu_SprResetChars,
@@ -32821,8 +32836,9 @@ Menu_UseLeave:                          ; header: see Menu_UseHealItem
 ; $C2:B1F8 — Menu_UseFullItem (8 bytes, $B1F8–$B1FF)
 ; Menu_UseKindTable entry 4: Menu_UseKind = $CA (HP, MP, all members)
 ; and a jump into Menu_UseHealItem's member loop (Menu_UseTargets);
-; Menu_UseAmountA is not set here (only read when Menu_UseAmountB bit 6
-; is clear).
+; Menu_UseAmountA is not set here (Menu_CalcHealAmounts always reads
+; it, but the result is only used when Menu_UseAmountB bit 6 is clear:
+; Menu_HealHp / Menu_HealMp take the full amount otherwise).
 ; Callers note: Menu_UseKindTable entry 4 (Menu_UseItem).
 ; Entry: M=1, X=0, DP=$0000, DB=$7E; a menu thread
 ; Exit:  as Menu_UseHealItem
@@ -32839,8 +32855,8 @@ Menu_UseFullItem:
 ; Menu_CursorSel, Menu_CursorIndex, Menu_UseRowFirst and Menu_ArrowsOff
 ; = $0C; Menu_UseTargetsOpen. Every frame: a yield, Menu_PadInput,
 ; Menu_StatTargetCursor. Cancel: Menu_UseLeave (a BVS into
-; Menu_UseHealItem). Confirm with Menu_Unk0DBC 0 (the stat at its cap):
-; Menu_PlaySound1; else Menu_ApplyStatItem and Menu_AfterItemUse.
+; Menu_UseHealItem). Confirm with Menu_Unk0DBC 0 (the stat at its cap,
+; or none left: Menu_UseKind 0): Menu_PlaySound1; else Menu_ApplyStatItem and Menu_AfterItemUse.
 ; Callers note: Menu_UseKindTable entry 5 (Menu_UseItem).
 ; Entry: M any, X any (SEP #$30 / REP #$10 here), DP=$0000, DB=$7E; a
 ;        menu thread (it yields)
@@ -33030,8 +33046,9 @@ Menu_StatCountOfs:
 ; $C2:B31C — Menu_AfterItemUse (55 bytes, $B31C–$B352)
 ; After a use: one of the picked slot's item taken (Menu_ItemCount = 1,
 ; Menu_ItemId = Menu_InvIds[Menu_ItemsPicked]; for Menu_ItemRandom a new
-; effect rolled first, Menu_RollRandomItem; Menu_RemoveItem); the cursor
-; row redrawn (Menu_RedrawCursorRow); with none left Menu_UseKind = 0
+; effect rolled first, Menu_RollRandomItem; Menu_RemoveItem, which takes
+; it from the first slot holding the id, not necessarily the picked
+; one); the cursor row redrawn (Menu_RedrawCursorRow); with none left Menu_UseKind = 0
 ; (nothing more can be done with it); the slot's description
 ; (Menu_DrawDescText); the member rows again
 ; (Menu_PlaceMemberSprites); Menu_SprUploadMax = 1.
