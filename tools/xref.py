@@ -35,7 +35,10 @@ How the boundary is decided:
                  instruction is DOUBTFUL.
                  Elsewhere (basis `sweep`) a self-synchronising sweep:
                  decode forward from every offset in the 64 bytes before the
-                 site, under each of the four M/X start states, tracking
+                 site (in matched rows only from the source's instruction
+                 lines; when matched data lies in the window, only from the
+                 first byte after it, where the next item starts), under
+                 each of the four M/X start states, tracking
                  REP/SEP and the exit widths of the routines called. A sweep
                  that decodes BRK, COP, STP or WDM is implausible and
                  dropped; of the rest, the site is CONFIRMED when more than
@@ -161,6 +164,8 @@ class Xref:
         self._busy: set[tuple] = set()
         self._flow = None
         self._tables = None
+        self._lines = None
+        self._starts: dict[int, list] = {}
 
     # ── loading ────────────────────────────────────────────────────────────
     @staticmethod
@@ -531,13 +536,42 @@ class Xref:
                 return False, 0.0, f'byte {back} of the {what} at {fmt(pos - back)} ({Path(prev[0]).name}:{prev[1]})'
         return False, 0.0, 'not an instruction start in the source'
 
+    def _sweep_starts(self, pos: int) -> list:
+        """Offsets the sweep decodes from: the WINDOW bytes before pos, in its
+        bank, except what the source rules out. In a matched row only an
+        instruction line can start an instruction. No code runs through a
+        data line, and the first byte after matched data starts whatever
+        follows it, so with matched data in the window the sweep decodes
+        only from that byte."""
+        if pos in self._starts:
+            return self._starts[pos]
+        lo = max(pos & ~0xFFFF, pos - WINDOW)          # code never runs across a bank
+        starts = []
+        for s in range(pos - 1, lo - 1, -1):
+            if self.routine_at(s):
+                line = self._line_at(s)
+                if line is not None and not self.boundaries[line][2]:
+                    starts = [s + 1]
+                    break
+                if line != s:
+                    continue
+            starts.append(s)
+        self._starts[pos] = starts
+        return starts
+
+    def _line_at(self, off: int):
+        """Start of the source line (instruction or data) holding off, if any."""
+        if self._lines is None:
+            self._lines = sorted(self.boundaries)
+        i = bisect.bisect_right(self._lines, off) - 1
+        return self._lines[i] if i >= 0 else None
+
     def _sweep(self, pos: int):
         memo = self._memo.setdefault(pos, {})
         rom = self.rom
-        lo = max(pos & ~0xFFFF, pos - WINDOW)          # code never runs across a bank
         lands = [0] * len(STATES)
         alive = [0] * len(STATES)
-        for start in range(pos - 1, lo - 1, -1):
+        for start in self._sweep_starts(pos):
             for n, (m0, x0, _) in enumerate(STATES):
                 path, o, m, x = [], start, m0, x0
                 while True:
@@ -571,12 +605,15 @@ class Xref:
                 if res != 'reject':
                     alive[n] += 1
                     lands[n] += res == 'land'
-        sweeps = (pos - lo) * len(STATES)
+        sweeps = len(self._sweep_starts(pos)) * len(STATES)
         weight = sum(w for (_, _, w), a in zip(STATES, alive) if a)
         if not sweeps or sum(alive) * 4 < sweeps or not weight:
             return False, 0.0, f'{sum(alive)}/{sweeps} sweeps plausible (too few: data?)'
         score = sum(w * l / a for (_, _, w), l, a in zip(STATES, lands, alive) if a) / weight
         detail = ' '.join(f'{name}:{l}/{a}' for name, l, a in zip(STATE_NAMES, lands, alive))
+        start = self._sweep_starts(pos)[-1]
+        if self.routine_at(start - 1) and not self.boundaries[self._line_at(start - 1)][2]:
+            detail += f' (only from {fmt(start)}, after the data of {self.routine_at(start - 1)})'
         return score > 0.5, score, f'landed {detail}'
 
     def classify(self, pos: int, kind: str) -> Hit:
