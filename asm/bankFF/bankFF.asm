@@ -1180,22 +1180,23 @@ BankFF_GradValues:
 ;   they point at.
 ; - .slot_checksum $FD53-$FD79: an older copy of the end of
 ;   BankFF_SetSlotOfs, BankFF_SlotSramOfs and BankFF_SlotChecksum
-;   ($FF:FBDD-$FC03; the same up to the checksum's end, which here is
-;   PLB, PLP, RTS).
+;   ($FF:FBDD-$FC03; byte-identical, ending PLB, PLP, RTS).
 ; - .startup $FD7A-$FDC0: SEP #$30, DB = 0, screen off, NMITIMEN = 1, DMA and HDMA
 ;   off, colour 0 = $001F (red), TM = 0, screen on at full brightness,
 ;   30 frames waited on HVBJOY, then JML $00:0500.
 ; - .grad_hdma $FDC1-$FE23: an older BankFF_BuildGradHdma and its table
 ;   (the same bytes but for the table address, $FF:FE14 here).
-; - .unk_fe24 $FE24-$FED2: two routines (PHP ... PLP, RTL) on DP $54 and
-;   $F4, $0100,X and $2993/$2995, calling $C2:FF42 and $C2:FECA, with
+; - .unk_fe24 $FE24-$FED2: one routine (a single PHP at $FE24; its JMP
+;   $FEA7 leads to a second exit, also PLP, RTL) on DP $54 and $F4, $0100,X and $2993/$2995, calling $C2:FF42 and $C2:FECA, with
 ;   byte tables at $FE8C-$FEA6 and a JSR (abs,X) table at $FED3; no
 ;   matched routine was found that looks like them.
 ; - .unk_fed3 $FED3-$FF0E: that table and code on $0F0A, $0D1C and the
 ;   sound block at $1E00.
 ; - .sound_tail2 $FF0F-$FF3D, .copy_e4_2 $FF3E-$FFE1, .copy_e4_table2
-;   $FFE2-$FFFF: the second layer's copies of the three segments above
-;   (the table words differ), cut off at the end of the bank.
+;   $FFE2-$FFF4: the second layer's copies of the three segments above
+;   (the table words differ), each complete.
+; - .tail_fff5 $FFF5-$FFFF: 11 bytes (D5 01 16 03 01 A9 00 08 23 00 00)
+;   that match none of the segments above.
 ; symbols/code_survey.csv counts part of these bytes as code (its
 ; allowance for $FF); they are data here.
 ; Entry/Exit: not code (data; never executed).
@@ -1274,4 +1275,6 @@ BankFF_OldBuildLeftovers:
     db $90,$E4,$28,$6B
 .copy_e4_table2:
     db $EA,$FF,$ED,$FF,$EE,$FF,$F0,$FF,$A9,$00,$00,$60,$0A,$60,$0A,$6D
-    db $14,$18,$60,$D5,$01,$16,$03,$01,$A9,$00,$08,$23,$00,$00
+    db $14,$18,$60
+.tail_fff5:
+    db $D5,$01,$16,$03,$01,$A9,$00,$08,$23,$00,$00
