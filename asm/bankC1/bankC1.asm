@@ -27549,10 +27549,13 @@ BattleAi_AddStatByteAtY:
 ; below): BattleAi_EnemyTurn sets !Battle_UnkB252 = !Battle_UnkAEC8 and
 ; !Battle_UnkB18B = that + 3 ($C1:8D01-$8D07). In the main-part pass
 ; (BattleSys_Unk8C09, from BattleSys_Main and from BattleSys_Unk8461 at
-; $C1:8826) they differ: !Battle_UnkB252 steps through enemy entries 0-7
-; but nothing in that loop writes !Battle_UnkB18B, so the handlers that
-; use it ($1A-$26) treat whatever battler it last held as "self", not the
-; enemy whose script runs. In BattleSys_Unk8461's reaction tests they also differ:
+; $C1:8826) they differ: !Battle_UnkB252 steps through enemy entries 0-7,
+; but the loop does not set !Battle_UnkB18B to the enemy whose script
+; runs. It keeps whatever battler it last held, except that
+; BattleSys_UpdateKo (through target handler $05, below) can leave a
+; KO'd PC's slot there; whether the test and choose handlers reach any
+; other writer of it is not traced. So the handlers that use it
+; ($1A-$26) treat that battler as "self", not the scripted enemy. In BattleSys_Unk8461's reaction tests they also differ:
 ; !Battle_UnkB252 is the reacting enemy, while !Battle_UnkB18B still
 ; holds !Battle_UnkB3B7, which BattleSys_Unk8461 copies from it at
 ; $C1:8637 after the BattleSys_UnkB223 call at $C1:8626 (so the battler
