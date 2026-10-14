@@ -91,6 +91,8 @@ if !hardware_inc == 0
 !BBAD_WH2              = $28  ; B-bus address of WH2 ($2128)
 !BBAD_WH3              = $29  ; B-bus address of WH3 ($2129)
 !BBAD_TM               = $2C  ; B-bus address of TM ($212C)
+!BBAD_CGWSEL           = $30  ; B-bus address of CGWSEL ($2130)
+!BBAD_BGMODE           = $05  ; B-bus address of BGMODE ($2105)
 !BBAD_CGADSUB          = $31  ; B-bus address of CGADSUB ($2131)
 !NMITIMEN_NmiAutoJoy   = $81  ; NMI on, auto-joypad read on
 !OBSEL_Size8And16_Base4000 = $02 ; size %000 = 8x8 and 16x16 sprites, sprite tiles at VRAM word $4000

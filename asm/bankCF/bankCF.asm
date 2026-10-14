@@ -20,8 +20,8 @@ hirom
 
 ; $CF:E300 — BattleCF_VblankUploads (650 bytes, $E300–$E589)
 ; Copies the battle's buffers to the PPU by DMA on channel 7, which needs
-; vertical blank or forced blank: hence "vblank", inferred (the caller at
-; $CD:08B4 is not matched). In order:
+; vertical blank or forced blank: hence "vblank", inferred (the caller,
+; BattleCD_NmiMain at $CD:08B4, is the NMI's work). In order:
 ;   - OAM: $220 bytes from BattleOam (bank $00 mirror of $7E:0700), OAM
 ;     address 0;
 ;   - when !Battle_VramQPending is set, the one VRAM upload that
@@ -56,7 +56,8 @@ hirom
 ;        or the slot * 2 on the paths that index); Y unchanged
 ; Callers note: reached only by the JML at $C1:0076 (BankC1_JmlCFE300),
 ;   which the vector BankC1_VecCFE300 ($C1:0009) jumps to; that vector is
-;   JSL'd from $CD:08B4 (unmatched), so the RTL here returns there.
+;   JSL'd from $CD:08B4 (BattleCD_NmiMain), so the RTL here returns
+;   there.
 ; No JSR/JSL calls.
 org $CFE300
 BattleCF_VblankUploads:
@@ -358,7 +359,7 @@ BattleCF_VblankUploads:
 ;        on entry
 ; Callers note: reached only by the JML at $C1:007A (BankC1_JmlCFE58A),
 ;   which the vector BankC1_VecCFE58A ($C1:000C) jumps to; that vector is
-;   JSL'd from $CD:0997 and $EF:523C (unmatched).
+;   JSL'd from $CD:0997 (BattleCD_NmiMain) and $EF:523C (unmatched).
 ; Callees: BattleCF_StepFxColourCycle, BattleCF_RunMovers,
 ;          BattleCF_StepPathWalks, BattleCF_FollowObjects,
 ;          BattleCF_RecordPosHistory, BattleCF_BounceHitNumbers,
@@ -4480,15 +4481,15 @@ BattleMsg_FormatNumber4Digits:
 ;   - else copies !Battle_SpecialPalLen colour bytes (from byte 2) of its
 ;     palette unit into the !Battle_SpecialPalette unit, live and saved,
 ;     switches the enemy to that palette, runs BattleSys_VecCD0024 with
-;     A = the slot (a fade-out, probably; not traced) and clears
-;     !Battler_Present.
+;     A = the slot (BattleCD_EnemyDissolve: the enemy's dissolve or an
+;     exit effect) and clears !Battler_Present.
 ; So a marked enemy stays present only when !Battler_Unk9FF7 is 0,
 ; !Battler_ActAttr is non-zero and the record has the flag set.
 ; Callers (1 JSL site): BattleSys_Service6 ($C1:006D).
 ; Entry: M=1, X=0, DP=0 (DP $80-$83), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X = 2; A, Y clobbered; DP $80 and
 ;        $82-$83 (the 16-bit STX) written; and what BattleSys_VecCD0024
-;        changes (not traced)
+;        changes (see BattleCD_EnemyDissolve)
 ; Callees: BattleSys_VecCD0024
 org $CFFE20
 BattleCF_RemoveMarkedEnemies:

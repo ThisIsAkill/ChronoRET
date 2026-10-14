@@ -24,9 +24,9 @@ incsrc "../hardware.inc"
 ;   BattleSys_RemoveReadyLong ($C1:B963), BattleSys_UnkBFA4 ($C1:BFA6) and BattleSys_UnkC1DD
 ;   ($C1:C73D, $C1:C748).
 ; Callers of BattleSys_ExitVec (1 JMP site): BattleSys_Main ($C1:845E).
-; Callers of BankC1_VecCFE300 (1 JSL site): unmatched ($CD:08B4).
-; Callers of BankC1_VecCFE58A (2 JSL sites): unmatched ($CD:0997, $EF:523C).
-; Callers of BankC1_VecCCE000 (1 JSL site): unmatched ($CD:0AB4).
+; Callers of BankC1_VecCFE300 (1 JSL site): BattleCD_NmiMain ($CD:08B4).
+; Callers of BankC1_VecCFE58A (2 JSL sites): BattleCD_NmiMain ($CD:0997) and unmatched ($EF:523C).
+; Callers of BankC1_VecCCE000 (1 JSL site): BattleCD_NmiSetup ($CD:0AB4).
 ; Callers of BankC1_VecRefreshMenu (1 JSL site): unmatched ($CD:3E78).
 ; Callers of BankC1_VecLongDispatch (1 JSL site): unmatched ($CC:F066).
 ; Entry vectors and the service dispatcher ($C1:0000–$C1:007D)
@@ -100,16 +100,19 @@ BankC1_ExitBattleJml:                   ; header: see EngCall_BattleMain
 ; Battle_CacheBattlerCoordsAll, BattleCC_UnkED87,
 ; Battle_DrawAllBattlerFrames, BattleSys_VecCD0003, BattleSys_VecCD000C,
 ; then BattleSys_VecCD0012 again and again while it returns with Z
-; clear (a wait, probably), then JMP to Battle_StartPose, whose RTS
-; returns to BattleSys_RunService. What the bank-$CC/$CD callees do is
-; not analysed, so "scene set-up" rests on the bank-$C1 steps (status
-; bar frame, battler coordinates and frames, the start pose).
+; clear (the wait for the opening wipe), then JMP to Battle_StartPose,
+; whose RTS returns to BattleSys_RunService. The bank-$CD callees switch
+; the NMI to its main work (BattleCD_SetNmiMode1), start the opening wipe
+; (BattleCD_StartOpenWipe) and report whether it still runs
+; (BattleCD_WipeRunning); what the bank-$CC callees do is not analysed,
+; so "scene set-up" rests on the other steps (status bar frame, battler
+; coordinates and frames, the wipe, the start pose).
 ; Callers note: none by call; BattleSys_ServiceTable entry 0 (JSR (T,X)
 ;   in BattleSys_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_Main requests it; the
 ;        bank-$C1 callees assume them)
 ; Exit:  as Battle_StartPose leaves it (M=1, X=0, DP=0, DB=$7E assumed
-;        after the bank-$CC/$CD callees, not analysed); A, X, Y
+;        after the bank-$CC callees, not analysed); A, X, Y
 ;        clobbered (BattleSys_RunService restores them)
 BattleSys_SceneSetup:
     JSL BattleCC_UnkE2E4
@@ -222,7 +225,7 @@ BankC1_LongDispatchTable:
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the callers of service 6 run)
 ; Exit:  as BattleCF_RemoveMarkedEnemies leaves it: M=1, X=0, DP=0,
 ;        DB=$7E; A, Y clobbered; X = 2; DP $80 and $82-$83 written; and
-;        what BattleSys_VecCD0024 changes (not analysed)
+;        what BattleSys_VecCD0024 changes (see BattleCD_EnemyDissolve)
 BattleSys_Service6:
     JSL BattleCF_RemoveMarkedEnemies
     RTS
@@ -259,7 +262,8 @@ BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
 ; inferred, not proven. ($CF:FB65 also zeroes $9E, but it is the battle
 ; entry, reached once from the field: JSL $C10000 at $C0:18A7 -> JMP
 ; $001B -> JML $CFFB65, which clears battle RAM and JMLs to $C1:8000.)
-; What the $CD0036 callee does meanwhile is not analysed.
+; The $CD0036 callee (BattleCD_IdleTick) waits there while the battle is
+; paused (BattleCD_PauseWait, not matched).
 ; Callers (20 JSR sites): BattleSys_UpkeepTwoFrames ($C1:109D, $C1:10BD), BattleSys_DefeatPose
 ;   ($C1:3554), BattleSys_VictoryPose ($C1:358E, $C1:3596, $C1:359E), Battle_RunPcPose ($C1:3686),
 ;   BattleSys_RunAction ($C1:405F, $C1:40A0, $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4,
@@ -3836,8 +3840,8 @@ BattleMenu_RefreshIfDirtyL:
 ;   ($C1:485E, $C1:4867, $C1:4890) and BattleAct_UnpackFrames ($C1:4946).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
-;        clobbered, plus whatever BattleSys_FrameTickVec (not matched yet)
-;        changes
+;        clobbered, plus whatever BattleSys_FrameTickVec
+;        (BattleCD_FrameTick) changes
 ; Callees: BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
 ;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay,
 ;          BattleSys_FrameTickVec
@@ -4306,7 +4310,8 @@ BattleMenu_ConfirmCommand:
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered, plus BuildTargetList's (see its header) and
-;        whatever BattleMsg_ShowMsg0BIfKeyChangedVec (not matched yet) changes
+;        whatever BattleMsg_ShowMsg0BIfKeyChangedVec (BattleCD_ShowTargetInfo)
+;        changes
 ; Callees: BattleMsg_ShowMsg0BIfKeyChangedVec,
 ;          BattleMenu_BuildTargetList, Battle_ClearPadEdges
 org $C1129C
@@ -26774,8 +26779,9 @@ BattleAi_RunNop0E:
 ; $C1:9E63 — BattleAi_RunMessage (21 bytes, $9E63–$9E77)
 ; BattleAi_RunTable entry $0F. Record [$0F, byte]: a non-zero byte goes
 ; to BattleMsg_UnkVecCD0033; !BattleAi_RunMode = !BattleAi_RunNone. The
-; byte is a message, probably (hence the name): it only goes to that
-; vector, which is not analysed.
+; byte is a message (hence the name): it only goes to that vector,
+; BattleCD_ShowScriptMessage, which shows that string of
+; !BattleRom_ScriptMsgStrings.
 ; Callers note: none by call; BattleAi_RunTable entry $0F (JSR (T,X)
 ;   in BattleAi_EnemyTurn).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = code * 2, B = 0;
@@ -45051,10 +45057,11 @@ BattleMenu_ItemListScrollDown_SkipRender:   ; header: see BattleMenu_ItemListScr
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero; STZ.b/STY.b), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; pad-edge bytes cleared (shared tail, same as
 ;        Battle_ClearPadEdges elsewhere); A, X, Y clobbered; DP $80-$83 and
-;        $EC written, plus whatever the JSL targets (not matched yet) change
+;        $EC written, plus whatever the JSL targets change (the message
+;        vectors: DP $53 and the message state, see BattleCD_ShowEnemyInfo)
 ; Callees: Battle_ShiftRight4, BattleMenu_ClearTechCursorTiles,
 ;          BattleMenu_DrawCursorSprites, BattleMsg_ShowMsg0BIfKeyChangedVec,
-;          BattleMsg_UnkVecCD0030 (sibling message vector, not analysed),
+;          BattleMsg_UnkVecCD0030 (BattleCD_ShowEnemyInfo, the sibling),
 ;          Battle_QueueVramUpload_0E80
 ; Direct-page roles:
 !BattleMenu_OverlayChanged = !BattleTmp_80 ; 1 B: item path: non-zero when arrows or row cursor changed

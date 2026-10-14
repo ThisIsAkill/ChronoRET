@@ -28282,11 +28282,12 @@ MusicCueDispatch:
 ;   way). Quirk: it saves DB then D (PHB, PHD) but restores DB first
 ;   (PLB, PLD): on return DB = the caller's D low byte and D = the
 ;   caller's DB << 8 | its D high byte. That is harmless only when the
-;   caller has D = $0000 and DB = $00 (not traced at $CD:043E); kept
-;   as found.
+;   caller has D = $0000 and DB = $00 (BattleCD_ExitBattle, at
+;   $CD:043E, calls it with D = 0 and DB = $7E, between PHB/PHD/PHP
+;   and PLP/PLD/PLB, which puts them back); kept as found.
 ; Callers (1 BRL site): ReentryVectors ($C0:000B).
 ; Callers note: vector [4], reached by JSL $C0:000B from $CD:043E
-;   (unmatched).
+;   (BattleCD_ExitBattle).
 ; On entry: M=1 (8-bit A: the PHA pushes one byte), X any (not used),
 ;   DP any (saved; set to DP_Field), DB any (saved; set to $00).
 ; Exit: M=1 (RTL); D and DB scrambled as above; A clobbered; X and Y as
