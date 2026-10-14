@@ -88,17 +88,3 @@ BattleCD_Unk38E5:                       ; JSR from BattleCD_FxOpTriCentre (DB = 
 org $CD3924
 BattleCD_Unk3924:                       ; JSR from BattleCD_FxOp3924 (script opcode $B8) with A = the operand
 
-; --- Bank $CE battle code (called from banks $CD and $D1; none analysed) ---
-
-org $CEE000
-BattleCE_UnkE000:                       ; JSL from BattleCD_FxOpCEE000 (script opcode $B2)
-org $CEE18E
-BattleCE_UnkE18E:                       ; JSL from BattleCD_NmiMain (with !Battle_Unk2A21 bit 0)
-org $CEE7CF
-BattleCE_UnkE7CF:                       ; JSL from BattleCD_CalcAngle: two points in DP $23-$26; leaves an angle in DP $45, probably
-org $CEEE6E
-BattleCE_UnkEE6E:                       ; JSL from BattleCD_StepWipe at an opening wipe's start, A = !BattleFx_CeSet,
-                                        ; and from BattleFx_Init / BattleFx_ReloadCeSet (A = the set); copies records
-                                        ; from bank $CE to $7E:C867 and on
-org $CEF066
-BattleCE_UnkF066:                       ; JSL from BattleCD_NmiMain unless !Battle_UnkCD2D / !Battle_UnkA028

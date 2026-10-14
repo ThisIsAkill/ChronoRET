@@ -3840,9 +3840,9 @@ BattleFx_MirrorWin1ToWin2:
 ; When !BattleFx_CeSetWant differs from !BattleFx_CeSet (which then
 ; takes it), or else when !BattleFx_CeSetReload is set: JSL
 ; BattleCE_UnkEE6E with A = !BattleFx_CeSetBase + !BattleFx_CeSet +
-; !Battle_MsgShown, and !BattleFx_CeSetReload = 0. What the sets are
-; is not traced (BattleCE_UnkEE6E copies records from bank $CE to
-; $7E:C867 on; not analysed).
+; !Battle_MsgShown, and !BattleFx_CeSetReload = 0. The sets are HDMA
+; sets: BattleCE_UnkEE6E copies the set's first entries of the nine
+; indirect HDMA tables from bank $CE to !Battle_HdmaTables ($7E:C867).
 ; Callers (1 JSR site): BattleFx_Irq ($D1:FECE).
 ; Entry: M=1, X=0, DP=0, DB=$7E (BattleFx_Irq sets it just before)
 ; Exit:  M=1; A, X and Y clobbered on the reload path (as

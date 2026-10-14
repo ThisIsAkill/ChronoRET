@@ -2271,8 +2271,10 @@ endstruct
                                   ; !Battle_UnkCD45 (then cleared); zeroed as a word at set-up; + 1 by script opcode $F2,
                                   ; which $F1 waits on
 !BattleFx_UnkCD46         = $CD46 ; 1 B: $FF at set-up, $FD with !Battle_Unk2A21 bit 0; set by script opcode $F5
-!BattleFx_UnkCDC7         = $CDC7 ; 2 B: zeroed by BattleFx_Init
-!BattleFx_UnkCDC8         = $CDC8 ; 1 B: zeroed by BattleFx_MoveBgRowsUp, counted up by BattleFx_LoadBgRows2To4
+!BattleFx_UnkCDC7         = $CDC7 ; 2 B: zeroed by BattleFx_Init; the low byte is the layer-2 wave's step count
+                                  ; (BattleCE_UnkE18E: + 1 a call, / 4 & 31 = the window's position)
+!BattleFx_UnkCDC8         = $CDC8 ; 1 B: zeroed by BattleFx_MoveBgRowsUp, counted up by BattleFx_LoadBgRows2To4;
+                                  ; non-zero makes BattleCE_UnkE18E zero the wave lines instead
 !BattleFx_GradStart       = $CDC9 ; 1 B: BattleFx_FindGradStart's result: rotation index of the gradient tables;
                                   ; BattleCD_TickCDC9 counts it 13 down to 0 and round
 !BattleFx_GradColours     = $CDCC ; 56 B: the gradient's 14 colours as shown, then a copy of them
@@ -2307,6 +2309,55 @@ endstruct
 !BattleRom_BgSetPalettes  = $D0FA00 ; background sets' palette rows (BattleFx_BgSetPalOfs gives the offsets)
 !BattleRom_GradColours    = $D0FBE2 ; 9 sets of 14 colours, $20 apart (BattleFx_GradLevelOfs)
 !BattleRom_BgRows2To4     = $D0FD00 ; 48 colours BattleFx_LoadBgRows2To4 loads into background rows 2-4
+
+; ------------------------------------------------------------
+; Bank $CE: the battle code at $CE:E000-$CE:F0E5 (bankCE.asm, BattleCE_*)
+; ------------------------------------------------------------
+; --- Direct page (D = 0): BattleCE_CalcAngle ---
+!BattleCE_AngleAX         = $23   ; 1 B DP: first point x (BattleCE_CalcAngle; snapped down to a multiple of 8 there)
+!BattleCE_AngleAY         = $24   ; 1 B DP: first point y (the same)
+!BattleCE_AngleBX         = $25   ; 1 B DP: second point x (moved down by the first point's x & 7)
+!BattleCE_AngleBY         = $26   ; 1 B DP: second point y (moved down by the first point's y & 7)
+!BattleCE_AngleDX         = $27   ; 2 B DP: first x - second x, the high byte $FF on a borrow
+!BattleCE_AngleDY         = $29   ; 2 B DP: first y - second y, the same
+!BattleCE_AngleLowBits    = $45   ; 1 B DP: the first point's coordinate & 7 (then the result, !BattleCE_Angle)
+!BattleCE_Angle           = $45   ; 1 B DP: BattleCE_CalcAngle's result (256 per turn)
+!BattleCE_AngleRun        = $46   ; 2 B DP: |dx| / 8, rounded
+!BattleCE_AngleAbsDX      = $48   ; 2 B DP: |dx| (+ 8 when its bit 2 is set)
+!BattleCE_AngleAbsDY      = $4A   ; 2 B DP: |dy| (the same)
+!BattleCE_AngleIndex      = $4C   ; 2 B DP: the !BattleRom_AngleTable index
+; --- Direct page: BattleCE_DrawHalfPlane ---
+!BattleCE_EdgeOfs         = $45   ; 2 B DP: the byte offset in a line of the edge drawn (A at entry; + 1 for a right edge)
+!BattleCE_EdgeStart       = $47   ; 2 B DP: offset of the line's first row in the window table (!BattleCE_LineY x 4
+                                  ; + !BattleCE_EdgeOfs)
+!BattleCE_StepAcc         = $45   ; 2 B DP: the line walk's running remainder (starts at |dx|)
+!BattleCE_StepDX          = $47   ; 2 B DP: |dx| of the line (!BattleCE_LineAbsDX)
+!BattleCE_StepDY          = $49   ; 2 B DP: |dy| of the line (!BattleCE_LineAbsDY)
+!BattleCE_StepRows        = $4B   ; 1 B DP: rows of the walk left
+!BattleCE_LineX           = $4F   ; 1 B DP: x of the line's upper point (the bank-$CD caller copies !BattleCE_LineP1)
+!BattleCE_LineY           = $51   ; 1 B DP: y of that point (from !BattleCE_LineP1+1)
+; --- Direct page: BattleCE_RunCopyWords ---
+!BattleCE_CopyEntry       = $4B   ; 2 B DP: where BattleCE_RunCopyWords jumps into BattleCE_CopyWordsToLines (read as
+                                  ; $00:004B by JMP (abs)): $CE:E7C7 - 6 x the word count
+; --- WRAM ---
+!BattleCE_Bg2WaveLines    = $CD47 ; $80 B: layer-2 scroll line data, (x, y) word pairs: BattleCE_UnkE18E copies a
+                                  ; window of BattleCE_WaveTable here or zeroes it; channel 2's tables in the HDMA
+                                  ; sets BattleCE_UnkEE6E loads with !Battle_Unk2A21 bit 0 point their lines here
+                                  ; ($CD47 and $CDA7, read from the set data in bank $CE)
+!BattleCE_LineP1          = $CA9B ; 2 B: x, y of the half-plane line's upper point (set in bank $CD, opcode $97's
+                                  ; handler at $CD:30BE, not matched: a point from the table at $CE:F28E by angle,
+                                  ; or the screen centre)
+!BattleCE_LineP2          = $CA9D ; 2 B: x, y of its lower point (the same, the other one)
+!BattleCE_LineDirX        = $CA9F ; 1 B: the line's x direction from P1 to P2 ($FF left, 0, 1 right)
+!BattleCE_LineAbsDX       = $CAA1 ; 1 B: |x2 - x1|
+!BattleCE_LineAbsDY       = $CAA2 ; 1 B: |y2 - y1|: the rows the line walk covers
+!BattleCE_LineAngle       = $CAA3 ; 1 B: the angle opcode $97 drew last (bit 7: the point is in the upper half and
+                                  ; the right edges are drawn; 0: special case, see BattleCE_DrawHalfPlane)
+; --- ROM (bank $CE data, not matched) ---
+!BattleRom_HdmaSetOfs     = $CEF24E ; 2 B per HDMA set (BattleCE_UnkEE6E): its record's offset from
+                                    ; !BattleRom_HdmaSetRecs (set x $14 in the ROM)
+!BattleRom_HdmaSetRecs    = $CEF58E ; $14 B per set: ten words, the bank-$CE addresses of the nine tables' first
+                                    ; 30 bytes, then table 2's alternative for !Battle_Unk2A21 bit 0
 
 ; ------------------------------------------------------------
 ; Bank $CD: battle display, messages and background effects ($CD:0000-$CD:16B4; the script
@@ -2626,7 +2677,7 @@ endstruct
 !Battle_ActVar0C          = $5D8C ; 1 B: variable $0C
 !Battle_ActVar0E          = $5D8E ; 1 B: variable $0E
 !Battle_ActVar0F          = $5D8F ; 1 B: variable $0F
-!Battle_FxAngle           = $CD08 ; 1 B: the angle BattleCD_CalcAngle got from two points (BattleCE_UnkE7CF's DP $45)
+!Battle_FxAngle           = $CD08 ; 1 B: the angle BattleCD_CalcAngle got from two points (BattleCE_CalcAngle's !BattleCE_Angle, DP $45)
 !Battle_FxObjUnkD1        = $CAD1 ; 1 B per object 0-1: set by script opcode $BD; reader not traced
 !Battle_FxObjCentreX      = $CAD4 ; 1 B per object 0-1 (2 B apart, X = the object): the screen x its model is drawn
                                   ; around (and its triangle scaled towards)

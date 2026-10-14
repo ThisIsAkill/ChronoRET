@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$CE:E18E,BattleCE_UnkE18E,2026-10-09,rev146a,approved,a321a96e041b,"B=0 holds: NmiLayerScroll handlers end TDC, StepShake/StepWipe callees keep or re-zero B, rest 8-bit; hedge over-cautious, fine. Paths/MVN/Exit/DP/DB checked. nit: some sets' table 2 isn't $CD47"

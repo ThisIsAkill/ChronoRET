@@ -10,8 +10,8 @@ hirom
 ; read by bank $C1). Other banks reach the code through the JMP vectors
 ; at $CD:0000-$CD:0038; inside the bank it calls itself by JSR and, for
 ; a few routines, by JSL. Banks $CD, $CE and $D1 call each other; the
-; bank-$D1 routines are matched (bankD1.asm, BattleFx_*), the bank-$CE
-; ones and this bank's $CD:2A4A-$CD:3B5E are not (stubs in
+; bank-$D1 and bank-$CE routines are matched (bankD1.asm, BattleFx_*;
+; bankCE.asm, BattleCE_*), this bank's $CD:2A4A-$CD:3B5E is not (stubs in
 ; asm/include/unmatched_battle.asm).
 ;
 ; Unless a header says otherwise the code runs as the rest of the battle
@@ -1308,9 +1308,9 @@ BattleCD_WipeStepClose:
 ; frame), by !Battle_WipeMode:
 ;   - 0: nothing;
 ;   - !BattleCD_WipeOpen ($FF, set by BattleCD_StartOpenWipe): first
-;     !BattleFx_CeSetBase = 0 and JSL BattleCE_UnkEE6E ($CE:EE6E, not matched;
-;     A = !BattleFx_CeSet, set up the tables, probably), then the mode
-;     becomes 1;
+;     !BattleFx_CeSetBase = 0 and JSL BattleCE_UnkEE6E with A =
+;     !BattleFx_CeSet (loads that HDMA set's first entries into the nine
+;     tables at !Battle_HdmaTables), then the mode becomes 1;
 ;   - 1-$7F: while !Battle_WipeSteps is non-zero, BattleCD_WipeStepOpen
 ;     and a step less; when that reaches 0, !BattleFx_CeSetBase =
 ;     !BattleCD_CA25Unk02 and !BattleFx_CeSetReload + 1; on the next call (no
@@ -1320,8 +1320,8 @@ BattleCD_WipeStepClose:
 ;     0 (!Battle_UnkCE16 kept).
 ; Callers (2 JSR sites): BattleCD_NmiMain ($CD:08F5, $CD:08F8).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (as BattleCD_NmiMain sets it)
-; Exit:  M=1, X=0 (assumed after the bank-$CE call, not traced); A, X
-;        clobbered; Y unchanged unless that call changes it
+; Exit:  M=1, X=0 (BattleCE_UnkEE6E returns so too); A, X clobbered; Y
+;        unchanged, except after BattleCE_UnkEE6E's call (Y = $C9ED)
 BattleCD_StepWipe:
     LDA.w !Battle_WipeMode
     BEQ .done
@@ -4903,11 +4903,11 @@ BattleCD_FxOpCopyWin1ToWin2:
 ; operand is put in X (8-bit) and not read again here (whether
 ; BattleCD_FillTriangle reads X is not traced).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $40 at the operands
-;        (BattleCD_ClampCalcAngle runs BattleCE_UnkE7CF, assumed to
-;        return M=1, X=0)
+;        (BattleCD_ClampCalcAngle runs BattleCE_CalcAngle, which
+;        returns M=1, X=0)
 ; Exit:  M and X as BattleCD_FillTriangle leaves them (not traced; X=0
 ;        when it is called); Y = DP $40 + 1 (two operand bytes); DP
-;        $12-$17, $23-$26, $45-$4C written
+;        $12-$17, $23-$2A, $45-$4D written
 BattleCD_FxOpWedge:
     LDX.w #4
     JSR BattleCD_ClampCalcAngle
@@ -5298,9 +5298,9 @@ BattleCD_FxOpSetupBounce:
 ; Clamps the points of !Battle_ActCalcResult entries 0 and 1 to the
 ; screen (BattleCD_ClampCalcPair), then falls into BattleCD_CalcAngle
 ; ($1B22): DP $23-$26 = the two points at !Battle_ActCalcResult+X (x,
-; y, x, y), JSL BattleCE_UnkE7CF (not matched), !Battle_FxAngle = the
-; DP $45 it leaves (the angle from the first point to the second,
-; probably).
+; y, x, y), JSL BattleCE_CalcAngle, !Battle_FxAngle = the DP $45 it
+; leaves (!BattleCE_Angle: the direction from the second point to the
+; first, 256 per turn).
 ; Sub-entry: BattleCD_CalcAngle.
 ; Callers note: also BattleCD_FxOpTable entry $CC. Run as that opcode X
 ;   = $98 (the doubled opcode), so the points come from
@@ -5309,25 +5309,26 @@ BattleCD_FxOpSetupBounce:
 ; Callers (2 JSR sites): BattleCD_FxOpWedge ($CD:193A) and BattleCD_FxOpBeam ($CD:2463).
 ; Callers of BattleCD_CalcAngle (2 JSR sites): BattleCD_FxOpBeamFromPair ($CD:19BC) and unmatched
 ;   ($CD:BDE0).
-; Entry: M=1, X=0, DP=0, DB=$7E; X = the first point's offset in
-;        !Battle_ActCalcResult (2 per entry)
-; Exit:  M and X as BattleCE_UnkE7CF leaves them (assumed M=1, X=0); X
-;        as on entry (PHX/PLX, at 16 bits with that X=0); A =
-;        !Battle_FxAngle; Y as BattleCE_UnkE7CF leaves it
+; Entry: M=1, X=0, DP=0, DB=$7E (as BattleCE_CalcAngle needs them); X
+;        = the first point's offset in !Battle_ActCalcResult (2 per
+;        entry)
+; Exit:  M=1, X=0 (as BattleCE_CalcAngle returns); X as on entry
+;        (PHX/PLX, at 16 bits); A = !Battle_FxAngle; Y unchanged; DP $23-$2A and
+;        $45-$4D written (by BattleCE_CalcAngle)
 BattleCD_ClampCalcAngle:
     JSR BattleCD_ClampCalcPair01
 BattleCD_CalcAngle:                     ; header: see BattleCD_ClampCalcAngle
     PHX
     LDA.w !Battle_ActCalcResult,X
-    STA.b !BattleCD_MathA
+    STA.b !BattleCE_AngleAX
     LDA.w !Battle_ActCalcResult+1,X
-    STA.b !BattleCD_MathA+1
+    STA.b !BattleCE_AngleAY
     LDA.w !Battle_ActCalcResult+2,X
-    STA.b !BattleCD_MathB
+    STA.b !BattleCE_AngleBX
     LDA.w !Battle_ActCalcResult+3,X
-    STA.b !BattleCD_MathB+1
-    JSL BattleCE_UnkE7CF
-    LDA.b !BattleCD_Tmp45
+    STA.b !BattleCE_AngleBY
+    JSL BattleCE_CalcAngle
+    LDA.b !BattleCE_Angle
     STA.w !Battle_FxAngle
     PLX
     RTS
@@ -6412,13 +6413,17 @@ BattleCD_FxWaveStoreY:
     RTS
 
 ; $CD:20D3 — BattleCD_FxOpCEE000 (5 bytes, $20D3–$20D7)
-; Opcode $B2 (one operand byte, not read here): JSL BattleCE_UnkE000
-; (not matched).
-; Entry: M=1, X=0, DP=0, DB=$7E (what the bank-$CE routine needs is not
-;        traced)
-; Exit:  as BattleCE_UnkE000 leaves it (not traced)
+; Opcode $B2 (one operand byte, not read here; BattleCE_CopyWindowEdges
+; reads it): JSL BattleCE_CopyWindowEdges, which copies one window's
+; edge pair of lines 0-215 (the operand x 2 picks it) from the window
+; table not written this frame into the one that is.
+; Entry: M=1, X=0, DP=0, DB=$7E (as BattleCE_CopyWindowEdges needs it);
+;        DP $40 at the operand
+; Exit:  M=1, X=0; A = 0; X = (operand x 2 + $6C) & $FF; Y's high byte
+;        cleared; DP $45-$46 written (as BattleCE_CopyWindowEdges leaves
+;        them)
 BattleCD_FxOpCEE000:
-    JSL BattleCE_UnkE000
+    JSL BattleCE_CopyWindowEdges
     RTS
 
 ; $CD:20D8 — BattleCD_FxOpScaleObj (21 bytes, $20D8–$20EC)
@@ -7056,10 +7061,10 @@ BattleCD_ClampCalcPair01:               ; header: see BattleCD_ClampCalcPair
 ; Sub-entry: BattleCD_FxOpBeamQuad.
 ; Callers of BattleCD_FxOpBeamQuad (1 JMP site): BattleCD_FxOpBeamFromPair ($CD:19BF).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $40 at the operands
-;        (BattleCD_ClampCalcAngle runs BattleCE_UnkE7CF, assumed to
-;        return M=1, X=0)
+;        (BattleCD_ClampCalcAngle runs BattleCE_CalcAngle, which
+;        returns M=1, X=0)
 ; Exit:  M=1, X=0 (as BattleFx_DrawQuad leaves them); Y = DP $40 + 1
-;        (two operand bytes); DP $03-$19, $23-$26 and $45-$4C written
+;        (two operand bytes); DP $03-$19, $23-$2A and $45-$4D written
 BattleCD_FxOpBeam:
     LDX.w #4
     JSR BattleCD_ClampCalcAngle

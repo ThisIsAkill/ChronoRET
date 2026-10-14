@@ -43630,7 +43630,7 @@ BankC0_OldBuildLeftovers:
 ; $C0; through $00 that is the $00:F300 mirror) and Battle_CalcAngle (LDA.l
 ; !BattleRom_AngleTable,X, index (|dy| & ~7) x 4 + |dx| >> 3); also
 ; by C2Scene_Unk229D ($C2:229D, through DB $00) and LDA.l
-; at $CE:E85B (unmatched, not read here) and in Battle_CalcAngleCF.
+; in BattleCE_CalcAngle ($CE:E85B) and in Battle_CalcAngleCF.
 ; The readers use the defines !Rom_AngleTable / !BattleRom_AngleTable, both = this
 ; address.
 ; ==================================================================
