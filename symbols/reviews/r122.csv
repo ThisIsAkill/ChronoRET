@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:EE58,Menu_FrameSides,2026-10-09,rev122a,approved,077b03f066ce,"Prior fix ok: one t (EdgeRow leaves (t0 OR 3)+1=t0+4); rows t/t+1,t+2/t+3 via EOR 3; end (OR 3)+1=t+4; (dp),Y right store, DP 0/DB 7E; X=0, Y, A exit verified vs ROM."

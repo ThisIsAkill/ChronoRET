@@ -24,9 +24,6 @@
 
 ; --- Other banks, called from bank $C0 ---
 
-org $C2F871
-Menu_UnkF871:       ; JSR from Menu_SprThread for each object with .Flags18 = 0 (DP = its page);
-                    ; probably places its sprites in OAM (not analysed)
 org $FFF9BB
 BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the character's Menu_Unk29AF bit
 org $FFF9C4
@@ -40,8 +37,6 @@ MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the st
                     ; SRAM +$0603 byte is the last entry not above it
 org $FFF958
 BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
-org $C2A051
-Menu_UnkA051:       ; Menu_MainPreviewTable entry 0 (icon 0's preview; not analysed)
 org $C2AD50
 Menu_UnkAD50:       ; Menu_MainPreviewTable entry 1 (not analysed)
 org $C2B8DA
@@ -52,8 +47,6 @@ org $C2C9E5
 Menu_UnkC9E5:       ; Menu_MainPreviewTable entry 4 (not analysed)
 org $C2D065
 Menu_UnkD065:       ; Menu_MainPreviewTable entry 5 (not analysed)
-org $C2A101
-Menu_UnkA101:       ; Menu_MainRedrawTable entry 0 (not analysed)
 org $C2ADC3
 Menu_UnkADC3:       ; Menu_MainRedrawTable entry 1 (not analysed)
 org $C2B960
@@ -64,17 +57,39 @@ org $C2CAE6
 Menu_UnkCAE6:       ; Menu_MainRedrawTable entry 4 (not analysed)
 org $C2D0DB
 Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
-org $C2E984
-Menu_UnkE984:       ; JSR from Menu_MainMenuLoop: the menu's pad handling; moves Menu_CursorSel and sets
-                    ; Menu_PadAction bits 7/6 from the Menu_ButtonMap buttons (read from the ROM; not matched)
-org $C2EAC2
-Menu_UnkEAC2:       ; JSR/JMP from the main menu: A = 0, then JSR $C2:EB03 (not analysed)
-org $C2ED31
-Menu_UnkED31:       ; JSR with X = a bank-$FF address: runs a list of command bytes there until one has
-                    ; bit 7 set (DB=$FF while it runs; not analysed)
-org $C2F28D
-Menu_UnkF28D:       ; JSR from Menu_MainMenuLoop with X = a tilemap address and Y = clock bytes: draws
-                    ; hours:minutes (99:59 when the byte at Y+4 is set; not matched)
+org $C2FA49
+Menu_UnkFA49:       ; JSR from Menu_DrawDescText: clears a buffer row at Menu_TextDest, sets TextWin_*
+                    ; and Menu_Unk0DC7-0DD7, then TextWin_Init (JSL BankC2_Entry0003) (not matched)
+org $C290FC
+Menu_Unk90FC:       ; JSR from Menu_Mode01Init (not analysed)
+org $C29121
+Menu_Unk9121:       ; JSR from Menu_Icon0Redraw (not analysed)
+org $C2A6F0
+Menu_UnkA6F0:       ; JSR from Menu_DrawMemberStatus with X = a tilemap address (not analysed)
+org $C2FC3E
+Menu_VramRecBg3Rows60: ; Menu_VramRec in unmatched data: VRAM $6F80 (BG3 map row 60) = $7E:5D00, $100 bytes
+org $C2A569
+Menu_UnkA569:       ; JSR from Menu_Mode01H1 and Menu_EquipItemIdle (not analysed)
+org $C2A59A
+Menu_UnkA59A:       ; JSR from Menu_EquipItemIdle with X = a tilemap address: probably draws item Menu_ItemId (not analysed)
+org $C2A5C3
+Menu_UnkA5C3:       ; JSR from Menu_Mode01H3 (not analysed)
+org $C2A64D
+Menu_UnkA64D:       ; JSR from Menu_Mode01H3 (not analysed)
+org $C2A71E
+Menu_UnkA71E:       ; JSR from Menu_Mode01H1 (not analysed)
+org $C2A85C
+Menu_UnkA85C:       ; JSR from Menu_Mode01H2 (not analysed)
+org $C2FBEA
+Menu_VramRecBg1Low: ; Menu_VramRec in unmatched data: VRAM $5C00 (BG1 map, lower half) = $7E:3600, $800 bytes
+org $C2FC06
+Menu_VramRecBg2Low: ; Menu_VramRec in unmatched data: VRAM $6400 (BG2 map, lower half) = $7E:4600, $800 bytes
+org $C2FC1B
+Menu_VramRecBg3:    ; Menu_VramRec in unmatched data: VRAM $6800 (BG3 map) = $7E:4E00, $680 bytes
+org $C2FC45
+Menu_VramRecBg3Rows58: ; Menu_VramRec in unmatched data: VRAM $6F40 (BG3 map row 58) = $7E:5C80, $100 bytes
+org $C2A4AF
+Menu_UnkA4AF:       ; JSR from Menu_EquipItemsOpen (not analysed)
 org $C2FBE3
 Menu_VramRecClock:  ; Menu_VramRec in unmatched data: VRAM $5840 = $7E:2E80, $640 bytes (queued by
                     ; Menu_MainMenuLoop after the clock is drawn)
@@ -83,14 +98,6 @@ Menu_VramRecBg2:    ; Menu_VramRec in unmatched data: VRAM $6000 = $7E:3E00 (Men
 org $C2FBFF
 Menu_VramRecBg2B:   ; Menu_VramRec in unmatched data: VRAM $6040 = $7E:3E80, $680 bytes (its first byte
                     ; is the last of Menu_VramRecBg2)
-org $C29C31
-Menu_Mode01H0:      ; Menu_Mode01List entry 0 (not analysed)
-org $C29C39
-Menu_Mode01H1:      ; Menu_Mode01List entry 1 (not analysed)
-org $C29C70
-Menu_Mode01H2:      ; Menu_Mode01List entry 2 (not analysed)
-org $C29CA5
-Menu_Mode01H3:      ; Menu_Mode01List entry 3 (not analysed)
 org $C2AA40
 Menu_Mode02H0:      ; Menu_Mode02List entry 0 (not analysed)
 org $C2AA4A
