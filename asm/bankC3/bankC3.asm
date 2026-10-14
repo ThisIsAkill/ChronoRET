@@ -2500,7 +2500,7 @@ C3_SprListSmall:
 ; a negative X keeps its low byte and gets bit 8 set. The high-table
 ; byte is always shifted right by 2 with size = 1 and X bit 8 put in.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
-;   $7E:5044, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
+;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
 ;   $7E:88B4 and $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (probably 0),
 ;        DB = $00 or $7E; A = the list's address.
