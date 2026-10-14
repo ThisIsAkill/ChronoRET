@@ -1162,3 +1162,19 @@ endif
                                          ; metatiles $100 + their Map_TileProps state
 !TileAnim_ColumnTop = $E4                ; start state of an $E6 column's upper tile, probably: the IRQ
                                          ; draws metatile $1E5 there after ModeE6_Handler adds 1
+
+; --- Bank $C3 kernel: the decompressor (Decomp_ToWram) and the module boot ---
+!Decomp_ModeMask = $C0                   ; first end-marker byte, bits 6-7: 0 = 12-bit offsets and
+                                         ; 4-bit lengths, else 11-bit offsets and 5-bit lengths
+!Decomp_GroupSize = 8                    ; items per control byte
+!Decomp_MarkerCountMask = $3F            ; end-marker bits 0-5: 0 = end of the data, else the items
+                                         ; in the next segment's first control byte
+!Decomp_RunBytes = 8                     ; literal bytes after a zero control byte
+!Decomp_Offset12Mask = $0FFF             ; back-reference distance, 12-bit mode
+!Decomp_Offset11Mask = $07FF             ; back-reference distance, 11-bit mode
+!Decomp_In = $0000                       ; base of Decomp_ToWram's reads of the packed data: X = the
+                                         ; offset in Decomp_SrcBank (DB = that bank), +1.. the bytes
+                                         ; after X
+!C3_BootIrqOn = $80                      ; C3_EntryArg bit 7: C3_BootModule runs the unpack with the
+                                         ; display on and the line-211 IRQ (Field_HookLeaveToBankC3's
+                                         ; BankC3_HookArg $85 sets it; event sub $00-$7F never does)

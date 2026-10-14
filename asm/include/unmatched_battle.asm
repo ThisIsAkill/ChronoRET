@@ -135,13 +135,6 @@ BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
 
-; --- Bank $C3 ---
-
-org $C30002
-Decomp_ToWramVec:                       ; JSL vector (JMP $C3:0557): unpacks the data at the long address in
-                                        ; !Battle_DecompSrc.. into WRAM at !Battle_DecompDest.. through WMADD/WMDATA
-                                        ; (inferred: a decompressor, from its header-driven copy loops); not analysed
-
 ; --- Bank $C7 (audio) ---
 
 org $C70004

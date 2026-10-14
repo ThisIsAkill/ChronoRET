@@ -1688,6 +1688,28 @@ if !ram_engine_inc == 0
 !Decomp_OutLen = $0306                   ; 16-bit, read back after Decomp_ToWramVec: the unpacked
                                          ; length, or end offset (LocLoad_CheckEvtData limits it to
                                          ; Evt_DataMax; ram_battle.inc reads it as the end offset)
+!DP_Decomp = $0300                       ; direct page Decomp_ToWram sets (its block is the dp bytes
+                                         ; $00-$16); also the direct page of the bank $C3 window
+                                         ; effects (WinFx_Arg* at $50-$58, scratch at $F0-$F7)
+!Decomp_SegEnd = $0309                   ; 16-bit Decomp_ToWram scratch: offset (in the source bank)
+                                         ; of the current segment's end marker
+!Decomp_GroupLeft = $030B                ; 8-bit: items left in the current control group (8, or
+                                         ; the marker's count after a segment change)
+!Decomp_CtrlBits = $030D                 ; 8-bit: the control byte, shifted right once per item
+!Decomp_CopyLen = $030F                  ; 16-bit (the high byte $0310 is zeroed at the start): a
+                                         ; back-reference's length - 1, the count MVN takes
+!Decomp_SrcSave = $0315                  ; 16-bit: the source offset kept across a back-reference's
+                                         ; MVN (which uses X for the copy source)
+!C3_EntryArg = $0384                     ; 8-bit: the A BankC3_Entry0000 was entered with
+                                         ; (C3_BootModule); bit 7 = C3_BootIrqOn; the module reads
+                                         ; it (bits 0-4 index a table of its own, bits 5 and 7
+                                         ; are tested; seen in its unpacked code, not traced)
+!C3Rom_PackPtrs = $FE0000                ; 3 B per entry: long pointers to packed blocks; entry 0 is
+                                         ; $C3:1200, entry 1 the module $C3:1313 (C3_BootModule
+                                         ; reads entry 1's low word)
+!C3Mod_Code = $7E3000                    ; where C3_BootModule unpacks the bank $C3 module and jumps
+                                         ; (its first byte is the module's entry); alias of
+                                         ; LocGfx_Stage, which the field no longer uses by then
 !Map_PropsPtrs = $F61E00                 ; 3 bytes per entry: long pointer to a location's packed
                                          ; MapProps; LocRom.MapProps picks the entry
 !LocGfx_Lists = $F61C00                  ; 8 bytes per LocRom.Tileset12: graphics pack numbers ($FF =

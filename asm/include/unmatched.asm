@@ -188,19 +188,20 @@ BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tm
 org $C6E797
 BankC6_UnkE797:     ; JSL from C2Scene_ObjAFly before object A comes down: takes the task's 8x8 tile
                     ; and dispatches on Loc_Id - $1F0 through a table at $C6:E7BA; C=1 keeps it up
-org $C30000
-BankC3_Entry0000:   ; JML target (Field_HookLeaveToBankC3, A = $85): reinstalls the NMI/IRQ
-                    ; trampolines into bank $C3, unpacks code via $C3:0557 from a $FE:0003 pointer
-                    ; to $7E:3000 and JMLs there; never returns to the field
-org $C30008
-BankC3_Entry0008:   ; JSL vector (JMP $0077): builds a window table from $0350-$0358 (WinFx_Arg*),
-                    ; A = mode; runs with DP=$0300, saves P/DP/DB (shape not traced)
-org $C3000E
-BankC3_Entry000E:   ; JSL vector (JMP $01E4): DP=$0300; while $0350 != 0 steps a $20-frame effect,
-                    ; then clears $0350 (Field_HookWinC3E)
-org $C30011
-BankC3_Entry0011:   ; JSL vector (JMP $0EFA): window table from 4 points at $0360-$0367
-                    ; (Field_HookWinQuad); starts from the point with the smallest Y
+org $C30077
+WinFx_BuildCircle:  ; bank $C3 window circle builder (BankC3_Entry0008's target); not matched yet
+org $C301E4
+WinFx_StepFade:     ; BankC3_Entry000E's target; not matched yet
+org $C30EFA
+WinFx_BuildQuad:    ; BankC3_Entry0011's target; not matched yet
+org $C31313
+BankC3_PackedModule: ; packed data (Decomp_ToWram's format, 12-bit mode), $C3:1313-$C3:7A2B
+                    ; (26,393 bytes): the bank $C3 module, 65816 code and its data, which
+                    ; C3_BootModule unpacks to C3Mod_Code ($7E:3000-$7E:B57E, $857F bytes) and
+                    ; jumps to. Pointed to by C3Rom_PackPtrs entry 1 ($FE:0003). Kept as ROM
+                    ; bytes: matching its code needs it unpacked (and a packer that rebuilds
+                    ; these exact bytes). $C3:1200-$C3:1312 before it is another pack
+                    ; (C3Rom_PackPtrs entry 0; $400 bytes unpacked; user not traced).
 org $C70000
 Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
