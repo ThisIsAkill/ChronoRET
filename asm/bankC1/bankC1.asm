@@ -60,8 +60,10 @@ incsrc "../hardware.inc"
 ;   - $0018 BankC1_VecLongDispatch: JMP BankC1_LongDispatch (JSL from
 ;     Battle_ReencodeText at $CC:F066 with A = 0).
 ; None of these instructions touches a register or flag.
-; Callers note: the JSL sites named above are in unmatched code in banks
-;   $CD and $EF; the one at $CC:F066 is in Battle_ReencodeText;
+; Callers note: of the JSL sites named above, $CD:08B4 and $CD:0997 are
+;   in BattleCD_NmiMain and $CD:0AB4 in BattleCD_NmiSetup; $CD:3E78 and
+;   $EF:523C are in unmatched code; the one at $CC:F066 is in
+;   Battle_ReencodeText;
 ;   BattleSys_RunServiceVec and BattleSys_ExitVec are listed above.
 ; Entry: M any, X any, DP any, DB any (nothing is used here; each target
 ;        has its own needs)
@@ -147,9 +149,12 @@ BattleSys_SceneSetup:
 ;        Checked only for services 1, 2, 5 and 7: the callees of 2, 5
 ;        and 7 are all matched bank-$C1 code, and 1 calls only
 ;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
-;        DB. The other six reach code that is not analysed, so for them
-;        it is assumed: 0 (the bank-$CD JSLs of BattleSys_SceneSetup; its
-;        bank-$CC steps are matched),
+;        DB. For the other six it is assumed: 0 (BattleSys_SceneSetup's
+;        bank-$CD JSLs reach BattleCD_SetNmiMode1, BattleCD_StartOpenWipe
+;        and BattleCD_WipeRunning, all matched and returning M=1 with
+;        X=0 kept, and its bank-$CC steps are matched, but the rest of
+;        its call tree is not checked here); the other five reach code
+;        that is not analysed:
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
 ;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
@@ -260,13 +265,15 @@ BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
 ; $C1:007E — BattleSys_PumpFrames (11 bytes, $007E–$0088)
 ; Waits for the next frame: sets !Battle_FramePending, then calls
 ; BattleSys_IdleVecCD0036 again and again until something else clears
-; the flag. The likely clearer is the STZ $9E at $CF:E77B, just before
-; the RTL of a bank-$CF routine that reads JOY1 ($CF:E6E0, $CF:E70B) and
-; bumps a 32-bit counter at $96F1, which reads as per-frame work; its
-; entry and who calls it are not traced, so "wait for the frame" is
-; inferred, not proven. ($CF:FB65 also zeroes $9E, but it is the battle
-; entry, reached once from the field: JSL $C10000 at $C0:18A7 -> JMP
-; $001B -> JML $CFFB65, which clears battle RAM and JMLs to $C1:8000.)
+; the flag. The clearer is the STZ !Battle_FramePending at $CF:E77B,
+; at the end of BattleCF_FrameUpdate (the battle's once-a-frame work),
+; which BattleCD_NmiMain JSLs (through BankC1_VecCFE58A) at $CD:0997 on
+; every NMI in modes 1 and 2 except paused ones (the paused path returns
+; before it). The vector's other JSL, at $EF:523C, is in unmatched code.
+; (BattleCF_EnterBattle at $CF:FB65 also zeroes $9E, but it is the
+; battle entry, reached once from the field: JSL $C10000 at $C0:18A7 ->
+; JMP $001B -> JML $CFFB65, which clears battle RAM and JMLs to
+; $C1:8000.)
 ; The $CD0036 callee (BattleCD_IdleTick) waits there while the battle is
 ; paused (BattleCD_PauseWait, not matched).
 ; Callers (20 JSR sites): BattleSys_UpkeepTwoFrames ($C1:109D, $C1:10BD), BattleSys_DefeatPose
@@ -292,7 +299,7 @@ BattleSys_PumpFrames:
 .wait:
     JSL BattleSys_IdleVecCD0036
     LDA.b !Battle_FramePending
-    BNE .wait                   ; cleared elsewhere (likely $CF:E77B)
+    BNE .wait                   ; cleared by BattleCF_FrameUpdate ($CF:E77B)
     RTS
 
 ; ============================================================

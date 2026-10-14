@@ -40,14 +40,15 @@ org $CCE000
 ;            $1800.
 ; The second and later blocks of a stage keep the mode and B-bus address
 ; of the first. Which layers the VRAM places belong to is not traced.
-; Callers note: the JML at $C1:0072 is reached by JSL $C1:000F from the
+; Callers note: the JML at $C1:0072 is reached by JSL $C1:000F from
 ;   BattleCD_NmiSetup ($CD:0AB4), which runs it while $7E:CAD3 is
 ;   non-zero (DB=$7E there, X 16-bit).
 ; Callers (1 JML site): BankC1_JmlCCE000 ($C1:0072).
-; Entry: M=1 (8-bit A), X any (no index register used), DP=0 assumed (TDC
-;        gives the zero bytes written to VMADDL/VMADDH; the caller's DP is
-;        not traced), DB=$7E (!Battle_InitUploadStage is absolute; the
-;        DMA registers are written long)
+; Entry: M=1 (8-bit A), X any (no index register used), DP=0 (TDC
+;        gives the zero bytes written to VMADDL/VMADDH; BattleCD_NmiSetup
+;        runs with the DP=0 the bank-$D1 NMI handler sets), DB=$7E
+;        (!Battle_InitUploadStage is absolute; the DMA registers are
+;        written long)
 ; Exit:  RTL; M=1, X, Y, DP and DB unchanged; A clobbered; DMA channel 7
 ;        registers, VMADDL/H and !Battle_InitUploadStage changed
 Battle_InitUploadStep:

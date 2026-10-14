@@ -56,9 +56,10 @@ hirom
 ; ============================================================
 
 ; $CD:0000 — BattleSys_VecCD0000 (57 bytes, $0000–$0038)
-; The bank's entry block: 19 three-byte JMPs, all but one reached by JSL
-; from other banks (their targets end in RTL). The names are the ones
-; the callers already use. By entry:
+; The bank's entry block: 19 three-byte JMPs, all but two ($000F and
+; $001E, see the Callers note) reached by JSL from other banks (their
+; targets end in RTL). The names are the ones the callers already use.
+; By entry:
 ;   - $0000 BattleSys_VecCD0000 → BattleCD_EnterBattle (JSL from
 ;     BattleCF_EnterBattle, before it clears battle RAM);
 ;   - $0003 BattleSys_VecCD0003 → BattleCD_SetNmiMode1
@@ -603,8 +604,10 @@ BattleCD_ClearTextGfx:
 ; TextWin_StrIndex = A, !Battle_MsgTiming = 0, !Battle_TextUnkA1 = 0,
 ; TextWin_GfxBuf = !Battle_TextGfxBuf (bank $7E), TextWin_Mode = 0, the
 ; buffer cleared (BattleCD_ClearTextGfx), TextWin_Init (through
-; BankC2_Entry0003). Returns A = !BattleCD_TextStepCount, which every
-; caller passes straight to BattleCD_ShowText.
+; BankC2_Entry0003). Returns A = !BattleCD_TextStepCount, which the
+; three message callers (BattleCD_ShowMessage, BattleCD_ShowMessageTimed,
+; BattleCD_ShowScriptMessage) pass straight to BattleCD_ShowText;
+; BattleCD_ShowTargetInfo and BattleCD_ShowTechInfo drop it.
 ; Callers (5 JSR sites): BattleCD_ShowMessage ($CD:01D2), BattleCD_ShowMessageTimed ($CD:0222),
 ;   BattleCD_ShowScriptMessage ($CD:02AD), BattleCD_ShowTargetInfo ($CD:02FF) and
 ;   BattleCD_ShowTechInfo ($CD:032F).
@@ -648,8 +651,10 @@ BattleCD_ShowText:
     RTS
 
 ; $CD:0295 — BattleCD_ShowScriptMessage (54 bytes, $0295–$02CA)
-; An enemy script's message (the run handlers pass !Battle_UnkB3C7, a
-; script byte, in A): !Battle_ScriptMsgUp + 1, string table
+; An enemy script's message (the run handlers pass a script byte in A:
+; most pass !Battle_UnkB3C7; BattleAi_RunTech, BattleAi_RunSetFlags and
+; BattleAi_RunMessage pass one read straight from the script,
+; !BattleRom_ScriptBank+1/+2,X): !Battle_ScriptMsgUp + 1, string table
 ; !BattleRom_ScriptMsgStrings; unless A is !Battle_LastScriptMsg (the
 ; last one shown, which the NMI resets to $FF when the message closes):
 ; !Battle_NextScriptMsg = A, the text started and drawn
@@ -813,8 +818,9 @@ BattleCD_ShowTechInfo:
 ; Callers (2 JSR sites): BattleCD_NmiMain ($CD:091E, $CD:09CA).
 ; Entry: M=1 (REP/SEP #$20 here), X any, DP=0 (!Battle_PadHeld and the
 ;        edge bytes), DB=$7E (BattleCD_NmiMain sets it before the call)
-; Exit:  M=1; A = !Battle_PadPrev's low byte, B = 0 (TDC); X, Y
-;        unchanged
+; Exit:  M=1; A = !Battle_PadPrev's low byte, or
+;        !BattleCD_PadDelayRepeat when that byte has bit 7 set; B = 0
+;        (TDC); X, Y unchanged
 BattleCD_PadRepeat:
     REP #$20
     LDA.w !Battle_PadNow
@@ -2212,8 +2218,9 @@ BattleCD_ClampPalAnims:
 ; (FieldAnimB[10]) by MVN and clears bit 7 (and returns); any other bit
 ; copies !Battle_PalAnimRecs89 (24 bytes) to records 8 and 9 and clears
 ; bit 0.
-; Quirk: the x axis's random draw passes whatever A holds (the old step
-; count, at or above its period) to BattleCD_RandByte. Kept as found.
+; Quirk: the x axis's random draw passes whatever A holds
+; (!Battle_ShakeXRandTime, the frames since the last draw, at or above
+; !Battle_ShakeXRandPeriod) to BattleCD_RandByte. Kept as found.
 ; Callers (1 JSR site): BattleCD_NmiMain ($CD:092C).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleCD_NmiMain runs; MVN sets
 ;        DB=$7E again); B = 0 assumed for the TAXs
@@ -2672,7 +2679,9 @@ BattleCD_LayerFx84:
 ; Waits (BattleCD_WaitFrameRefresh) while !Battle_Unk5D9B is set.
 ; Callers (1 JSR site): BattleCD_RunLayerFx ($CD:0E06).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y as the waits leave them
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; B as on entry when there is
+;        no wait, else as BattleCD_WaitFrameRefresh leaves it; X, Y as
+;        the waits leave them
 BattleCD_WaitLayerFxIdle:
     LDA.w !Battle_Unk5D9B
     BEQ .done
@@ -2690,7 +2699,10 @@ BattleCD_WaitLayerFxIdle:
 ; also JMPs here (its RTL then returns for it).
 ; Callers (2 sites: 1 JSL, 1 JMP): BattleCD_EnemyDissolve (JSL $CD:0075, JMP $CD:0090).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = the effect, B = 0 (the 16-bit TAX;
-;        BattleCD_EnemyDissolve's state, assumed)
+;        BattleCD_EnemyDissolve's state, assumed). That entry B reaches
+;        the TAX only when BattleCD_WaitLayerFxIdle does not wait; after
+;        a wait B is what BattleCD_WaitFrameRefresh's chain leaves
+;        (assumed 0, not traced)
 ; Exit:  M=1, X=0, DP=0, DB=$7E (RTL); A = 0; X, Y clobbered; DP
 ;        $53-$75 written
 BattleCD_RunLayerFx:
