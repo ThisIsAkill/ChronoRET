@@ -70,6 +70,7 @@ test-hooks:
 test-tools:
 	python3 tools/test_xref.py
 	python3 tools/test_index_claims.py
+	python3 tools/test_lint_size.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]

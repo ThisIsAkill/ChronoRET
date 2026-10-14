@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:F9B2,Menu_CfgTextThread,2026-10-09,rev167a,approved,6bafe1b21b56,"Fix ok: PEA $7E7E $81C1, PLB $81C4 sets DB=$7E. Checked all stores vs ROM, DP $26/$28 math, M0X0 DP0 entry, Callers note. nit: 2nd PLB at $81C5; say PEA/PLBs $81C1-$81C5"
