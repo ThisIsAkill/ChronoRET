@@ -105,6 +105,11 @@ jobs:
         run: |
           python3 tools/lint_readability.py
 
+      - name: Tool tests (xref verdicts, the lint's INDEX rule)
+        if: env.SKIP_CHECK != '1'
+        run: |
+          make test-tools
+
       - name: Validate symbols/ (statuses and the review log)
         if: env.SKIP_CHECK != '1'
         run: |
