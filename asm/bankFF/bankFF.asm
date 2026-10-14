@@ -858,7 +858,7 @@ BankFF_SaveRecords:
 ; Loads slot Menu_SlotIdx back: the same BankFF_SaveRecords blocks, read
 ; from SRAM (Menu_NmiMoveCode as MVN from bank $30, destination bank
 ; patched per record), from the slot's offset on. No checksum test here.
-; Callers (1 JSL site): unmatched ($C2:E657).
+; Callers (1 JSL site): Menu_Mode0EH1 ($C2:E657).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_SlotIdx,
 ;        Menu_SlotSramOfs, Menu_Tmp00, Menu_Unk51), DB=$7E (absolute RAM)
 ; Exit:  P restored; DB=$7E; A, X, Y, DP $00-$01 and $7B clobbered;
@@ -912,7 +912,7 @@ BankFF_LoadSlot:
 ; inventory slot (of $F2) whose item has Menu_ItemInfo0 bit 4, and sets
 ; Menu_Unk7F01CF to $10. Probably the start of a new game from a cleared
 ; save (items and names kept, equipment reset); not traced.
-; Callers (1 JSL site): unmatched ($C2:E6D8).
+; Callers (1 JSL site): Menu_Mode0EH2 ($C2:E6D8).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_SlotIdx,
 ;        Menu_SlotSramOfs, Menu_Tmp00-05, Menu_ListPtr, Menu_Unk51),
 ;        DB=$7E (absolute RAM)
@@ -1097,7 +1097,7 @@ BankFF_SlotChecksum:
 ; registers channel 1 writes is not set here (the values fit CGADSUB /
 ; COLDATA: colour math adding, then subtracting, a fixed colour stepping
 ; down and up; probably).
-; Callers (1 JSL site): unmatched ($C2:E503).
+; Callers (1 JSL site): Menu_NameInit ($C2:E503).
 ; Entry: M, X any (P saved; REP #$30 then SEP #$30 here), DP=0
 ;        (Menu_Tmp00-02), DB=$7E (Menu_GradHdma is absolute; A1T1L long)
 ; Exit:  P restored; A, X, Y and DP $00-$02 clobbered

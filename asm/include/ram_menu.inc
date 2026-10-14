@@ -1031,6 +1031,34 @@ endstruct
 !Menu_ShopMenuSel = $0080                ; 8-bit; the top row's cursor record, kept while handler 6 runs
 !Menu_ShopListSel = $007F                ; 8-bit; the list's cursor record, kept while the count window shows
 
+; --- Menu modes $0B-$0E: the name entry (mode $0D) and the load screen (mode $0E) ---
+!Menu_NameBuf = $0F00                    ; 6 B: the name being entered (from the character's, then edited)
+!Menu_NameLen = $0F06                    ; 8-bit; characters entered (0-5; zeroed as a word with $0F07)
+!Menu_NameCol = $0F08                    ; 8-bit; the grid cursor's column (0-9) ...
+!Menu_NameRow = $0F09                    ; 8-bit; ... and row (0-7)
+!Menu_NameUnk0F0A = $0F0A                ; 8-bit; zeroed with each row step (reader not found)
+!Menu_NameUnk0F0B = $0F0B                ; 8-bit; the grid cursor's Y, as record 0's .Y (reader not found)
+!Menu_NameDest = $0F0C                   ; 16-bit; address of the character's 6 bytes in TextWin_CharNames
+!Menu_NamedOnce = $299F                  ; 8-bit, Menu_Config+$0F; ORed with the character in mode $0D's
+                                         ; handler 0 and then set to the HDMA bits (non-zero): zero only
+                                         ; before the first name entry
+!Menu_NameTrimmed = $9890                ; 6 B: Menu_NameTrim's result (the Menu_SprScratch RAM)
+!Menu_NameWork = $98A0                   ; 6 B: Menu_NameTrim's copy of Menu_NameBuf
+!Menu_NameGridText = $9890               ; Menu_NameGridBuild's string of the grid (the same RAM)
+!Menu_NamePrevPos = $007F                ; 16-bit; record 0's X and Y before a grid step
+!Menu_NameCursorOam = $0880              ; OAM copy entry 96 (X, Y, tile, attributes; entry 97 after it):
+                                         ; the two sprites Menu_NameCursorX places
+!Menu_NameTextBuf = $5E00                ; $400 B zeroed by Menu_NameInit: 2bpp text Menu_DrawText draws
+!Menu_LoadMsgShown = $0D84               ; 8-bit; non-zero while Menu_LoadAskSlot's question shows
+                                         ; (Menu_UnkD36C then draws no slot details)
+!Menu_LoadSavedRow = $0F00               ; 8-bit; the slot row under the erase question
+!Menu_LoadHiliteRow = $007F              ; 8-bit; the row + 1 AND 3 Menu_UnkCFFB reads (probably)
+!Menu_LoadMsgRows = $52C0                ; $100 B zeroed when the question goes
+!Menu_LoadDetailRows = $3200             ; $240 B zeroed by Menu_LoadCursor (a slot's details, probably)
+!Menu_LoadLineA = $5248                  ; 18 B copied from it (zeros) ...
+!Menu_LoadLineB = $5288                  ; ... and 18 more
+!Menu_EraseRec = $9890                   ; 8 B: the Menu_VramRec Menu_LoadEraseSlot builds and queues
+
 ; --- The menu's NMI (Menu_Nmi): dp offsets from Menu_NmiDp ($0D00) ---
 !Menu_NmiFrames = $00                    ; 8-bit; +1 every menu NMI
 !Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_NmiUpload) and
@@ -1204,7 +1232,8 @@ endstruct
 !Menu_SumPlace = $0022                   ; 16-bit; its SRAM offset of the party place (low byte stepped)
 !Menu_SumLeft = $0024                    ; 8-bit; places left
 !Menu_SlotValid = $0D49                  ; 3 B: 1 when the slot passed BankFF_UnkF9C4, else 0
-!Menu_Unk0D4C = $0D4C                    ; 8-bit; set to $FF by Menu_LoadSlotSummaries; use not traced
+!Menu_Unk0D4C = $0D4C                    ; 8-bit; set to $FF by Menu_LoadSlotSummaries; Menu_LoadCursor
+                                         ; reads it as row 3's Menu_SlotValid (the byte after them)
 !Menu_SlotWinStyle = $0D79               ; 3 B: each slot's window style (its Menu_Config01 AND 7)
 !Menu_SlotSummaries = $7600              ; 3 x $40 B: Menu_ReadSlotSummary's blocks
 !Menu_SlotTextBufs = $7000               ; 3 x $200 B: each slot's text (Menu_DrawSlotText)

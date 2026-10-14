@@ -139,24 +139,38 @@ Menu_ShopGainGold:  ; JSR from Menu_Mode0CH4: the gold (Menu_Unk2C53, 3 bytes) +
                     ; at 9,999,999 ($C2:FDDF) (not matched)
 org $C2FDBB
 Menu_ShopPayGold:   ; JSR from Menu_Mode0CH5: the gold - Menu_ShopPrice, then the same cap (not matched)
-org $C2E1ED
-Menu_Mode0DH0:      ; Menu_Mode0DList entry 0 (not analysed)
-org $C2E21E
-Menu_Mode0DH1:      ; Menu_Mode0DList entry 1 (not analysed)
-org $C2E236
-Menu_Mode0DH2:      ; Menu_Mode0DList entry 2 (not analysed)
-org $C2E201
-Menu_Mode0DH3:      ; Menu_Mode0DList entry 3 (not analysed)
-org $C2E209
-Menu_Mode0DH4:      ; Menu_Mode0DList entry 4 (not analysed)
-org $C2E613
-Menu_Mode0EH0:      ; Menu_Mode0EList entry 0 (not analysed)
-org $C2E61B
-Menu_Mode0EH1:      ; Menu_Mode0EList entry 1 (not analysed)
-org $C2E6AE
-Menu_Mode0EH2:      ; Menu_Mode0EList entry 2 (not analysed)
-org $C2E705
-Menu_Mode0EH3:      ; Menu_Mode0EList entry 3 (not analysed)
+org $C2CFFB
+Menu_UnkCFFB:       ; JSR from Menu_LoadCursor (and mode 6): builds an HDMA table at $7E:9720 from
+                    ; $C2:D044 and marks row Menu_LoadHiliteRow in it (probably the row highlight)
+org $C2D10D
+Menu_DrawSlotWindows: ; JSR from Menu_LoadInit: for slots 0-2 the label and text tile strips
+                    ; (Menu_DrawTileStripAttr / Menu_DrawTileStrip), then $C2:D32C (not matched)
+org $C2D32C
+Menu_UnkD32C:       ; JSR from Menu_LoadEraseSlot: slot Menu_SlotIdx's window frame in its style
+                    ; (Menu_LoadSlotWindowStyle); in the unmatched $C2:D32C-$C2:D4EF
+org $C2D36C
+Menu_UnkD36C:       ; JSR from Menu_LoadCursor and Menu_LoadInit: the details of slot Menu_SlotIdx
+                    ; (none while Menu_LoadMsgShown is set); in the unmatched $C2:D32C-$C2:D4EF
+org $C2FB97
+Menu_DrawTileStrip: ; JSR from Menu_NameInit: Y tile words with attribute $31 from tile A AND $EF at
+                    ; $7E:X, and each tile + $10 one row below (not matched)
+org $C2FBB4
+Menu_DrawTileStripAttr: ; JSR from Menu_LoadAskSlot: the same with A's high byte AND $33 as the
+                    ; attribute (not matched)
+org $C2FBDC
+Menu_VramRecBg1Row16: ; Menu_VramRec in unmatched data: VRAM $5A00 (BG1 map row 16) = $7E:3200, $240 bytes
+org $C2FC0D
+Menu_VramRecBg2Row2: ; Menu_VramRec in unmatched data: VRAM $6040 (BG2 map row 2) = $7E:3E80, $300 bytes
+org $C2FC14
+Menu_VramRecBg3Full: ; Menu_VramRec in unmatched data: VRAM $6800 (BG3 map) = $7E:4E00, $1000 bytes
+org $C2FC29
+Menu_VramRecBg3Row3: ; Menu_VramRec in unmatched data: VRAM $6860 (BG3 map row 3) = $7E:4EC0, $440 bytes
+org $C2FC53
+Menu_VramRecLabels: ; Menu_VramRec in unmatched data: VRAM $7800 = $7E:6E00 (Menu_SlotLabelArea), $800 bytes
+org $C2FC61
+Menu_VramRecTiles1800: ; Menu_VramRec in unmatched data: VRAM $1800 = $7E:3600, $600 bytes
+org $C2FC68
+Menu_VramRecRomEB88: ; Menu_VramRec in unmatched data: VRAM $2010 = $FF:EB88, $480 bytes
 org $C6E74E
 BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
                     ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for
