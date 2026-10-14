@@ -10,7 +10,7 @@ was written, it is regenerated (a few seconds; needs the ROM and asar).
 
 "Computed from" is recorded as a fingerprint in symbols/.generated (also
 untracked): every file under asm/, the review log, the readability baseline,
-the tools, and the ROM.
+the code survey, the tools, and the ROM.
 
     python3 tools/generated.py      regenerate if stale, print what it did
 """
@@ -46,7 +46,7 @@ def _inputs() -> list[Path]:
     files += [p for p in SYMBOLS.glob('reviews*') if p.is_file()]
     files += [p for p in (SYMBOLS / 'reviews').glob('*') if p.is_file()]
     files += [p for p in Path('tools').glob('*.py')]
-    files += [Path('tools/readability_baseline.txt')]
+    files += [Path('tools/readability_baseline.txt'), SYMBOLS / 'code_survey.csv']
     return sorted(p for p in set(files) if p.exists())
 
 
