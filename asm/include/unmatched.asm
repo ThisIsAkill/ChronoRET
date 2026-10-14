@@ -101,13 +101,6 @@ Menu_UnkD32C:       ; JSR from Menu_LoadEraseSlot: slot Menu_SlotIdx's window fr
 org $C2D36C
 Menu_UnkD36C:       ; JSR from Menu_LoadCursor and Menu_LoadInit: the details of slot Menu_SlotIdx
                     ; (none while Menu_LoadMsgShown is set); in the unmatched $C2:D32C-$C2:D4EF
-org $C6E74E
-BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
-                    ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for
-                    ; left / right / above / below (not matched)
-org $C6E797
-BankC6_UnkE797:     ; JSL from C2Scene_ObjAFly before object A comes down: takes the task's 8x8 tile
-                    ; and dispatches on Loc_Id - $1F0 through a table at $C6:E7BA; C=1 keeps it up
 org $C31313
 BankC3_PackedModule: ; packed data (Decomp_ToWram's format, 12-bit mode), $C3:1313-$C3:7A2B
                     ; (26,393 bytes): the bank $C3 module, 65816 code and its data, which

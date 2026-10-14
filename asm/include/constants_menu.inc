@@ -1600,6 +1600,65 @@ if !constants_menu_inc == 0
 !BankFF_GradValue2 = $82
 !BankFF_GradGroups = $10                 ; groups of three 1-line entries
 
+; --- Bank $C6 scene routines (bankC6.asm) ---
+!C6Scene_ObjPackA = 2                    ; C2SceneRom_ObjPacks entry C6Scene_UnpackObjPackA unpacks
+!C6Scene_ObjPackB = 13                   ; and C6Scene_UnpackObjPackB
+!C6Scene_PalPackA = 1                    ; C2SceneRom_PalettePacks entry C6Scene_UnpackPalPackA unpacks
+!C6Scene_PalPackB = 2                    ; and C6Scene_UnpackPalPackB
+!C6Scene_GradFull = (!COLDATA_AllZero|$1F) ; COLDATA: red, green and blue at 31 (white)
+!C6Scene_GradFirstStep = (!COLDATA_AllZero|30) ; C6Scene_FadeGradInit's first step (all channels 30)
+!C6Scene_GradSteps = $001E               ; its steps, 30 down to 1
+!C6Scene_GradStepLines = $0008           ; lines per step (one byte each)
+!C6Scene_GradRunBytes = $0070            ; 112 lines of one byte: one HDMA run of a COLDATA table
+!C6Scene_GradScreenBytes = $00E0         ; 224 lines of one byte
+!C6Scene_GradStepBytes = $0008           ; C6Scene_FadeGradStep: 8 lines a call
+!C6Scene_RampStart = (!COLDATA_AllZero|16) ; C6Scene_Grad2Init's ramp: all channels from 16 down
+!C6Scene_RampSteps = $0008               ; 8 levels two lines each, then 8 levels four lines each
+!C6Scene_EdgeLineBase = $0088            ; C6Scene_PlaceOnEdgeRandom: .SprY = this + the random line
+!C6Scene_EdgeLineOfs = $0008             ; the table line read is .SprY - this
+!C6Scene_EdgeRightBit = $0080            ; second random byte's bit 7: the right edge
+!C6Scene_FlagF2Mask = $3C                ; C6Scene_GetFlagF2Bits: bits 2-5
+!C6Scene_WipeRunBytes = $0070            ; 112 lines of one byte (the WH1 wipe table's HDMA run)
+!C6Scene_Bg3AccelX = $0DDB               ; C6Scene_Bg3Accel: added to .XVelFrac a frame (about 0.054 pixel)
+!C6Scene_Bg3AccelY = $0800               ; added to .YVelFrac a frame (1/32 pixel)
+!C6Scene_WaveLineStep = $0008            ; C6Scene_Bg1WaveStep: angle step per line and per frame
+!C6Scene_PlaceRandYMask = $3F            ; C6Scene_PlaceInViewRandom: random Y spread 0-63 ...
+!C6Scene_PlaceTopY = $0060               ; ... from Y $60
+!C6Scene_NudgeDistMask = $3F             ; C6Scene_NudgeRandomDir: distance 0-63
+!C6Scene_RectLeftOf = $01                ; BankC6_UnkE74E's result bits: the tile is left of the rectangle,
+!C6Scene_RectRightOf = $02               ; right of it,
+!C6Scene_RectAbove = $04                 ; above it,
+!C6Scene_RectBelow = $08                 ; below it
+!C6Scene_NoLand1F0Rows = $7F64           ; BankC6_UnkE797's rectangles, rows word (low byte: first row,
+!C6Scene_NoLand1F0Cols = $7241           ; high byte: last + 1) and columns word: Loc_Id $1F0
+!C6Scene_NoLand1F1Rows = $7F76           ; Loc_Id $1F1
+!C6Scene_NoLand1F1Cols = $6E60
+!C6Scene_NoLand1F3Rows = $3400           ; Loc_Id $1F3
+!C6Scene_NoLand1F3Cols = $0E00
+!C6Scene_NoLand1F4Rows = $7F60           ; Loc_Id $1F4
+!C6Scene_NoLand1F4Cols = $2000
+!C6Scene_PicBytes = $3000                ; C6Scene_MapPicture: 192 Mode 7 tiles of 64 bytes
+!C6Scene_PicNextBand = (!C2Scene_MapBandBytes-$40) ; from 4 metatile rows into a tile row to the next tile row
+!C6Scene_PixelRowBytes = $0008           ; bytes of a Mode 7 tile's pixel row
+!C6Scene_PerspInitRun = $0070            ; C6Scene_PerspInit's second-run offset (overwritten at once)
+!C6Scene_PerspBufBOfs = $02A0            ; buffer B of each matrix register is this far after buffer A
+!C6Scene_PerspScale0 = $0080             ; C6Scene_PerspInit's starting .Scale ...
+!C6Scene_PerspDepthA0 = $00A0            ; ... .DepthA,
+!C6Scene_PerspDepthB0 = $0060            ; .DepthB,
+!C6Scene_PerspCenterX0 = $0040           ; .CenterX,
+!C6Scene_PerspCenterY0 = $0070           ; .CenterY
+!C6Scene_PerspAhead0 = $0070             ; and .Ahead
+!C6Scene_SignA = $0001                   ; C6Scene_PerspSigns bits: M7A (or cos) negative,
+!C6Scene_SignB = $0002                   ; M7B (or sin),
+!C6Scene_SignC = $0004                   ; M7C,
+!C6Scene_SignD = $0008                   ; M7D
+!C6Scene_PerspMidPair = $38              ; the middle line pair (56 of 112), where the depths are .DepthA/B
+!C6Scene_PerspLinePairs = $70            ; line pairs a frame (224 lines)
+!C6Scene_RoundBit = $0080                ; a product's low byte bit 7: round the / 256 up
+!C6Scene_PerspPivotX = $0080             ; screen X of the Mode 7 turning point (M7X - BG1 scroll)
+!C6Scene_PerspPivotY = $00E0             ; its screen Y
+!C6Scene_Unk7F01F5Keep = $FE             ; C6Scene_ClearUnk7F01F5Bit0: all bits but 0
+
 ; --- Menu mode 3: the tech screen ---
 !MenuRom_Mode03List = $FFBFDA            ; Menu_Mode03Init's draw list
 !MenuRom_TechMembersList = $FFC042       ; Menu_Mode03H1's draw list

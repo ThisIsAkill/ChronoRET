@@ -52,14 +52,17 @@ incsrc "../hardware.inc"
 ;   ($C2:2A6D), C2Scene_LoadPartyGfx ($C2:2B7C), C2Scene_DialUnpack ($C2:721B), C2Scene_UnpackBgPack
 ;   ($C2:7B1B), C2Scene_UnpackBg3MapPack ($C2:7B3F), C2Scene_LoadExtraObjPack ($C2:7B7A),
 ;   C2Scene_LoadExtraPalette ($C2:7B9A), C2Scene_LoadUnkC600 ($C2:7BBF), Menu_SprLoad ($C2:F542),
-;   BattleFx_LoadBgSet ($D1:ED38, $D1:EDB4), BankFF_BuildScreenMap ($FF:F690) and unmatched
-;   ($C6:E048, $C6:E06D, $C6:E66A, $C6:E68F).
+;   C6Scene_UnpackObjPackA ($C6:E048), C6Scene_UnpackPalPackA ($C6:E06D), C6Scene_UnpackObjPackB
+;   ($C6:E66A), C6Scene_UnpackPalPackB ($C6:E68F), BattleFx_LoadBgSet ($D1:ED38, $D1:EDB4) and
+;   BankFF_BuildScreenMap ($FF:F690).
 ; Callers of BankC3_Entry0008 (13 sites: 2 JSR, 11 JSL): Field_HookWinGrow0 (JSL $C0:225C),
 ;   Field_HookWinShrink0 (JSL $C0:22B7), Field_HookWinGrow1 (JSL $C0:237D), Field_HookWinShrink1
 ;   (JSL $C0:23DD), Field_HookWinFixedA (JSL $C0:2579), Field_HookWinFixedB (JSL $C0:25FE),
 ;   Field_WinPulseDraw (JSL $C0:2748), C2Scene_Win1Step (JSL $C2:7952), C2Scene_Win2Step (JSL
-;   $C2:79B0) and unmatched (JSR $C3:D16C, JSR $C3:DE5C, JSL $C6:E3D2, JSL $C6:E4FB).
-; Callers of BankC3_Entry000E (2 JSL sites): Field_HookWinC3E ($C0:22FA) and unmatched ($C6:E27E).
+;   $C2:79B0), C6Scene_EllipseBuild (JSL $C6:E3D2), C6Scene_CapsuleBuild (JSL $C6:E4FB) and
+;   unmatched (JSR $C3:D16C, JSR $C3:DE5C).
+; Callers of BankC3_Entry000E (2 JSL sites): Field_HookWinC3E ($C0:22FA) and C6Scene_WipeWinStep
+;   ($C6:E27E).
 ; Callers of BankC3_Entry0011 (1 JSL site): Field_HookWinQuad ($C0:24A3).
 ; Callers note: the unpacked module JSLs $C3:000E (from $7E:3D72); it calls
 ;   Decomp_ToWram and the window routines by their own addresses. The JSR

@@ -84,10 +84,12 @@ if !hardware_inc == 0
 !DMAP_FourRegs         = $04  ; transfer mode 4: four consecutive B-bus registers
 !BBAD_BG1SC            = $07  ; B-bus address of BG1SC ($2107)
 !BBAD_BG1HOFS          = $0D  ; B-bus address of BG1HOFS ($210D)
+!BBAD_BG1VOFS          = $0E  ; B-bus address of BG1VOFS ($210E)
 !BBAD_BG2HOFS          = $0F  ; B-bus address of BG2HOFS ($210F)
 !BBAD_BG2VOFS          = $10  ; B-bus address of BG2VOFS ($2110)
 !BBAD_BG3HOFS          = $11  ; B-bus address of BG3HOFS ($2111)
 !BBAD_WH0              = $26  ; B-bus address of WH0 ($2126)
+!BBAD_WH1              = $27  ; B-bus address of WH1 ($2127)
 !BBAD_WH2              = $28  ; B-bus address of WH2 ($2128)
 !BBAD_WH3              = $29  ; B-bus address of WH3 ($2129)
 !BBAD_TM               = $2C  ; B-bus address of TM ($212C)

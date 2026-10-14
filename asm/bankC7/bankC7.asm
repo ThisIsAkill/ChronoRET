@@ -32,7 +32,7 @@ incsrc "../hardware.inc"
 
 ; ============================================================
 ; Callers (1 JSL site): GameLoop ($C0:0053).
-; Callers of Audio_DriverCommand (58 JSL sites): LocLoad_AudioSetup ($C0:1B73, $C0:1B8B),
+; Callers of Audio_DriverCommand (54 JSL sites): LocLoad_AudioSetup ($C0:1B73, $C0:1B8B),
 ;   Audio_PlaySfxAtLeader ($C0:1BA2), MusicCueDispatch ($C0:1BCE, $C0:1BDF), AudioFadeDispatch
 ;   ($C0:1C2A, $C0:1C3A, $C0:1C52, $C0:1C65, $C0:1C78, $C0:1C89, $C0:1CA9, $C0:1CB7, $C0:1CCF,
 ;   $C0:1CE2, $C0:1CF5), Evt_OpE8_SoundCmd18 ($C0:3C26), Evt_OpEA_PlayMusic ($C0:3C43),
@@ -45,8 +45,8 @@ incsrc "../hardware.inc"
 ;   $C2:80C5, $C2:80CE, $C2:80E1, $C2:80EA), Menu_CfgEntry0 ($C2:C033), Menu_Mode0EH1_start
 ;   ($C2:E6A1), Menu_SendSoundArg ($C2:EB1A), C3_SongCheck ($C3:09D1), C3_RunScript ($C3:0BE9),
 ;   BattleCD_ApuCmd81 ($CD:03AB), BattleCD_RunEndFx ($CD:0D70, $CD:0D81), BattleCD_ApuCmd18
-;   ($CD:3B7D), BattleCD_PauseWait ($CD:3E54, $CD:3E70) and unmatched ($C2:CBF3, $C2:CC09, $C2:CF46,
-;   $FF:FC82, $FF:FC97, $FF:FF24, $FF:FF39).
+;   ($CD:3B7D), BattleCD_PauseWait ($CD:3E54, $CD:3E70) and unmatched ($C2:CBF3, $C2:CC09,
+;   $C2:CF46).
 ; Callers of Audio_VecSendSampleDir (1 JSL site): unmatched ($E6:F15C).
 ; Entry vectors and boot tables ($C7:0000–$C7:0037)
 ; ============================================================
