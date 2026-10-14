@@ -140,7 +140,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    $05 (endless loop with !Battle_Unk2989 bit 5), $08 (PC 0 never compared), $1F (STA for STX),
    $2F (entry numbers, not slots), $38 (one-entry clear); whether !Battle_UnkB252 + 3 and
    !Battle_UnkB18B always name the same enemy; what the bank-$CC/$CD/$CF callees of service 0 and
-   the vectors do (stubs `BattleCC_*` and `BattleSys_VecCD00xx`; the bank-$CF ones are matched, item 5). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
+   the vectors do (stubs `BattleSys_VecCD00xx`; the bank-$CF ones are matched, item 7, and the bank-$CC ones, item 8). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
    (`!BattleRom_AiActLength` `$FD:BA4A` gives lengths $FF for codes 4/5), what the fixed scripts
    `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits;
    BattleSys_UnkB0B6 sets `!BattleAi_ChosenBlock` to $FF when Status2 bit 2 changes), and the
@@ -190,11 +190,12 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched;
    the "Actions: service 4" banner before BattleSys_RunAction says the script interpreter (the
    threads BattleAct_RunThreads runs) "is not matched yet", though it is.
-   The bank-$CF readers of the action state are matched now (item 5: the movers, position
+   The bank-$CF readers of the action state are matched now (item 7: the movers, position
    history, path walk, object follower, hit-number bounce, colour rotation, object links and
-   the attribute values). Still open out of this bank: in bank $CC `BattleAct_StepPalettes`
-   `$CC:F1E7` and the action helpers `$CC:F06B`-`$CC:F2A9` (object lists stepped at
-   `$CC:F278`); no reader found of the battlers' `!Battle_ActorCircleX/Y`.
+   the attribute values), and so are the bank-$CC readers, `BattleAct_StepPalettes` and the
+   action helpers `$CC:F06B`-`$CC:F364` (item 8; the attribute values are filled at
+   `$CC:E3FC`). Not found: who draws the position history and who reads
+   `!Battler_PosHistUnkAB7D/AB88`, `!Battler_UnkA5D8` and the battlers' `!Battle_ActorCircleX/Y`.
    Still open from service 4: the code at `$C1:ACF0` that fills the action block
    `$AE91`-`$AE9B`. Open: who writes `!Enemy_TargetWanted` (`$5E15`).
 2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
@@ -604,7 +605,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Menu_DrawText` with A=$81). Next, in reach order: the mode 1 helpers still stubbed
    (`Menu_UnkA4AF`, `A569`, `A59A`, `A5C3`, `A64D`, `A6F0`, `A71E`, `A85C`, up to $C2:AA33), the
    other icons' preview/redraw routines (`Menu_UnkAD50`/`ADC3` ...), `Menu_Unk90FC`/`9121`,
-   `Menu_UnkFA49`, then modes 2-7, and `BankFF_UnkF9C4`/`F813`/`F958`.
+   `Menu_UnkFA49`, then modes 2-7 (`BankFF_UnkF9C4`/`F813`/`F958` are matched: item 9).
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:
@@ -812,15 +813,67 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Callers note calls `$C1:5BB9` unmatched; `BattleAct_OpLinkObjBit7`'s "what the link does is
    not traced (read at `$CF:EDD4` and `$CF:F81D`)": bit 7 / bit 6 draw the object in front of /
    behind the battler (`BattleCF_DrawFrontLayer`, `BattleCF_DrawBackObjects`).
-   Open: who fills `!Battler_FrameDma*` (`$A654`-`$A6D7`), the tile-word lists at `$11B0`
-   (`!BattleRom_SprTileListPtr`), `!Battler_SprBytes` (`$1D7F`), `!Battle_OamHighIdx`/`XBit`
-   (`$902D`/`$8E2D`), `!Battle_ActObjFrame` (`$A2C0`), `!Battle_DemoQuitTimer` (`$BB00`) and
-   `!Battle_PartsAnchor`/`!Enemy_PartOfs*` with `!Battle_EnemyPartsOn`; who sets
-   `!Battle_UnkA113` (slot 9 mirrors slot 3), `!Battle_UnkA101` and `!Battle_UnkE5`; what the
-   bank-$CD vectors `$CD:0000`/`0006`/`0024` do (the last after an enemy is moved to the special
-   palette: a fade-out, probably); the meaning of `!Battle_Unk9F`, `!Battle_UnkB9`,
-   `!Battle_Unk98CA`, `!Battle_UnkA0A6`, `!Battle_UnkBB80`. Next in this bank: the data
-   `$CF:0000`-`$CF:E2FF` (what reads it is not traced).
+   Found by the bank-$CC batch (item 8): the battle set-up (`Battle_InitScene`,
+   `Battle_InitSceneGfx`) fills `!Battler_FrameDma*`, `!Battler_SprBytes`, the OAM helper tables
+   `!Battle_OamHighIdx`/`XBit`/`XClear`, the `Battle_SprRec` records at `$11B0`,
+   `!Battle_PartsAnchor`/`!Enemy_PartOfs*` with `!Battle_EnemyPartsOn` and `!Battle_UnkA113`;
+   `BattleAct_StepObjAnim` sets `!Battle_ActObjFrame`; `!Battle_InitUploadStage` (`$98CA`, which
+   `BattleCF_EnterBattle` zeroes) is `Battle_InitUploadStep`'s stage counter. Whether anything
+   rewrites those during the battle is not traced.
+   Open: `!Battle_DemoQuitTimer` (`$BB00`); who sets `!Battle_UnkA101` and `!Battle_UnkE5`; what
+   the bank-$CD vectors `$CD:0000`/`0006`/`0024` do (the last after an enemy is moved to the
+   special palette: a fade-out, probably); the meaning of `!Battle_Unk9F`, `!Battle_UnkB9`,
+   `!Battle_UnkA0A6`, `!Battle_UnkBB80`. Next in this bank: the data `$CF:0000`-`$CF:E2FF`
+   (what reads it is not traced).
+
+8. Bank $CC code (branch match-cc-ff): `$CC:E000`-`$CC:F382` is matched in full. The battle
+   set-up: `Battle_InitUploadStep` (was `BattleCC_UnkE000`; the three staged VRAM uploads, run from
+   the JSL at `$CD:0AB4` through `$C1:000F`), `Battle_InitUploadObjTiles` with the unreached
+   `Battle_InitUploadObjTilesDead`, `Battle_InitScene` (was `BattleCC_UnkE2E4`: RAM start state,
+   names, tech lists, PC and enemy positions and sprite pointers, enemy kinds and name lines),
+   `Battle_InitSceneGfx` (was `BattleCC_UnkED87`: sprite records, tiles, OAM, colours, the
+   `!Battler_FrameDmaSrcA` words, then the upload wait), `Battle_ReencodeText`; the action helpers
+   `BattleAct_ResetState`, `ResetFxApplied`, `Battle_BuildOccupiedCellMap`,
+   `BattleAct_BuildBattlerList`, `StepPalettes`, `TickUnkA1A8` and `BattleAct_StepObjAnim`
+   (`$CC:F2A9`). Quirks recorded: the dead tail of `Battle_InitUploadObjTiles`; the unused
+   duration stride and the unbounded enemy-name lines in `Battle_InitScene`; the BRA to the next
+   instruction in `Battle_ReencodeText`; the 11-entry scan from slot 3 in
+   `Battle_BuildOccupiedCellMap`; the facing stored back into itself in `BattleAct_StepObjAnim`.
+   Merged with the bank-$CF batch (item 7), which reads much of what the set-up writes: the RAM
+   names were unified to one each (`!Battler_FrameDma*` was `!Battler_UnkA654`.., also
+   `!Battle_CursorGlowStep`, `!Battle_FrameCount8`, `!Battle_EnemyPartsOn`, `!Battle_PartsAnchor`,
+   `!Enemy_PartOfsX/Y`, `!Battler_SprBytes`, `!Battle_OamHighIdx`/`XBit`/`XClear`,
+   `!Battle_ActObjFrame`; bank $CF's `!Battle_Unk98CA` and `!Battle_MenuMem*` are now
+   `!Battle_InitUploadStage`, `Battle_SavedCursor` and `!Battle_SavedItemScroll`/`Row`).
+   Open: what most of the bytes set at set-up mean (`!Battle_Unk9842`, `!Battle_Unk9919`,
+   `!Battler_UnkA5C2`, `!Enemy_Unk988B`, `!Battle_Unk0B24`, `!Enemy_SprFlags` bits,
+   `!Battle_UnkE4`), which layers the VRAM uploads feed, the `!BattleRom_EnemyKindList` kinds other
+   than 3 and 4, why a large enemy's sprite rows cover the next enemy entries, and who reads
+   `!Battle_OamHighXClear` (bank $CF's sprite builder reads only `Idx`/`XBit`). The rest of bank $CC ($CC:0000-$DFFF,
+   $CC:F383 on) is data, still ROM bytes. Headers edited (back to review): EngCall_BattleMain,
+   BattleSys_SceneSetup, BankC1_LongDispatch, BankC1_JmlCCE000, BattleAct_OpLoopAnim,
+   BattleAct_OpResetSpeed; in the merge with the bank-$CF batch also BattleSys_RunService (the
+   service-0 note), BattleCF_EnterBattle (`!Battle_InitUploadStage`) and BattleCF_ExitBattle
+   (`Battle_SavedCursor`, `!Battle_SavedItemScroll`/`Row`).
+
+9. Bank $FF code (branch match-cc-ff): `$FF:F548`-`$FF:FC66` is matched (with the wave tables
+   already matched): `BankFF_BuildTileSets`, `BankFF_LoadE4Palette`, `BankFF_BuildScreenMap`,
+   `BankFF_StepWave`, `BankFF_WidenTiles`, `BankFF_UnkF813` (tech data for the menu),
+   `BankFF_UnkF958` (combo availability in `Menu_Unk04A4`), `BankFF_UnkF9C4` (save-slot check),
+   `BankFF_SaveSlot`, `BankFF_LoadSlot`, `BankFF_LoadSlotPart` (partial load with the starting
+   equipment put back; probably a new game from a save), `BankFF_SetSlotOfs`,
+   `BankFF_SlotChecksum`, `BankFF_BuildGradHdma`, and the tables between them
+   (`BankFF_ScreenMapTiles`, `BankFF_ScreenColoursA/B`, `BankFF_TechStepLimit`, `BankFF_CharBits`,
+   `BankFF_SaveRecords`, `BankFF_PartRecords`, `BankFF_EquipOffsets`, `BankFF_SlotSramOfs`,
+   `BankFF_GradValues`). Callers of most are unmatched bank-$C2 code, so their entry states are
+   read from the routines (hedged in the headers). Open: what the tile sets of
+   `BankFF_BuildTileSets` / `WidenTiles` and the `$7E:1640` bytes of `BankFF_UnkF813` show, the
+   `Menu_ItemInfo0` entries it marks, `BankFF_UnkF9C4` writing its result to `$0400` under
+   `Menu_CmdBootCheckSaves`, and which registers HDMA channel 1 feeds. Not matched: `$FF:F540`-
+   `$F547` (8 data bytes before the code) and `$FF:FC67`-`$FFFF` (unreached fragments of older
+   builds, by their look). Headers edited (back to review): Menu_CmdBootCheckSaves,
+   Menu_InitNewGameData, Menu_BuildItemTables, Menu_LoadSlotSummaries (the slot-layout note above
+   it).
 
 ## Tables
 
