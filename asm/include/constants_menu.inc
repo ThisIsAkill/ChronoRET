@@ -1509,4 +1509,38 @@ if !constants_menu_inc == 0
 !Menu_TechTargetsMap = $3662             ; tilemap address of the first target row
 !Menu_TechTargetRowBytes = $0100         ; 4 tile rows a target
 
+; --- Menu mode 4: the settings screen ---
+!MenuRom_Icon3List = $FFC19C             ; Menu_Icon3Preview's draw lists ...
+!MenuRom_Icon3ListB = $FFC1B9            ; ... (the second after a frame's wait)
+!MenuRom_Mode04List = $FFC1F6            ; Menu_Mode04Init's draw list
+!MenuRom_Icon3Pal = $FFCBE4              ; 24 colours -> $50-$67
+!MenuRom_CfgIcons = $FFD562              ; per entry 0-11: the first tile word of its 2 x 2 icon
+!Menu_CfgHdmaBits = $5D                  ; Menu_HdmaenShadow in mode 4 (not traced)
+!Menu_Icon3HdmaBits = $1C                ; ... on icon 3
+!Menu_SoundCmdF3 = $F3                   ; sound command sent with Menu_CfgA3 (probably stereo / mono)
+!Menu_PadSelect = $02                    ; Pad_Pressed bit 1: Select
+!Menu_CfgCLowRecFirst = $0C              ; cursor record of Menu_CfgCLow's value 0 (handler 3)
+!Menu_CfgEntrySub = $05                  ; the entry that opens entries 10-11 ...
+!Menu_CfgEntryALow = $0A                 ; ... and entry 10
+!Menu_CfgEntryMap = $08                  ; the button map switch's entry
+!Menu_CfgEntryMapRight = $03             ; where Right sends the cursor from it (map off)
+!Menu_CfgMapRecFirst = $0F               ; cursor record of map row 0
+!Menu_CfgMapButtonsEnd = $FF             ; end of Menu_CfgMapButtons
+!Menu_CfgStyleCursorXY = $3B38           ; cursor record 6's .X / .Y: $38 / $3B ...
+!Menu_CfgStyleEditXY = $3788             ; ... $88 / $37 while the style is edited
+!Menu_CfgBg3RowWord = $21FF              ; Menu_Icon3Preview's words for BG3 row 1 ...
+!Menu_CfgBg3Row1Bytes = $001C            ; ... 14 of them ...
+!Menu_CfgBg3RowEndWord = $21FB           ; ... and for its tiles 14-15
+!Menu_CfgUnk0D0E = $0189                 ; Menu_Unk0D0E in mode 4
+!Menu_CfgMarkTiles = $1530               ; the first tile word of the 0 mark (the 1 mark: + 4)
+!Menu_CfgShownBytes = $000A
+!Menu_CfgALowMap = $2EA6                 ; tilemap address of Menu_CfgALow's selector ...
+!Menu_CfgBMidMap = $2F66                 ; ... Menu_CfgBMid's ...
+!Menu_CfgStyleMap = $2FE6                ; ... and Menu_WinStyle's
+!Menu_CfgSelectorAttr = $0C08            ; Menu_SetAttr2Rows: 8 tiles, attribute byte $0C ...
+!Menu_CfgSelectedAttr = $0001            ; ... the chosen one's tile, 0
+!Menu_CfgCLowMap = $3064                 ; tilemap address of Menu_CfgCLow's row
+!Menu_CfgCLowAttr = $0C09                ; Menu_SetAttr2Rows: 9 tiles, $0C ...
+!Menu_CfgCLowLitAttr = $0003             ; ... the chosen value's 3 tiles, 0
+
 endif

@@ -1394,3 +1394,22 @@ endif
                                          ; open, zeroed when it closes
 !Menu_TechUseCost = $0F4F                ; 8-bit; the MP cost of the tech being used (Menu_Mode03H3), taken from
                                          ; the caster's MP after each use (Menu_Mode03H4)
+
+; --- Menu mode 4: the settings screen ---
+!Menu_CfgCursor = $0417                  ; 8-bit; mode 4's entry (cursor record 0-11), kept for the next visit (a
+                                         ; byte of Menu_Unk0415)
+!Menu_CfgPrevCursor = $007F              ; 8-bit; Menu_CfgCursor after the last Menu_CfgEntryRun (the Menu_Unk7F
+                                         ; byte)
+!Menu_CfgShown = $0F09                   ; 10 B: copy of Menu_CfgA3 ... Menu_CfgA7 for the marks
+                                         ; (Menu_CfgDrawToggles); bytes 4-6 are used as the three flags below
+!Menu_CfgCLowOpen = $0F0D                ; 8-bit; non-zero while handler 3 picks Menu_CfgCLow
+!Menu_CfgSubOpen = $0F0E                 ; 8-bit; 1 while the cursor is on entries 10-11 (opened from entry 5)
+!Menu_CfgStyleEdit = $0F0F               ; 8-bit; bit 0: entry 6 steps the window style (the cursor held)
+!Menu_CfgMapEdit = $0F00                 ; 9 B: the button map handler 2 edits (a copy of Menu_CfgButtonMap)
+!Menu_CfgButtonMap = $0408               ; 9 B: the button map Menu_CfgA4 selects (the Menu_Unk0408 bytes;
+                                         ; Menu_UnkC54F takes it for Menu_ButtonMap when Menu_CfgA4 is set)
+!Menu_CfgIconMap = $3446                 ; 2 x 2 tile words: the cursor entry's icon (Menu_CfgEntryIcon)
+!Menu_CfgBg3Row1 = $4E44                 ; Menu_Bg3TileBuf+$44: row 1, tile 2 of a 32-tile map ...
+!Menu_CfgBg3RowEnd = $4E5C               ; ... and its tiles 14-15
+!Menu_Unk0DCE = $0DCE                    ; 8-bit; Menu_CfgEntryIcon's entry (Menu_UnkF943 reads it, not analysed)
+!Menu_Unk0DCF = $0DCF                    ; 8-bit; the entry's value + Menu_CfgEntryStrBase (likewise)
