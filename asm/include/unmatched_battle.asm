@@ -8,132 +8,30 @@
 ; the comment says what the call site expects.
 ; ============================================================
 
-; --- Bank $C1 (battle engine, not matched yet) ---
-
-org $C10045
-BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
-                                        ; $C1:0051 (also reached through JMP at $C1:0003)
-
-org $C10003
-BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
-org $C10006
-BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
-; --- Enemy script target handlers (BattleAi_TargetTable at $C1:B8BB-$C1:B92C;
-;     not analysed) ---
-org $C1A3F6
-BattleAi_Target00:                      ; BattleAi_TargetTable entry $00
-org $C1A3F7
-BattleAi_Target01:                      ; BattleAi_TargetTable entry $01
-org $C1A411
-BattleAi_Target02:                      ; BattleAi_TargetTable entry $02
-org $C1A42E
-BattleAi_Target03:                      ; BattleAi_TargetTable entry $03
-org $C1A43D
-BattleAi_Target04:                      ; BattleAi_TargetTable entry $04
-org $C1A452
-BattleAi_Target05:                      ; BattleAi_TargetTable entry $05
-org $C1A4AF
-BattleAi_Target06:                      ; BattleAi_TargetTable entry $06
-org $C1A4E0
-BattleAi_Target07:                      ; BattleAi_TargetTable entry $07
-org $C1A508
-BattleAi_Target08:                      ; BattleAi_TargetTable entry $08
-org $C1A541
-BattleAi_Target09:                      ; BattleAi_TargetTable entry $09
-org $C1A54B
-BattleAi_Target0A:                      ; BattleAi_TargetTable entry $0A
-org $C1A555
-BattleAi_Target0B:                      ; BattleAi_TargetTable entry $0B
-org $C1A55F
-BattleAi_Target0C:                      ; BattleAi_TargetTable entry $0C
-org $C1A569
-BattleAi_Target0D:                      ; BattleAi_TargetTable entry $0D
-org $C1A573
-BattleAi_Target0E:                      ; BattleAi_TargetTable entry $0E
-org $C1A5A3
-BattleAi_Target0F:                      ; BattleAi_TargetTable entry $0F
-org $C1A5D3
-BattleAi_Target10:                      ; BattleAi_TargetTable entry $10
-org $C1A603
-BattleAi_Target11:                      ; BattleAi_TargetTable entry $11
-org $C1A633
-BattleAi_Target12:                      ; BattleAi_TargetTable entry $12
-org $C1A663
-BattleAi_Target13:                      ; BattleAi_TargetTable entry $13
-org $C1A693
-BattleAi_Target14:                      ; BattleAi_TargetTable entry $14
-org $C1A6C3
-BattleAi_Target15:                      ; BattleAi_TargetTable entry $15
-org $C1A6ED
-BattleAi_Target16:                      ; BattleAi_TargetTable entry $16
-org $C1A709
-BattleAi_Target17:                      ; BattleAi_TargetTable entry $17
-org $C1A737
-BattleAi_Target18:                      ; BattleAi_TargetTable entry $18
-org $C1A765
-BattleAi_Target19:                      ; BattleAi_TargetTable entry $19
-org $C1A7A9
-BattleAi_Target1A:                      ; BattleAi_TargetTable entry $1A
-org $C1A7E5
-BattleAi_Target1B:                      ; BattleAi_TargetTable entry $1B
-org $C1A819
-BattleAi_Target1C:                      ; BattleAi_TargetTable entry $1C
-org $C1A855
-BattleAi_Target1D:                      ; BattleAi_TargetTable entry $1D
-org $C1A889
-BattleAi_Target1E:                      ; BattleAi_TargetTable entry $1E
-org $C1A8C5
-BattleAi_Target1F:                      ; BattleAi_TargetTable entry $1F
-org $C1A8F9
-BattleAi_Target20:                      ; BattleAi_TargetTable entry $20
-org $C1A935
-BattleAi_Target21:                      ; BattleAi_TargetTable entry $21
-org $C1A971
-BattleAi_Target22:                      ; BattleAi_TargetTable entry $22
-org $C1A9AD
-BattleAi_Target23:                      ; BattleAi_TargetTable entry $23
-org $C1A9E9
-BattleAi_Target24:                      ; BattleAi_TargetTable entry $24
-org $C1AA25
-BattleAi_Target25:                      ; BattleAi_TargetTable entry $25
-org $C1AA61
-BattleAi_Target26:                      ; BattleAi_TargetTable entry $26
-org $C1AAAB
-BattleAi_Target27:                      ; BattleAi_TargetTable entry $27
-org $C1AAB6
-BattleAi_Target28:                      ; BattleAi_TargetTable entry $28
-org $C1AAC1
-BattleAi_Target29:                      ; BattleAi_TargetTable entry $29
-org $C1AACC
-BattleAi_Target2A:                      ; BattleAi_TargetTable entry $2A
-org $C1AAD7
-BattleAi_Target2B:                      ; BattleAi_TargetTable entry $2B
-org $C1AAE2
-BattleAi_Target2C:                      ; BattleAi_TargetTable entry $2C
-org $C1AAED
-BattleAi_Target2D:                      ; BattleAi_TargetTable entry $2D
-org $C1AAF8
-BattleAi_Target2E:                      ; BattleAi_TargetTable entry $2E
-org $C1AB03
-BattleAi_Target2F:                      ; BattleAi_TargetTable entry $2F
-org $C1AB4E
-BattleAi_Target30:                      ; BattleAi_TargetTable entry $30
-org $C1AB59
-BattleAi_Target31:                      ; BattleAi_TargetTable entry $31
-org $C1AB64
-BattleAi_Target32:                      ; BattleAi_TargetTable entry $32
-org $C1AB6F
-BattleAi_Target33:                      ; BattleAi_TargetTable entry $33
-org $C1AB7A
-BattleAi_Target34:                      ; BattleAi_TargetTable entry $34
-org $C1AB85
-BattleAi_Target35:                      ; BattleAi_TargetTable entry $35
-org $C1AB90
-BattleAi_Target36:                      ; BattleAi_TargetTable entry $36
-org $C1AB9B
-BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
-org $C1ABC9
-BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
+; --- Long targets of bank $C1's entry block and service 0 (EngCall_BattleMain,
+;     BattleSys_SceneSetup, BattleSys_Service6; none analysed) ---
+org $CFFB65
+BattleCF_EnterBattle:                   ; JML from $C1:001B: clears battle RAM and JMLs to $C1:8000
+org $CFFBE5
+BattleCF_UnkFBE5:                       ; JML from $C1:001F (BattleSys_ExitVec's way out of the battle)
+org $CFE300
+BattleCF_UnkE300:                       ; JML from $C1:0076 (vector $C1:0009)
+org $CFE58A
+BattleCF_UnkE58A:                       ; JML from $C1:007A (vector $C1:000C)
+org $CCE000
+BattleCC_UnkE000:                       ; JML from $C1:0072 (vector $C1:000F)
+org $CFFE20
+BattleCF_UnkFE20:                       ; JSL from BattleSys_Service6
+org $CCE2E4
+BattleCC_UnkE2E4:                       ; JSL from BattleSys_SceneSetup (first step)
+org $CCED87
+BattleCC_UnkED87:                       ; JSL from BattleSys_SceneSetup
+org $CD0003
+BattleSys_VecCD0003:                    ; JSL vector (JMP $CD:0399) from BattleSys_SceneSetup
+org $CD000C
+BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleSys_SceneSetup
+org $CD0012
+BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
 
 ; --- Bank $C7 (audio) ---
 
@@ -208,16 +106,6 @@ BattleMsg_UnkVecCD0033:                 ; JSL vector (JMP $CD:0295): A = a non-z
 org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
                                         ; after a tech, A = 3 or $0D; not analysed
-
-; --- Bank $FD (called from BattleSys_UnkB575 and BattleSys_UnkB967; not analysed) ---
-
-org $FDA8A5
-BattleFD_UnkA8A5:                       ; JSL from BattleSys_UnkB967, A = a PC slot taking part; leaves !Battle_UnkB3EA
-org $FDA93C
-BattleFD_UnkA93C:                       ; JSL from BattleSys_UnkB967 when !Battle_UnkB3EA is non-zero
-org $FDA95F
-BattleFD_UnkA95F:                       ; JSL from BattleSys_UnkB575 after it set !Battle_CmdPcs
-
 
 ; --- Bank $CF (battle support) ---
 

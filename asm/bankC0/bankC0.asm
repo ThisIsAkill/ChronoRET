@@ -5309,7 +5309,8 @@ Oam_UploadShadow:
 ;   a wait for H-blank (HVBJOY bit 6), INIDISP = FORCED_BLANK, HDMAEN =
 ;   0, and by Field_Unk53 bit 0 (Field_Unk53Phase, which
 ;   EngFD_UnkC2C1 flips each frame): clear, Irq_UploadTileAnim; set,
-;   FdVec_FFFD (bank $FD, unmatched). So the tile writes happen every
+;   FdVec_FFFD (FieldFD_UploadTileAnims, the FieldAnimA tiles). So the
+;   tile writes happen every
 ;   other frame. The RTS after the RTI ($ED14) is never reached.
 ; Callers note: entered only as the IRQ (IrqTrampoline).
 ; On entry: any state (an interrupt): it sets REP #$30 and then M=1;
@@ -5916,8 +5917,9 @@ Irq_ChoiceCursorClearRow0:
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
 ;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
 ; Callers (8 sites: 6 JML, 2 BRL): Field_SceneChangeTick (BRL $C0:0CC4), Evt_OpE1_WarpNow (BRL
-;   $C0:3B95), C2Scene_Mode2 (JML $C2:2505), Menu_ExitRestart (JML $C2:8349) and unmatched (JML
-;   $FD:DA5B, JML $FD:DABA, JML $FD:DB19, JML $FD:DB93).
+;   $C0:3B95), C2Scene_Mode2 (JML $C2:2505), Menu_ExitRestart (JML $C2:8349), M7Scene_Run80 (JML
+;   $FD:DA5B), M7Scene_Run81 (JML $FD:DABA), M7Scene_Run82 (JML $FD:DB19) and M7Scene_Run83 (JML
+;   $FD:DB93).
 ; Entry: each entry only branches, so the state is the target's: [0] as
 ;        GameLoop_Main expects (it sets DB itself); [1]-[4] the JSL
 ;        caller's state, passed through unchanged.
@@ -6149,9 +6151,9 @@ Field_IdleFrame:
 ; NOT called per frame — only when entering a new location/map.
 ; Callers (1 JSR site): GameLoop_LoadField ($C0:0088).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
-; Exit: M=1, X=0, DP=$0100 as far as is known: the ten steps keep them,
-; the two bank-$FD vectors are unmatched, and GameLoop_LoadField carries
-; on without resetting any of them.
+; Exit: M=1, X=0, DP=$0100: the ten steps keep them, the two bank-$FD
+; vectors (FieldFD_LoadAnimSetA/B) restore P, DP and DB, and
+; GameLoop_LoadField carries on without resetting any of them.
 ; A, X and Y are not saved.
 ; ============================================================
 LoadLocation:
@@ -13755,8 +13757,8 @@ Evt_OpFE_WinQuad:
 ;     Field_SceneChangeTick's fade does) unless it is already dark, then
 ;     InitHW, S = StackTop and a JML with A = sub (B = 0): sub $00-$7F to
 ;     BankC3_Entry0000, $80 to FdVec_FFF1, $81 to FdVec_FFEB, $82 to
-;     FdVec_FFE8, $83-$8F to FdVec_FFE5 (bank $FD vectors, unmatched).
-;     Never returns.
+;     FdVec_FFE8, $83-$8F to FdVec_FFE5 (bank $FD vectors to the Mode 7
+;     scene, M7Scene_Run80/81/82/83). Never returns.
 ;   - else: JSR to entry sub - $90 of Evt_OpFFTable (with Y = the
 ;     opcode's offset), then C=0; the sub-handler sets X. sub is not
 ;     bounded: past $A3 the JSR would read beyond the table.

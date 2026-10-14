@@ -975,7 +975,7 @@ if !constants_menu_inc == 0
 
 ; --- Menu mode 0 ---
 !Menu_SubThreads = $74                   ; Menu_KillThreads mask: slots 2, 4, 5, 6
-!MenuRom_MainConfirmList = $FFBD51       ; Menu_UnkED31 lists of the main menu
+!MenuRom_MainConfirmList = $FFBD51       ; Menu_RunDrawList lists of the main menu
 !MenuRom_MainIconList = $FFBD2E
 !MenuRom_MainIconOam = $FFBD5C           ; 6 OAM entries: the icons
 !MenuRom_MainPalA = $FFCC14              ; 8 colours -> $80-$87
@@ -1023,8 +1023,167 @@ if !constants_menu_inc == 0
 !Menu_BoostFlagsMask = $FFFE
 
 ; --- List paging ---
-!Menu_PadPageBits = $03                  ; Menu_PadAction bits 0-1: page on / back (set by Menu_UnkE984)
+!Menu_PadPageBits = $03                  ; Menu_PadAction bits 0-1: page on / back (set by Menu_PadInput)
 !Menu_PadPageBack = $02
+!Menu_PadPageOn = $01
+!Menu_PadConfirm = $80                   ; Menu_PadAction bit 7 (Menu_ButtonMap entry 0)
+!Menu_PadCancel = $40                    ; Menu_PadAction bit 6 (entry 1, or Menu_Unk83)
+!Menu_PadActionButtonCount = 2           ; Menu_PadActionButtons entries Menu_PadInput reads
+!Menu_ButtonPageBack = 6                 ; Menu_ButtonMap entry of Menu_PadPageBack
+!Menu_ButtonPageOn = 7                   ; ... and of Menu_PadPageOn
+!Menu_CursorNoDir = $80                  ; Menu_CursorDir: no direction
+!Menu_DirCount = 4                       ; D-pad bits Menu_CursorMove tests
+!Menu_CursorEdge = $80                   ; Menu_CursorPos neighbour / Menu_CursorDpad bit 7: an edge
+!Menu_SoundCursor = $00                  ; Menu_PlaySound0's id (probably the cursor sound)
+!Menu_SoundRefuse = $01                  ; Menu_PlaySound1's id (probably the refusal sound)
+!Menu_SoundPendBit1 = $02                ; Menu_Unk0DBC bit 1: sound Menu_SoundPend1
+!Menu_SoundPendBit0 = $01                ; Menu_Unk0DBC bit 0: sound Menu_SoundPend0
+!Menu_SoundPend1 = $06
+!Menu_SoundPend0 = $07
+!Menu_SoundGap = 3                       ; Menu_NmiTimer frames after a sound before the next is sent
+!Menu_ByteInvert = $FF                   ; EOR mask: n becomes -n - 1
+!Menu_ScrollRowLines = $0C               ; lines of the added Menu_ScrollTable entries
+!Menu_ScrollLastAdd = $0004              ; value step Menu_ListScrollInit gives the added entries
+!Menu_ScrollStepDown = $0003             ; Menu_ScrollStep values
+!Menu_ScrollStepUp = $FFFD
+!Menu_ScrollFrameCount = 4               ; Menu_ScrollFrames; Menu_PadRepeatTimer 5 is lowered to it
+!Menu_PortraitRows = 6                   ; Menu_DrawPortrait: 6 rows of 6 tiles
+!Menu_PortraitCharMask = $0007           ; MenuRom_PortraitPals has 8 entries
+!Menu_AttrPalMask = $001C                ; attribute byte bits 2-4: the palette
+!Menu_AttrKeepMask = $0F                 ; attribute bits Menu_SetRowAttr keeps
+!Menu_SlotWinAttrLow = $03               ; Menu_Unk0D47 high byte bits 0-1 Menu_LoadSlotWindowStyle sets
+!MenuRom_PortraitTiles = $FFCE70         ; 8 B: first tile per Menu_PortraitChar ($01 + 36 n; entry 7 = $01)
+!MenuRom_PortraitPals = $FFCE78          ; 8 words: bank-$FF address of 16 colours per entry
 !Menu_Unk81Set = $FF
+
+; --- Draw lists, windows, strings and numbers ---
+!MenuRom_DrawArgLens = $FFBD18           ; per command byte: argument bytes - 1 (Menu_RunDrawList)
+!MenuRom_DrawArgLensAbs = !MenuRom_DrawArgLens&$FFFF ; the same as an absolute address (read with DB=$FF)
+!Menu_LowNibble = $0F                    ; AND mask: a digit's low nibble
+!MenuRom_StringPtrs = $FFC457            ; words: bank-$FF string addresses (Menu_DrawCmdString)
+!MenuRom_NumLimits = $FFCF33             ; bytes: Menu_TextNumberOrBar's limits ($63, $10, $63 ...)
+!MenuRom_DescStrTable = $CC2EB1          ; string table Menu_DrawDescText gives the text-window decoder
+!MenuRom_ItemNameBank = $CC              ; bank of the Menu_ItemNamePtrs strings
+!Menu_ItemNameLen = $0B                  ; their length (Menu_DrawString's count)
+!Menu_PosRowMask = $FF00                 ; Menu_DrawArg2: the row
+!Menu_PosColMask = $001F                 ; Menu_DrawArg2: the column
+!Menu_WinWidthMask = $001F               ; Menu_DrawArg4 bits used as a width
+!Menu_WinHeightMask = $003F              ; Menu_DrawArg5 bits used as a height
+!Menu_FrameCornerBits = $0003            ; frame tile bits: t OR 3 is the corner, EOR 3 the other side pair
+!Menu_WinInsideOfs = $0042               ; one row down and one tile right
+!Menu_WinFillColMask = $0003             ; Menu_WinFillPattern column bits
+!Menu_WinFillRewind = $0008              ; 4 tiles back: the pattern row to copy on
+!Menu_WinFillRowStep = $0004             ; Menu_FillPatRow step ...
+!Menu_WinFillRowMask = $000C             ; ... and its bits (4 rows)
+!Menu_TextCountMask = $7F                ; Menu_TextFlags bits that are the count
+!Menu_TextAttrClear = $DC                ; Menu_TextAttr bits cleared after a string (palette, flips, bit 3)
+!Menu_TextFirstTile = $10                ; string bytes below this (and above 0) are control codes
+!Menu_BlankTile = $FF                    ; the tile put for blanks (padding, leading zeros)
+!Menu_TextNameLen = 5                    ; Menu_TextName's tiles
+!Menu_TextNameFlags = $8005              ; Menu_TextLeft/Flags meanwhile: 5 tiles, one row
+!Menu_BarTile = $2F                      ; Menu_TextNumberOrBar's tile at or above the limit
+!Menu_NumFlags2Digits = $11              ; Menu_DrawNumber flags: 1 byte, 2 digits, zeros blanked
+!Menu_NumBytesMask = $03                 ; Menu_DrawNumber flags bits 0-1: the byte count
+!Menu_NumShowZeros = $80                 ; flags bit 7: show leading zeros (Menu_NumFlags gets it inverted)
+!Menu_NumDigitsMask = $07                ; flags bits 4-6 (shifted down): digits - 1
+!Menu_NumBlankZeroOnes = $08             ; Menu_NumFlags bit 3: a zero ones digit stays blank
+!Menu_DigitTile0 = $D4                   ; tile of digit 0 (1-9 follow)
+!Menu_ClockMaxHours = 99                 ; Menu_DrawClock once the play time maxed out
+!Menu_ClockMaxMins = 59
+!Menu_ClockNumFlags = $91                ; 1 byte, 2 digits, leading zeros shown
+!Menu_AttrByteMask = $FF00               ; the attribute byte of a tile word
+!Menu_ClockColonTile = $002D             ; the tile between hours and minutes (probably a colon)
+!Menu_DescTextDest = $4E84               ; Menu_DrawDescText's settings
+!Menu_DescUnk0DCC = $6840
+!Menu_DescUnk0DD0 = $0080
+!Menu_MapRecMask = $00F0                 ; Menu_DrawCmdMapRec: record address bits ...
+!Menu_MapRecBase = $9000                 ; ... x 8 + this: the record's tilemap buffer
+
+; --- Sprite placement ---
+!Menu_SprTileCountMask = $000F           ; Menu_Spr.TileCount bits Menu_SprPlaceOam uses
+!Menu_SprHiFirstBit = $01                ; the first sprite's X-high bit in its high-table byte
+!Menu_SprTileRowBit = $10                ; tile bit 4: set then cleared to step 16x16 tiles in a 16-wide sheet
+
+; --- Main menu icon 0 and the member list ---
+!MenuRom_Icon0List = $FFBD74             ; Menu_Icon0Preview's draw list
+!Menu_Icon0BlankTile = $61FF             ; tile word Menu_Icon0Preview fills Menu_Unk5D42's row with
+!Menu_Icon0RowBytes = 24                 ; bytes in each of the two 12-tile rows it fills
+!Menu_Icon0HdmaBits = $64                ; Menu_HdmaenShadow on icon 0 (channels 2, 5, 6; not traced)
+!Menu_Mode01HdmaBits = $65               ; ... in mode 1 (and channel 0)
+!MenuRom_Icon0Pal = $FFCBAC              ; 4 colours -> $24-$27
+!MenuRom_Icon0RedrawPal = $FFCBC4        ; 8 colours -> $70-$77
+!MenuRom_Mode01Pal = $FF9C70             ; 4 colours -> $70-$73 and $74-$77
+!MenuRom_Mode01List = $FFBDCD            ; Menu_Mode01Init's draw list
+!Menu_HalfColourMask = $3DEF             ; a colour >> 1 without the bits shifted in from the next channel
+!Menu_Unk3600Bytes = $0800
+!Menu_MemberRowLines = 12                ; lines per member row (list arrows)
+!Menu_MemberArrowSpan = $7400            ; dividend of Menu_MemberArrows' arrow factors
+!Menu_MemberArrowXY = $1268              ; Menu_ArrowX $68, Menu_ArrowY $12
+!Menu_MemberMapFirst = $2E00             ; tilemap address of the first member row
+!Menu_MemberRowBytes = $0180             ; 6 tilemap rows per member
+!Menu_MemberMapEnd = $3280               ; past the third row
+!MenuRom_MemberRowList = $FFBE0E         ; draw list of a member row
+!MenuRom_EmptyRowList = $FFBE15          ; ... of an empty one
+!MenuRom_StatusList = $FFBE1C            ; Menu_DrawMemberStatus's draw list
+!Menu_Unk0D5DSet = $0004
+!Menu_Unk0D4DBit = $0020
+!Menu_StatusUnkMap = $30A2               ; X for Menu_UnkA6F0 (a tilemap address)
+!Menu_StatusPortraitAttr = $0E           ; the portrait's attribute byte (palette 3)
+!Menu_StatusPortraitMap = $2EDE          ; tilemap address of the portrait
+!MenuRom_CharIconTiles = $FFCE88         ; words by Menu_CharIconIndex: first tile word of the icon
+!MenuRom_CharIconPals = $FFCE92          ; words by Menu_CharIconIndex: bank-$FF address of 16 colours
+
+; --- Menu mode 1 ---
+!Menu_Unk84None = $FF
+!Menu_SoundEquip = $B5                   ; Menu_Mode01H3's sound on a confirm (probably the equip sound)
+!Menu_ArrowsThreadBit = $10              ; Menu_KillThreads mask: slot 4 (Menu_ListArrowsThread)
+!Menu_Unk7F00B4Count = 6
+!Menu_RowCopyUp = $2602                  ; Menu_RowCopyPos: column 2, row $26 (below the list)
+!Menu_RowCopyDown = $2002                ; ... row $20
+!Menu_RowCopySwap = $0600                ; EOR: the other of the two
+!Menu_MemberMapAbove = $3580             ; where the row scrolling in is drawn: going up ...
+!Menu_MemberMapBelow = $3A00             ; ... going down
+!Menu_MemberScrollUp = $FFFC             ; Menu_ScrollStep values
+!Menu_MemberScrollDown = $0004
+!Menu_RowScrollUpInit = $611F            ; Menu_RowScrollWord's start values
+!Menu_RowScrollDownInit = $60EF
+!Menu_MemberScrollFrames = $000C
+!Menu_MemberRowAttrOfs = $0084           ; a member row's first tile from its map address (row 2, column 2)
+!Menu_MemberAttrFirst = $2E84            ; the first row's, in the BG1 map
+!Menu_MemberRowDimAttr = $100C           ; Menu_SetMemberRowAttr's Y: 12 tiles, attribute bit 4 ...
+!Menu_MemberRowLitAttr = $000C           ; ... or none
+!Menu_MemberRowRows = $0006              ; tile rows per member row
+!Menu_MemberBlockPos = $0202             ; the list's block: column 2, row 2 ...
+!Menu_MemberBlockSize = $120C            ; ... 12 tiles by 18 rows
+!Menu_EquipHdmaBits = $4D                ; Menu_HdmaenShadow in handler 2 (not traced)
+!Menu_EquipListFirstRec = 4              ; Menu_CursorPos record of the item list's first row
+!Menu_EquipHdmaTable = $9303             ; the table Menu_EquipItemIdle scrolls (NMI move destination)
+!Menu_EquipHdmaBytes = $0025
+!Menu_EquipListRows = 9
+!Menu_EquipNewItemMap = $53C6            ; tilemap address the incoming item is drawn at
+!Menu_ItemListShift = $0080              ; two tile rows: one item
+!Menu_ItemListBytes = $0400
+
+; --- Menu mode 1: slots and item list set-up ---
+!MenuRom_SlotsCloseList = $FFBDEF        ; draw list of Menu_EquipSlotsClose
+!MenuRom_SlotsOpenList = $FFBE6D         ; ... of Menu_EquipSlotsOpen
+!MenuRom_ItemsOpenList = $FFBEEC         ; ... of Menu_EquipItemsOpen
+!Menu_Mode01HdmaTable = $9300            ; the NMI move's destination in mode 1 (an HDMA table, probably)
+!Menu_Mode01HdmaBytesA = $0013           ; its size with the member list ...
+!Menu_Mode01HdmaBytesB = $0025           ; ... and with the slot and item lists
+!Menu_SlotsBlankTile = $40FF
+!Menu_SlotsHdmaBits = $C5                ; Menu_HdmaenShadow in handler 2's set-up (not traced)
+!Menu_ItemsHdmaBits = $DF                ; ... in handler 3's
+!Menu_SlotNameMap = $3086                ; where Menu_DrawSlotName draws
+!Menu_SlotNameLen = $0A                  ; 10 tiles, two-row text
+!Menu_SlotNameRows = $3040               ; the two tile rows it copies ...
+!Menu_SlotNameCopyOfs = $0800            ; ... this far on
+!Menu_SlotRowsMap = $3062                ; the first slot row
+!Menu_SlotRowDimAttr = $1C0B             ; Menu_SetAttr2Rows' A: 11 tiles, attribute $1C (palette 7) ...
+!Menu_SlotRowLitAttr = $000B             ; ... or 0 (the selected slot)
+!Menu_ItemsArrowXY = $4268               ; Menu_ArrowX $68, Menu_ArrowY $42
+!Menu_RefreshArrowXY = $6268             ; Menu_ArrowX $68, Menu_ArrowY $62
+!Menu_EquipArrowSpan = $1500             ; dividend of the item list's arrow factors
+!Menu_EquipPageRows = 8                  ; item list rows per page
 
 endif

@@ -473,7 +473,7 @@ struct Menu_VramRec $0000
 .Src:       skip 2     ; source address
 .SrcBank:   skip 1     ; its bank
 .Size:      skip 2     ; byte count
-            skip 1
+.Unk7:      skip 1     ; set to $7E by Menu_DrawCmdMapRec (use not traced)
 endstruct
 
 ; The inventory and the current character (Menu_AddItem ... Menu_LoadCharRec).
@@ -545,13 +545,48 @@ endstruct
 !Menu_BlinkMask = $0DA6                  ; 8-bit; Menu_CursorBlinkMasked's timer mask (Menu_StartCursorC: $FC)
 !Menu_Unk0DA8 = $0DA8                    ; 8-bit; see Menu_CursorThreadB
 
-; A cursor position record (6 bytes; Menu_CursorRecOffset); only X and Y
-; are read here.
+; A cursor position record (6 bytes; Menu_CursorRecOffset): the cursor's
+; X and Y, and the record Menu_CursorMove goes to per D-pad direction
+; (bit 7 set: an edge of the list, Menu_CursorEdge).
 struct Menu_CursorPos $9380
 .X:         skip 1
 .Y:         skip 1
-            skip 4
+.Up:        skip 1
+.Down:      skip 1
+.Left:      skip 1
+.Right:     skip 1
 endstruct align 6
+
+; --- Pad input and cursor movement (Menu_PadInput, Menu_CursorMove) ---
+!Menu_CursorMovedFrom = $0055            ; 8-bit; Menu_CursorSel before the last D-pad move (Menu_CursorMove)
+!Menu_ListMaxTop = $0057                 ; 8-bit; Menu_ListPageSetup's largest top row (0: the list fits its
+                                         ; page); Menu_ListCursorEdge tests it (Menu_Setup's word zeroing of
+                                         ; Menu_Unk56 covers it)
+!Menu_CursorDpad = $005A                 ; 8-bit; Menu_PadRepeat's D-pad bits at the last Menu_CursorMove
+                                         ; (Up, Down, Left, Right = bits 3-0); bit 7 set when that move hit
+                                         ; an edge (Menu_CursorToUp)
+!Menu_CursorDir = $0D1E                  ; 8-bit; the direction Menu_CursorMove found (0 Right, 1 Left, 2 Down,
+                                         ; 3 Up), $80 for none
+!Menu_CursorHold = $0D1F                 ; 8-bit; non-zero: Menu_CursorMove makes no move (it then zeroes it;
+                                         ; writer not traced)
+!Menu_Unk0DBC = $0DBC                    ; 8-bit; bits 1 and 0: sounds 6 and 7 for Menu_PlayPendingSound
+                                         ; (writer not traced)
+
+; --- List smooth scroll (Menu_ListScrollInit, Menu_ListScrollStep) ---
+!Menu_ScrollStep = $0D22                 ; 16-bit; lines added to Menu_ScrollOfs per frame (3 or -3 in the item lists, 4 or -4 in the member list)
+!Menu_ScrollFrames = $0D24               ; 16-bit; frames of the scroll (set to 4)
+!Menu_ScrollEntry = $0DA9                ; 8-bit byte offset in Menu_ScrollTable of the first entry built
+!Menu_ScrollRows = $0DAA                 ; 8-bit; entries of the table that scroll (set by the caller)
+!Menu_ScrollOfs = $0DAB                  ; 16-bit signed; lines scrolled so far (stepped by the callers)
+!Menu_ScrollBuild = $969A                ; the table Menu_ListScrollStep builds; Menu_NmiMoveSrc
+!Menu_ScrollSaved = $9710                ; a copy of the whole live table (Menu_ListScrollInit)
+!Menu_ScrollTable = $9790                ; 3-byte entries (line count, 16-bit value): an added row, then the
+                                         ; first Menu_ScrollRows live entries
+
+; --- Portraits and tilemap helpers ---
+!Menu_PortraitChar = $0D46               ; 8-bit; Menu_DrawPortrait's index (probably a character id)
+!Menu_MapPtr = $0061                     ; 16-bit; tilemap write address of the map helpers
+                                         ; (Menu_DrawPortrait, Menu_SetRowsAttr ...; = Menu_SumPtr)
 
 ; One thread slot of Menu_RunThreads: 8 slots of 8 bytes at $00B0-$00EF.
 struct Menu_Thread $00B0
@@ -969,9 +1004,10 @@ endstruct
                                          ; to 1 once, then clears it
 !Menu_RepeatStage = $19                  ; 8-bit index into Menu_RepeatDelays (1 after a release, 0
                                          ; after the first repeat); handled as a word by Menu_NmiPad
-!Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0 (who sets it not traced)
-!Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here (use not
-                                         ; traced)
+!Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0; Menu_SendSound sets it to 3 and
+                                         ; sends no sound while it runs
+!Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here; non-zero:
+                                         ; Menu_PadInput sets the cancel bit every call
 !Menu_NmiSavedSp = $1DFE                 ; 16-bit S at the menu NMI's entry
 !Menu_NmiStackTop = $1DFD                ; the menu NMI's own stack
 !Menu_ButtonMap1Long = $7E2994          ; Menu_ButtonMap+1 as a long address (Menu_NmiPad)
@@ -1012,7 +1048,8 @@ endstruct
                                          ; BankFF_CharBits; inferred from Menu_CanEquip)
 !Menu_ItemInfo4 = $7B00                  ; 242 B: record A byte 4 below category 3; for category 3 record
                                          ; B byte 2 when its byte 1 has bit 6, else 0; 0 from category 4
-!Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id (probably name offsets; not traced)
+!Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id: bank-$CC addresses of 11-byte strings
+                                         ; (Menu_ItemNamePtr; probably the item names)
 !Menu_GoldCopy = $9D96                   ; 3 B: copy of Menu_Unk2C53 (Menu_BuildItemTables)
 
 ; --- Menu sprite objects (Menu_InitSprites ... Menu_SprUploadTiles) ---
@@ -1021,7 +1058,8 @@ endstruct
                                          ; Menu_ReadSlotSummary calls Menu_SumPlace)
 !Menu_Tmp06 = $0006                      ; 16-bit scratch (absolute)
 !Menu_Unk0D2C = $0D2C                    ; 16-bit; Menu_Times64's last result
-!Menu_Unk0D2E = $0D2E                    ; 16-bit; zeroed by Menu_StartSprThread; use not traced
+!Menu_Unk0D2E = $0D2E                    ; 16-bit; zeroed by Menu_StartSprThread; added to every object's X
+                                         ; (Menu_SprPlaceOam)
 !Menu_Unk0D30 = $0D30                    ; 16-bit; likewise
 !Menu_Unk0D72 = $0D72                    ; 16-bit; bit 7 and Menu_SprUploads (its high byte) pick the
                                          ; WRAM tile buffer of Menu_SprUploadTiles
@@ -1042,14 +1080,15 @@ struct Menu_Spr $0000
 .FramePtr:      skip 3  ; 24-bit: the frame records
 .AnimFrames:    skip 2  ; bank-$E4 address of its animations' frame lists
 .AnimTimes:     skip 2  ; ... and time lists
-                skip 3
+.ScreenY:       skip 1  ; the sprites' base Y (Menu_SprPlaceOam)
+.ScreenX:       skip 2  ; ... and X (16-bit: bit 8 goes to the OAM high table)
 .Anim:          skip 1  ; animation (bits 0-6); bit 7: loop to .LoopFrame at the end
 .PrevAnim:      skip 1
 .Timer:         skip 1  ; frames left on this frame
 .AnimLen:       skip 2  ; entries per direction
 .Frame:         skip 1  ; index in the lists
 .Dir:           skip 1  ; 0-3: which quarter of the frame list
-.Flags18:       skip 1  ; bit 7: not animated; non-zero: Menu_UnkF871 not called
+.Flags18:       skip 1  ; bit 7: not animated; non-zero: Menu_SprPlaceOam not called
 .TileAttr:      skip 2  ; OAM tile (bits 0-8) and attributes (palette bits 9-11)
 .FrameListPtr:  skip 3  ; 24-bit (bank $E4) pointer to the frame numbers
 .TimeListPtr:   skip 3  ; ... and to the times
@@ -1073,7 +1112,8 @@ endstruct
 !Menu_PageMax = $0DDA                    ; 8-bit; the largest top row
 !Menu_PageCursorFirst = $0DDB            ; 8-bit; Menu_CursorSel when paging back past the start
 !Menu_PageCursorLast = $0DDC             ; 8-bit; ... and on past the end
-!Menu_Unk81 = $0081                      ; 8-bit; set to $FF when the page changes (use not traced)
+!Menu_Unk81 = $0081                      ; 8-bit; set to $FF when the page changes; Menu_CursorMove stores
+                                         ; Menu_CursorSel here before moving (handlers compare the two)
 
 ; --- Menu mode 0: the main menu ---
 !Menu_MainSel = $0411                    ; 8-bit; the main menu's icon (0-5); mode = it + 1 on confirm
@@ -1084,7 +1124,7 @@ endstruct
 !Menu_Unk041A = $041A
 !Menu_Unk7F = $007F                      ; 8-bit; zeroed by the main menu (use not traced)
 !Menu_UnkAF = $00AF                      ; 8-bit; likewise
-!Menu_PadAction = $0D1D                  ; 8-bit; bit 7 confirm, bit 6 cancel (set by Menu_UnkE984)
+!Menu_PadAction = $0D1D                  ; 8-bit; bit 7 confirm, bit 6 cancel (set by Menu_PadInput)
 !Menu_Unk0D17 = $0D17                    ; 8-bit; set to $FF on entering a submenu (use not traced)
 !Menu_MainFrame = $5780                  ; tilemap rows of $40 B: the main menu's 16 x 6 frame
 !Menu_MainFrameRow1 = $57C0
@@ -1094,7 +1134,7 @@ endstruct
 !Menu_MainMoveDest = $9080               ; ... (use not traced)
 !Menu_OamArrowA = $0718                  ; OAM copy entries 6 and 7: the arrows at the selected icon
 !Menu_OamArrowB = $071C
-!Menu_MainClockTile = $3390              ; tilemap address Menu_UnkF28D draws the clock at
+!Menu_MainClockTile = $3390              ; tilemap address Menu_DrawClock draws the clock at
 
 ; --- Menu commands (Menu_RunCommand, DP = Menu_CmdDp) ---
 !Menu_CmdDp = $0400                      ; direct page of Menu_RunCommand and its handlers
@@ -1143,3 +1183,75 @@ endstruct
 !Menu_SramUnk0793 = $300793
 
 endif
+
+; --- Draw lists, windows, strings and numbers (Menu_RunDrawList ...) ---
+!Menu_DrawArg0 = $005B                   ; 16-bit; a draw command's argument bytes start here (Menu_RunDrawList
+!Menu_DrawArg1 = $005C                   ; copies them); Arg0/1: a style and attribute, a source position,
+!Menu_DrawArg2 = $005D                   ; a string id or an address; Arg2 (16-bit) usually a position
+                                         ; (column bits 0-4, row the high byte; Menu_DrawPosToAddr)
+!Menu_DrawArg4 = $005F                   ; 8-bit; a width (tiles) or a string's count and flags
+!Menu_DrawArg5 = $0060                   ; 8-bit; a height (rows)
+!Menu_DrawAddr = $0063                   ; 16-bit; Menu_DrawPosToAddr's tilemap address
+!Menu_DrawAddr2 = $0065                  ; 16-bit; a second address: copy destination, frame row, line start
+!Menu_TextWord = $007D                   ; 16-bit; Menu_DrawCmdFill's word; its high byte is ...
+!Menu_TextAttr = $007E                   ; 8-bit; ... the attribute byte strings and numbers are put with
+!Menu_TextLeft = $0087                   ; 8-bit; tiles a string may still put (Menu_DrawStringLoop)
+!Menu_TextFlags = $0088                  ; 8-bit; bit 7: one-row text (Menu_PutChar, Menu_TextNewLine)
+!Menu_DrawInnerW = $008A                 ; 16-bit; window inside width (or a copy's byte count - 1)
+!Menu_DrawInnerH = $008C                 ; 16-bit; window inside height (or rows to copy)
+!Menu_TextVec = $008A                    ; 16-bit; Menu_TextCtrl's JMP (abs) target
+!Menu_NumBcd = $008A                     ; 4 B; Menu_BinToBcd's BCD result (Menu_DrawHex: the raw bytes)
+!Menu_NumDigits = $008E                  ; 8-bit; digits to draw - 1
+!Menu_NumFlags = $008F                   ; 8-bit; bit 7: zeros still blanked; bit 3: blank a zero ones digit
+!Menu_NumPos = $0090                     ; 16-bit; tilemap address of the number
+!Menu_NumBytes = $0092                   ; 16-bit; bytes of the value Menu_BinToBcd converts
+!Menu_FrameRightOfs = $0006              ; 16-bit; Menu_DrawWindowFrame: the right edge's offset (w - 1) x 2
+!Menu_FillLeft = $0006                   ; 16-bit; Menu_FillWindowInside: tiles left in the row
+!Menu_FrameTile = $0008                  ; 16-bit; the next frame tile word (Menu_DrawWindowFrame ...)
+!Menu_FillPatRow = $000A                 ; 16-bit; Menu_FillWindowInside's pattern row offset (0, 4, 8, 12)
+!Menu_ClockHours = $0022                 ; 8-bit; Menu_DrawClock's hours ...
+!Menu_ClockMins = $0023                  ; 8-bit; ... and minutes
+!Menu_TextRowAbove = $7DFFC0             ; $7E:0000 - $40: long base one tilemap row above X (Menu_PutChar)
+!Menu_MapBank7E = $7E0000                ; long base of the tilemaps (bank $7E)
+!Menu_Unk0D77 = $0D77                    ; 8-bit; the string Menu_DrawDescText set up last
+!Menu_Unk0D78 = $0D78                    ; 8-bit; bit 7 set: Menu_DrawDescText sets up again (it zeroes it)
+!Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText (use not traced)
+!Menu_Unk0DCC = $0DCC                    ; 16-bit; set to $6840 by Menu_DrawDescText (use not traced)
+!Menu_Unk0DD0 = $0DD0                    ; 16-bit; set to $0080 by Menu_DrawDescText; Menu_UnkFA49 reads it
+
+; --- Sprite placement (Menu_SprPlaceOam; absolute, DB=$7E) ---
+!Menu_SprHiMask = $0000                  ; 8-bit; the high-table bit of the sprite being placed
+!Menu_SprObjNum = $0002                  ; 16-bit; the object number n
+!Menu_SprEnd = $0004                     ; 16-bit; .FrameData bytes to place (sprites x 2)
+!Menu_SprX = $0006                       ; 16-bit; .ScreenX + Menu_Unk0D2E (high byte reshuffled: bit 7 = bit 8)
+!Menu_SprTile = $0008                    ; 16-bit; tile offset of the next sprite
+!Menu_SprOam = $0800                     ; Oam_LowTable entry 64: the objects' 4 entries each
+!Menu_SprOamHigh = $0910                 ; Oam_HighTable byte of entries 64-67 (+ n for object n)
+
+; --- Main menu icon 0 and the member list (Menu_Icon0Preview ...) ---
+!Menu_Unk85 = $0085                      ; 8-bit; the member count Menu_DrawMemberRows stops at and
+                                         ; Menu_Icon0Preview's max top comes from (writer not traced)
+!Menu_MemberMaxTop = $0FC4               ; 8-bit; Menu_Unk85 - 3 (0 when below): the largest Menu_Unk0413
+!Menu_Unk5D42 = $5D42                    ; 12 tile words set to $61FF by Menu_Icon0Preview
+!Menu_Unk5DC2 = $5DC2                    ; 12 tile words set to $FFFF by Menu_Icon0Preview (A after an MVN)
+!Menu_DimPalBuf = $9500                  ; colours 0-23 at half brightness (Menu_Icon0Preview's Menu_DimPalette)
+!Menu_Unk3600 = $3600                    ; $800 B zeroed by Menu_Mode01Init (tilemap; VRAM $5C00 probably)
+!Menu_Unk0D4D = $0D4D                    ; 16-bit; Menu_MemberRowFlags: character id OR $20
+!Menu_Unk0D5D = $0D5D                    ; 16-bit; Menu_MemberRowFlags: 4 or 0
+!Menu_CharIconMap = $2EEC                ; tilemap: Menu_DrawCharIcon's 6 x 2 tiles (and + $40)
+
+; --- Menu mode 1 (Menu_Mode01H0 ...) ---
+!Menu_LastMember = $0083                 ; 8-bit; Menu_CurMember at handler 1's last move (sound on a change)
+!Menu_Unk84 = $0084                      ; 8-bit; Menu_ListKind + Menu_CurMember at handler 2's last
+                                         ; Menu_UnkA45D ($FF: redo)
+!Menu_RowCopyPos = $0026                 ; 16-bit; Menu_MemberScrollAnim's off-screen block position
+!Menu_RowScrollWord = $0022              ; 16-bit; the word Menu_MemberScrollAnim steps into Menu_Unk5D42
+!Menu_Unk0D26 = $0D26                    ; 16-bit; the Menu_CurCharRec offset handler 3 swaps (the
+                                         ; slot's record byte, probably)
+!Menu_Unk0FC5 = $0FC5                    ; 8-bit; handler 2's Menu_CursorSel, kept for the return from 3
+!Menu_EquipListTop = $0FC8               ; 8-bit; top row of the item list (Menu_EquipList)
+!Menu_Unk04CA = $04CA                    ; 8-bit; the count of the item Menu_EquipItemIdle scrolls in
+!Menu_Unk7F00B4 = $7F00B4                ; 6 B, one per character id 0-5: zeroed by Menu_EquipClearCharFlag
+!Menu_ItemListMap = $4F80                ; tilemap rows of the item list ($400 bytes moved by
+                                         ; Menu_ShiftItemListMap)
+!Menu_Unk5CC2 = $5CC2                    ; 12 tile words set to $40FF by Menu_EquipSlotsOpen

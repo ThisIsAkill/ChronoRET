@@ -1997,18 +1997,25 @@ endstruct
 !PalAnim_Save = $0C                      ; 2 B dp (DP=$0500): a Pal_Buf colour held across a rotation;
                                          ; in the PalAnim_Scale* routines the colour's unscaled channels
 !PalAnim_SaveCgram = $0E                 ; 2 B dp: the Pal_CgramBuf colour held across a rotation
+!PalAnim_Green = $0E                     ; 1 B dp: alias of PalAnim_SaveCgram in the PalAnim_Whiten* routines:
+                                         ; the colour's green x 8 while it is lightened
 !PalAnim_End = $10                       ; 2 B dp: the last offset a rotation reaches (colour x 2)
 !PalAnim_Span = $12                      ; 2 B dp: FieldAnimB.Unk2 x 2 in the rotations
 !PalAnim_Dest = $18                      ; 3 B dp: long Pal_CgramBuf address kinds 1 and 8 write
                                          ; (kind 8 first uses it to read its list byte)
 ; 12 records of 5 B at $05B0, filled by FieldFD_LoadAnimSetA from the list LocRom.Tileset12 picks.
 struct FieldAnimA $05B0
-    .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry)
+    .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry); with
+                         ; .Unk1 a word FieldFD_UploadTileAnims steps: bits 9-11 pick the frame
     .Unk1: skip 1        ; 0
-    .Unk2: skip 1        ; list byte
-    .Unk3: skip 1        ; list byte, or $80 for an $80 entry
-    .Bank: skip 1        ; $7F (the data written to $7F:0400 on, probably)
+    .Unk2: skip 1        ; list byte; with .Unk3 the VRAM address the frames go to
+    .Unk3: skip 1        ; list byte, or $80 for an $80 entry (negative word: no upload)
+    .Bank: skip 1        ; $7F: the bank of the frames' source addresses
 endstruct
+!FieldAnimA_Phase = $1D                  ; 1 B dp (DP=$0500): FieldFD_UploadTileAnims' call count (bit 0
+                                         ; picks records 0-5 or 6-11)
+!FieldAnimA_Data = $7F0400               ; 32 B per FieldAnimA record (FieldFD_LoadAnimSetA): 8 step
+                                         ; words, then 8 frame source addresses
 ; 12 records of 12 B at $0520-$05AF, the first 6 filled by FieldFD_LoadAnimSetB from the list
 ; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (PalAnim_TickAll).
 struct FieldAnimB $0520
@@ -2016,14 +2023,54 @@ struct FieldAnimB $0520
                          ; (PalAnim_TickAll: frames - 1 for kinds 1 and 8)
     .Unk1: skip 1        ; first colour the PalAnim_* kinds work on
     .Unk2: skip 1        ; colour count
-    .Unk3: skip 1        ; 0; frame (kinds 1/8) or step (kinds 5/7)
+    .Unk3: skip 1        ; 0; frame (kinds 1/8) or step (kinds 4-7)
     .Unk4: skip 1        ; 0; frame counter up to .Unk5 (PalAnim_TickAll)
     .Unk5: skip 1        ; frames between steps
     .Unk6: skip 1        ; kinds 1 and 8 only; with .Unk7 the ROM offset of their colours; kinds
-                         ; 5/7: channels kept (bits 0-2 red, green, blue; PalAnim_ApplyLevel)
-    .Unk7: skip 1        ; kind 5 level, kind 7 phase
-    .Unk8: skip 1        ; kind 5 target level, kind 7 depth
+                         ; 5/7: channels kept (bits 0-2 red, green, blue; PalAnim_ApplyLevel);
+                         ; kinds 4/6: channels lightened (PalAnim_ApplyWhiteLevel)
+    .Unk7: skip 1        ; kinds 4/5 level, kinds 6/7 phase
+    .Unk8: skip 1        ; kinds 4/5 target level, kinds 6/7 depth
     .Ptr: skip 3         ; kind 8: long address of the list bytes after the record's own
 endstruct
+
+; --- Bank-$FD Mode 7 scene (M7Scene_Run80-83, event $FF $80-$83) ---
+; It runs on its own after Evt_OpFF_Misc has left the field, with DP=$0500 and its own NMI.
+!DP_M7Scene = $0500                      ; its direct page (M7Scene_Init, M7Scene_Nmi)
+!M7Scene_Zero = $08                      ; 2 B dp: 0 (set by M7Scene_Init; LDX of it loads 0)
+!M7Scene_Tmp = $0A                       ; 1 B dp: the iris radius (BuildIris), the colour bits
+                                         ; (PlotPixel), a line's scaled distance (InitHdma)
+!M7Scene_Acc = $0C                       ; 2 B dp: the ray's colour accumulator (Init, high byte
+                                         ; = colour), WriteScale's product ($0C-$0F); scratch
+!M7Scene_Step = $0E                      ; 2 B dp: the ray's colour step (Init); a colour (CyclePalette)
+!M7Scene_DirX = $10                      ; 2 B dp: the ray's X step (Init); WriteScale's quotient
+!M7Scene_DirY = $12                      ; 2 B dp: the ray's Y step (Init)
+!M7Scene_PosX = $14                      ; 2 B dp: 8.8 X of the ray (Init) or of the iris edge
+                                         ; (BuildIris); PlotPixel reads the high byte
+!M7Scene_PosY = $16                      ; 2 B dp: 8.8 Y, as M7Scene_PosX
+!M7Scene_Ofs = $18                       ; 2 B dp: PlotPixel's byte offset; BuildIris's row count
+!M7Scene_Frame = $1B                     ; 2 B dp: frames since Init (M7Scene_Nmi counts them)
+!M7Scene_NmiFlag = $1E                   ; 1 B dp: M7Scene_Nmi increments it, M7Scene_WaitNmi waits
+!M7Scene_IrisX = $1F                     ; 1 B dp: the iris centre's X (BuildIris sets $80)
+!M7Scene_IrisY = $21                     ; 1 B dp: the iris centre's line in the window table ($80)
+!M7Scene_IrisR = $23                     ; 1 B dp: the iris radius (0: nothing inside)
+!M7Scene_IrisBuf = $24                   ; 1 B dp: bit 0 picks the window buffer (BuildIris, Nmi)
+!M7Scene_FlickerFrac = $35               ; 1 B dp: M7Scene_Run83's flicker phase, fraction
+!M7Scene_FlickerIdx = $36                ; 1 B dp: its index into M7Scene_FlickerLevels (0-31)
+!M7Scene_BitMasks = $0525                ; 8 B ($80 >> n): a pixel's bit in a plane byte (PlotPixel)
+!M7Scene_ClearMasks = $052D              ; 8 B: the same, inverted
+!M7Scene_Tilemap = $7F0000               ; 16 KB: the 128 x 128 Mode 7 tilemap it builds (its first
+                                         ; 512 bytes are saved first: Eng_Unk7F0000 is among them)
+!M7Scene_SprGfx = $7F4000                ; 8 KB: the sprite bitmap (4bpp tiles, 16 per 512-byte row)
+!M7Scene_HdmaInd = $7F6000               ; 28 B: the indirect tables of HDMA channels 1-4 (7 B each)
+!M7Scene_M7AB = $7F601C                  ; 256 x 4 B: M7A and M7B per line (HDMA channel 1)
+!M7Scene_M7CD = $7F681C                  ; 256 x 4 B: M7C and M7D per line (HDMA channel 2)
+!M7Scene_Scroll = $7F701C                ; 16 B: M7X/M7Y (channel 3) for the top and bottom half,
+                                         ; then BG1HOFS/BG1VOFS (channel 4) for the two halves
+!M7Scene_IrisWidths = $7F702C            ; 1 B per line from the centre: the iris half-width
+!M7Scene_IrisBuf0 = $7F70AC              ; 255 x 2 B: WH0/WH1 per line (window buffer 0)
+!M7Scene_IrisBuf1 = $7F72AC              ; 255 x 2 B: window buffer 1
+!M7Scene_WinInd = $7F74AC                ; 7 B: HDMA channel 5's indirect table (WH0/WH1)
+!M7Scene_Save7F = $7F74B3                ; 512 B: the saved first 512 bytes of $7F0000
 
 endif

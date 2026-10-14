@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev121a,changes,c5d6bddf6b8b,"Banner: 'nothing in that loop writes B18B' is false: main-part tests/choose handlers call BattleAi_ReadTargets; handler $05 runs BattleSys_UpdateKo (STA B18B at $C1:B2FD). Say so."
+$C1:AA61,BattleAi_TargetLowestHpOtherEnemy,2026-10-09,rev121a,approved,4080ac4e1ec7,"Checked vs $19 (only TXA/CMP B18B added), DP $02/$0E, A=1 B=0, $03 zeroed, count=1 always, Entry/Exit. nit: banner it points to has a false main-pass line (see $A3F6)."

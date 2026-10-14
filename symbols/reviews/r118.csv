@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev118a,approved,15104fa5d6d2,"Svc 3 fix OK ($CF:FD9E via BattleMenu_UpdateWindows/ConfirmCommand, no PoseStep); per-service unmatched callees, svc 2/5/7 all-matched, addresses, B=0, P from PLA checked"
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev118a,changes,31b096ff2e85,"$26 fix OK. Banner: $2F is not 'a random enemy' in battler slots: it stores entry numbers 0-7 of AF15-bit-7 enemies. Say so in the kinds list and in '(battler slots, ...)'"

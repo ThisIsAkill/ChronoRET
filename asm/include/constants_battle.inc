@@ -480,9 +480,9 @@ if !constants_battle_inc == 0
 !Sfx_Unk18Arg            = $FF   ; !Sfx_Param1 sent with it
 
 ; --- Battle main routine (BattleSys_Main) ---
-!BattleSys_ServiceUnk0    = 0     ; $C10045 service run first by BattleSys_Main ($C1:0023; not analysed)
+!BattleSys_ServiceUnk0    = 0     ; $C10045 service run first by BattleSys_Main (BattleSys_SceneSetup)
 !BattleSys_ServiceUpkeep  = 3     ; ... BattleSys_UpkeepTwoFrames
-!BattleSys_ServiceUnk6    = 6     ; ... $C1:006D, run by the debug win; not analysed
+!BattleSys_ServiceUnk6    = 6     ; ... BattleSys_Service6 (JSL $CF:FE20, not analysed), run by the debug win
 !BattleSys_ServiceVictory = 8     ; ... BattleSys_VictoryPose
 !BattleSys_ServiceDefeat  = 9     ; ... BattleSys_DefeatPose
 !Battle_EntryNone         = $FF   ; list / slot entry: empty (the BattleSys_Main lists, !Battler_UnkAEFF)
@@ -606,7 +606,7 @@ if !constants_battle_inc == 0
 !BattleAi_Status2Bit2     = $04   ; the BattlerStats.Status2 bit for !BattleAi_ScriptUnk8D1E (the same bit as
                                   ; !Battle_TurnNoReactBit)
 !BattleAi_TgtCodePcs      = $01   ; target code 1: the present PCs (BattleAi_TargetTable entry 1); test $02's choice
-!BattleAi_TgtCodeUnk16    = $16   ; target code $16 (handler not analysed): test $02's other choice
+!BattleAi_TgtCodeUnk16    = $16   ; target code $16: the present enemies (BattleAi_TargetEnemies); test $02's other choice
 !BattlePos_QueryWithin32  = 4     ; !BattlePos_Mode: subject within 32 pixels of other (test $0C)
 !BattlePos_QuerySameRow   = 5     ; !BattlePos_Mode: |dy| within !BattlePos_RowBand (test $0D)
 !BattlePos_QueryAbove     = 6     ; !BattlePos_Mode: subject above other; + 1 = left of other (test $0E)
@@ -616,6 +616,21 @@ if !constants_battle_inc == 0
 !BattlePos_QueryRightPart = $0B   ; ... right part
 !BattlePos_QueryLeftPart  = $0C   ; ... left part
 !BattlePos_QueryWithin48  = $0E   ; !BattlePos_Mode: subject within 48 pixels of other (test $1F)
+!BattlePos_QueryNearestPc = 0     ; !BattlePos_Mode: nearest PC (target handler $06)
+!BattlePos_QueryFarthestPc = 1    ; !BattlePos_Mode: farthest PC (target handler $07)
+!BattlePos_QueryFarthestEnemy = 3 ; !BattlePos_Mode: farthest enemy (target handler $18)
+!BattleAi_RandPcHigh      = $63   ; target handler $05: Battle_RandRange high bound (rolls 0-98) ...
+!BattleAi_RandPc1From     = $21   ; ... rolls from here pick PC 1 (below: PC 0) ...
+!BattleAi_RandPc2From     = $42   ; ... from here PC 2
+!BattleAi_HpStartMin      = $7FFF ; target handler $08: start of its lowest-HP search
+!BattleAi_HpStartMinAll   = $FFFF ; target handlers $19 / $26: start of their lowest-HP search
+!BattleAi_TgtBit0         = $01   ; !BattleAi_PcByteMask bits the target handlers $0E-$14, $20-$25
+!BattleAi_TgtBit1         = $02   ;   ask for in a stat-block byte (meanings unknown; see each
+!BattleAi_TgtBit2         = $04   ;   handler for the byte)
+!BattleAi_TgtBit3         = $08
+!BattleAi_TgtBit4         = $10
+!BattleAi_TgtBit6         = $40
+!BattleAi_TgtBit7         = $80
 !BattleAi_PathArgBit0     = $01   ; test $0F: !BattlePos_Arg = record byte 2 * 4 + this
 !BattleAi_PercentBound    = 100   ; Battle_RandRange high bound for a 0-99 roll (test $17, choose $04)
 !BattleAi_B19EKindMask    = $F0   ; !Battle_UnkB19E byte 0 bits tests $11/$12 compare

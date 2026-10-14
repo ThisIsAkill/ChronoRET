@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$FD:E275,PalAnim_StopAll,2026-10-09,rev113a,approved,98ba5e1d78c9,"ROM E275-E291: Unk0=0 in 12 x $0C records, DB=0, P/DB restored, A=Y=$90; kind 0 skipped by TickAll; note checked: JSL at $C3:4D46, BRK $C3:4D42, xref doubtful 12/256"
+$FD:EB8B,M7Scene_BuildIris,2026-10-09,rev113a,changes,db590fc2933b,"r+1 fix right (sim: last store at r for all radii; $7F:70AC). But Exit 'X and Y return with high bytes cleared' is false for r=0 (X=0 throughout: X = buffer addr, Y kept); say so"
+$FD:FFEE,FdVec_FFEE,2026-10-09,rev113a,approved,4282140d8620,"ROM 4C 75 E2 = JMP PalAnim_StopAll; Entry/Exit as target; Callers note fixed: probably data, xref doubtful 12/256 at $C3:4D46, BRK at $C3:4D42 checked in ROM"

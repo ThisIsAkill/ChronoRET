@@ -124,13 +124,23 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    message by `!Battle_UnkB3C7`, probably), `!Battle_UnkB19E`'s 4-byte records (tests $11-$15),
    `!Battle_UnkB320`, `!Battle_UnkB158`, what the action codes 5 / 7 left in `!BattleAi_ActCode`
    by run handlers $07 / $09 do later, and the many quirks recorded in the headers (tests
-   $01, $0D, $0E, $14, $18, $1C; run handlers $0D, $12, $15). Next, in reach order: the target
-   handlers (stubs `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`);
-   the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
-   (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
-   `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
-   and service 0
-   (`$C1:0023`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
+   $01, $0D, $0E, $14, $18, $1C; run handlers $0D, $12, $15). Also matched (the target-handler batch): the 57 target handlers
+   `$C1:A3F6`-`$C1:AC13` (`BattleAi_TargetNone`, `TargetPcs`, `TargetAll`, `TargetSelf`, the random /
+   nearest / farthest / lowest- and highest-HP picks, the stat-byte lists `TargetPc*` / `TargetEnemy*`
+   / `TargetOtherEnemy*` through BattleAi_AddPcByByte, the fixed `TargetEnemy0-7` / `TargetSlot0-6`);
+   the entry block `$C1:0000`-`$C1:007D` (`EngCall_BattleMain` and its vectors, `BattleSys_SceneSetup`
+   = service 0, `BattleSys_RunService` with `BattleSys_ServiceTable`, `BankC1_LongDispatch`,
+   `BattleSys_Service6`, the JMLs); the bank-$FD callees `$FD:A8A5`-`$FD:A981` (`BattleFD_UnkA8A5`
+   the can-act check, `BattleFD_DropPcCommand`, `BattleFD_DropLatchedPcCommand`, `BattleFD_UnkA93C`,
+   `BattleFD_UnkA95F`); and the bank's end `$C1:FDD3`-`$C1:FFFF` (`BankC1_OldBuildTail`, old-build
+   leftovers, and `BankC1_DebugFlag`). Bank $C1 is now matched in full. Headers edited by it (back to
+   review): BattleAi_ReadTargets, TargetsByPcByte, PickPcTarget, AddPcByByte, BattleSys_UpdateKo,
+   the TargetTable header, Battle_CacheBattlerCoordsAll, BattleSys_UnkAC57, UnkAC5E,
+   RemoveReadyLong, UnkBFA4, UnkB575, UnkB967. Open from it: the quirks recorded in target handlers
+   $05 (endless loop with !Battle_Unk2989 bit 5), $08 (PC 0 never compared), $1F (STA for STX),
+   $2F (entry numbers, not slots), $38 (one-entry clear); whether !Battle_UnkB252 + 3 and
+   !Battle_UnkB18B always name the same enemy; what the bank-$CC/$CD/$CF callees of service 0 and
+   the vectors do (stubs `BattleCC_*`, `BattleCF_*`, `BattleSys_VecCD00xx`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
    (`!BattleRom_AiActLength` `$FD:BA4A` gives lengths $FF for codes 4/5), what the fixed scripts
    `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits;
    BattleSys_UnkB0B6 sets `!BattleAi_ChosenBlock` to $FF when Status2 bit 2 changes), and the
@@ -571,10 +581,37 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BankC2_MenuEntry` stores only Menu_EntryX's low byte). Quirks recorded: `Menu_RunCommand`'s
    LDA #$00/XBA decoding as LDA #$EB00 after the M=0 handlers; `Menu_LoadWindowGfx` copies $281
    bytes; the dead byte in `Menu_ReadSlotSummary`; the dead INC in `Menu_SprAnimEnd`;
-   `Menu_SprAnimate`'s frame data running past the page for .TileCount 6. Next, in reach order:
-   the main menu's preview/redraw routines (`Menu_MainPreviewTable`, `Menu_MainRedrawTable`), the
-   menu pad handler `Menu_UnkE984`, `Menu_UnkED31`/`EAC2`/`F28D`, `Menu_UnkF871` (sprite OAM),
-   then the mode handlers `Menu_Mode01H0` on, and `BankFF_UnkF9C4`/`F813`/`F958`.
+   `Menu_SprAnimate`'s frame data running past the page for .TileCount 6.
+   Also matched (branch match-c2-menu-modes): the pad and cursor code $C2:E97C-$C2:ED07
+   (`Menu_PadInput`, was `Menu_UnkE984`, with `Menu_CursorMove` and the per-direction neighbour
+   steps, now `Menu_CursorPos.Up/Down/Left/Right`; `Menu_ListCursorEdge`, `Menu_ListPageSetup`; the
+   sound senders `Menu_PlaySound`/`PlaySound0` (was `Menu_UnkEAC2`)/`PlaySound1`/`SendSound`, at most one
+   command per 3 frames through `Menu_NmiTimer`; the list smooth scroll `Menu_ListScrollInit`/`Step`;
+   `Menu_DrawPortrait`, the attribute helpers, `Menu_LoadSlotWindowStyle`); the draw lists and text
+   $C2:ED31-$C2:F3C9 (`Menu_RunDrawList`, was `Menu_UnkED31`, with its 11 commands; window frame and
+   inside, block copy/swap; `Menu_DrawString` with control codes $01-$0C; decimal (BCD) and hex
+   numbers; `Menu_DrawClock`, was `Menu_UnkF28D`; `Menu_DrawItemName`, `Menu_DrawDescText`);
+   `Menu_SprPlaceOam` ($C2:F871, was `Menu_UnkF871`); and mode 1, the equipment screen (slot names
+   "Weapon/Helmet/Armor/Accessory" at $C2:A3BA), $C2:9C31-$C2:A4AE: `Menu_Mode01H0`-`H3`,
+   `Menu_Icon0Preview`/`Redraw` (were `Menu_UnkA051`/`A101`), the member list and its row scroll,
+   the slot list and the item list set-up. Found: $0D83 (`Menu_NmiDp`+`Menu_Unk83`) forces the cancel
+   bit; dp $C1/$C9 bumps are thread 2/3 `.Wait`; `Menu_ItemNamePtrs` holds bank-$CC addresses of
+   11-byte strings; `Menu_Unk51` is used as a zero start index (`Menu_BinToBcd`,
+   `Menu_DimPalette`). Quirks recorded: `Menu_CursorMove` loses the record offset's high byte
+   (records 43 on); `Menu_ListScrollStep`'s SBC of entry 0 instead of ,X; `Menu_CopyDrawArgsUnused`
+   and `Menu_DeadF362` unreached; `Menu_FillWindowInside` not testing a height of 0;
+   `Menu_TextCopyTile`'s uncounted 0; `Menu_EquipClearCharFlag` indexing by the cursor row alone;
+   `Menu_EquipItemsOpen` reading `Menu_EquipList[$25]`; `Menu_SprPlaceOam` placing more than 4
+   sprites into the next objects' entries; the second REP #$20 in `Menu_DrawClock`. Re-review
+   needed (verified headers edited): `Menu_MainMenuLoop`, `Menu_ReturnToMainMenu`,
+   `Menu_MainMenuIcons`, `Menu_MainPreviewTable`, `Menu_MainRedrawTable`, `Menu_Mode01List`,
+   `Menu_SprThread`, `Menu_SprResetChars`. Open: what the draw lists in bank $FF draw, the
+   mode 1 HDMA tables ($7E:9300) and HDMAEN values, who writes `Menu_Unk85` and `Menu_CursorHold`,
+   what `Menu_DrawDescText`'s strings at $CC:2EB1 are; the 7 bytes $C2:F905 (an entry into
+   `Menu_DrawText` with A=$81). Next, in reach order: the mode 1 helpers still stubbed
+   (`Menu_UnkA4AF`, `A569`, `A59A`, `A5C3`, `A64D`, `A6F0`, `A71E`, `A85C`, up to $C2:AA33), the
+   other icons' preview/redraw routines (`Menu_UnkAD50`/`ADC3` ...), `Menu_Unk90FC`/`9121`,
+   `Menu_UnkFA49`, then modes 2-7, and `BankFF_UnkF9C4`/`F813`/`F958`.
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:
@@ -587,8 +624,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `EngFD_UnkD52D`; the HDMA table builders behind its tables, `FieldHdma_*` (`$FD:C2EB`-`$FD:D52C`:
    plain screen, top band and bottom band for each table set, the channel 2/7 helpers, the data
    fill with the BG3 wave, the wave run adders); the palette animation ticker `PalAnim_TickAll`
-   (`$FD:E39C`-`$FD:E806`: kinds 1, 2, 3, 5, 7, 8 and the seven channel scalers); the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and
-   `FieldFD_LoadAnimSetB` (`$FD:E292`) and the vectors `FdVec_FFF4`/`FFF7`/`FFFA`. The `BattleFD_Unk*`
+   (`$FD:E39C`-`$FD:EAA5`: all eight kinds, the seven darkening scalers `PalAnim_Scale*` and the
+   seven lightening ones `PalAnim_Whiten*` of kinds 4/6, `PalAnim_FadeWhite`/`PalAnim_PulseWhite`);
+   the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and `FieldFD_LoadAnimSetB`
+   (`$FD:E292`), the field IRQ's tile-animation upload `FieldFD_UploadTileAnims` (`$FD:E022`) and
+   `PalAnim_StopAll` (`$FD:E275`); the Mode 7 scene of event `$FF $80-$8F` (`M7Scene_*`,
+   `$FD:DA00`-`$FD:DE97` and `$FD:EAA6`-`$FD:F28F`: the four run loops, init, own NMI/IRQ, iris
+   window, per-line Mode 7 scale, ray-drawn sprite bitmap, palette cycling); and all the vectors
+   `FdVec_FFE5`-`FdVec_FFFD`. The `BattleFD_Unk*`
    and `EngFD_Unk*` routines keep their names because verified code calls them by name; better names
    once those callers are re-reviewed: `BattleFD_UnkA982` ClearWorkRam, `UnkAA98` KoAllEnemies,
    `UnkACFD` ClearUnkB328, `UnkAD09` ClearTechEntries, `UnkAD17` ShowEndMessages, `UnkAE52`
@@ -608,9 +651,16 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    out), the band builders' extra 41-n TM run and the TM table ending at the band when
    Field_Unk27 = 1, PalAnim_Pulse's level 0 (black) where 256 was meant, PalAnim_Fade storing
    .Unk5 as the level when it is $80 or more. Better names once the verified callers are
-   re-reviewed: `EngFD_UnkC2C1` FieldHdma_RunFrame. Next, in reach order: `PalAnim_UnkE82C` (kind 4,
-   `$FD:E82C`, with its callees up to about `$FD:EAA0`) and `PalAnim_UnkE807` (kind 6, which
-   branches into it at `$FD:E869`); who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
+   re-reviewed: `EngFD_UnkC2C1` FieldHdma_RunFrame. Re-review needed from the palette/Mode 7
+   batch (verified headers edited): `PalAnim_TickAll` (banner and dispatch names), `FdVec_FFF4`
+   (its "three JMPs" text), `FieldFD_LoadAnimSetA` (banner: the $05B0 records are now traced),
+   `Evt_OpFF_Misc` and `IrqHandler` ("unmatched" vectors). Quirks recorded there: kind 4/6's
+   `PalAnim_WhitenR`/`WhitenB` write one byte of the colour (the other stays as Pal_CgramBuf had
+   it), `WhitenRG` drops blue and `WhitenGB` drops red; `M7Scene_Init` fills window buffer 1 twice;
+   `M7Scene_IrisRadii` has 31 entries (entry 31 is the next table's 0); `M7Scene_UpdateScroll`'s
+   dead BG colour rotation. Open: which scene `$FF $80-$8F` is, who calls `FdVec_FFEE`
+   (`$C3:4D46` looks like a JSL in unmatched code), and the pointer table after `$FD:F28F`
+   (no confirmed reader). Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
    `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
    BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967) and the data at `$FD:B957` (pointer table and
    records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`

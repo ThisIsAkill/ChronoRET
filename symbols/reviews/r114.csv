@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$FD:EB8B,M7Scene_BuildIris,2026-10-09,rev114a,approved,5f50bd321b45,"Exit per path OK: r=0 A=$FF, X=buf addr (PLX), Y kept; r>0 X/Y high cleared, B=0/$05. Sim radii 2-$7F: last store at r, 255 lines. nit: bottom WH0 floor is LDA #0, not TDC"

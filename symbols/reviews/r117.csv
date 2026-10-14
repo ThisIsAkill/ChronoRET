@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev117a,changes,b7e5423c337e,"Svc 3: $CF:FD9E is not 'through Battle_PoseStep' (svc 3 never reaches it); its JSLs are BattleMenu_UpdateWindows $C1:0C30, BattleMenu_ConfirmCommand $C1:1283. Svc 0 fix OK"
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev117a,changes,0c56f195478f,"Banner kinds pair '$19, $26 enemies' with lowest/highest, but $26 is lowest HP but self; write 'lowest HP ($08 PCs, $19 enemies, $26 those but self), highest HP PC ($37)'. B3B7 fix OK"

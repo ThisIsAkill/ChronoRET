@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev123a,changes,d4f2cd0b067e,"Banner: 'handlers that use it ($1A-$26)' is false: $1B/$1D/$1F (self included) never read B18B. Say ($1A, $1C, $1E, $20-$26). Last round's B18B/UpdateKo fix is correct."
