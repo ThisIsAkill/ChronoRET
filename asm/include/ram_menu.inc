@@ -569,8 +569,6 @@ endstruct align 6
                                          ; 3 Up), $80 for none
 !Menu_CursorHold = $0D1F                 ; 8-bit; non-zero: Menu_CursorMove makes no move (it then zeroes it;
                                          ; writer not traced)
-!Menu_Unk0D83 = $0D83                    ; 8-bit; non-zero: Menu_PadInput sets the cancel bit every call
-                                         ; (writer not traced)
 !Menu_Unk0DBC = $0DBC                    ; 8-bit; bits 1 and 0: sounds 6 and 7 for Menu_PlayPendingSound
                                          ; (writer not traced)
 
@@ -1008,8 +1006,8 @@ endstruct
                                          ; after the first repeat); handled as a word by Menu_NmiPad
 !Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0; Menu_SendSound sets it to 3 and
                                          ; sends no sound while it runs
-!Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here (use not
-                                         ; traced)
+!Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here; non-zero:
+                                         ; Menu_PadInput sets the cancel bit every call
 !Menu_NmiSavedSp = $1DFE                 ; 16-bit S at the menu NMI's entry
 !Menu_NmiStackTop = $1DFD                ; the menu NMI's own stack
 !Menu_ButtonMap1Long = $7E2994          ; Menu_ButtonMap+1 as a long address (Menu_NmiPad)
@@ -1241,3 +1239,18 @@ endif
 !Menu_Unk0D4D = $0D4D                    ; 16-bit; Menu_MemberRowFlags: character id OR $20
 !Menu_Unk0D5D = $0D5D                    ; 16-bit; Menu_MemberRowFlags: 4 or 0
 !Menu_CharIconMap = $2EEC                ; tilemap: Menu_DrawCharIcon's 6 x 2 tiles (and + $40)
+
+; --- Menu mode 1 (Menu_Mode01H0 ...) ---
+!Menu_LastMember = $0083                 ; 8-bit; Menu_CurMember at handler 1's last move (sound on a change)
+!Menu_Unk84 = $0084                      ; 8-bit; Menu_ListKind + Menu_CurMember at handler 2's last
+                                         ; Menu_UnkA45D ($FF: redo)
+!Menu_RowCopyPos = $0026                 ; 16-bit; Menu_MemberScrollAnim's off-screen block position
+!Menu_RowScrollWord = $0022              ; 16-bit; the word Menu_MemberScrollAnim steps into Menu_Unk5D42
+!Menu_Unk0D26 = $0D26                    ; 16-bit; the Menu_CurCharRec offset handler 3 swaps (the
+                                         ; slot's record byte, probably)
+!Menu_Unk0FC5 = $0FC5                    ; 8-bit; handler 2's Menu_CursorSel, kept for the return from 3
+!Menu_EquipListTop = $0FC8               ; 8-bit; top row of the item list (Menu_EquipList)
+!Menu_Unk04CA = $04CA                    ; 8-bit; the count of the item Menu_EquipItemIdle scrolls in
+!Menu_Unk7F00B4 = $7F00B4                ; 6 B, one per character id 0-5: zeroed by Menu_EquipClearCharFlag
+!Menu_ItemListMap = $4F80                ; tilemap rows of the item list ($400 bytes moved by
+                                         ; Menu_ShiftItemListMap)

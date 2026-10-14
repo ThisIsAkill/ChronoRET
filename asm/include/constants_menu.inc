@@ -1027,7 +1027,7 @@ if !constants_menu_inc == 0
 !Menu_PadPageBack = $02
 !Menu_PadPageOn = $01
 !Menu_PadConfirm = $80                   ; Menu_PadAction bit 7 (Menu_ButtonMap entry 0)
-!Menu_PadCancel = $40                    ; Menu_PadAction bit 6 (entry 1, or Menu_Unk0D83)
+!Menu_PadCancel = $40                    ; Menu_PadAction bit 6 (entry 1, or Menu_Unk83)
 !Menu_PadActionButtonCount = 2           ; Menu_PadActionButtons entries Menu_PadInput reads
 !Menu_ButtonPageBack = 6                 ; Menu_ButtonMap entry of Menu_PadPageBack
 !Menu_ButtonPageOn = 7                   ; ... and of Menu_PadPageOn
@@ -1132,5 +1132,36 @@ if !constants_menu_inc == 0
 !Menu_StatusPortraitMap = $2EDE          ; tilemap address of the portrait
 !MenuRom_CharIconTiles = $FFCE88         ; words by Menu_CharIconIndex: first tile word of the icon
 !MenuRom_CharIconPals = $FFCE92          ; words by Menu_CharIconIndex: bank-$FF address of 16 colours
+
+; --- Menu mode 1 ---
+!Menu_Unk84None = $FF
+!Menu_SoundEquip = $B5                   ; Menu_Mode01H3's sound on a confirm (probably the equip sound)
+!Menu_ArrowsThreadBit = $10              ; Menu_KillThreads mask: slot 4 (Menu_ListArrowsThread)
+!Menu_Unk7F00B4Count = 6
+!Menu_RowCopyUp = $2602                  ; Menu_RowCopyPos: column 2, row $26 (below the list)
+!Menu_RowCopyDown = $2002                ; ... row $20
+!Menu_RowCopySwap = $0600                ; EOR: the other of the two
+!Menu_MemberMapAbove = $3580             ; where the row scrolling in is drawn: going up ...
+!Menu_MemberMapBelow = $3A00             ; ... going down
+!Menu_MemberScrollUp = $FFFC             ; Menu_ScrollStep values
+!Menu_MemberScrollDown = $0004
+!Menu_RowScrollUpInit = $611F            ; Menu_RowScrollWord's start values
+!Menu_RowScrollDownInit = $60EF
+!Menu_MemberScrollFrames = $000C
+!Menu_MemberRowAttrOfs = $0084           ; a member row's first tile from its map address (row 2, column 2)
+!Menu_MemberAttrFirst = $2E84            ; the first row's, in the BG1 map
+!Menu_MemberRowDimAttr = $100C           ; Menu_SetMemberRowAttr's Y: 12 tiles, attribute bit 4 ...
+!Menu_MemberRowLitAttr = $000C           ; ... or none
+!Menu_MemberRowRows = $0006              ; tile rows per member row
+!Menu_MemberBlockPos = $0202             ; the list's block: column 2, row 2 ...
+!Menu_MemberBlockSize = $120C            ; ... 12 tiles by 18 rows
+!Menu_EquipHdmaBits = $4D                ; Menu_HdmaenShadow in handler 2 (not traced)
+!Menu_EquipListFirstRec = 4              ; Menu_CursorPos record of the item list's first row
+!Menu_EquipHdmaTable = $9303             ; the table Menu_EquipItemIdle scrolls (NMI move destination)
+!Menu_EquipHdmaBytes = $0025
+!Menu_EquipListRows = 9
+!Menu_EquipNewItemMap = $53C6            ; tilemap address the incoming item is drawn at
+!Menu_ItemListShift = $0080              ; two tile rows: one item
+!Menu_ItemListBytes = $0400
 
 endif
