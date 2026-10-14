@@ -33,9 +33,10 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; $C1:0000 — EngCall_BattleMain (35 bytes, $0000–$0022)
-; The bank's entry block: nine 3-byte JMPs reached from other banks by
-; JSL (each target returns with RTL or never returns), then the two
-; JMLs out of the bank they lead to. The name is the one bank $C0's
+; The bank's entry block: nine 3-byte JMPs, most of them reached from
+; other banks by JSL (those targets return with RTL or never return;
+; $0003, $0006 and $0015 are not, see the list), then the two JMLs out
+; of the bank they lead to. The name is the one bank $C0's
 ; caller uses. By entry:
 ;   - $0000 EngCall_BattleMain: JMP BankC1_EnterBattleJml ($001B), JML
 ;     $CF:FB65, which starts the battle (it clears battle RAM and JMLs
@@ -58,7 +59,7 @@ incsrc "../hardware.inc"
 ; None of these instructions touches a register or flag.
 ; Callers note: the JSL sites named above are in unmatched code in banks
 ;   $CC, $CD and $EF; BattleSys_RunServiceVec and BattleSys_ExitVec are
-;   listed below.
+;   listed above.
 ; Entry: M any, X any, DP any, DB any (nothing is used here; each target
 ;        has its own needs)
 ; Exit:  through the jump target; nothing is changed here
@@ -135,9 +136,10 @@ BattleSys_SceneSetup:
 ;        DB=$7E (what the services expect); A = the service number
 ;        (0-9), B = 0 (the 16-bit TAX)
 ; Exit:  A, X, Y as on entry (8-bit A, 16-bit X and Y pulled back; this
-;        holds only while the service returns with the same M and X,
-;        which every matched service does); P, DP, DB and memory as the
-;        service leaves them
+;        holds only while the service returns with the same M and X:
+;        checked for services 1-5 and 7-9; for services 0 and 6 it is
+;        assumed, since their callees in banks $CC, $CD and $CF are not
+;        analysed); P, DP, DB and memory as the service leaves them
 BattleSys_RunService:
     PHA
     PHX
@@ -27527,8 +27529,13 @@ BattleAi_AddStatByteAtY:
 ; BattleAi_ReadTargets_Code ran BattleAi_ClearTargets first, so the list
 ; starts all $FF) and !BattleAi_TargetCount. "Self" is the acting enemy:
 ; slot !Battle_UnkB252 + 3 in some handlers, slot !Battle_UnkB18B in
-; others (the code never shows the two to be the same; on the enemy's
-; turn both are expected to name it, not traced). Kinds:
+; others. On the enemy's own turn the two agree: BattleAi_EnemyTurn sets
+; !Battle_UnkB252 = !Battle_UnkAEC8 and !Battle_UnkB18B = that + 3
+; ($C1:8D01-$8D07). In BattleSys_Unk8461's reaction tests they differ:
+; !Battle_UnkB252 is the reacting enemy, while !Battle_UnkB18B still
+; holds the battler that last acted (!Battle_UnkB3B7), or, once an
+; earlier reaction in the same pass has run BattleAi_EnemyTurn, that
+; enemy's slot. Kinds:
 ;   - fixed lists: nothing ($00), the present PCs ($01), all present
 ;     battlers ($02), the present enemies ($16) or those but self ($15),
 ;     self ($03), one fixed slot ($27-$2E: 3-10, $30-$36: 0-6);
@@ -29697,7 +29704,8 @@ BattleAi_TargetsByPcByte:
 ;   ($C1:AD9D).
 ; Callers note: BattleAi_TargetsByPcByte and 19 target handlers ($0E-$14,
 ;   $1A-$25).
-; Entry: M=1, X=0, DP any (not used), DB=$7E
+; Entry: M=1, X=0, DP=0 (the TDC/TAX/TAY at $C1:ADB0 and at .any_mark
+;        use it as zero, and BattleAi_TargetFarthestPc needs DP=0), DB=$7E
 ; Exit:  M=1, X=0 (BattleAi_TargetFarthestPc returns with X=0),
 ;        DB=$7E; A, X, Y clobbered; !BattleAi_Targets[0] and
 ;        !BattleAi_TargetCount written as above, plus what
@@ -43803,7 +43811,7 @@ BankC1_OldBuildTail:
 .calc_older:                            ; $C1:FFB6-$C1:FFD3: the end of an older CalcUnk56 ($205 higher) and four veneers
     db $A2,$18,$00,$86,$2A,$20,$06,$CB,$A5,$2C,$18,$69,$44,$60,$20,$E7
     db $CA,$6B,$20,$F7,$D1,$6B,$20,$94,$C1,$6B,$20,$BB,$AF,$6B
-.setup_oldest:                          ; $C1:FFD4-$C1:FFFE: the oldest ($22E higher): a Battle_SetupBattle end, CalcUnk56, four veneers and the last bytes of a fifth
+.setup_oldest:                          ; $C1:FFD4-$C1:FFFE: the oldest copy here ($22E higher): a Battle_SetupBattle end, CalcUnk56 and four veneers (to $FFFC); $FFFD-$FFFE ($B0,$6B) are the tail of a veneer from a still older copy
     db $37,$B1,$FD,$22,$DA,$AD,$FD,$60,$AA,$86,$28,$A2,$18,$00,$86,$2A
     db $20,$49,$CB,$A5,$2C,$18,$69,$44,$60,$20,$2A,$CB,$6B,$20,$3A,$D2
     db $6B,$20,$D7,$C1,$6B,$20,$1E,$B0,$6B,$B0,$6B

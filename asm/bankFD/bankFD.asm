@@ -43,7 +43,9 @@ org $FDA8A5
 ; command when it is 1 ("cannot act", probably).
 ; Callers (6 JSL sites): BattleSys_UnkB575 ($C1:B640, $C1:B671, $C1:B6A2) and BattleSys_UnkB967
 ;   ($C1:BA01, $C1:BA11, $C1:BA21).
-; Entry: M=1, X any, DP any (not used), DB=$7E; A = the PC slot (0-2),
+; Entry: M=1, X=0 (with X=1 the TAY keeps only the low byte, so slot 2's
+;        $100 becomes 0), DP=0 (the TDC at $FD:A8AD loads it as zero; the
+;        Exit B=0 holds only with DP=0), DB=$7E; A = the PC slot (0-2),
 ;        B = 0 (XBA / LSR make slot * $80)
 ; Exit:  M=1, DB=$7E; A = 1 when it cannot act, else the .Status2 byte
 ;        (none of $86 set); B = 0; Y = slot * $80; X unchanged;
