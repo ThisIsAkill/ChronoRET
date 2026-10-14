@@ -4048,9 +4048,10 @@ C2Script_IfRamByteNonZero:
 ; $C2:14AD — C2Script_IfRamByteNe (37 bytes, $14AD–$14D1)
 ; Op $24, 5 bytes: if the RAM byte at arg 1-2 is not arg 3, branch by
 ; arg 4; else advance 5.
-; Callers note: none direct (C2Script_OpTable). The JSR byte pattern at
-;   $C2:FFB4 is not a call: it lies in BankC2_OldBuildLeftovers (bytes
-;   kept as data).
+; Callers note: none direct (C2Script_OpTable). xref's three DOUBTFUL
+;   JSR hits are not calls: $C2:FF7A and $C2:FFB4 lie in
+;   BankC2_OldBuildLeftovers (bytes kept as data), $C2:D096 is byte 1 of
+;   the instruction at $C2:D095 (Menu_UnkD065).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5, or the offset with C=0; X = the address; Y = 3
 ;        or 4
@@ -7436,7 +7437,9 @@ C2Scene_ModeIdle:
 ; C2Scene_MainLoop jumps to one of these through C2Scene_ModeTable when
 ; C2Scene_Mode is 2-6, 8 or 9 (C2Script_GoToLocation, op $05, sets 2;
 ; C2Scene_LeaderInput 3, 5, 6 and 9; object A's task 5, 6 and 8, and
-; its scripts through C2Script_SetRamByte; C2Scene_TrigListC 4). Each runs to its end inside one pass of the
+; its scripts through C2Script_SetRamByte; object B's task
+; C2Scene_ObjBFly 5 and 6 (its .menu and .mode7 tails);
+; C2Scene_TrigListC 4). Each runs to its end inside one pass of the
 ; loop: the ones that come back set C2Scene_ModeIdle1 and JMP to
 ; C2Scene_MainLoop; modes 2 and 4 never come back. All are entered with
 ; M=1, X=0, DP=$0000, DB=$00 (C2Scene_Main's state), A = X = the mode *
@@ -16920,9 +16923,14 @@ TextWin_Step:
 
 ; $C2:5842 — TextWin_StateTable (4 words, $5842–$5849)
 ; TextWin_Step's handler for each TextWin_State (TextWin_State0-3). State 0
-; reads the next byte of the string at TextWin_TextPtr; $C2:58F6 sets
-; state 1 after it points the 24-bit $0237 into a bank-$DE table, which
-; state 1 reads from (the meaning of states 2 and 3 is not traced).
+; reads the next byte of the string at TextWin_TextPtr; for a dictionary
+; byte TextWin_State0 sets state 1 (TextWin_StateDict, at $C2:58F6) after
+; it points the 24-bit TextWin_SubPtr into TextWin_DictPtrs' sub-string
+; in bank $DE, which state 1 reads from. States 2 (TextWin_StateDec,
+; decimal digits) and 3 (TextWin_StateHex, hex digit glyphs) draw a
+; number from TextWin_Digits; TextWin_CodeNum8 and TextWin_CodeNum16
+; enter either (TextWin_StartDec / TextWin_StartHex), TextWin_CodeNum24
+; state 2 only (it falls into TextWin_StartDec).
 TextWin_StateTable:
     dw TextWin_State0
     dw TextWin_State1
@@ -24761,7 +24769,8 @@ Menu_PollPad:
 ; $C2:8545 — Menu_MapButtons (105 bytes, $8545–$85AD, with the sub-entry
 ; Menu_MapButtonsOne at $C2:8555)
 ; Turns the three pad words into the game's button bytes through the
-; configured button map (Menu_ButtonMap, 8 JOY1-layout masks): bit n of
+; configured button map (Menu_ButtonMap, 8 masks in the Pad_Pressed
+; layout Menu_PollPad builds, not JOY1's): bit n of
 ; the result is set when every button of its mask is in the word. Bits
 ; 7-0 come from Menu_ButtonMap + 0, 2, 7, 6, 1, 4, 3, 5 (with the
 ; default map, MenuRom_DefaultButtonMap: A, X, L, R, B, Select, B, Y).
@@ -35632,7 +35641,7 @@ Menu_CfgEntry11:
 ; Menu_CfgA4 is set, else moves the cursor to entry 3 (Menu_CursorSel and
 ; Menu_CfgCursor). Opening: Menu_CursorSel = $0F (the map's first row),
 ; Menu_ThreadVar + 1 (handler 2) and Menu_CfgButtonMap copied to
-; Menu_CfgMapEdit. Every frame ends with Menu_UnkC54F (the map applied
+; Menu_CfgMapEdit (MVN count 8: 9 bytes). Every frame ends with Menu_UnkC54F (the map applied
 ; and drawn).
 ; Callers note: Menu_CfgEntryTable entry 8 (Menu_CfgEntryRun).
 ; Entry: M=1 (8-bit), X=0 (16-bit LDX/LDY), DP=$0000 (the TDC: B = 0,
@@ -36910,7 +36919,8 @@ Menu_XchgSwap:
 ; Entry: M=1, X=1 (8-bit LDX and STX), DP=$0000 (Menu_Tmp00-01), DB=$7E;
 ;        A = the row
 ; Exit:  M=1, X=1; A = (the row, less 3 on the reserve side, AND 7) x 2
-;        (the PLA); X = the first column; Y unchanged
+;        (the PLA); X = Menu_XchgPartyX or Menu_XchgReserveX (also
+;        when Menu_Tmp00 became Menu_XchgAloneX); Y unchanged
 ; Calls: none.
 Menu_XchgBlockPos:
     LDX.b #!Menu_XchgPartyX
@@ -37094,7 +37104,8 @@ Menu_XchgCursor:
 ;        menu thread (Menu_XchgScroll yields)
 ; Exit:  M=1, X=1 (Menu_XchgScroll's P is saved around it); A
 ;        clobbered, X and Y as well when it scrolls; Menu_Tmp00 changed
-;        after a Down move
+;        after a Down move, and after an Up move that scrolls
+;        (Menu_XchgScroll sets it)
 ; Calls: Menu_XchgScroll.
 Menu_XchgEdge:
     LDA.b !Menu_CursorDpad
@@ -37246,7 +37257,8 @@ Menu_XchgScroll:
 ; Callers (1 JSR site): Menu_XchgScroll ($C2:C917).
 ; Entry: M any (P and X saved; SEP #$30 / REP #$10 here), X any, DP any,
 ;        DB=$7E
-; Exit:  P and X restored; A, Y clobbered
+; Exit:  P and X restored; A, Y clobbered; Menu_Unk0D2C = the last
+;        object's offset (Menu_Times64 writes it)
 ; Calls: Menu_Times64.
 Menu_XchgShiftSprites:
     PHX
@@ -37375,8 +37387,8 @@ Menu_XchgSkip:
 ; Menu_LoadCharPalettes; Menu_DimPalette into Menu_DimPalBuf (its 24
 ; colours cover the 16 just copied: the MVN's work is lost, harmless);
 ; Menu_XchgBuildRows; a frame's wait; Menu_XchgPlaceSprites; a frame's
-; wait; Menu_SprUploadMax = 2 and Menu_StartSprThread;
-; Menu_XchgDimLocked; Menu_BuildGradient; the palette flagged;
+; wait; Menu_SprUploadMax = 2 (a 16-bit store: $0D76 = 0 too) and
+; Menu_StartSprThread; Menu_XchgDimLocked; Menu_BuildGradient; the palette flagged;
 ; Menu_HdmaenShadow = Menu_XchgHdmaBits; Menu_VramRecClock,
 ; Menu_VramRecBg2B and Menu_VramRecBg3Rows62 queued.
 ; Callers note: Menu_MainPreviewTable entry 4 (Menu_MainMenuPreview).
@@ -37557,8 +37569,8 @@ Menu_UnkCAE6:
 ; Menu_ListRows = (Menu_XchgReserveCount - 4) x 6 (rows of scroll),
 ; Menu_ListTop = Menu_Unk80 x 6, the list arrows started
 ; (Menu_StartListArrows) with Menu_ArrowX / ArrowY = $EC / $12 and
-; Menu_ArrowMulA / MulB = the quotient of Menu_XchgArrowDividend /
-; Menu_ListRows (the hardware divider; with fewer the divider is set
+; Menu_ArrowMulA and Menu_ArrowMulB (one word store) = the quotient of
+; Menu_XchgArrowDividend / Menu_ListRows (the hardware divider; with fewer the divider is set
 ; and Menu_ListRows left as the difference). Then Menu_DimPalette into
 ; Menu_DimPalBuf, Menu_XchgCursor, and Menu_VramRecClock,
 ; Menu_VramRecBg3Rows62 and Menu_VramRecBg2B queued.
@@ -37618,7 +37630,7 @@ Menu_XchgInit:
     LDA.w #!Menu_XchgArrowXY
     STA.w !Menu_ArrowX
     LDA.l RDDIVL
-    STA.w !Menu_ArrowMulA
+    STA.w !Menu_ArrowMulA               ; and Menu_ArrowMulB
 .palette:
     REP #$30
     LDY.w #!Menu_DimPalBuf
@@ -37646,7 +37658,9 @@ Menu_XchgInit:
 ; Entry: M=1 (8-bit loads and stores), X=0 (16-bit LDX), DP=$0000
 ;        (Menu_Tmp02-03, Menu_StartThread), DB=$7E
 ; Exit:  M=1, or M=0 and X=0 after starting the thread (the REP #$30);
-;        A clobbered, X and Y as well when it plays
+;        A clobbered; X = Menu_Unk0D32 once the bit-6 test passes
+;        (also when no song is started), X and Y clobbered when it
+;        plays
 ; Calls: Menu_XchgSound81, Menu_StartThread.
 Menu_XchgMusic:
     STZ.w !Menu_XchgMusicOn
@@ -37782,8 +37796,8 @@ Menu_XchgLeave:
 
 ; $C2:CC4F — Menu_XchgDimLocked (100 bytes, $CC4F–$CCB2)
 ; Dims the party rows 0-2 whose Menu_XchgRows entry has bit 7 or 6 set:
-; the character's sprite colours (Menu_XchgDimChar; nothing for an
-; empty row) and 6 map rows of its block, on Menu_XchgMap and on
+; sprite colours (Menu_XchgDimChar, see the quirk) and 6 map rows of
+; its block, on Menu_XchgMap and on
 ; Menu_Bg2Map ($1000 on), with Menu_SetRowsAttr: Menu_XchgDimAttr
 ; (14 tiles from Menu_XchgDimMap; each attribute byte keeps bits 0-3
 ; and gets $10: palette + 4, probably the halved colours that
@@ -37792,6 +37806,13 @@ Menu_XchgLeave:
 ; Menu_XchgAloneDimMap; then also the .X of cursor records 0-2 =
 ; Menu_XchgAloneCursorX). The map address (Menu_Tmp04) moves 6 rows
 ; ($180) per party row.
+; Quirk, kept: the row test (AND #$00C0) also passes an empty row
+; (Menu_XchgEmpty, $80), and the TXA at $C2:CC80 hands Menu_XchgDimChar
+; the row number, not the entry, which it uses as the party position.
+; So it halves the palette of Menu_PartyOrder[row]'s character (the
+; row's own character only while the positions before it are filled),
+; and when that position is empty too ($80) Y = $80 x $20 = $1000 and
+; it halves the 15 words at $7E:A5A2-$A5BF (Menu_CharPalettes + $1000).
 ; Callers (2 JSR sites): Menu_UnkC9E5 ($C2:CA3F) and Menu_XchgInit ($C2:CB0D).
 ; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0 (16-bit LDX
 ;        before the REP), DP=$0000 (Menu_Tmp00-05, Menu_MapPtr), DB=$7E
@@ -37850,13 +37871,16 @@ Menu_XchgDimLocked:
 ; $C2:CCB3 — Menu_XchgDimChar (40 bytes, $CCB3–$CCDA)
 ; Halves colours 1-15 of the sprite palette of the character at
 ; position A (A AND $BF: without the locked bit; nothing when bit 7 is
-; set): the 16-bit read at Menu_PartyOrder - 1 + position puts the
+; set, which never happens from its caller): the 16-bit read at Menu_PartyOrder - 1 + position puts the
 ; character in the high byte, x $20 gives its palette in Menu_PalBuf
 ; (colour $91 + 16 x character, as Menu_LoadCharPalettes loads them);
 ; each colour >> 1 AND Menu_HalfColourMask.
 ; Callers (1 JSR site): Menu_XchgDimLocked ($C2:CC81).
+; Callers note: Menu_XchgDimLocked passes the row number 0-2 (TXA at
+;   $C2:CC80), not the row's Menu_XchgRows entry, so the row is used as
+;   the position and the BMI .done never fires (see its quirk).
 ; Entry: M, X any (P saved; SEP #$30 / REP #$30 here), DP any, DB=$7E;
-;        A = the Menu_XchgRows entry
+;        A = the party position (from the caller: the row number 0-2)
 ; Exit:  P restored; A, X, Y clobbered
 ; Calls: none.
 Menu_XchgDimChar:
@@ -37898,7 +37922,8 @@ Menu_XchgDimChar:
 ; Entry: M, X any (P saved; REP #$30 / SEP #$30 here), DP=$0000
 ;        (Menu_XchgSprIdx, Menu_XchgRowIdx), DB=$7E
 ; Exit:  P restored; A, X, Y clobbered; Menu_CurMember = the number of
-;        party members drawn
+;        party members drawn; $0025 = 0 (the first STZ of
+;        Menu_XchgRowIdx is 16-bit)
 ; Calls: Menu_XchgAddSprite.
 Menu_XchgPlaceSprites:
     PHP
@@ -37954,8 +37979,9 @@ Menu_XchgPlaceSprites:
 ; BankFF_CharBits bit is set in Menu_Unk7F01DF. Unless Menu_Unk0D36 is
 ; set (low byte), the reserve: for positions 3-8 with a character the
 ; entry = the position, from Menu_XchgReserveRows on, and
-; Menu_XchgReserveCount = their number (with Menu_Unk0D36 set it keeps
-; its old value). Quirk, harmless: the LDA #$40 at $C2:CD79 is never
+; Menu_XchgReserveCount = their number. The STZ.w Menu_XchgPartyCount
+; at $C2:CD40 runs with M=0, so it zeroes Menu_XchgReserveCount too:
+; with Menu_Unk0D36 set the count stays 0. Quirk, harmless: the LDA #$40 at $C2:CD79 is never
 ; reached (a BEQ right after a BNE on the same flag skips it), so
 ; Menu_Tmp00 is 0 and the BVS at $C2:CD94 never taken.
 ; Callers (2 JSR sites): Menu_XchgSwap ($C2:C77C) and Menu_UnkC9E5 ($C2:CA2A).
@@ -38035,7 +38061,9 @@ Menu_XchgBuildRows:
 ; Callers (3 JSR sites): Menu_XchgScroll ($C2:C8CE) and Menu_XchgPlaceSprites ($C2:CCF7, $C2:CD1A).
 ; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_CurMember,
 ;        Menu_XchgSprIdx as a word: its high byte must be 0), DB=$7E
-; Exit:  P restored; A, X, Y clobbered; Menu_CurCharRec loaded
+; Exit:  P restored; A, X, Y clobbered; Menu_CurCharRec loaded;
+;        Menu_CurIsReserve set (Menu_LoadPartyCharRec); Menu_Unk0D2C
+;        the object's offset when there was a character (Menu_Times64)
 ; Calls: Menu_LoadPartyCharRec, Menu_DrawMemberRow, Menu_Times64.
 Menu_XchgAddSprite:
     PHP
@@ -38468,8 +38496,8 @@ Menu_Mode06H3:
 
 ; $C2:CFA2 — Menu_UnkCFA2 (89 bytes, $CFA2–$CFFA)
 ; The save screen's cursor step: Menu_SlotIdx = Menu_LoadHiliteRow =
-; Menu_CursorSel (the slot; Menu_PlaySound0 when it is not the last
-; one), the row's highlight (Menu_UnkCFFB); Menu_LoadDetailRows ($240
+; Menu_CursorSel (the slot; Menu_PlaySound0 when it differs from the
+; previous one, the old Menu_LoadHiliteRow), the row's highlight (Menu_UnkCFFB); Menu_LoadDetailRows ($240
 ; bytes) zeroed and from there 18 bytes each to Menu_LoadLineA and
 ; Menu_LoadLineB; the slot's details (Menu_UnkD36C) when it holds a save
 ; (Menu_SlotValid; the index is the Menu_SlotIdx word);
@@ -38693,7 +38721,9 @@ Menu_UnkD0E5:
 ; For slots 0-2 (Menu_SlotIdx): Menu_DrawSlotWindow at Menu_MapPtr
 ; (from Menu_SlotWinMap, + $100: 4 rows, each time; the INC of its
 ; high byte is absolute, $0062, with DP $0000 and DB $7E the same byte)
-; with Menu_TextTileWord = $20, $40, $60 (the slot's text tiles).
+; with Menu_TextTileWord = $20, $40, $60 (the slot's text tiles; 8-bit
+; stores: only its low byte is written, the high byte is left as it
+; was).
 ; Callers (2 JSR sites): Menu_UnkD065 ($C2:D06E) and Menu_LoadInit ($C2:E7CC).
 ; Entry: M=1 (8-bit loads and stores), X=0 (16-bit LDX), DP=$0000,
 ;        DB=$7E
@@ -43218,8 +43248,10 @@ Menu_LoadEraseSlot:
 
 ; $C2:E914 — Menu_VramRecUnkE914 (7 bytes, $E914–$E91A)
 ; A Menu_VramRec: VRAM $5840 = $7E:2E80, $80 bytes (the first two rows
-; Menu_VramRecClock sends). No reference found (tools/xref.py finds
-; none to $C2:E914).
+; Menu_VramRecClock sends). No reference found: tools/xref.py looks
+; only at jumps and calls and finds none, and a byte search of bank $C2
+; finds no $14 $E9 at all (so no LDX #Menu_VramRecUnkE914 and no table
+; word pointing here).
 Menu_VramRecUnkE914:
     dw !Menu_VramRecE914Dest, !Menu_VramRecE914Src
     db !Bank7E
@@ -47424,9 +47456,11 @@ MenuRom_DefaultConfig:
 
 ; $C2:FCA9 — MenuRom_DefaultButtonMap (9 bytes, $FCA9–$FCB1)
 ; Bytes 3-11 of the new game's Menu_Config: the default button map as
-; JOY1 masks (A, B, X, B, Select, Y, R, L, X), also copied alone to
-; Menu_Unk0408 (Menu_ClearConfigAndFlags) and to Menu_ButtonMap
-; (Menu_UnkC54F). The !MenuRom_DefaultButtonMap define names this label.
+; masks in the Pad_Pressed layout that Menu_PollPad builds (low byte A X
+; L R B Y Select Start, not JOY1's: $08 is B and $02 Select only there):
+; A, B, X, B, Select, Y, R, L, X. Also copied alone to Menu_Unk0408
+; (Menu_ClearConfigAndFlags), to Menu_ButtonMap (Menu_UnkC54F) and to
+; Menu_CfgButtonMap and Menu_CfgMapEdit (Menu_CfgMapCursor, on Start). The !MenuRom_DefaultButtonMap define names this label.
 MenuRom_DefaultButtonMap:
     db !Pad_A, !Pad_B, !Pad_X, !Pad_B, !Menu_PadSelect, !Pad_Y, !Pad_R, !Pad_L, !Pad_X
 
@@ -47521,7 +47555,8 @@ Menu_ShopSellQtyInit:
 ; Menu_ShopRem = 0, and 24 steps of shift and subtract shift the
 ; quotient bits into the 4 bytes from Menu_ShopQuot from below as the
 ; dividend's bits leave at the top. The byte at Menu_ShopQuot before
-; the call ends in Menu_ShopQuot+3. A divisor of 0 gives $FFFFFF.
+; the call ends in Menu_ShopQuot+3 shifted left by one (25 shifts in
+; all: its bit 7 is lost, bit 0 is 0). A divisor of 0 gives $FFFFFF.
 ; Callers (2 JSR sites): Menu_ShopBuyQtyInit ($C2:FCDC) and Menu_ShopSellQtyInit ($C2:FD18).
 ; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00-05,
 ;        Menu_ShopQuot, Menu_ShopRem), DB any
@@ -47630,7 +47665,8 @@ Menu_UnkFD68:
 ; $C2:FD97 — Menu_ShopGainGold (36 bytes, $FD97–$FDBA)
 ; The gold (Menu_Unk2C53, 3 bytes) + Menu_ShopPrice (3 bytes); a carry
 ; out of the third byte sets it to Menu_GoldMax's ($98), never in
-; practice (at most 9,999,999 + 99 x 65,000 is below 2^24); then the cap
+; practice (at most 9,999,999 + 99 x 65,535, a 16-bit unit price, is
+; 16,487,964, below 2^24); then the cap
 ; (Menu_ShopCapGold).
 ; Callers (1 JSR site): Menu_Mode0CH4 ($C2:D6A5).
 ; Entry: M, X any (P saved; REP #$20 / SEP #$20 here), DP any, DB=$7E
@@ -47741,8 +47777,10 @@ Menu_Mode0FList:
 ; Its CONFIRMED hits are five JSLs into these bytes from banks $C7,
 ; $C9, $E8 and $E9 (sites $C7:C93E, $C9:6E49, $C9:7E94, $E8:5D33,
 ; $E9:E00A, bytes not matched there), not checked; its DOUBTFUL ones are
-; operand bytes of matched code or sweeps of unmatched bytes. The first
-; 225 bytes are tails of the code just before them, as with
+; operand bytes of matched code, sweeps of unmatched bytes, or sites
+; inside data (this table itself, BankFF_OldBuildLeftovers,
+; Menu_CfgMapButtons). The first 223 bytes ($FE0C-$FEEA: segments of 6,
+; 72, 48 and 97) are tails of the code just before them, as with
 ; BankC0_OldBuildLeftovers: each segment repeats the bytes of a stretch
 ; of the current code that ends at $C2:FE0B (Menu_ShopPayGold,
 ; Menu_ShopCapGold and Menu_Mode0FList), with the JSR to

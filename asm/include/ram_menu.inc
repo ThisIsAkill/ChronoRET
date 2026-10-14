@@ -47,7 +47,7 @@ if !ram_menu_inc == 0
                                          ; from Menu_BuildPartyLists
 !Menu_Config = $2990                     ; 32 B $2990-$29AF zeroed by Menu_ClearConfigAndFlags; the first
                                          ; 12 get MenuRom_DefaultConfig
-!Menu_ButtonMap = $2993                  ; 8 B: the JOY1 mask behind each mapped button bit (Menu_MapButtons)
+!Menu_ButtonMap = $2993                  ; 8 B: the mask (Pad_Pressed layout) behind each mapped button bit (Menu_MapButtons)
 !Menu_Config01 = $7E2991                 ; 8-bit; Menu_Config+1 as a long address; bits 0-2 pick the
                                          ; colour set Pal_LoadUnkRow0 loads and Field_UploadUnk1F00's graphics set
 !Menu_Config1E = $7E29AE                 ; 8-bit; Menu_Config+$1E as a long address; C2Scene_LoadScene copies it
@@ -1460,7 +1460,7 @@ endif
                                          ; bit 6 locked (Menu_XchgLockedBit), $80 empty; rows 0-2 the party
 !Menu_XchgReserveRows = $0F05            ; 6 B: the reserve rows (positions 3-8 with a character, in order)
 !Menu_XchgPartyCount = $0F0B             ; 8-bit; party rows that can be picked (not locked)
-!Menu_XchgReserveCount = $0F0C           ; 8-bit; reserve rows (kept from before with Menu_Unk0D36 set)
+!Menu_XchgReserveCount = $0F0C           ; 8-bit; reserve rows (0 with Menu_Unk0D36 set: Menu_XchgBuildRows' 16-bit STZ)
 !Menu_XchgCurEntry = $0F0D               ; 8-bit; the Menu_XchgRows entry under the cursor
 !Menu_XchgSong = $0F0E                   ; 8-bit; mode 7: the song to play again on leaving
 !Menu_XchgMusicOn = $0F0F                ; 8-bit; mode 7: non-zero when Menu_XchgMusic changed the music
