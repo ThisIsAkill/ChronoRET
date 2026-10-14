@@ -1428,26 +1428,22 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     against asar, the code/data split, the round trip); xref and tables leave the lines of
     `asm/spc700/` out of the 65816 instruction starts (otherwise SPC700 instructions would count as
     65816 ones in xref's verdicts and in code_survey's opcode statistics; the survey's numbers are
-    unchanged). `asm/spc700/` is outside the `asm/bank*/*.asm` glob, so the lint, callers, progress
-    and draft do not read it. Proposed, for the maintainer:
-    - lint: an SPC700 mode for `asm/spc700/*.asm` with the same rules where they apply (ADDR,
-      CONST, WIDTH: `.b`/`.w` on every memory operand, OPCODE: no `db` instructions, HEADER, SIZE
-      in ARAM addresses, and Entry lines stating P instead of DP/DB), and a generated Callers block
-      from the trace (spc700.py knows every CALL/JMP/PCALL and table entry) in place of the
-      hand-written `Callers note:` lines used now;
-    - progress: a second figure beside the 65816 one, e.g. "SPC700 driver: N of 6,543 code bytes
-      matched", from the emitted bytes inside `spc700.CODE_RANGES` (data from `DATA_RANGES`), with
-      readable/verified once the lint and review cover it; the 65816 figure and its denominator
-      stay as they are (the driver is not in either). Its rows would need their own table (ARAM
-      addresses), e.g. `symbols/spc700_functions.csv`, generated the same way;
-    - code_survey: keep `spc700_bytes` (7,153 with the length word), optionally split into code
-      6,543 / data 608 from the same ranges;
-    - drafting: a `make spc-draft ADDR=0B96 END=0E10` that names operands from `spc700.inc` the
-      way draft.py does from the 65816 includes (now `tools/spc700.py START END` prints the bytes
-      with `.loc_`/`Spc_XXXX` labels and raw operands, which this batch named by hand).
+    unchanged). The review path (added after the maintainer's
+    go-ahead): `tools/progress.py` writes `symbols/spc700_functions.csv` (generated, untracked:
+    ARAM and ROM range, size, kind, status, source_hash) and prints a separate SPC700 line
+    (`"spc700"` in progress.json), leaving the 65816 figure, its denominator and code_survey as
+    they were; `tools/lint_spc700.py` (run by the lint) applies ADDR, CALL, CONST, WIDTH, OPCODE,
+    PLUMB, HEADER and SIZE, STATE (the Entry line states P) for DPDB, and checks that each header
+    names every CALL/JMP/PCALL site the driver trace finds; review rows in `symbols/reviews/`
+    verify SPC700 routines by name and source_hash like the 65816 ones
+    (`tools/validate_functions.py` checks both tables); `tools/test_lint_spc700.py` tests the
+    rules. Still open: a generated Callers block, a split of code_survey's `spc700_bytes` (7,153
+    with the length word) into code 6,543 / data 608, and a `make spc-draft` that names operands
+    from `spc700.inc` the way draft.py does (now `tools/spc700.py START END` prints labelled
+    source with raw operands).
 
-    **(d) Header convention** (written into driver.asm's banner; STYLE.md would need the same
-    paragraph, a rule change for the maintainer): title `$ARAM — Name (N bytes, $XXXX–$YYYY; ROM
+    **(d) Header convention** (driver.asm's banner and STYLE.md, "SPC700 (the sound driver)"):
+    title `$ARAM — Name (N bytes, $XXXX–$YYYY; ROM
     $C7:xxxx–$yyyy)`; `Entry:`/`Exit:` state P (direct page $00xx or $01xx), A, X, Y (YA for word
     results), SP when moved, and the PSW flags callers branch on; `DSP:` the S-DSP registers
     written; `Ports:` what goes through CPUIO0-3 and its 65816 counterpart (Audio_*);
@@ -1467,8 +1463,16 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     (Spc_SaveSong) and a later request for it resumes it with a fade-in; $18/$19 start effect
     (Arg0) on voices 7-6 / 5-4, Arg1 into each track's `$F281`; $FC sets the echo delay, $FD writes
     DSP register Arg0 = Arg1, $FE takes the transfers; $12/$13/$16/$17 and $1A-$1F run a bare RET
-    and are never echoed (whether the 65816 ever sends $1A-$1F, which Audio_CmdSend would pass on,
-    was not checked). Each
+    and are never echoed. Does the 65816 send $1A-$1F (Audio_CmdSend would pass them on)? Every
+    store to `!Audio_CmdId` / `!Sfx_Command` in matched code was read (banks $C0, $C1, $C2, $C3,
+    $CD; $C7's own `Audio_CmdSongAlias` writes $10): the constant ones are $10, $11, $14, $18,
+    $19, $70, $80, $81, $82, $83, $86, $F2 (`!C3_SndPause`), $F3 and $F5
+    (`!BattleCD_ApuCmdPause`), none in $1A-$1F; the battle sound opcodes $78-$7B send $18/$19 only; Menu_ and
+    C2Scene_ senders use named constants of the same set. Three senders take the id from script
+    data and were not scanned (the scripts are packed or need their own parsers): event opcode
+    $EC (`Evt_OpEC_SoundCmd`, from `!Evt_Data`), scene op $4B (`C2Script_SoundCmd`, through
+    `C2Scene_QueueSoundCmd`) and the `$C3` module's script op 6 (`C3_RunScript .op_driver`). So
+    no code path sends $1A-$1F; whether any script byte does is open (headers unchanged). Each
     pass the driver writes APUIO0 = 0, APUIO1 = the song's fade steps left, APUIO2/3 status bits
     (unless `!Spc_Flags88` bit 7 is set: command $FF with Arg0 = 1 and Arg1 nonzero sets it);
     commands other than $10-$17 and $FE that arrive while tracks are stepped are queued (16) and run
