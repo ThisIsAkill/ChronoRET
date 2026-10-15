@@ -2560,11 +2560,11 @@ C3_SprListSmall:
 ;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
 ;   $7E:88B4 and $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (0 at
-;        $7E:5042, $7E:50CE and $7E:514E, the others not traced), DB =
-;        a bank that maps the I/O registers and low WRAM ($00-$3F or
-;        $80-$BF: WMADDL/H, WMDATA and the OAM shadow are absolute;
-;        $00 at those three, under a task; the other sites' not
-;        traced); A = the list's address.
+;        $7E:5042, $7E:50CE, $7E:514E and $7E:56F8, the others not
+;        traced), DB = a bank that maps the I/O registers and low WRAM
+;        ($00-$3F or $80-$BF: WMADDL/H, WMDATA and the OAM shadow are
+;        absolute; $00 at those four, under a task; the other sites'
+;        not traced); A = the list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:

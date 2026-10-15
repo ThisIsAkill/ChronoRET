@@ -530,6 +530,45 @@ endmacro
 !C3_PadLeft = $0200                      ; Left
 !C3_PadDown = $0400                      ; Down
 !C3_PadUp = $0800                        ; Up
+; Program 4 (the mode-7 plane and the stars).
+!C3_Prog4TileList = $60                  ; the sprite tiles' list: 96 bytes (pack 21)
+!C3_Prog4SprVram = $4600                 ; VRAM word of pack 17's sprite tiles
+!C3_Prog4MapBytes = $0380                ; the mode-7 map bytes sent
+!C3_Prog4MapClear = $3C80                ; ... and cleared after them
+!C3_Prog4Colours = $20                   ; pack 20's bytes (pack 18: twice that)
+!C3_M7SelTransparent = $80               ; M7SEL: outside the map transparent
+!C3_Prog4Fade = $0606                    ; C3_FadeStep and C3_FadeTimer
+!C3_Prog4Tiles = $55                     ; BG12NBA and BG34NBA
+!C3_TileListLeft = $FFFE                 ; $7F:FFFE: C3Mod_TileListToVram's count
+!C3_TileWords = $0010                    ; a 4bpp tile's words
+!C3_StarSpeed = $00                      ; page $0B00's var 0: the stars' speed
+!C3_DriftX = $02                         ; var 1: their sideways drift
+!C3_DriftY = $04                         ; var 2: their up drift
+!C3_DriftAngle = $0A                     ; var 5: the drift angle
+!C3_PlaneScrollVarX = $02                ; page $0A00's var 1: the plane's scroll X
+!C3_PlaneScrollVarY = $04                ; var 2: its scroll Y
+!C3_PlaneCentreVarX = $06                ; var 3: its centre X
+!C3_PlaneCentreVarY = $08                ; var 4: its centre Y
+!C3_PlaneMatrix = $14                    ; page $0A00: the mode-7 matrix words A, B, C, D
+!C3_SpinStep = $16                       ; C3Mod_SpinTask: the angle step a frame
+!C3_PictureY = $70                       ; the large picture's Y
+!C3_Unk576ABytes = $20                   ; C3Mod_Unk576A's MVN count
+!C3_StarXY = $0C00                       ; the stars' X and Y bytes, by OAM offset
+!C3_StarDepth = $0E00                    ; their depths, by OAM offset
+!C3_StarDepthMask = $7F                  ; a star's depth
+!C3_StarBytes = $0200                    ; the OAM low table's end
+!C3_StarDivisor = $44                    ; dp: a star's divider (C3_Prog9's byte reused)
+!C3_StarDepthBase = $80                  ; the divider = depth + this
+!C3_HighByteMask = $FF00
+!C3_StarTile0 = $60                      ; the stars' first tile
+!C3_StarMidX = $80                       ; the stars' centre on the screen
+!C3_StarMidY = $70
+!C3_StarTileFar = $68                    ; tiles from this one: the far attribute
+!C3_StarAttrNear = $32                   ; palette 1, priority 3
+!C3_StarAttrFar = $02                    ; palette 1, priority 0
+!C3_AtanUp = $0300                       ; C3Mod_Atan's angle for X = 0, Y positive
+!C3_FullTurn = $0400                     ; a turn (C3Mod_Sine's 1024 steps)
+!C3_TanTableBytes = $0080                ; C3Mod_TanTable's size
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
