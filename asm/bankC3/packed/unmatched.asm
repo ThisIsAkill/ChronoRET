@@ -20,8 +20,6 @@ C3Mod_Prog13:
 
 ; Module code (and operands written at run time) that matched code
 ; names, by address (what they are has not been traced).
-%C3ModOrg($7E89ED)
-C3Mod_Unk89ED:
 %C3ModOrg($7E73C6)
 C3Mod_Unk73C6:
 %C3ModOrg($7E7441)
@@ -30,9 +28,3 @@ C3Mod_Unk7441:
 C3Mod_Unk783C:
 %C3ModOrg($7E7841)
 C3Mod_Unk7841:
-%C3ModOrg($7E8752)
-C3Mod_Unk8752:
-%C3ModOrg($7E8772)
-C3Mod_Unk8772:
-%C3ModOrg($7E90A7)
-C3Mod_Unk90A7:

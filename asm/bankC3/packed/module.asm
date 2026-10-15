@@ -865,10 +865,11 @@ C3Mod_SquareRoot:
 
 ; $7E:350A — C3Mod_FillBytes (4 bytes, $350A–$350D)
 ; DMA fill sources: the zero word at $350B is the fixed source of the
-; VRAM fills at $3D9D (DMAP $09 to VMDATAL: fixed address, two
-; registers, so whole words cleared), $5AEE (C3Mod_MapToM7: DMAP $08
-; to VMDATAL, one register, only the low bytes cleared; C3Mod_Prog2's
-; fill after it keeps that source with DMAP $09) and $90B0 (DMAP/BBAD from Y:
+; VRAM fills at $3D9D (C3Mod_Prog0LoadGfx: DMAP $09 to VMDATAL: fixed
+; address, two registers, so whole words cleared), $5AEE
+; (C3Mod_MapToM7: DMAP $08 to VMDATAL, one register, only the low bytes
+; cleared; C3Mod_Prog2's fill after it keeps that source with DMAP $09)
+; and $90B0 (C3Mod_VramFillLow / C3Mod_VramFill: DMAP/BBAD from Y,
 ; $1808 when entered at $90A7, $1809 from the callers of $90AA, at
 ; $8A50, $8A69 and $9F81); the $FF bytes around it have no reader found
 ; (probably fill bytes too).
@@ -1501,7 +1502,7 @@ C3Mod_AudioSend:
 ; picture for C3_ScaleBitmap, which reads 64-byte rows) is not traced.
 ;   Its JSL callers each call C3Mod_UnpackPack ($3691) first; at
 ; C3Mod_Prog0LoadGfx's calls ($3DED, $3DFA) that puts the pack at
-; $7F:0200 (C3Mod_Unk89ED set Decomp_Dest there); at $7908 and $87B3
+; $7F:0200 (C3Mod_DestBitmapSrc set Decomp_Dest there); at $7908 and $87B3
 ; (code not matched yet), probably the same.
 ; Callers note: JSL from C3Mod_Prog0LoadGfx ($3DED, $3DFA) and $7908
 ;   and $87B3 (code not matched yet).
@@ -2717,12 +2718,13 @@ C3Mod_WipeTask:
 ;     C3_Obsel);
 ;   - pack 5 to C3_PaletteWork ($00:2000, Decomp_DestBank = 0) and
 ;     C3Mod_CommitPalette;
-;   - C3Mod_Unk89ED: Decomp_Dest = $7F:0200 (C3_BitmapSrc) for the
+;   - C3Mod_DestBitmapSrc: Decomp_Dest = $7F:0200 (C3_BitmapSrc) for the
 ;     rest; pack 7 to VRAM's high bytes from word 0 (VMAIN = $80 as
 ;     left by the clear: C3_DmaMode 0, C3_DmaBbad VMDATAH: the mode-7
 ;     tiles), packs 8 and 9 each doubled in height (C3Mod_DoubleRows)
-;     and sent by C3Mod_Unk8752 (from VMADD 0 on; probably the mode-7
-;     map in the low bytes, not traced);
+;     and sent by C3Mod_SendM7Map to VRAM's low bytes (VMAIN = 0):
+;     the mode-7 map, pack 8's 64 rows from word 0, pack 9's from
+;     $2000;
 ;   - VMAIN = $80, two registers (VMDATAL/H): packs 13 and 14 to words
 ;     $7000 and $7100 (the BG tiles, BG12NBA = BG34NBA = $77), pack 6
 ;     to $5000 (the sprites' second tile page);
@@ -2741,8 +2743,8 @@ C3Mod_WipeTask:
 ;        C3_DmaMode = DMAP_TwoRegs, C3_DmaBbad = VMDATAL; A =
 ;        MDMAEN_Ch7, X = Decomp_OutLen ($0800), Y = $E140 (past the
 ;        MVN; Decomp_ToWram restores it).
-; Calls: C3Mod_UnpackPack, C3Mod_CommitPalette, C3Mod_Unk89ED,
-;   C3Mod_DmaUnpacked (JSL), C3Mod_DoubleRows (JSL), C3Mod_Unk8752.
+; Calls: C3Mod_UnpackPack, C3Mod_CommitPalette, C3Mod_DestBitmapSrc,
+;   C3Mod_DmaUnpacked (JSL), C3Mod_DoubleRows (JSL), C3Mod_SendM7Map.
 C3Mod_Prog0LoadGfx:
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
@@ -2764,7 +2766,7 @@ C3Mod_Prog0LoadGfx:
     LDX.w #5*!C3_PackPtrBytes
     JSR C3Mod_UnpackPack
     JSR C3Mod_CommitPalette
-    JSR C3Mod_Unk89ED
+    JSR C3Mod_DestBitmapSrc
     LDX.w #0
     STX.w VMADDL
     LDX.w #7*!C3_PackPtrBytes
@@ -2779,11 +2781,11 @@ C3Mod_Prog0LoadGfx:
     LDX.w #8*!C3_PackPtrBytes
     JSR C3Mod_UnpackPack
     JSL C3Mod_DoubleRows
-    JSR C3Mod_Unk8752
+    JSR C3Mod_SendM7Map
     LDX.w #9*!C3_PackPtrBytes
     JSR C3Mod_UnpackPack
     JSL C3Mod_DoubleRows
-    JSR C3Mod_Unk8752
+    JSR C3Mod_SendM7Map
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
     LDA.b #!DMAP_TwoRegs
@@ -6491,7 +6493,7 @@ C3Mod_HudSmall:
 ;     (C3Mod_SpaceRows: $7F:2200 on); $380 bytes of it from $7F:2200 to
 ;     VRAM's low bytes from word 0 (VMAIN = 0: + 1 after the low byte),
 ;     the rest of the map's $4000 cleared ($3C80 bytes from word $380,
-;     C3Mod_Unk90A7: a fixed zero to VMDATAL);
+;     C3Mod_VramFillLow: a fixed zero to VMDATAL);
 ;   - the colours: the raw packs 20 ($20 bytes) and 18 ($40 bytes) to
 ;     C3_PaletteBuf ($7E:2200) and $7E:2300 (C3_RowCount at C3_TmpF0
 ;     the count), then colour 0 = black;
@@ -6509,7 +6511,7 @@ C3Mod_HudSmall:
 ;        / BG2SC word; Y as C3_RunScript left it.
 ; Calls: C3Mod_UnpackPack, C3Mod_UnpackNibbles, C3Mod_DmaUnpacked (JSL),
 ;   C3Mod_CopyRawPack, C3Mod_TileListToVram, C3Mod_SpaceRows (JSL),
-;   C3Mod_Unk90A7, C3Mod_ScriptTaskA, C3Mod_InitStars.
+;   C3Mod_VramFillLow, C3Mod_ScriptTaskA, C3Mod_InitStars.
 C3Mod_Prog4:
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
@@ -6579,7 +6581,7 @@ C3Mod_Prog4:
     LDA.b #!MDMAEN_Ch7
     STA.w MDMAEN
     LDX.w #!C3_Prog4MapClear
-    JSR C3Mod_Unk90A7
+    JSR C3Mod_VramFillLow
     STZ.w !Decomp_DestBank
     STZ.b !C3_RowCount+1
     LDA.b #!C3_Prog4Colours
@@ -7425,7 +7427,7 @@ C3Mod_TanTable:
 ; The program of C3Mod_ProgramTable entry 2: one picture, first as a
 ; rocking mode-7 plane, later (C3Mod_Prog2ToMode2) in mode 2 with a
 ; wave, and sprites over it.
-;   - C3Mod_Unk89ED: the packs go to $7F:0200 (C3_BitmapSrc); VMAIN =
+;   - C3Mod_DestBitmapSrc: the packs go to $7F:0200 (C3_BitmapSrc); VMAIN =
 ;     $80; pack 24 to VRAM word $4000 (the sprite tiles) and pack 23 to
 ;     $5000 (C3Mod_DmaUnpacked, two registers from VMDATAL; $5000 is
 ;     also BG1's and BG2's tiles in mode 2); pack 23's first 160 tiles
@@ -7463,11 +7465,11 @@ C3Mod_TanTable:
 ;        take any DP, and C3_ModuleFrame sets 0), DB=$00; A = APUIO3's
 ;        low nibble (not 0), X = C3_SongArgs (C3Mod_PlaySong's), Y =
 ;        $0090 (PalAnim_StopAll's).
-; Calls: C3Mod_Unk89ED, C3Mod_UnpackPack, C3Mod_DmaUnpacked (JSL),
+; Calls: C3Mod_DestBitmapSrc, C3Mod_UnpackPack, C3Mod_DmaUnpacked (JSL),
 ;   C3Mod_TilesToM7, C3Mod_MapToM7, C3Mod_CommitPalette,
 ;   C3Mod_ScriptTaskA, FdVec_FFEE (JSL), C3Mod_PlaySong.
 C3Mod_Prog2:
-    JSR C3Mod_Unk89ED
+    JSR C3Mod_DestBitmapSrc
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
     LDX.w #!C3_SprTilesVram
@@ -8671,7 +8673,7 @@ C3Mod_WaveNmiTask:
 ; with sparks, a palette that fades towards a second one, then the
 ; text "BUT... THE FUTURE REFUSED TO CHANGE." in sprites; a button
 ; ends it with a soft reset (C3Mod_ResetWaitTask).
-;   - VMAIN = $80; C3Mod_Unk89ED (the packs to $7F:0200); pack 33 (a
+;   - VMAIN = $80; C3Mod_DestBitmapSrc (the packs to $7F:0200); pack 33 (a
 ;     2bpp font) made 4bpp at VRAM word $4000 (C3Mod_Font2To4, $80
 ;     tiles); pack 31 to $4800, pack 69 to $5000 and pack 59 to $7000
 ;     (C3Mod_DmaUnpacked, two registers from VMDATAL);
@@ -8679,7 +8681,7 @@ C3Mod_WaveNmiTask:
 ;     byte; no reader of it as a word was found); pack 28 to
 ;     $7E:2020 (C3_PaletteWork from colour 16), packs 29 and 30 to
 ;     $7E:B574 and $B774 (the fade targets of C3Mod_PalFadeTask; the
-;     generated copy code's place, unused here), C3Mod_Unk8772
+;     generated copy code's place, unused here), C3Mod_SetGreys
 ;     (colours $F1-$F3 and colour 0 of C3_PaletteWork), pack 32 to
 ;     $7E:21C0 (colours $E0 on);
 ;   - page $0A00 runs C3Mod_Prog7Script, or C3Mod_Prog8Script when
@@ -8696,13 +8698,13 @@ C3Mod_WaveNmiTask:
 ; Entry: M=1, X=0, DP=0, DB=$00 (as C3Mod_Start calls the programs).
 ; Exit:  M=1, X=0, DP=0, DB=$00 (the PLB of the PHB); A = $FF, X =
 ;        C3_Prog7ExitFrames, Y = $0090 (PalAnim_StopAll's).
-; Calls: C3Mod_Unk89ED, C3Mod_UnpackPack, C3Mod_Font2To4,
-;   C3Mod_DmaUnpacked (JSL), C3Mod_Unk8772, C3Mod_CommitPalette,
+; Calls: C3Mod_DestBitmapSrc, C3Mod_UnpackPack, C3Mod_Font2To4,
+;   C3Mod_DmaUnpacked (JSL), C3Mod_SetGreys, C3Mod_CommitPalette,
 ;   C3Mod_ScriptTaskA, C3Mod_InitSparks, FdVec_FFEE (JSL).
 C3Mod_Prog7:
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
-    JSR C3Mod_Unk89ED
+    JSR C3Mod_DestBitmapSrc
     LDX.w #!C3_SprTilesVram
     STX.w VMADDL
     LDX.w #33*!C3_PackPtrBytes
@@ -8742,7 +8744,7 @@ C3Mod_Prog7:
     STX.w !Decomp_Dest
     LDX.w #30*!C3_PackPtrBytes
     JSR C3Mod_UnpackPack
-    JSR C3Mod_Unk8772
+    JSR C3Mod_SetGreys
     LDX.w #(!C3_PaletteWork&$FFFF)+$1C0
     STX.w !Decomp_Dest
     LDX.w #32*!C3_PackPtrBytes
@@ -10511,7 +10513,125 @@ C3Mod_Credits5Roles:
 
 %C3ModOrg($7E6E42)
 C3Mod_Rest6E42:
-    %C3ModRomBytes($7E6E42, $7EA651)
+    %C3ModRomBytes($7E6E42, $7E8752)
+
+%C3ModOrg($7E8752)
+; ============================================================
+; Small helpers of the later programs ($8752–$878F)
+; ============================================================
+
+; $7E:8752 — C3Mod_SendM7Map (32 bytes, $8752–$8771)
+; Sends the 128 rows of $7F:2200-$41FF (C3_BitmapDest: the rows
+; C3Mod_DoubleRows or C3Mod_SpaceRows built) to VRAM's low bytes from
+; the address the caller set: VMAIN = 0 (+ 1 after the low byte), DMA
+; channel 7 one register to VMDATAL, $2000 bytes (64 rows of a 128-wide
+; mode-7 map).
+; Callers note: C3Mod_Prog0LoadGfx ($3DF1, $3DFE) and $859F, $85AC,
+;   $87C4 and $87C7 (code not matched yet).
+; Entry: M=1, X=0 (the 16-bit register pairs), DP any, DB = a bank with
+;        the I/O registers ($00 at C3Mod_Prog0LoadGfx's calls; the
+;        others' not traced); VMADD set.
+; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = C3_M7MapHalf ($2000); Y
+;        unchanged; VMAIN = 0; VMADD past the bytes.
+C3Mod_SendM7Map:
+    STZ.w VMAIN
+    LDX.w #!BBAD_VMDATAL<<8
+    STX.w DMAP7                         ; and BBAD7
+    LDX.w #!C3_BitmapDest
+    STX.w A1T7L
+    LDA.b #!Bank7F
+    STA.w A1B7
+    LDX.w #!C3_M7MapHalf
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; $7E:8772 — C3Mod_SetGreys (30 bytes, $8772–$878F)
+; With DB = $7E (PEA $007E / PLB; the second PLB takes the $00):
+; C3_PaletteWork's colours $F1-$F3 = $77BD, $4631 and $1CE7 (light to
+; dark grey) and colour 0 = black (16-bit stores).
+; Callers note: C3Mod_Prog7 ($62C5) and $868F (code not matched yet).
+; Entry: M any, X=0 (the 16-bit stores), DP any, DB any (set to $7E,
+;        then $00).
+; Exit:  M as on entry, X=0, DB=$00; A unchanged, X = 0; Y unchanged.
+C3Mod_SetGreys:
+    PEA.w !Bank7E                       ; PLB takes the $7E; the $00 stays for the second PLB
+    PLB
+    LDX.w #!C3_CreditsColour1
+    STX.w !C3_GreysColours
+    LDX.w #!C3_CreditsColour2
+    STX.w !C3_GreysColours+2
+    LDX.w #!C3_CreditsColour3
+    STX.w !C3_GreysColours+4
+    LDX.w #0
+    STX.w !C3_PaletteWorkLow
+    PLB
+    RTS
+
+%C3ModOrg($7E8790)
+C3Mod_Rest8790:
+    %C3ModRomBytes($7E8790, $7E89ED)
+
+%C3ModOrg($7E89ED)
+; $7E:89ED — C3Mod_DestBitmapSrc (20 bytes, $89ED–$8A00)
+; Decomp_DestBank / Decomp_Dest = $7F:0200 (C3_BitmapSrc): two
+; overlapping 16-bit long stores ($7F00 at $0304, then $0200 at $0303).
+; Callers note: C3Mod_Prog0LoadGfx ($3DC5), C3Mod_Prog2 ($5978),
+;   C3Mod_Prog7 ($624D) and $78EC, $7AD8, $853D, $87AA, $87DD, $8A20,
+;   $8BCE, $8C33, $8CF2 and $8ED9 (code not matched yet).
+; Entry: M any (P saved; 16-bit set here), X any, DP any, DB any (the
+;        stores are long).
+; Exit:  P restored; A = $0002 (the XBA of $0200; A's low byte 2 at
+;        M=1); X, Y unchanged.
+C3Mod_DestBitmapSrc:
+    PHP
+    REP #$20
+    LDA.w #!Bank7F<<8
+    STA.l !Decomp_Dest+1                ; and Decomp_DestBank = $7F
+    LDA.w #!C3_BitmapSrc
+    STA.l !Decomp_Dest
+    XBA
+    PLP
+    RTS
+
+%C3ModOrg($7E8A01)
+C3Mod_Rest8A01:
+    %C3ModRomBytes($7E8A01, $7E90A7)
+
+%C3ModOrg($7E90A7)
+; $7E:90A7 — C3Mod_VramFillLow (26 bytes with C3Mod_VramFill, $90A7–$90C0)
+; Fills VRAM from the address the caller set with the zero byte of
+; C3Mod_FillBytes ($7E:350B) by DMA channel 7: X bytes, DMAP / BBAD =
+; Y (C3Mod_VramFillLow: $1808, fixed source, one register, VMDATAL:
+; only the low bytes, as VMAIN steps). C3Mod_VramFill ($90AA) takes Y
+; from the caller ($1809 at its calls: two registers, whole words).
+; Sub-entry: C3Mod_VramFill ($90AA).
+; Callers note: C3Mod_Prog4 ($5476) and $85B2, $8D89 and $8F57 (code not
+;   matched yet). C3Mod_VramFill: $8A53, $8A6C and $9F84 (code not
+;   matched yet).
+; Entry: M=1, X=0 (16-bit X and Y), DP any, DB = a bank with the I/O
+;        registers ($00 at C3Mod_Prog4's call; the others' not traced);
+;        X = the byte count, VMADD and VMAIN set. C3Mod_VramFill: the
+;        same, Y = DMAP7 | BBAD7 << 8.
+; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = C3Mod_FillBytes + 1, Y = the DMAP
+;        / BBAD word; VMADD past the fill.
+C3Mod_VramFillLow:
+    LDY.w #!BBAD_VMDATAL<<8|!DMAP_FixedSource
+C3Mod_VramFill:                         ; header: see C3Mod_VramFillLow
+    STX.w DAS7L
+    STY.w DMAP7                         ; and BBAD7
+    LDX.w #C3Mod_FillBytes+1
+    STX.w A1T7L
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+%C3ModOrg($7E90C1)
+C3Mod_Rest90C1:
+    %C3ModRomBytes($7E90C1, $7EA651)
 
 ; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
 ; The staff credits the module shows, in two texts to the module's end:

@@ -774,6 +774,9 @@ endmacro
 !C3_OamHighBytes = $0020
 !C3_CreditsPages = 5
 !C3_CreditsFrames = $005A                ; C3_FrameCount at which the page fades out
+!C3_M7MapHalf = $2000                    ; 64 rows of a 128-wide mode-7 map (C3Mod_SendM7Map)
+!C3_GreysColours = $21E2                 ; $7E: C3_PaletteWork's colour $F1 (C3Mod_SetGreys)
+!C3_PaletteWorkLow = $2000               ; $7E: C3_PaletteWork as a bank-$7E address
 !C3_CreditsPalA = $2200                  ; $7E: C3_PaletteBuf (colours 0-3) ...
 !C3_CreditsPalB = $2300                  ; ... and its colours $80-$83
 !C3_CreditsColour1 = $77BD               ; colours 1-3 (and $81-$83)
