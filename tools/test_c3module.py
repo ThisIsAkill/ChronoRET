@@ -132,11 +132,29 @@ def plant(root: Path, case: str) -> None:
         bank.write_text(bank.read_text() + '\n; $C3:1200 — C3Rom_Pack0 (275 bytes, $1200–$1312)\n'
                         '; A pack. Entry: none. Exit: none.\norg $C31200\nC3Rom_Pack0:\n'
                         '    %DataBlock($31200, $31313)\n')
+    elif case == 'N1':      # the image define set again after module.inc
+        src = mod.read_text().replace('incsrc "module.inc"\n',
+                                      f'incsrc "module.inc"\n!C3Mod_RomImage = "{ABS_MODULE}"\n')
+        mod.write_text(src)
+    elif case == 'N2':      # a readfile name pasted from defines
+        module_hole(f'!rfA = rea\n!rfB = dfile1\n    db !rfA!rfB("{ABS_MODULE}", $1BF)\n'
+                    '    %C3ModRomBytes($7E31C0, $7E377A)')
+    elif case == 'N3':      # an incbin pasted from defines
+        module_hole(f'!dA = inc\n!dB = bin\n    !dA!dB "{ABS_MODULE}":$1BF..$77A')
+    elif case == 'N3c':     # the same in a macro of macros.inc, used in a bank file
+        rom = str(c3pack.ROM_PATH.resolve())
+        with (asm / 'include/macros.inc').open('a') as f:
+            f.write(f'\n!dA = inc\n!dB = bin\nmacro DataBlock(a, b)\n    !dA!dB "{rom}":<a>..<b>\n'
+                    'endmacro\n')
+        bank = asm / 'bankC3/bankC3.asm'
+        bank.write_text(bank.read_text() + '\n; $C3:1200 — C3Rom_Pack0 (275 bytes, $1200–$1312)\n'
+                        '; A pack. Entry: none. Exit: none.\norg $C31200\nC3Rom_Pack0:\n'
+                        '    %DataBlock($31200, $31313)\n')
     else:
         raise ValueError(case)
 
 
-CASES = ('T2', 'T3', 'T5', 'T7', 'T4b')
+CASES = ('T2', 'T3', 'T5', 'T7', 'T4b', 'N1', 'N2', 'N3', 'N3c')
 
 
 class FileReads(unittest.TestCase):
@@ -226,7 +244,7 @@ class Source(unittest.TestCase):
         # The module's ROM bytes read any other way than %C3ModRomBytes never
         # count as source: source_bytes() refuses (a read outside the copy,
         # or a symlink).
-        for case in ('T2', 'T3', 'T5', 'T7'):
+        for case in ('T2', 'T3', 'T5', 'T7', 'N1', 'N2', 'N3'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
                 root = self.isolated_root(tmp, case)
                 c3pack.build(root)
@@ -246,19 +264,33 @@ class Source(unittest.TestCase):
             expected = c3pack.source_bytes()
             with no_strace:
                 self.assertEqual(c3pack.source_bytes(), expected)
+            self.assertEqual(isolated.run_mode(), 'none')      # the figures are unchecked
         with no_strace, mock.patch.dict(os.environ, {isolated.REQUIRE_ENV: '1'}):
             with self.assertRaises(c3pack.PackError):
                 c3pack.source_bytes()
+        isolated._modes.clear()
+
+    def test_fingerprint_has_the_mode(self):
+        # outputs made without the strace check are not current where it runs
+        from unittest import mock
+        import generated
+        import isolated
+        with mock.patch.object(isolated, 'expected_mode', lambda: 'strace'):
+            a = generated.fingerprint()
+        with mock.patch.object(isolated, 'expected_mode', lambda: 'none'):
+            b = generated.fingerprint()
+        self.assertNotEqual(a, b)
 
     @unittest.skipUnless(shutil.which('strace'), 'needs strace')
     def test_bank_read_rejected(self):
         import verify
-        with tempfile.TemporaryDirectory() as tmp:
-            root = self.isolated_root(tmp, 'T4b')
-            work = Path(tmp) / 'work'
-            work.mkdir()
-            with self.assertRaises(SystemExit):
-                verify.assemble_onto(0x00, work, root)
+        for case in ('T4b', 'N3c'):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                root = self.isolated_root(tmp, case)
+                work = Path(tmp) / 'work'
+                work.mkdir()
+                with self.assertRaises(SystemExit):
+                    verify.assemble_onto(0x00, work, root)
 
 
 if __name__ == '__main__':

@@ -34,9 +34,10 @@ runs these and reports them the same way (a finding keeps the routine at
          label on the other side holds that label's address. Needs the
          ROM and asar.
 
-  (File reads: lint_readability.py's FILEREAD rule covers every file
-  under asm/, this module's included, and tools/isolated.py checks the
-  assemblies themselves.)
+  (File reads: lint_readability.py's FILEREAD rule flags them in every
+  file under asm/, this module's included, which reduces the risk; the
+  guarantee is tools/isolated.py's strace check of the assemblies
+  themselves, which CI requires.)
 
 A label whose body is only %C3ModRomBytes (a block not matched yet, kept as
 the ROM's bytes) is not a routine: no rule applies to it.

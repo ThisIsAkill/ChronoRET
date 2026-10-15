@@ -119,6 +119,7 @@ def main() -> int:
             'mismatched_bytes': len(mismatched),
             'per_bank': per_bank,
             'packed_module_bytes': packed_emitted,
+            'file_check': isolated.run_mode(),
             'ranges': [[s, e] for s, e in to_ranges(emitted)] if args.ranges else None,
         }, indent=2))
     else:
@@ -148,8 +149,13 @@ def main() -> int:
         for s, e in to_ranges(mismatched)[:20]:
             print(f'  0x{s:06X}-0x{e - 1:06X}', file=sys.stderr)
         return 1
-    print('VERIFIED: every source-emitted byte matches the ROM.',
-          file=sys.stderr if args.json else sys.stdout)
+    out = sys.stderr if args.json else sys.stdout
+    if isolated.run_mode() == 'strace':
+        print('File check: strace (asar opened no file outside the source).', file=out)
+    else:
+        print('UNCHECKED: no strace file-open check ran (tools/isolated.py), so a byte read '
+              'from the ROM could count as source here; CI runs the check.', file=out)
+    print('VERIFIED: every source-emitted byte matches the ROM.', file=out)
     return 0
 
 

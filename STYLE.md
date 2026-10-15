@@ -170,6 +170,8 @@ The jet-bike race module (`BankC3_PackedModule`, packed at `$C3:1313`) is matche
   (labels take `$7E:xxxx`). Bytes not matched yet are `%C3ModRomBytes(start, end)` under a
   `C3Mod_Rest<addr>` label (no rule applies to those); label-only stubs for module code not
   matched yet go in `asm/bankC3/packed/unmatched.asm`, names and constants in `module.inc`.
+  No other file read anywhere in `asm/` (the lint's FILEREAD rule flags them; what guarantees
+  that ROM bytes never count as source is `tools/isolated.py`'s strace check, required in CI).
 - **Names.** Module routines are `C3Mod_*`; its RAM and constants `!C3_*` (the kernel's are in
   `ram_engine.inc` / `constants_engine.inc`, the module's own in `module.inc`). Kernel and engine
   labels it calls are defines named after the label (`JSL !C3_ModuleFrame`), and the kernel

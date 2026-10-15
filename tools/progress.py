@@ -78,6 +78,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asm_source  # noqa: E402
 import c3module  # noqa: E402
 import c3pack  # noqa: E402
+import isolated  # noqa: E402
 import generated  # noqa: E402
 import lint_readability  # noqa: E402
 import review_log  # noqa: E402
@@ -462,6 +463,7 @@ def analyse() -> dict:
                        'data_bytes': sum(hi - lo + 1 for lo, hi in spc700.DATA_RANGES),
                        'totals': level_totals(spc_rows)},
             'spc700_functions': spc_rows,
+            'file_check': isolated.run_mode(),
             'c3module': {'emitted_bytes': pack_emitted, 'unpacked_bytes': c3pack.MODULE_SIZE,
                          'source_bytes': len(mod_source), **c3module_code(c3_rows),
                          'totals': level_totals(c3_rows)},
@@ -518,11 +520,13 @@ def render_c3module_csv(result) -> str:
 def render_progress_json(result) -> str:
     # "spc700" (added beside schema 3's keys; nothing else changed): the
     # driver's code and data bytes and its totals per level, apart from the
-    # 65816 figures. "c3module" likewise for the packed $C3 module: its
+    # 65816 figures. "file_check": "strace" when every isolated assembly
+    # behind the figures had tools/isolated.py's file-open check, "none"
+    # when one ran without it (unchecked figures). "c3module" likewise for the packed $C3 module: its
     # packed bytes emitted, its unpacked bytes and those from source, its
     # code bytes (traced and matched) and its totals per level.
-    data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'surveyed_code_bytes', 'totals',
-                                   'banks', 'slices', 'spc700', 'c3module')}
+    data = {k: result[k] for k in ('file_check', 'emitted_bytes', 'code_bytes', 'surveyed_code_bytes',
+                                   'totals', 'banks', 'slices', 'spc700', 'c3module')}
     return json.dumps({'schema': SCHEMA, **data}, indent=2) + '\n'
 
 
@@ -678,6 +682,9 @@ def main() -> int:
     print(render_status_line(result))
     print(render_spc700_line(result))
     print(render_c3module_line(result))
+    if result['file_check'] != 'strace':
+        print('UNCHECKED: these figures were made without the strace file-open check '
+              '(progress.json "file_check": "none"); CI makes them with it.')
     return 0
 
 

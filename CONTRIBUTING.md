@@ -79,11 +79,14 @@ every tool that reads them regenerates them when they are stale, and
 ## Workflow tools
 
 - `tools/verify.py` (and progress, which uses it) assembles the source in an isolated copy of
-  `asm/` (`tools/isolated.py`: no `roms/` or `build/`, symlinks refused), so no byte read from
-  the ROM can count as source; the lint's FILEREAD rule names any file read in the text. With
-  `strace` installed (Linux) it also checks every file asar opens; without it (macOS, Windows)
-  that one check is skipped with a warning and everything else, the pre-commit hook included,
-  works as usual. CI requires it (`CHRONORET_REQUIRE_STRACE=1`).
+  `asm/` (`tools/isolated.py`: no `roms/` or `build/`, symlinks refused). With `strace`
+  installed (Linux) it also checks every file asar opens: that check is what guarantees no byte
+  read from the ROM counts as source, and CI requires it (`CHRONORET_REQUIRE_STRACE=1`). The
+  lint's FILEREAD rule flags file reads in the text and the known ways of hiding them, which
+  reduces the risk but cannot close it (asar can build a file read from text in ways no text
+  rule sees). Without strace (macOS, Windows) everything works, the pre-commit hook included,
+  but the figures are marked unchecked: a warning, verify's "UNCHECKED" line and
+  `"file_check": "none"` in `symbols/progress.json`; only `"strace"` figures get published.
 - `make draft ADDR=C1:3714` (`tools/draft.py`) starts a match from source instead of raw
   bytes. It disassembles the routine from that address until it ends (every path has returned
   or jumped away and no branch of its own reaches further; `END=C1:373A` fixes the end),

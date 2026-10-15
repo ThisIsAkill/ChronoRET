@@ -25,8 +25,11 @@ off, whatever the text:
 The file-open check needs strace (Linux). Where strace is missing (macOS,
 Windows) or cannot trace, the assembly still runs isolated (the copy, the
 placeholders, symlinks refused, asar errors failing) and one warning says
-the file-open check was skipped; the lint's FILEREAD rule closes the known
-ways round it on its own. Set CHRONORET_REQUIRE_STRACE=1 to make the check
+the file-open check was skipped, and the figures made are marked
+unchecked (run_mode() 'none': progress.json's "file_check", verify.py's
+report). The lint's FILEREAD rule reduces the risk but cannot close it
+(asar can build a file read from text in ways no text rule sees): the
+strace check is the guarantee. Set CHRONORET_REQUIRE_STRACE=1 to make the check
 mandatory (CI's match job does, and installs strace).
 """
 
@@ -67,6 +70,34 @@ def make_tree(root: Path, dest: Path) -> Path:
 
 REQUIRE_ENV = 'CHRONORET_REQUIRE_STRACE'
 _warned = []
+_modes = set()          # 'strace' / 'none': how this process's isolated runs were checked
+_probe = []
+
+
+def expected_mode() -> str:
+    """'strace' when the file-open check can run here (strace present and
+    able to trace), else 'none'. Probed once per process."""
+    if not _probe:
+        ok = False
+        if shutil.which('strace') is not None:
+            try:
+                ok = subprocess.run(['strace', '-qq', '-o', os.devnull, 'true'],
+                                    capture_output=True, timeout=30).returncode == 0
+            except (OSError, subprocess.SubprocessError):
+                ok = False
+        _probe.append('strace' if ok else 'none')
+    return _probe[0]
+
+
+def run_mode() -> str:
+    """How the isolated runs of this process were checked: 'strace' only if
+    every one had the file-open check, 'none' if any ran without it (and
+    expected_mode() before any has run). Figures made under 'none' are
+    unchecked: the lint's text rules reduce the risk of ROM bytes counted
+    as source but do not close it."""
+    if not _modes:
+        return expected_mode()
+    return 'strace' if _modes == {'strace'} else 'none'
 
 
 def strace_required() -> bool:
@@ -79,11 +110,13 @@ def _without_strace(args, tree, why) -> subprocess.CompletedProcess:
     if strace_required():
         raise IsolationError(f'{why}, and {REQUIRE_ENV} requires the file-open check '
                              f'(apt-get install strace)')
+    _modes.add('none')
     if not _warned:
         _warned.append(True)
         print(f'warning: {why}: the isolated assembly ran without its check of the files asar '
-              f'opens (the lint\'s FILEREAD rule still applies; set {REQUIRE_ENV}=1 to require '
-              f'it, as CI does)', file=sys.stderr)
+              f'opens, so the figures are UNCHECKED (file_check "none"; the lint\'s FILEREAD rule '
+              f'reduces the risk but does not close it; set {REQUIRE_ENV}=1 to require the '
+              f'check, as CI does)', file=sys.stderr)
     r = subprocess.run(['asar', *args], cwd=tree, capture_output=True, text=True)
     if r.returncode != 0:
         raise IsolationError(f'asar failed in the isolated tree:\n{r.stdout}{r.stderr}')
@@ -134,4 +167,5 @@ def run_asar(args: list[str], tree: Path, allowed: Path) -> subprocess.Completed
     if outside:
         raise IsolationError('the source read file(s) from outside itself (only asm/ and the '
                              'generated placeholders may be read): ' + ', '.join(sorted(outside)))
+    _modes.add('strace')
     return r

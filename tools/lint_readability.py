@@ -28,8 +28,13 @@ asm/include/ and are exempt):
          ALLOWED_READS names (bankC3.asm's incbin of the packed $C3 module,
          and the ROM's bytes of its unmatched parts in module.inc's
          %C3ModRomBytes); incsrc/incbin/table paths literal, relative and
-         inside asm/; only .asm and .inc files and no symlink under asm/.
-         Cannot be opted out of. tools/isolated.py enforces the same at
+         inside asm/; only .asm and .inc files and no symlink under asm/;
+         !C3Mod_RomImage set nowhere but module.inc, no other define
+         holding a file path, and no name built by pasting defines
+         together (`!a!b`, `!{...}`), which could spell a file read. These
+         reduce the risk; they cannot close it (asar can build text in
+         other ways): tools/isolated.py's strace check is the guarantee,
+         and CI requires it. Cannot be opted out of. tools/isolated.py enforces the same at
          assembly time (verify.py and c3pack.source_bytes assemble a copy of
          asm/ that cannot reach the ROM).
   HEADER every routine's header (the comment block tools/asm_source.py
@@ -166,10 +171,17 @@ def literal_value(text: str):
 ALLOWED_READS = {
     ('asm/bankC3/bankC3.asm', 'incbin "../../build/c3pack/module.lz"'),
     ('asm/bankC3/packed/module.inc', 'incbin "!C3Mod_RomImage":<start>-!C3Mod_Code..<end>-!C3Mod_Code'),
+    ('asm/bankC3/packed/module.inc', '!C3Mod_RomImage = "../../../build/c3pack/rom_module.bin"'),
 }
 FILE_READ = re.compile(r'(?<![A-Za-z0-9_!.])(?:incbin|(?:can)?readfile\d*|filesize|getfilestatus)\b', re.I)
 PATH_DIRECTIVE = re.compile(r'(?<![A-Za-z0-9_!.])(incsrc|incbin|table)\s+(?:"([^"]*)"|([^\s:]+))', re.I)
 SOURCE_SUFFIXES = ('.asm', '.inc')
+# Ways round the words above that the text can still show (they reduce the
+# risk, they do not close it: asar can build text in more ways than these;
+# tools/isolated.py's strace check is the guarantee):
+DEFINE_SET = re.compile(r'^!([A-Za-z_][A-Za-z0-9_]*)\s*(?:[?:#+])?=\s*(.*)$')     # !name = value
+PATH_STRING = re.compile(r'"[^"]*(?:/|\\|\.[A-Za-z0-9]{1,4}")')                 # "dir/file", "x.bin"
+BUILT_NAME = re.compile(r'![A-Za-z_][A-Za-z0-9_]*!|!\{|![A-Za-z_][A-Za-z0-9_]*\s*\(')   # !a!b, !{..}, !f(..)
 
 
 def split_comment(line: str) -> tuple[str, str]:
@@ -637,6 +649,19 @@ def file_read_findings(root: Path = Path('asm')):
             if FILE_READ.search(code):
                 out.append((str(path), '<file>', no, 'FILEREAD',
                             f'bytes read from a file are not source: {code}'))
+                continue
+            d = DEFINE_SET.match(code)
+            if d and d.group(1) == 'C3Mod_RomImage':
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'!C3Mod_RomImage is set only in module.inc (it names the ROM\'s module): {code}'))
+                continue
+            if d and PATH_STRING.search(d.group(2)):
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'a define holding a file path: {code}'))
+                continue
+            if BUILT_NAME.search(code):
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'a name built from defines (it could spell a file read): {code}'))
                 continue
             for m in PATH_DIRECTIVE.finditer(code):
                 target = m.group(2) if m.group(2) is not None else m.group(3)

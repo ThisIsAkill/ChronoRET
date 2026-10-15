@@ -61,6 +61,10 @@ def fingerprint() -> str:
         h.update(hashlib.sha256(p.read_bytes()).digest())
     if ROM_PATH.exists():
         h.update(b'rom\0' + hashlib.sha256(ROM_PATH.read_bytes()).digest())
+    # how the figures can be checked here (tools/isolated.py): outputs made
+    # without the strace check do not count as current where it can run
+    import isolated
+    h.update(b'file_check\0' + isolated.expected_mode().encode())
     return h.hexdigest()
 
 
