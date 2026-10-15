@@ -27,7 +27,14 @@ asm/include/ and are exempt):
          getfilestatus anywhere in a line's code, but the two lines
          ALLOWED_READS names (bankC3.asm's incbin of the packed $C3 module,
          and the ROM's bytes of its unmatched parts in module.inc's
-         %C3ModRomBytes); incsrc/incbin/table paths literal, relative and
+         %C3ModRomBytes) and the data layer's assets: in
+         asm/data/bankXX.asm only, a line that is exactly
+         `incbin "../../build/assets/<kind>/<label>.bin"` or
+         `incbin "../../build/packs/<label>.lz"` for a piece of bank $XX
+         that the manifest symbols/data_assets.csv lists, once each; the
+         manifest itself must be well formed and exactly what
+         tools/extract_data.py makes from symbols/data_survey.csv (so no
+         other path can be added to it by hand); incsrc/incbin/table paths literal, relative and
          inside asm/; only .asm and .inc files and no symlink under asm/;
          !C3Mod_RomImage set nowhere but module.inc, no other define
          holding a file path, and no name built by pasting defines
@@ -632,6 +639,7 @@ def file_read_findings(root: Path = Path('asm')):
     the build whatever the text; this rule says where they are.)"""
     out = []
     base = root.resolve()
+    data_reads, used = _data_incbins(root, out), set()
     for path in sorted(root.rglob('*')):
         if path.is_symlink():
             out.append((str(path), '<file>', 0, 'FILEREAD', f'{path} is a symlink'))
@@ -644,7 +652,15 @@ def file_read_findings(root: Path = Path('asm')):
             continue
         for no, raw in enumerate(path.read_text(errors='replace').splitlines(), 1):
             code = split_comment(raw)[0].strip()
-            if not code or (f'asm/{path.relative_to(root).as_posix()}', code) in ALLOWED_READS:
+            rel = f'asm/{path.relative_to(root).as_posix()}'
+            if not code or (rel, code) in ALLOWED_READS:
+                continue
+            d = DATA_INCBIN.match(code)
+            if d and (rel, d.group(1)) in data_reads:
+                if d.group(1) in used:
+                    out.append((str(path), '<file>', no, 'FILEREAD',
+                                f'an asset is incbin\'d once only: {code}'))
+                used.add(d.group(1))
                 continue
             if FILE_READ.search(code):
                 out.append((str(path), '<file>', no, 'FILEREAD',
@@ -677,6 +693,24 @@ def file_read_findings(root: Path = Path('asm')):
                 if bad:
                     out.append((str(path), '<file>', no, 'FILEREAD', f'{m.group(1)} of {bad}: {code}'))
     return out
+
+
+DATA_INCBIN = re.compile(r'^incbin "([^"]+)"$')
+
+
+def _data_incbins(root: Path, out: list) -> set[tuple[str, str]]:
+    """{(asm/data/bankXX.asm, incbin path)} the manifest allows; a problem
+    with the manifest becomes a finding in `out` (and allows nothing)."""
+    import extract_data
+    manifest = extract_data.MANIFEST
+    problems = extract_data.manifest_problems()
+    if problems:
+        out += [(str(manifest), '<file>', 0, 'FILEREAD', p) for p in problems]
+        return set()
+    allowed = set()
+    for path, piece in extract_data.allowed_incbins(extract_data.read_manifest()).items():
+        allowed.add((f'asm/data/bank{0xC0 + (piece["offset"] >> 16):02X}.asm', path))
+    return allowed
 
 
 def collect():

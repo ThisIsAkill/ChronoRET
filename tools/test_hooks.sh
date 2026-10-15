@@ -2,7 +2,7 @@
 # test_hooks.sh — prove the pre-commit firewall actually fires.
 #
 # A check that has never failed proves nothing. This plants things the hook
-# must refuse (a ROM image, a generated file, a local notes file, a blocked word) in a scratch
+# must refuse (a ROM image, an extracted asset, a generated file, a local notes file, a blocked word) in a scratch
 # checkout of HEAD and asserts the hook rejects each one, then asserts it
 # accepts a harmless change. Run it whenever tools/pre-commit changes.
 set -uo pipefail
@@ -38,6 +38,12 @@ expect reject "a ROM image (.sfc)"
 
 head -c 4096 /dev/zero > planted.smc && git add -f planted.smc
 expect reject "a ROM image (.smc)"
+
+mkdir -p assets && head -c 64 /dev/zero > assets/planted.bin && git add -f assets/planted.bin
+expect reject "an extracted asset (.bin)"
+
+mkdir -p build/packs && head -c 64 /dev/zero > build/packs/planted.lz && git add -f build/packs/planted.lz
+expect reject "a packed asset under build/"
 
 mkdir -p symbols && echo "address" > symbols/functions.csv && git add -f symbols/functions.csv
 expect reject "a generated file (symbols/functions.csv)"

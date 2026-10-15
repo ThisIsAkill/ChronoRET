@@ -1,0 +1,2232 @@
+# The data layer's manifest: every piece tools/extract_data.py places, made from
+# symbols/data_survey.csv by `python3 tools/extract_data.py generate` (never by hand;
+# the lint checks it is that tool's output). piece: fill (source: the value in param),
+# table (source: pointer entries as labels), extracted (the ROM's bytes, from
+# build/assets/<asset>), packed (build/assets/<asset> holds the unpacked bytes, the build
+# packs them in the mode of param to build/packs/<label>.lz). The assets are written
+# from the user's own ROM into the ignored build/ directory; holds no ROM bytes.
+label,start,end,size,piece,asset,param
+Padding_C310CB,$C3:10CB,$C3:11FF,309,fill,,$00
+C3Pack_000,$C3:1200,$C3:1312,275,packed,packed_lz/C3Pack_000.bin,lz12 -> 1024 B
+Padding_C37A2C,$C3:7A2C,$C3:7FFF,1492,fill,,$00
+SceneDialPack_000,$C3:8000,$C3:8B6B,2924,packed,packed_lz/SceneDialPack_000.bin,lz11 -> 3648 B
+SceneScriptPack_000,$C3:8B6C,$C3:97D6,3179,packed,packed_lz/SceneScriptPack_000.bin,lz12 -> 5557 B
+SceneScriptPack_001,$C3:97D7,$C3:9F40,1898,packed,packed_lz/SceneScriptPack_001.bin,lz12 -> 2999 B
+SceneScriptPack_002,$C3:9F41,$C3:A606,1734,packed,packed_lz/SceneScriptPack_002.bin,lz12 -> 2661 B
+SceneScriptPack_003,$C3:A607,$C3:AC3D,1591,packed,packed_lz/SceneScriptPack_003.bin,lz12 -> 2021 B
+SceneScriptPack_004,$C3:AC3E,$C3:BA13,3542,packed,packed_lz/SceneScriptPack_004.bin,lz12 -> 6293 B
+SceneScriptPack_005,$C3:BA14,$C3:BF7A,1383,packed,packed_lz/SceneScriptPack_005.bin,lz12 -> 2167 B
+SceneScriptPack_006,$C3:BF7B,$C3:C804,2186,packed,packed_lz/SceneScriptPack_006.bin,lz12 -> 3368 B
+SceneScriptPack_007,$C3:C805,$C3:CE43,1599,packed,packed_lz/SceneScriptPack_007.bin,lz12 -> 2691 B
+ScenePalPack_000,$C3:CE44,$C3:CED9,150,packed,packed_lz/ScenePalPack_000.bin,lz11 -> 256 B
+ScenePalPack_001,$C3:CEDA,$C3:CF6B,146,packed,packed_lz/ScenePalPack_001.bin,lz11 -> 160 B
+ScenePalPack_002,$C3:CF6C,$C3:CFF4,137,packed,packed_lz/ScenePalPack_002.bin,lz12 -> 128 B
+ScenePalPack_003,$C3:CFF5,$C3:D01B,39,packed,packed_lz/ScenePalPack_003.bin,lz12 -> 32 B
+ScenePalPack_004,$C3:D01C,$C3:D1EB,464,packed,packed_lz/ScenePalPack_004.bin,lz11 -> 512 B
+ScenePalPack_005,$C3:D1EC,$C3:D35E,371,packed,packed_lz/ScenePalPack_005.bin,lz11 -> 512 B
+ScenePalPack_006,$C3:D35F,$C3:D4D7,377,packed,packed_lz/ScenePalPack_006.bin,lz11 -> 512 B
+ScenePalPack_007,$C3:D4D8,$C3:D644,365,packed,packed_lz/ScenePalPack_007.bin,lz11 -> 512 B
+ScenePalPack_008,$C3:D645,$C3:D7C2,382,packed,packed_lz/ScenePalPack_008.bin,lz11 -> 512 B
+ScenePalPack_009,$C3:D7C3,$C3:D937,373,packed,packed_lz/ScenePalPack_009.bin,lz11 -> 512 B
+ScenePalPack_010,$C3:D938,$C3:DAF1,442,packed,packed_lz/ScenePalPack_010.bin,lz11 -> 512 B
+ScenePalPack_011,$C3:DAF2,$C3:DB98,167,packed,packed_lz/ScenePalPack_011.bin,lz11 -> 352 B
+ScenePalPack_012,$C3:DB99,$C3:DC44,172,packed,packed_lz/ScenePalPack_012.bin,lz11 -> 256 B
+ScenePalPack_013,$C3:DC45,$C3:DCBD,121,packed,packed_lz/ScenePalPack_013.bin,lz11 -> 160 B
+ScenePalPack_014,$C3:DCBE,$C3:DD12,85,packed,packed_lz/ScenePalPack_014.bin,lz11 -> 128 B
+ScenePalPack_015,$C3:DD13,$C3:DD84,114,packed,packed_lz/ScenePalPack_015.bin,lz11 -> 224 B
+ScenePalPack_016,$C3:DD85,$C3:DEB1,301,packed,packed_lz/ScenePalPack_016.bin,lz11 -> 608 B
+ScenePalPack_017,$C3:DEB2,$C3:DF3D,140,packed,packed_lz/ScenePalPack_017.bin,lz11 -> 256 B
+ScenePalPack_018,$C3:DF3E,$C3:DFE0,163,packed,packed_lz/ScenePalPack_018.bin,lz11 -> 224 B
+Padding_C3DFE1,$C3:DFE1,$C3:DFFF,31,fill,,$00
+C2SceneRom_AnimTable,$C3:E000,$C3:FF09,7946,extracted,event_script/C2SceneRom_AnimTable.bin,
+Padding_C3FF0A,$C3:FF0A,$C3:FFFF,246,fill,,$00
+SceneBgPack_000,$C4:0000,$C4:0EB7,3768,packed,packed_lz/SceneBgPack_000.bin,lz12 -> 4096 B
+SceneBgPack_001,$C4:0EB8,$C4:1D39,3714,packed,packed_lz/SceneBgPack_001.bin,lz12 -> 4096 B
+SceneBgPack_002,$C4:1D3A,$C4:2C31,3832,packed,packed_lz/SceneBgPack_002.bin,lz12 -> 4096 B
+SceneBgPack_003,$C4:2C32,$C4:3A9F,3694,packed,packed_lz/SceneBgPack_003.bin,lz12 -> 4096 B
+SceneBgPack_004,$C4:3AA0,$C4:4838,3481,packed,packed_lz/SceneBgPack_004.bin,lz12 -> 4096 B
+SceneBgPack_005,$C4:4839,$C4:55D6,3486,packed,packed_lz/SceneBgPack_005.bin,lz12 -> 4096 B
+SceneBgPack_006,$C4:55D7,$C4:6422,3660,packed,packed_lz/SceneBgPack_006.bin,lz12 -> 4096 B
+SceneBgPack_007,$C4:6423,$C4:72C1,3743,packed,packed_lz/SceneBgPack_007.bin,lz12 -> 4096 B
+SceneBgPack_008,$C4:72C2,$C4:804E,3469,packed,packed_lz/SceneBgPack_008.bin,lz12 -> 4096 B
+SceneBgPack_009,$C4:804F,$C4:8C46,3064,packed,packed_lz/SceneBgPack_009.bin,lz12 -> 4096 B
+SceneBgPack_010,$C4:8C47,$C4:8E32,492,packed,packed_lz/SceneBgPack_010.bin,lz12 -> 4096 B
+SceneBgPack_011,$C4:8E33,$C4:9E44,4114,packed,packed_lz/SceneBgPack_011.bin,lz12 -> 4096 B
+SceneBgPack_012,$C4:9E45,$C4:AD55,3857,packed,packed_lz/SceneBgPack_012.bin,lz12 -> 4096 B
+SceneBgPack_013,$C4:AD56,$C4:BD48,4083,packed,packed_lz/SceneBgPack_013.bin,lz12 -> 4096 B
+SceneBgPack_014,$C4:BD49,$C4:C703,2491,packed,packed_lz/SceneBgPack_014.bin,lz12 -> 4096 B
+SceneBgPack_015,$C4:C704,$C4:D3FE,3323,packed,packed_lz/SceneBgPack_015.bin,lz12 -> 4096 B
+SceneBgPack_016,$C4:D3FF,$C4:D944,1350,packed,packed_lz/SceneBgPack_016.bin,lz12 -> 4096 B
+SceneBgPack_017,$C4:D945,$C4:DB30,492,packed,packed_lz/SceneBgPack_017.bin,lz12 -> 4096 B
+SceneBgPack_018,$C4:DB31,$C4:E881,3409,packed,packed_lz/SceneBgPack_018.bin,lz12 -> 4096 B
+SceneBgPack_019,$C4:E882,$C4:F7AE,3885,packed,packed_lz/SceneBgPack_019.bin,lz12 -> 4096 B
+SceneBgPack_020,$C4:F7AF,$C4:FD71,1475,packed,packed_lz/SceneBgPack_020.bin,lz12 -> 4096 B
+SceneBgPack_021,$C4:FD72,$C4:FFC1,592,packed,packed_lz/SceneBgPack_021.bin,lz12 -> 1024 B
+Padding_C4FFC2,$C4:FFC2,$C4:FFFF,62,fill,,$00
+SceneBgPack_022,$C5:0000,$C5:0EE7,3816,packed,packed_lz/SceneBgPack_022.bin,lz12 -> 4096 B
+SceneBgPack_023,$C5:0EE8,$C5:1E25,3902,packed,packed_lz/SceneBgPack_023.bin,lz12 -> 4096 B
+SceneBgPack_024,$C5:1E26,$C5:2E1B,4086,packed,packed_lz/SceneBgPack_024.bin,lz12 -> 4096 B
+SceneBgPack_025,$C5:2E1C,$C5:3CC8,3757,packed,packed_lz/SceneBgPack_025.bin,lz12 -> 4096 B
+SceneBgPack_026,$C5:3CC9,$C5:4A9A,3538,packed,packed_lz/SceneBgPack_026.bin,lz12 -> 4096 B
+SceneBgPack_027,$C5:4A9B,$C5:5A47,4013,packed,packed_lz/SceneBgPack_027.bin,lz12 -> 4096 B
+SceneBgPack_028,$C5:5A48,$C5:65A4,2909,packed,packed_lz/SceneBgPack_028.bin,lz12 -> 4096 B
+SceneBgPack_029,$C5:65A5,$C5:7150,2988,packed,packed_lz/SceneBgPack_029.bin,lz12 -> 4096 B
+SceneBgPack_030,$C5:7151,$C5:7FFF,3759,packed,packed_lz/SceneBgPack_030.bin,lz12 -> 4096 B
+SceneBgPack_031,$C5:8000,$C5:8B01,2818,packed,packed_lz/SceneBgPack_031.bin,lz12 -> 4096 B
+SceneBgPack_032,$C5:8B02,$C5:8F59,1112,packed,packed_lz/SceneBgPack_032.bin,lz12 -> 4096 B
+SceneBgPack_033,$C5:8F5A,$C5:97F6,2205,packed,packed_lz/SceneBgPack_033.bin,lz12 -> 4096 B
+SceneBgPack_034,$C5:97F7,$C5:9847,81,packed,packed_lz/SceneBgPack_034.bin,lz12 -> 512 B
+SceneBgPack_035,$C5:9848,$C5:98AB,100,packed,packed_lz/SceneBgPack_035.bin,lz12 -> 256 B
+SceneBgPack_036,$C5:98AC,$C5:9A55,426,packed,packed_lz/SceneBgPack_036.bin,lz12 -> 656 B
+SceneObjPack_000,$C5:9A56,$C5:B113,5822,packed,packed_lz/SceneObjPack_000.bin,lz12 -> 8192 B
+SceneObjPack_001,$C5:B114,$C5:B797,1668,packed,packed_lz/SceneObjPack_001.bin,lz12 -> 4096 B
+SceneObjPack_002,$C5:B798,$C5:C6EC,3925,packed,packed_lz/SceneObjPack_002.bin,lz12 -> 8192 B
+SceneObjPack_003,$C5:C6ED,$C5:CD20,1588,packed,packed_lz/SceneObjPack_003.bin,lz12 -> 2048 B
+SceneObjPack_004,$C5:CD21,$C5:D596,2166,packed,packed_lz/SceneObjPack_004.bin,lz12 -> 4096 B
+SceneObjPack_005,$C5:D597,$C5:D80A,628,packed,packed_lz/SceneObjPack_005.bin,lz12 -> 4096 B
+SceneObjPack_006,$C5:D80B,$C5:DA87,637,packed,packed_lz/SceneObjPack_006.bin,lz12 -> 4096 B
+SceneObjPack_007,$C5:DA88,$C5:E0F6,1647,packed,packed_lz/SceneObjPack_007.bin,lz12 -> 4096 B
+SceneObjPack_008,$C5:E0F7,$C5:EAAE,2488,packed,packed_lz/SceneObjPack_008.bin,lz12 -> 4096 B
+SceneObjPack_009,$C5:EAAF,$C5:ED13,613,packed,packed_lz/SceneObjPack_009.bin,lz12 -> 4096 B
+SceneObjPack_010,$C5:ED14,$C5:F364,1617,packed,packed_lz/SceneObjPack_010.bin,lz12 -> 4096 B
+Padding_C5F365,$C5:F365,$C5:FFFF,3227,fill,,$00
+SceneObjPack_011,$C6:0000,$C6:07B5,1974,packed,packed_lz/SceneObjPack_011.bin,lz12 -> 4096 B
+SceneObjPack_012,$C6:07B6,$C6:0E99,1764,packed,packed_lz/SceneObjPack_012.bin,lz12 -> 4096 B
+SceneObjPack_013,$C6:0E9A,$C6:1E70,4055,packed,packed_lz/SceneObjPack_013.bin,lz12 -> 6144 B
+Padding_C61E71,$C6:1E71,$C6:1FFF,399,fill,,$00
+SceneDialPack_002,$C6:2000,$C6:2410,1041,packed,packed_lz/SceneDialPack_002.bin,lz12 -> 8192 B
+SceneListPack_000,$C6:2411,$C6:25DE,462,packed,packed_lz/SceneListPack_000.bin,lz12 -> 574 B
+SceneListPack_001,$C6:25DF,$C6:2798,442,packed,packed_lz/SceneListPack_001.bin,lz12 -> 530 B
+SceneListPack_002,$C6:2799,$C6:2833,155,packed,packed_lz/SceneListPack_002.bin,lz12 -> 152 B
+SceneListPack_003,$C6:2834,$C6:28E3,176,packed,packed_lz/SceneListPack_003.bin,lz12 -> 187 B
+SceneListPack_004,$C6:28E4,$C6:2921,62,packed,packed_lz/SceneListPack_004.bin,lz12 -> 61 B
+SceneListPack_005,$C6:2922,$C6:2990,111,packed,packed_lz/SceneListPack_005.bin,lz12 -> 110 B
+SceneListPack_006,$C6:2991,$C6:29D9,73,packed,packed_lz/SceneListPack_006.bin,lz12 -> 61 B
+SceneListPack_007,$C6:29DA,$C6:29EB,18,packed,packed_lz/SceneListPack_007.bin,lz12 -> 19 B
+SceneMetatilePack_000,$C6:29EC,$C6:3725,3386,packed,packed_lz/SceneMetatilePack_000.bin,lz11 -> 4096 B
+SceneMetatilePack_001,$C6:3726,$C6:4111,2540,packed,packed_lz/SceneMetatilePack_001.bin,lz11 -> 4096 B
+SceneMetatilePack_002,$C6:4112,$C6:4B7C,2667,packed,packed_lz/SceneMetatilePack_002.bin,lz11 -> 4096 B
+SceneMetatilePack_003,$C6:4B7D,$C6:5666,2794,packed,packed_lz/SceneMetatilePack_003.bin,lz11 -> 4096 B
+SceneMetatilePack_004,$C6:5667,$C6:60BC,2646,packed,packed_lz/SceneMetatilePack_004.bin,lz11 -> 4096 B
+SceneMetatilePack_005,$C6:60BD,$C6:6A38,2428,packed,packed_lz/SceneMetatilePack_005.bin,lz11 -> 4096 B
+SceneMapPack_000,$C6:6A39,$C6:793E,3846,packed,packed_lz/SceneMapPack_000.bin,lz11 -> 12288 B
+SceneMapPack_001,$C6:793F,$C6:88FD,4031,packed,packed_lz/SceneMapPack_001.bin,lz11 -> 12288 B
+SceneMapPack_002,$C6:88FE,$C6:90D6,2009,packed,packed_lz/SceneMapPack_002.bin,lz11 -> 12288 B
+SceneMapPack_003,$C6:90D7,$C6:9A88,2482,packed,packed_lz/SceneMapPack_003.bin,lz11 -> 12288 B
+SceneMapPack_004,$C6:9A89,$C6:AB74,4332,packed,packed_lz/SceneMapPack_004.bin,lz11 -> 12288 B
+SceneMapPack_005,$C6:AB75,$C6:BAC4,3920,packed,packed_lz/SceneMapPack_005.bin,lz11 -> 12288 B
+SceneMapPack_006,$C6:BAC5,$C6:C356,2194,packed,packed_lz/SceneMapPack_006.bin,lz11 -> 12288 B
+SceneMapPack_007,$C6:C357,$C6:C7F6,1184,packed,packed_lz/SceneMapPack_007.bin,lz11 -> 12288 B
+SceneBg3MapPack_000,$C6:C7F7,$C6:C993,413,packed,packed_lz/SceneBg3MapPack_000.bin,lz11 -> 4096 B
+SceneBg3MapPack_001,$C6:C994,$C6:CC0A,631,packed,packed_lz/SceneBg3MapPack_001.bin,lz11 -> 4096 B
+SceneBg3MapPack_002,$C6:CC0B,$C6:CD1E,276,packed,packed_lz/SceneBg3MapPack_002.bin,lz11 -> 4096 B
+SceneBg3MapPack_003,$C6:CD1F,$C6:CF71,595,packed,packed_lz/SceneBg3MapPack_003.bin,lz11 -> 4096 B
+SceneBg3MapPack_004,$C6:CF72,$C6:D2BF,846,packed,packed_lz/SceneBg3MapPack_004.bin,lz11 -> 4096 B
+SceneBg3MapPack_005,$C6:D2C0,$C6:D40F,336,packed,packed_lz/SceneBg3MapPack_005.bin,lz11 -> 2048 B
+Scene7000Pack_000,$C6:D410,$C6:D53C,301,packed,packed_lz/Scene7000Pack_000.bin,lz11 -> 512 B
+Scene7000Pack_001,$C6:D53D,$C6:D663,295,packed,packed_lz/Scene7000Pack_001.bin,lz11 -> 512 B
+Scene7000Pack_002,$C6:D664,$C6:D725,194,packed,packed_lz/Scene7000Pack_002.bin,lz11 -> 512 B
+Scene7000Pack_003,$C6:D726,$C6:D802,221,packed,packed_lz/Scene7000Pack_003.bin,lz11 -> 512 B
+Scene7000Pack_004,$C6:D803,$C6:D8BD,187,packed,packed_lz/Scene7000Pack_004.bin,lz11 -> 512 B
+Scene7000Pack_005,$C6:D8BE,$C6:D97B,190,packed,packed_lz/Scene7000Pack_005.bin,lz11 -> 512 B
+Scene7000Pack_006,$C6:D97C,$C6:DA75,250,packed,packed_lz/Scene7000Pack_006.bin,lz11 -> 512 B
+Scene7200Pack_000,$C6:DA76,$C6:DB72,253,packed,packed_lz/Scene7200Pack_000.bin,lz11 -> 3072 B
+Scene7200Pack_001,$C6:DB73,$C6:DC3B,201,packed,packed_lz/Scene7200Pack_001.bin,lz11 -> 3072 B
+Scene7200Pack_002,$C6:DC3C,$C6:DD04,201,packed,packed_lz/Scene7200Pack_002.bin,lz11 -> 3072 B
+Padding_C6DD05,$C6:DD05,$C6:DFFF,763,fill,,$00
+Text_C6F000,$C6:F000,$C6:F3FF,1024,extracted,text/Text_C6F000.bin,
+C2SceneRom_LabelStrings,$C6:F400,$C6:F4FF,256,extracted,text/C2SceneRom_LabelStrings.bin,
+C2SceneRom_MapMarkerTiles,$C6:F500,$C6:F53F,64,extracted,graphics/C2SceneRom_MapMarkerTiles.bin,
+C2SceneRom_MapViewObjPal,$C6:F540,$C6:F55F,32,extracted,palette/C2SceneRom_MapViewObjPal.bin,
+C2SceneRom_ZoomDivA,$C6:F560,$C6:F59F,64,extracted,table/C2SceneRom_ZoomDivA.bin,
+C2SceneRom_ZoomDivB,$C6:F5A0,$C6:F5DF,64,extracted,table/C2SceneRom_ZoomDivB.bin,
+C2SceneRom_ObjAPalA,$C6:F5E0,$C6:F5FF,32,extracted,palette/C2SceneRom_ObjAPalA.bin,
+C2SceneRom_ObjAPalB,$C6:F600,$C6:F61F,32,extracted,palette/C2SceneRom_ObjAPalB.bin,
+C2SceneRom_LastPalRow,$C6:F620,$C6:F63F,32,extracted,palette/C2SceneRom_LastPalRow.bin,
+C2SceneRom_RandVelocities,$C6:F640,$C6:F6BF,128,extracted,table/C2SceneRom_RandVelocities.bin,
+Padding_C6F6C0,$C6:F6C0,$C6:F6FF,64,fill,,$00
+C2SceneRom_DialNibbles,$C6:F700,$C6:FAFF,1024,extracted,graphics/C2SceneRom_DialNibbles.bin,
+SceneDialPack_001,$C6:FB00,$C6:FC50,337,packed,packed_lz/SceneDialPack_001.bin,lz12 -> 512 B
+Padding_C6FC51,$C6:FC51,$C6:FCFF,175,fill,,$00
+C2SceneRom_HeaderTable,$C6:FD00,$C6:FDEF,240,extracted,table/C2SceneRom_HeaderTable.bin,
+C2SceneRom_ObjPacks,$C6:FDF0,$C6:FE1F,48,table,,dl x 16
+C2SceneRom_BgPacks,$C6:FE20,$C6:FE9D,126,table,,dl x 42
+C2SceneRom_BgPacks_Tail,$C6:FE9E,$C6:FE9F,2,extracted,table/C2SceneRom_BgPacks_Tail.bin,
+C2SceneRom_PalettePacks,$C6:FEA0,$C6:FEFF,96,table,,dl x 32
+C2SceneRom_MetatilePacks,$C6:FF00,$C6:FF1D,30,table,,dl x 10
+C2SceneRom_MetatilePacks_Tail,$C6:FF1E,$C6:FF1F,2,extracted,table/C2SceneRom_MetatilePacks_Tail.bin,
+C2SceneRom_MapPacks,$C6:FF20,$C6:FF3D,30,table,,dl x 10
+C2SceneRom_MapPacks_Tail,$C6:FF3E,$C6:FF3F,2,extracted,table/C2SceneRom_MapPacks_Tail.bin,
+C2SceneRom_Bg3MapPacks,$C6:FF40,$C6:FF7E,63,table,,dl x 21
+C2SceneRom_Bg3MapPacks_Tail,$C6:FF7F,$C6:FF7F,1,extracted,table/C2SceneRom_Bg3MapPacks_Tail.bin,
+C2SceneRom_Unk7000Packs,$C6:FF80,$C6:FF9D,30,table,,dl x 10
+C2SceneRom_Unk7000Packs_Tail,$C6:FF9E,$C6:FF9F,2,extracted,table/C2SceneRom_Unk7000Packs_Tail.bin,
+C2SceneRom_Unk7200Packs,$C6:FFA0,$C6:FFBD,30,table,,dl x 10
+C2SceneRom_Unk7200Packs_Tail,$C6:FFBE,$C6:FFBF,2,extracted,table/C2SceneRom_Unk7200Packs_Tail.bin,
+C2SceneRom_ListPacks,$C6:FFC0,$C6:FFDD,30,table,,dl x 10
+C2SceneRom_ListPacks_Tail,$C6:FFDE,$C6:FFDF,2,extracted,table/C2SceneRom_ListPacks_Tail.bin,
+C2SceneRom_ScriptPacks,$C6:FFE0,$C6:FFFD,30,table,,dl x 10
+C2SceneRom_ScriptPacks_Tail,$C6:FFFE,$C6:FFFF,2,extracted,table/C2SceneRom_ScriptPacks_Tail.bin,
+AudioRom_SongSamples,$C7:0E11,$C7:1870,2656,extracted,table/AudioRom_SongSamples.bin,
+AudioRom_SongExtra,$C7:1871,$C7:241C,2988,extracted,table/AudioRom_SongExtra.bin,
+AudioRom_SongEcho,$C7:241D,$C7:24C2,166,extracted,table/AudioRom_SongEcho.bin,
+AudioRom_Block4700,$C7:40B4,$C7:42B6,515,extracted,brr_sample/AudioRom_Block4700.bin,
+AudioRom_Block1E00,$C7:42B7,$C7:42DC,38,extracted,spc_data/AudioRom_Block1E00.bin,
+AudioRom_Block1F80,$C7:42DD,$C7:42F2,22,extracted,spc_data/AudioRom_Block1F80.bin,
+AudioRom_Block1F00,$C7:42F3,$C7:4308,22,extracted,spc_data/AudioRom_Block1F00.bin,
+AudioRom_Block2F00,$C7:4309,$C7:5B0A,6146,extracted,music_sequence/AudioRom_Block2F00.bin,
+AudioRom_Block2F00Alt,$C7:5B0B,$C7:730C,6146,extracted,music_sequence/AudioRom_Block2F00Alt.bin,
+AudioSample_01,$C7:730D,$C7:81AE,3746,extracted,brr_sample/AudioSample_01.bin,
+AudioSample_02,$C7:81AF,$C7:8951,1955,extracted,brr_sample/AudioSample_02.bin,
+AudioSample_03,$C7:8952,$C7:8B81,560,extracted,brr_sample/AudioSample_03.bin,
+AudioSample_04,$C7:8B82,$C7:9B67,4070,extracted,brr_sample/AudioSample_04.bin,
+AudioSample_05,$C7:9B68,$C7:A313,1964,extracted,brr_sample/AudioSample_05.bin,
+AudioSample_06,$C7:A314,$C7:B4A9,4502,extracted,brr_sample/AudioSample_06.bin,
+AudioSample_07,$C7:B4AA,$C7:BEA7,2558,extracted,brr_sample/AudioSample_07.bin,
+AudioSample_08,$C7:BEA8,$C7:CBD8,3377,extracted,brr_sample/AudioSample_08.bin,
+AudioSample_09,$C7:CBD9,$C7:DF93,5051,extracted,brr_sample/AudioSample_09.bin,
+AudioSample_10,$C7:DF94,$C7:E3A9,1046,extracted,brr_sample/AudioSample_10.bin,
+AudioSample_11,$C7:E3AA,$C7:F53F,4502,extracted,brr_sample/AudioSample_11.bin,
+AudioSample_12,$C7:F540,$C7:FFFF,2752,extracted,brr_sample/AudioSample_12.bin,
+AudioSample_12_Cont,$C8:0000,$C8:03CF,976,extracted,brr_sample/AudioSample_12_Cont.bin,
+AudioSample_13,$C8:03D0,$C8:0B2A,1883,extracted,brr_sample/AudioSample_13.bin,
+AudioSample_14,$C8:0B2B,$C8:139C,2162,extracted,brr_sample/AudioSample_14.bin,
+AudioSample_15,$C8:139D,$C8:1CE6,2378,extracted,brr_sample/AudioSample_15.bin,
+AudioSample_16,$C8:1CE7,$C8:2E34,4430,extracted,brr_sample/AudioSample_16.bin,
+AudioSample_17,$C8:2E35,$C8:37FC,2504,extracted,brr_sample/AudioSample_17.bin,
+AudioSample_18,$C8:37FD,$C8:467A,3710,extracted,brr_sample/AudioSample_18.bin,
+AudioSample_19,$C8:467B,$C8:567B,4097,extracted,brr_sample/AudioSample_19.bin,
+AudioSample_20,$C8:567C,$C8:5A64,1001,extracted,brr_sample/AudioSample_20.bin,
+AudioSample_21,$C8:5A65,$C8:6DBC,4952,extracted,brr_sample/AudioSample_21.bin,
+AudioSample_22,$C8:6DBD,$C8:7D63,4007,extracted,brr_sample/AudioSample_22.bin,
+AudioSample_23,$C8:7D64,$C8:8959,3062,extracted,brr_sample/AudioSample_23.bin,
+AudioSample_24,$C8:895A,$C8:8F04,1451,extracted,brr_sample/AudioSample_24.bin,
+AudioSample_25,$C8:8F05,$C8:9695,1937,extracted,brr_sample/AudioSample_25.bin,
+AudioSample_26,$C8:9696,$C8:A2B8,3107,extracted,brr_sample/AudioSample_26.bin,
+AudioSample_27,$C8:A2B9,$C8:B217,3935,extracted,brr_sample/AudioSample_27.bin,
+AudioSample_28,$C8:B218,$C8:C647,5168,extracted,brr_sample/AudioSample_28.bin,
+AudioSample_29,$C8:C648,$C8:D4B3,3692,extracted,brr_sample/AudioSample_29.bin,
+AudioSample_30,$C8:D4B4,$C8:E1C0,3341,extracted,brr_sample/AudioSample_30.bin,
+AudioSample_31,$C8:E1C1,$C8:ECBA,2810,extracted,brr_sample/AudioSample_31.bin,
+AudioSample_32,$C8:ECBB,$C8:FBAD,3827,extracted,brr_sample/AudioSample_32.bin,
+AudioSample_33,$C8:FBAE,$C8:FFFF,1106,extracted,brr_sample/AudioSample_33.bin,
+AudioSample_33_Cont,$C9:0000,$C9:0E36,3639,extracted,brr_sample/AudioSample_33_Cont.bin,
+AudioSample_34,$C9:0E37,$C9:1B3A,3332,extracted,brr_sample/AudioSample_34.bin,
+AudioSample_35,$C9:1B3B,$C9:39B7,7805,extracted,brr_sample/AudioSample_35.bin,
+AudioSample_36,$C9:39B8,$C9:4079,1730,extracted,brr_sample/AudioSample_36.bin,
+AudioSample_37,$C9:407A,$C9:4EC1,3656,extracted,brr_sample/AudioSample_37.bin,
+AudioSample_38,$C9:4EC2,$C9:5958,2711,extracted,brr_sample/AudioSample_38.bin,
+AudioSample_39,$C9:5959,$C9:6A04,4268,extracted,brr_sample/AudioSample_39.bin,
+AudioSample_40,$C9:6A05,$C9:77AA,3494,extracted,brr_sample/AudioSample_40.bin,
+AudioSample_41,$C9:77AB,$C9:A5DE,11828,extracted,brr_sample/AudioSample_41.bin,
+AudioSample_42,$C9:A5DF,$C9:B252,3188,extracted,brr_sample/AudioSample_42.bin,
+AudioSample_43,$C9:B253,$C9:BBF6,2468,extracted,brr_sample/AudioSample_43.bin,
+AudioSample_44,$C9:BBF7,$C9:D91D,7463,extracted,brr_sample/AudioSample_44.bin,
+AudioSample_45,$C9:D91E,$C9:E495,2936,extracted,brr_sample/AudioSample_45.bin,
+AudioSample_46,$C9:E496,$C9:ED61,2252,extracted,brr_sample/AudioSample_46.bin,
+AudioSample_47,$C9:ED62,$C9:F837,2774,extracted,brr_sample/AudioSample_47.bin,
+AudioSample_48,$C9:F838,$C9:FFFF,1992,extracted,brr_sample/AudioSample_48.bin,
+AudioSample_48_Cont,$CA:0000,$CA:0796,1943,extracted,brr_sample/AudioSample_48_Cont.bin,
+AudioSample_49,$CA:0797,$CA:16F5,3935,extracted,brr_sample/AudioSample_49.bin,
+AudioSample_50,$CA:16F6,$CA:21D4,2783,extracted,brr_sample/AudioSample_50.bin,
+AudioSample_51,$CA:21D5,$CA:29F5,2081,extracted,brr_sample/AudioSample_51.bin,
+AudioSample_52,$CA:29F6,$CA:300C,1559,extracted,brr_sample/AudioSample_52.bin,
+AudioSample_53,$CA:300D,$CA:3D3D,3377,extracted,brr_sample/AudioSample_53.bin,
+AudioSample_54,$CA:3D3E,$CA:42BB,1406,extracted,brr_sample/AudioSample_54.bin,
+AudioSample_55,$CA:42BC,$CA:4866,1451,extracted,brr_sample/AudioSample_55.bin,
+AudioSample_56,$CA:4867,$CA:52BE,2648,extracted,brr_sample/AudioSample_56.bin,
+AudioSample_57,$CA:52BF,$CA:6121,3683,extracted,brr_sample/AudioSample_57.bin,
+AudioSample_58,$CA:6122,$CA:7C98,7031,extracted,brr_sample/AudioSample_58.bin,
+AudioSample_59,$CA:7C99,$CA:7FD6,830,extracted,brr_sample/AudioSample_59.bin,
+AudioSample_60,$CA:7FD7,$CA:831D,839,extracted,brr_sample/AudioSample_60.bin,
+AudioSample_61,$CA:831E,$CA:8664,839,extracted,brr_sample/AudioSample_61.bin,
+AudioSample_62,$CA:8665,$CA:8ACB,1127,extracted,brr_sample/AudioSample_62.bin,
+AudioSong_00,$CA:8ACC,$CA:8AF1,38,extracted,music_sequence/AudioSong_00.bin,
+AudioSong_01,$CA:8AF2,$CA:8FB2,1217,extracted,music_sequence/AudioSong_01.bin,
+AudioSong_02,$CA:8FB3,$CA:944D,1179,extracted,music_sequence/AudioSong_02.bin,
+AudioSong_03,$CA:944E,$CA:9AB8,1643,extracted,music_sequence/AudioSong_03.bin,
+AudioSong_04,$CA:9AB9,$CA:9D84,716,extracted,music_sequence/AudioSong_04.bin,
+AudioSong_05,$CA:9D85,$CA:9EC2,318,extracted,music_sequence/AudioSong_05.bin,
+AudioSong_06,$CA:9EC3,$CA:AAA9,3047,extracted,music_sequence/AudioSong_06.bin,
+AudioSong_07,$CA:AAAA,$CA:ABF3,330,extracted,music_sequence/AudioSong_07.bin,
+AudioSong_08,$CA:ABF4,$CA:B1B1,1470,extracted,music_sequence/AudioSong_08.bin,
+AudioSong_09,$CA:B1B2,$CA:B521,880,extracted,music_sequence/AudioSong_09.bin,
+AudioSong_0A,$CA:B522,$CA:B94C,1067,extracted,music_sequence/AudioSong_0A.bin,
+AudioSong_0B,$CA:B94D,$CA:BC33,743,extracted,music_sequence/AudioSong_0B.bin,
+AudioSong_0C,$CA:BC34,$CA:C14D,1306,extracted,music_sequence/AudioSong_0C.bin,
+AudioSong_0D,$CA:C14E,$CA:C679,1324,extracted,music_sequence/AudioSong_0D.bin,
+AudioSong_0F,$CA:C67A,$CA:C8BF,582,extracted,music_sequence/AudioSong_0F.bin,
+AudioSong_0E,$CA:C8C0,$CA:D0EB,2092,extracted,music_sequence/AudioSong_0E.bin,
+AudioSong_10,$CA:D0EC,$CA:D212,295,extracted,music_sequence/AudioSong_10.bin,
+AudioSong_11,$CA:D213,$CA:D354,322,extracted,music_sequence/AudioSong_11.bin,
+AudioSong_12,$CA:D355,$CA:D3AD,89,extracted,music_sequence/AudioSong_12.bin,
+AudioSong_13,$CA:D3AE,$CA:DD80,2515,extracted,music_sequence/AudioSong_13.bin,
+AudioSong_14,$CA:DD81,$CA:E0F3,883,extracted,music_sequence/AudioSong_14.bin,
+AudioSong_15,$CA:E0F4,$CA:E6DC,1513,extracted,music_sequence/AudioSong_15.bin,
+AudioSong_16,$CA:E6DD,$CA:ED53,1655,extracted,music_sequence/AudioSong_16.bin,
+AudioSong_17,$CA:ED54,$CA:F5FC,2217,extracted,music_sequence/AudioSong_17.bin,
+AudioSong_18,$CA:F5FD,$CA:FFFF,2563,extracted,music_sequence/AudioSong_18.bin,
+AudioSong_18_Cont,$CB:0000,$CB:010B,268,extracted,music_sequence/AudioSong_18_Cont.bin,
+AudioSong_19,$CB:010C,$CB:0193,136,extracted,music_sequence/AudioSong_19.bin,
+AudioSong_1A,$CB:0194,$CB:0220,141,extracted,music_sequence/AudioSong_1A.bin,
+AudioSong_1B,$CB:0221,$CB:05E2,962,extracted,music_sequence/AudioSong_1B.bin,
+AudioSong_1C,$CB:05E3,$CB:0787,421,extracted,music_sequence/AudioSong_1C.bin,
+AudioSong_1D,$CB:0788,$CB:0B31,938,extracted,music_sequence/AudioSong_1D.bin,
+AudioSong_1E,$CB:0B32,$CB:10F3,1474,extracted,music_sequence/AudioSong_1E.bin,
+AudioSong_1F,$CB:10F4,$CB:13F1,766,extracted,music_sequence/AudioSong_1F.bin,
+AudioSong_20,$CB:13F2,$CB:1455,100,extracted,music_sequence/AudioSong_20.bin,
+AudioSong_21,$CB:1456,$CB:14D5,128,extracted,music_sequence/AudioSong_21.bin,
+AudioSong_22,$CB:14D6,$CB:156B,150,extracted,music_sequence/AudioSong_22.bin,
+AudioSong_23,$CB:156C,$CB:1A30,1221,extracted,music_sequence/AudioSong_23.bin,
+AudioSong_24,$CB:1A31,$CB:1AF1,193,extracted,music_sequence/AudioSong_24.bin,
+AudioSong_25,$CB:1AF2,$CB:1C15,292,extracted,music_sequence/AudioSong_25.bin,
+AudioSong_26,$CB:1C16,$CB:1D58,323,extracted,music_sequence/AudioSong_26.bin,
+AudioSong_27,$CB:1D59,$CB:22E0,1416,extracted,music_sequence/AudioSong_27.bin,
+AudioSong_28,$CB:22E1,$CB:2C05,2341,extracted,music_sequence/AudioSong_28.bin,
+AudioSong_29,$CB:2C06,$CB:340E,2057,extracted,music_sequence/AudioSong_29.bin,
+AudioSong_2A,$CB:340F,$CB:3A37,1577,extracted,music_sequence/AudioSong_2A.bin,
+AudioSong_2B,$CB:3A38,$CB:3B0A,211,extracted,music_sequence/AudioSong_2B.bin,
+AudioSong_2C,$CB:3B0B,$CB:3E25,795,extracted,music_sequence/AudioSong_2C.bin,
+AudioSong_2D,$CB:3E26,$CB:4274,1103,extracted,music_sequence/AudioSong_2D.bin,
+AudioSong_2E,$CB:4275,$CB:430D,153,extracted,music_sequence/AudioSong_2E.bin,
+AudioSong_2F,$CB:430E,$CB:4795,1160,extracted,music_sequence/AudioSong_2F.bin,
+AudioSong_30,$CB:4796,$CB:4A22,653,extracted,music_sequence/AudioSong_30.bin,
+AudioSong_31,$CB:4A23,$CB:4F0D,1259,extracted,music_sequence/AudioSong_31.bin,
+AudioSong_32,$CB:4F0E,$CB:5A69,2908,extracted,music_sequence/AudioSong_32.bin,
+AudioSong_33,$CB:5A6A,$CB:60B0,1607,extracted,music_sequence/AudioSong_33.bin,
+AudioSong_34,$CB:60B1,$CB:613E,142,extracted,music_sequence/AudioSong_34.bin,
+AudioSong_35,$CB:613F,$CB:61FA,188,extracted,music_sequence/AudioSong_35.bin,
+AudioSong_36,$CB:61FB,$CB:6589,911,extracted,music_sequence/AudioSong_36.bin,
+AudioSong_37,$CB:658A,$CB:6626,157,extracted,music_sequence/AudioSong_37.bin,
+AudioSong_38,$CB:6627,$CB:6F25,2303,extracted,music_sequence/AudioSong_38.bin,
+AudioSong_39,$CB:6F26,$CB:7C4F,3370,extracted,music_sequence/AudioSong_39.bin,
+AudioSong_3A,$CB:7C50,$CB:7D56,263,extracted,music_sequence/AudioSong_3A.bin,
+AudioSong_3B,$CB:7D57,$CB:8400,1706,extracted,music_sequence/AudioSong_3B.bin,
+AudioSong_3C,$CB:8401,$CB:8B4F,1871,extracted,music_sequence/AudioSong_3C.bin,
+AudioSong_3D,$CB:8B50,$CB:8C60,273,extracted,music_sequence/AudioSong_3D.bin,
+AudioSong_3E,$CB:8C61,$CB:9063,1027,extracted,music_sequence/AudioSong_3E.bin,
+AudioSong_3F,$CB:9064,$CB:A337,4820,extracted,music_sequence/AudioSong_3F.bin,
+AudioSong_40,$CB:A338,$CB:A453,284,extracted,music_sequence/AudioSong_40.bin,
+AudioSong_41,$CB:A454,$CB:A56A,279,extracted,music_sequence/AudioSong_41.bin,
+AudioSong_42,$CB:A56B,$CB:A6CC,354,extracted,music_sequence/AudioSong_42.bin,
+AudioSong_43,$CB:A6CD,$CB:A728,92,extracted,music_sequence/AudioSong_43.bin,
+AudioSong_44,$CB:A729,$CB:AFA2,2170,extracted,music_sequence/AudioSong_44.bin,
+AudioSong_45,$CB:AFA3,$CB:B604,1634,extracted,music_sequence/AudioSong_45.bin,
+AudioSong_46,$CB:B605,$CB:BFD5,2513,extracted,music_sequence/AudioSong_46.bin,
+AudioSong_47,$CB:BFD6,$CB:C185,432,extracted,music_sequence/AudioSong_47.bin,
+AudioSong_48,$CB:C186,$CB:C2F8,371,extracted,music_sequence/AudioSong_48.bin,
+AudioSong_49,$CB:C2F9,$CB:CC52,2394,extracted,music_sequence/AudioSong_49.bin,
+AudioSong_4A,$CB:CC53,$CB:CD4B,249,extracted,music_sequence/AudioSong_4A.bin,
+AudioSong_4B,$CB:CD4C,$CB:CDBC,113,extracted,music_sequence/AudioSong_4B.bin,
+AudioSong_4C,$CB:CDBD,$CB:CE32,118,extracted,music_sequence/AudioSong_4C.bin,
+AudioSong_4D,$CB:CE33,$CB:D314,1250,extracted,music_sequence/AudioSong_4D.bin,
+AudioSong_4E,$CB:D315,$CB:E03F,3371,extracted,music_sequence/AudioSong_4E.bin,
+AudioSong_4F,$CB:E040,$CB:E13D,254,extracted,music_sequence/AudioSong_4F.bin,
+AudioSong_50,$CB:E13E,$CB:E88E,1873,extracted,music_sequence/AudioSong_50.bin,
+AudioSong_51,$CB:E88F,$CB:EE20,1426,extracted,music_sequence/AudioSong_51.bin,
+AudioSong_52,$CB:EE21,$CB:F163,835,extracted,music_sequence/AudioSong_52.bin,
+Music_CBF164,$CB:F164,$CB:FF90,3629,extracted,music_sequence/Music_CBF164.bin,
+Padding_CBFF91,$CB:FF91,$CB:FFFF,111,fill,,$FF
+BattleRom_AreaRec,$CC:0000,$CC:05CB,1484,extracted,table/BattleRom_AreaRec.bin,
+BattleRom_UnkCC05CC,$CC:05CC,$CC:06A3,216,extracted,table/BattleRom_UnkCC05CC.bin,
+BattleRom_EquipRec1,$CC:06A4,$CC:08BF,540,extracted,table/BattleRom_EquipRec1.bin,
+BattleRom_EquipRec2,$CC:08C0,$CC:0985,198,extracted,table/BattleRom_EquipRec2.bin,
+BattleRom_EquipRec3,$CC:0986,$CC:0ABB,310,extracted,table/BattleRom_EquipRec3.bin,
+BattleRom_ItemUseFlags,$CC:0ABC,$CC:0B5D,162,extracted,table/BattleRom_ItemUseFlags.bin,
+TextWinRom_ItemNames,$CC:0B5E,$CC:15C3,2662,extracted,text/TextWinRom_ItemNames.bin,
+MenuRom_TechNames,$CC:15C4,$CC:1ACA,1287,extracted,text/MenuRom_TechNames.bin,
+BattleRom_TechInfo,$CC:1ACB,$CC:1BB4,234,extracted,table/BattleRom_TechInfo.bin,
+BattleRom_ItemTargetMode,$CC:1BB5,$CC:1BEA,54,extracted,table/BattleRom_ItemTargetMode.bin,
+Table_CC1BEB,$CC:1BEB,$CC:213F,1365,extracted,table/Table_CC1BEB.bin,
+MenuRom_TechData,$CC:2140,$CC:249E,863,extracted,table/MenuRom_TechData.bin,
+BattleRom_TechUserSets,$CC:249F,$CC:24B2,20,extracted,table/BattleRom_TechUserSets.bin,
+MenuRom_TechMenuRec,$CC:24B3,$CC:253A,136,extracted,table/MenuRom_TechMenuRec.bin,
+BattleRom_TechMpCost,$CC:253B,$CC:2582,72,extracted,table/BattleRom_TechMpCost.bin,
+BattleRom_PcAttackNum,$CC:2583,$CC:2589,7,extracted,table/BattleRom_PcAttackNum.bin,
+BattleRom_HpGrowth,$CC:258A,$CC:25C1,56,extracted,table/BattleRom_HpGrowth.bin,
+BattleRom_MpGrowth,$CC:25C2,$CC:25F9,56,extracted,table/BattleRom_MpGrowth.bin,
+BattleRom_StatGrowth,$CC:25FA,$CC:2631,56,extracted,table/BattleRom_StatGrowth.bin,
+BattleRom_ExpToLevel,$CC:2632,$CC:26F9,200,extracted,table/BattleRom_ExpToLevel.bin,
+BattleRom_TechTpCost,$CC:26FA,$CC:2769,112,extracted,table/BattleRom_TechTpCost.bin,
+BattleRom_CharTechs,$CC:276A,$CC:2777,14,extracted,table/BattleRom_CharTechs.bin,
+BattleRom_ComboTechs,$CC:2778,$CC:28DA,355,extracted,table/BattleRom_ComboTechs.bin,
+MenuRom_TechMenuTiles,$CC:28DB,$CC:2934,90,extracted,table/MenuRom_TechMenuTiles.bin,
+MenuRom_TechLineTiles,$CC:2935,$CC:2952,30,extracted,table/MenuRom_TechLineTiles.bin,
+MenuRom_ComboNeeds,$CC:2953,$CC:2962,16,extracted,table/MenuRom_ComboNeeds.bin,
+MenuRom_TechByteMembers,$CC:2963,$CC:2978,22,extracted,table/MenuRom_TechByteMembers.bin,
+MenuRom_TechLineBits,$CC:2979,$CC:2982,10,extracted,table/MenuRom_TechLineBits.bin,
+MenuRom_ComboMembers,$CC:2983,$CC:29D6,84,extracted,table/MenuRom_ComboMembers.bin,
+MenuRom_ItemBoosts,$CC:29D7,$CC:2A04,46,extracted,table/MenuRom_ItemBoosts.bin,
+BattleRom_UnkCC2A05,$CC:2A05,$CC:2AAF,171,extracted,table/BattleRom_UnkCC2A05.bin,
+BattleRom_AreaRecPtr,$CC:2AB0,$CC:2BDB,300,extracted,table/BattleRom_AreaRecPtr.bin,
+BattleRom_TechWaitNib,$CC:2BDC,$CC:2C6C,145,extracted,table/BattleRom_TechWaitNib.bin,
+MenuRom_ShopLists,$CC:2C6D,$CC:2D68,252,extracted,table/MenuRom_ShopLists.bin,
+MenuRom_Char5Attack,$CC:2D69,$CC:2E30,200,extracted,table/MenuRom_Char5Attack.bin,
+BattleRom_UnkCC2E31,$CC:2E31,$CC:2EB0,128,extracted,table/BattleRom_UnkCC2E31.bin,
+MenuRom_DescStrTable,$CC:2EB1,$CC:3A08,2904,extracted,text/MenuRom_DescStrTable.bin,
+BattleRom_TechInfoStrings,$CC:3A09,$CC:43AE,2470,extracted,text/BattleRom_TechInfoStrings.bin,
+Padding_CC43AF,$CC:43AF,$CC:46FF,849,fill,,$FF
+BattleRom_EnemyStats,$CC:4700,$CC:5DFF,5888,extracted,table/BattleRom_EnemyStats.bin,
+Table_CC5E00,$CC:5E00,$CC:64FF,1792,extracted,table/Table_CC5E00.bin,
+BattleRom_EnemyNames,$CC:6500,$CC:6FCA,2763,extracted,text/BattleRom_EnemyNames.bin,
+BattleRom_UnkCC6FCB,$CC:6FCB,$CC:7AC8,2814,extracted,table/BattleRom_UnkCC6FCB.bin,
+BattleRom_EnemyEffectRecA,$CC:7AC9,$CC:86C8,3072,extracted,table/BattleRom_EnemyEffectRecA.bin,
+BattleRom_EnemyTechTarget,$CC:86C9,$CC:88CA,514,extracted,table/BattleRom_EnemyTechTarget.bin,
+BattleRom_UnkCC88CB,$CC:88CB,$CC:89C5,251,extracted,table/BattleRom_UnkCC88CB.bin,
+BattleRom_EnemyEffectRecB,$CC:89C6,$CC:8B07,322,extracted,table/BattleRom_EnemyEffectRecB.bin,
+BattleRom_AiScriptPtrs,$CC:8B08,$CC:CBC8,16577,extracted,battle_script/BattleRom_AiScriptPtrs.bin,
+BattleRom_ScriptMsgStrings,$CC:CBC9,$CC:DFFF,5175,extracted,text/BattleRom_ScriptMsgStrings.bin,
+Table_CCF383,$CC:F383,$CC:F38B,9,extracted,table/Table_CCF383.bin,
+BattleRom_TechListBase,$CC:F38C,$CC:F394,9,extracted,table/BattleRom_TechListBase.bin,
+BattleRom_TechEntryBase,$CC:F395,$CC:F39A,6,extracted,table/BattleRom_TechEntryBase.bin,
+BattleRom_TechRowMapOffset,$CC:F39B,$CC:F3A0,6,extracted,table/BattleRom_TechRowMapOffset.bin,
+BattleRom_TechEntryOffset,$CC:F3A1,$CC:F3B5,21,extracted,table/BattleRom_TechEntryOffset.bin,
+Table_CCF3B6,$CC:F3B6,$CC:F409,84,extracted,table/Table_CCF3B6.bin,
+BattleRom_FrameBytes,$CC:F40A,$CC:F413,10,extracted,table/BattleRom_FrameBytes.bin,
+BattleRom_PathFromDir,$CC:F414,$CC:F433,32,extracted,table/BattleRom_PathFromDir.bin,
+BattleRom_PathFacing,$CC:F434,$CC:F453,32,extracted,table/BattleRom_PathFacing.bin,
+BattleRom_PathAhead,$CC:F454,$CC:F473,32,extracted,table/BattleRom_PathAhead.bin,
+BattleRom_PathSide,$CC:F474,$CC:F493,32,extracted,table/BattleRom_PathSide.bin,
+BattleRom_PathStepDX,$CC:F494,$CC:F4BB,40,extracted,table/BattleRom_PathStepDX.bin,
+BattleRom_ActMoveSpeed,$CC:F4BC,$CC:F4C3,8,extracted,table/BattleRom_ActMoveSpeed.bin,
+BattleRom_Unk8E2DPattern,$CC:F4C4,$CC:F4CB,8,extracted,table/BattleRom_Unk8E2DPattern.bin,
+BattleRom_Unk8C2DPattern,$CC:F4CC,$CC:F4FB,48,extracted,table/BattleRom_Unk8C2DPattern.bin,
+BattleRom_FrameExtraCount,$CC:F4FC,$CC:F504,9,extracted,table/BattleRom_FrameExtraCount.bin,
+BattleRom_LayoutSprBytes,$CC:F505,$CC:F509,5,extracted,table/BattleRom_LayoutSprBytes.bin,
+BattleRom_LayoutSprites,$CC:F50A,$CC:F543,58,extracted,table/BattleRom_LayoutSprites.bin,
+BattleRom_EnemyMoveInterval,$CC:F544,$CC:F593,80,extracted,table/BattleRom_EnemyMoveInterval.bin,
+BattleRom_PathStepDY,$CC:F594,$CC:F5BB,40,extracted,table/BattleRom_PathStepDY.bin,
+BattleRom_ActMoveDelay,$CC:F5BC,$CC:F5C3,8,extracted,table/BattleRom_ActMoveDelay.bin,
+BattleRom_HitNumDigitX,$CC:F5C4,$CC:F5FC,57,extracted,table/BattleRom_HitNumDigitX.bin,
+BattleRom_FxOverlayPeriod,$CC:F5FD,$CC:F603,7,extracted,table/BattleRom_FxOverlayPeriod.bin,
+Table_CCF604,$CC:F604,$CC:F63B,56,extracted,table/Table_CCF604.bin,
+BattleRom_PcPathAlways,$CC:F63C,$CC:F643,8,extracted,table/BattleRom_PcPathAlways.bin,
+BattleRom_CellMapRow,$CC:F644,$CC:F67B,56,extracted,table/BattleRom_CellMapRow.bin,
+BattleRom_SlotTimes256,$CC:F67C,$CC:F693,24,extracted,table/BattleRom_SlotTimes256.bin,
+BattleRom_CellMapEdge,$CC:F694,$CC:F6D3,64,extracted,table/BattleRom_CellMapEdge.bin,
+Table_CCF6D4,$CC:F6D4,$CC:F753,128,extracted,table/Table_CCF6D4.bin,
+BattleRom_FxCycleList,$CC:F754,$CC:F77A,39,extracted,table/BattleRom_FxCycleList.bin,
+BattleRom_FxTintColours,$CC:F77B,$CC:F77E,4,extracted,palette/BattleRom_FxTintColours.bin,
+Table_CCF77F,$CC:F77F,$CC:F7BF,65,extracted,table/Table_CCF77F.bin,
+BattleRom_ActFrameBase,$CC:F7C0,$CC:F81F,96,extracted,table/BattleRom_ActFrameBase.bin,
+BattleRom_Times16,$CC:F820,$CC:F828,9,extracted,table/BattleRom_Times16.bin,
+BattleRom_HitSetOffset,$CC:F829,$CC:F82E,6,extracted,table/BattleRom_HitSetOffset.bin,
+BattleRom_EnemyListOffset,$CC:F82F,$CC:F836,8,extracted,table/BattleRom_EnemyListOffset.bin,
+BattleRom_PcNameOffset,$CC:F837,$CC:F83E,8,extracted,table/BattleRom_PcNameOffset.bin,
+BattleRom_SlotTimes5,$CC:F83F,$CC:F845,7,extracted,table/BattleRom_SlotTimes5.bin,
+BattleRom_CharTimes6,$CC:F846,$CC:F84C,7,extracted,table/BattleRom_CharTimes6.bin,
+BattleRom_SprTileListPtr,$CC:F84D,$CC:F8EC,160,extracted,table/BattleRom_SprTileListPtr.bin,
+BattleRom_StatsOffset,$CC:F8ED,$CC:F902,22,extracted,table/BattleRom_StatsOffset.bin,
+BattleRom_DigitTiles,$CC:F903,$CC:F90C,10,extracted,table/BattleRom_DigitTiles.bin,
+BattleRom_DigitTilesB,$CC:F90D,$CC:F916,10,extracted,table/BattleRom_DigitTilesB.bin,
+BattleRom_SlotTimes16,$CC:F917,$CC:F92C,22,extracted,table/BattleRom_SlotTimes16.bin,
+BattleRom_SlotTimes3,$CC:F92D,$CC:F938,12,extracted,table/BattleRom_SlotTimes3.bin,
+BattleRom_EnemyRecOfs,$CC:F939,$CC:F940,8,extracted,table/BattleRom_EnemyRecOfs.bin,
+BattleRom_FrameDestBase,$CC:F941,$CC:F956,22,extracted,table/BattleRom_FrameDestBase.bin,
+BattleRom_GfxStepSrcA,$CC:F957,$CC:F95E,8,extracted,table/BattleRom_GfxStepSrcA.bin,
+BattleRom_GfxStepSrcB,$CC:F95F,$CC:F966,8,extracted,table/BattleRom_GfxStepSrcB.bin,
+BattleRom_GfxStepVramA,$CC:F967,$CC:F96E,8,extracted,table/BattleRom_GfxStepVramA.bin,
+BattleRom_GfxStepVramB,$CC:F96F,$CC:F976,8,extracted,table/BattleRom_GfxStepVramB.bin,
+BattleRom_GfxStepSizeA,$CC:F977,$CC:F97E,8,extracted,table/BattleRom_GfxStepSizeA.bin,
+BattleRom_GfxStepSizeB,$CC:F97F,$CC:F986,8,extracted,table/BattleRom_GfxStepSizeB.bin,
+BattleRom_FrameDmaSrcA,$CC:F987,$CC:F99C,22,extracted,table/BattleRom_FrameDmaSrcA.bin,
+BattleRom_FrameDmaSrcB,$CC:F99D,$CC:F9B2,22,extracted,table/BattleRom_FrameDmaSrcB.bin,
+BattleRom_FrameDmaVramA,$CC:F9B3,$CC:F9C8,22,extracted,table/BattleRom_FrameDmaVramA.bin,
+BattleRom_FrameDmaVramB,$CC:F9C9,$CC:F9DE,22,extracted,table/BattleRom_FrameDmaVramB.bin,
+BattleRom_FrameDmaSizeA,$CC:F9DF,$CC:F9E8,10,extracted,table/BattleRom_FrameDmaSizeA.bin,
+BattleRom_FrameDmaSizeB,$CC:F9E9,$CC:F9FA,18,extracted,table/BattleRom_FrameDmaSizeB.bin,
+BattleRom_PcBit,$CC:F9FB,$CC:FA22,40,extracted,table/BattleRom_PcBit.bin,
+BattleRom_NameAttrL1,$CC:FA23,$CC:FA28,6,extracted,table/BattleRom_NameAttrL1.bin,
+BattleRom_NameAttrL02,$CC:FA29,$CC:FA2E,6,extracted,table/BattleRom_NameAttrL02.bin,
+BattleRom_HpCellL0,$CC:FA2F,$CC:FA34,6,extracted,table/BattleRom_HpCellL0.bin,
+BattleRom_HpCellL1,$CC:FA35,$CC:FA3A,6,extracted,table/BattleRom_HpCellL1.bin,
+BattleRom_HpCellL2,$CC:FA3B,$CC:FA40,6,extracted,table/BattleRom_HpCellL2.bin,
+BattleRom_CmdListTech,$CC:FA41,$CC:FA6A,42,extracted,tilemap/BattleRom_CmdListTech.bin,
+BattleRom_CmdListCombo,$CC:FA6B,$CC:FA94,42,extracted,tilemap/BattleRom_CmdListCombo.bin,
+BattleRom_TechBorder,$CC:FA95,$CC:FADC,72,extracted,tilemap/BattleRom_TechBorder.bin,
+BattleRom_MenuCursorCell,$CC:FADD,$CC:FAE2,6,extracted,table/BattleRom_MenuCursorCell.bin,
+BattleRom_TechCursorCell,$CC:FAE3,$CC:FAE8,6,extracted,table/BattleRom_TechCursorCell.bin,
+BattleRom_ItemCursorCell,$CC:FAE9,$CC:FAEF,7,extracted,table/BattleRom_ItemCursorCell.bin,
+BattleRom_CmdOffset,$CC:FAF0,$CC:FAF2,3,extracted,table/BattleRom_CmdOffset.bin,
+BattleRom_SprRecInit,$CC:FAF3,$CC:FB4A,88,extracted,table/BattleRom_SprRecInit.bin,
+BattleRom_TechFixedText,$CC:FB4B,$CC:FB6E,36,extracted,table/BattleRom_TechFixedText.bin,
+BattleRom_Squares,$CC:FB6F,$CC:FB7E,16,extracted,table/BattleRom_Squares.bin,
+BattleRom_ActLerpWeights,$CC:FB7F,$CC:FB8C,14,extracted,table/BattleRom_ActLerpWeights.bin,
+BattleRom_OamShowMask,$CC:FB8D,$CC:FB90,4,extracted,table/BattleRom_OamShowMask.bin,
+BattleRom_EnemyAnimKind,$CC:FB91,$CC:FBAA,26,extracted,table/BattleRom_EnemyAnimKind.bin,
+BattleRom_EnemyMover,$CC:FBAB,$CC:FBC4,26,extracted,table/BattleRom_EnemyMover.bin,
+BattleRom_GaugeLayoutByCfg,$CC:FBC5,$CC:FBC7,3,extracted,table/BattleRom_GaugeLayoutByCfg.bin,
+BattleRom_PcPartners,$CC:FBC8,$CC:FBCD,6,extracted,table/BattleRom_PcPartners.bin,
+BattleRom_Div5,$CC:FBCE,$CC:FC1D,80,extracted,table/BattleRom_Div5.bin,
+BattleRom_CharRecOffset,$CC:FC1E,$CC:FC2B,14,extracted,table/BattleRom_CharRecOffset.bin,
+Table_CCFC2C,$CC:FC2C,$CC:FC4E,35,extracted,table/Table_CCFC2C.bin,
+Padding_CCFC4F,$CC:FC4F,$CC:FFFF,945,fill,,$FF
+Table_CD4000,$CD:4000,$CD:4014,21,extracted,table/Table_CD4000.bin,
+Table_CD4015,$CD:4015,$CD:451E,1290,extracted,table/Table_CD4015.bin,
+Padding_CD451F,$CD:451F,$CD:45A5,135,fill,,$00
+Table_CD45A6,$CD:45A6,$CD:4925,896,extracted,table/Table_CD45A6.bin,
+Table_CD4926,$CD:4926,$CD:4F25,1536,extracted,table/Table_CD4926.bin,
+Table_CD4F26,$CD:4F26,$CD:5525,1536,extracted,table/Table_CD4F26.bin,
+Table_CD5526,$CD:5526,$CD:5C25,1792,extracted,table/Table_CD5526.bin,
+Table_CD5C26,$CD:5C26,$CD:5E01,476,extracted,table/Table_CD5C26.bin,
+Padding_CD5E02,$CD:5E02,$CD:5EC5,196,fill,,$FF
+BattleRom_PcAttackScripts,$CD:5EC6,$CD:5EEF,42,extracted,battle_script/BattleRom_PcAttackScripts.bin,
+BattleRom_PcTechScripts,$CD:5EF0,$CD:5FEF,256,extracted,battle_script/BattleRom_PcTechScripts.bin,
+BattleRom_EnemyAttackScripts,$CD:5FF0,$CD:61EF,512,extracted,battle_script/BattleRom_EnemyAttackScripts.bin,
+BattleRom_EnemyTechScripts,$CD:61F0,$CD:63EF,512,extracted,battle_script/BattleRom_EnemyTechScripts.bin,
+BattleRom_Kind3Scripts,$CD:63F0,$CD:64AF,192,extracted,battle_script/BattleRom_Kind3Scripts.bin,
+BattleRom_PcAttackObjs,$CD:64B0,$CD:656D,190,extracted,table/BattleRom_PcAttackObjs.bin,
+BattleRom_TechObjs,$CD:656E,$CD:666D,256,extracted,table/BattleRom_TechObjs.bin,
+BattleRom_EnemyActObjs,$CD:666E,$CD:686D,512,extracted,table/BattleRom_EnemyActObjs.bin,
+BattleRom_PcAttackPals,$CD:686E,$CD:692B,190,extracted,table/BattleRom_PcAttackPals.bin,
+BattleRom_PcTechPals,$CD:692C,$CD:6A2B,256,extracted,table/BattleRom_PcTechPals.bin,
+BattleRom_EnemyActPals,$CD:6A2C,$CD:6C2B,512,extracted,table/BattleRom_EnemyActPals.bin,
+BattleRom_Kind3Pals,$CD:6C2C,$CD:6CEB,192,extracted,table/BattleRom_Kind3Pals.bin,
+BattleRom_WeaponColourIdx,$CD:6CEC,$CD:6D4B,96,extracted,table/BattleRom_WeaponColourIdx.bin,
+BattleRom_PcAttackSfxA,$CD:6D4C,$CD:6DAB,96,extracted,table/BattleRom_PcAttackSfxA.bin,
+BattleRom_PcAttackSfxB,$CD:6DAC,$CD:6E0B,96,extracted,table/BattleRom_PcAttackSfxB.bin,
+BattleScript_CD6E0C,$CD:6E0C,$CD:96F9,10478,extracted,battle_script/BattleScript_CD6E0C.bin,
+BattleScript_CD96FA,$CD:96FA,$CD:EE22,22313,extracted,battle_script/BattleScript_CD96FA.bin,
+Table_CDEE23,$CD:EE23,$CD:F187,869,extracted,table/Table_CDEE23.bin,
+Table_CDF188,$CD:F188,$CD:F9B8,2097,extracted,table/Table_CDF188.bin,
+Padding_CDF9B9,$CD:F9B9,$CD:FFFF,1607,fill,,$FF
+BattleRom_ActSubscripts,$CE:0000,$CE:00FF,256,extracted,table/BattleRom_ActSubscripts.bin,
+BattleRom_FxCycleColours,$CE:0100,$CE:037F,640,extracted,palette/BattleRom_FxCycleColours.bin,
+BattleScript_CE0380,$CE:0380,$CE:8293,32532,extracted,battle_script/BattleScript_CE0380.bin,
+BattleScript_CE8294,$CE:8294,$CE:886F,1500,extracted,battle_script/BattleScript_CE8294.bin,
+Table_CE8870,$CE:8870,$CE:D427,19384,extracted,table/Table_CE8870.bin,
+BattleScript_CED428,$CE:D428,$CE:DC19,2034,extracted,battle_script/BattleScript_CED428.bin,
+Padding_CEDC1A,$CE:DC1A,$CE:DFFF,998,fill,,$FF
+BattleRom_MsgStrings,$CE:EF11,$CE:EFDF,207,extracted,text/BattleRom_MsgStrings.bin,
+BattleRom_DissolveRec,$CE:EFE0,$CE:EFE9,10,extracted,table/BattleRom_DissolveRec.bin,
+BattleRom_DissolvePhaseStep,$CE:EFEA,$CE:EFF1,8,extracted,table/BattleRom_DissolvePhaseStep.bin,
+BattleRom_FxTileVram,$CE:EFF2,$CE:EFF9,8,extracted,table/BattleRom_FxTileVram.bin,
+BattleRom_FxRecByte0,$CE:EFFA,$CE:EFFD,4,extracted,table/BattleRom_FxRecByte0.bin,
+BattleRom_FxRecB,$CE:EFFE,$CE:F005,8,extracted,table/BattleRom_FxRecB.bin,
+BattleRom_FxRecA,$CE:F006,$CE:F03D,56,extracted,table/BattleRom_FxRecA.bin,
+BattleRom_FxBitMask,$CE:F03E,$CE:F045,8,extracted,table/BattleRom_FxBitMask.bin,
+BattleRom_FxColumnOfs,$CE:F046,$CE:F065,32,extracted,table/BattleRom_FxColumnOfs.bin,
+BattleRom_Op80RegsA,$CE:F0E6,$CE:F0ED,8,extracted,table/BattleRom_Op80RegsA.bin,
+BattleRom_Op80RegsB,$CE:F0EE,$CE:F125,56,extracted,table/BattleRom_Op80RegsB.bin,
+BattleRom_Op80PairA,$CE:F126,$CE:F145,32,extracted,table/BattleRom_Op80PairA.bin,
+BattleRom_Op80PairB,$CE:F146,$CE:F155,16,extracted,table/BattleRom_Op80PairB.bin,
+BattleRom_LayoutFrameBytes,$CE:F156,$CE:F165,16,extracted,table/BattleRom_LayoutFrameBytes.bin,
+BattleRom_SlotFrameBuf,$CE:F166,$CE:F17B,22,extracted,table/BattleRom_SlotFrameBuf.bin,
+BattleRom_SlotFrameVram,$CE:F17C,$CE:F191,22,extracted,table/BattleRom_SlotFrameVram.bin,
+BattleRom_DissolveRanges,$CE:F192,$CE:F1C1,48,extracted,table/BattleRom_DissolveRanges.bin,
+BattleRom_DissolveMask,$CE:F1C2,$CE:F1D1,16,extracted,table/BattleRom_DissolveMask.bin,
+BattleRom_FxBobSteps,$CE:F1D2,$CE:F24D,124,extracted,table/BattleRom_FxBobSteps.bin,
+BattleRom_HdmaSetOfs,$CE:F24E,$CE:F28D,64,extracted,table/BattleRom_HdmaSetOfs.bin,
+BattleRom_HalfPlaneEdge,$CE:F28E,$CE:F48D,512,extracted,table/BattleRom_HalfPlaneEdge.bin,
+BattleRom_AbsSine,$CE:F48E,$CE:F58D,256,extracted,table/BattleRom_AbsSine.bin,
+BattleRom_HdmaSetRecs,$CE:F58E,$CE:FFFF,2674,extracted,table/BattleRom_HdmaSetRecs.bin,
+BattleRom_FxTileGfx,$CF:0000,$CF:7FFF,32768,extracted,graphics/BattleRom_FxTileGfx.bin,
+BattleRom_FxTileLists,$CF:8000,$CF:9FFF,8192,extracted,table/BattleRom_FxTileLists.bin,
+BattleRom_FxGfxLists,$CF:A000,$CF:DFFF,16384,extracted,table/BattleRom_FxGfxLists.bin,
+BattleRom_FxGfxColours,$CF:E000,$CF:E1FF,512,extracted,table/BattleRom_FxGfxColours.bin,
+BattleRom_FxPalBits,$CF:E200,$CF:E27F,128,extracted,table/BattleRom_FxPalBits.bin,
+Padding_CFE280,$CF:E280,$CF:E2FF,128,fill,,$FF
+BattleRom_FxGfxSrc,$D0:0000,$D0:DEBF,57024,extracted,graphics/BattleRom_FxGfxSrc.bin,
+Padding_D0DEC0,$D0:DEC0,$D0:DFFF,320,fill,,$FF
+BattleRom_BgMapPtrs,$D0:E000,$D0:E011,18,table,,dl x 6
+BattleBgMapPack_000,$D0:E012,$D0:E277,614,packed,packed_lz/BattleBgMapPack_000.bin,lz11 -> 2048 B
+BattleBgMapPack_001,$D0:E278,$D0:E577,768,packed,packed_lz/BattleBgMapPack_001.bin,lz11 -> 2048 B
+BattleBgMapPack_002,$D0:E578,$D0:EAFF,1416,packed,packed_lz/BattleBgMapPack_002.bin,lz11 -> 2048 B
+BattleBgMapPack_003,$D0:EB00,$D0:ED8A,651,packed,packed_lz/BattleBgMapPack_003.bin,lz11 -> 2048 B
+BattleBgMapPack_004,$D0:ED8B,$D0:F197,1037,packed,packed_lz/BattleBgMapPack_004.bin,lz11 -> 2048 B
+BattleBgMapPack_005,$D0:F198,$D0:F98E,2039,packed,packed_lz/BattleBgMapPack_005.bin,lz11 -> 2048 B
+Padding_D0F98F,$D0:F98F,$D0:F9FF,113,fill,,$00
+BattleRom_BgSetPalettes,$D0:FA00,$D0:FBE1,482,extracted,palette/BattleRom_BgSetPalettes.bin,
+BattleRom_GradColours,$D0:FBE2,$D0:FCFF,286,extracted,palette/BattleRom_GradColours.bin,
+Palette_D0FD00,$D0:FD00,$D0:FD5F,96,extracted,palette/Palette_D0FD00.bin,
+Padding_D0FD60,$D0:FD60,$D0:FFFF,672,fill,,$FF
+BattleRom_PcAttackFrames,$D1:0000,$D1:005F,96,table,,dw x 48
+BattleRom_ActFrames,$D1:0060,$D1:00FF,160,table,,dw x 80
+ActFramesPack_000,$D1:0100,$D1:015A,91,packed,packed_lz/ActFramesPack_000.bin,lz11 -> 101 B
+ActFramesPack_001,$D1:015B,$D1:01B9,95,packed,packed_lz/ActFramesPack_001.bin,lz11 -> 106 B
+ActFramesPack_002,$D1:01BA,$D1:0226,109,packed,packed_lz/ActFramesPack_002.bin,lz11 -> 140 B
+ActFramesPack_003,$D1:0227,$D1:029A,116,packed,packed_lz/ActFramesPack_003.bin,lz11 -> 127 B
+ActFramesPack_004,$D1:029B,$D1:02E1,71,packed,packed_lz/ActFramesPack_004.bin,lz11 -> 70 B
+ActFramesPack_005,$D1:02E2,$D1:031C,59,packed,packed_lz/ActFramesPack_005.bin,lz11 -> 84 B
+ActFramesPack_006,$D1:031D,$D1:03C8,172,packed,packed_lz/ActFramesPack_006.bin,lz11 -> 198 B
+ActFramesPack_007,$D1:03C9,$D1:043E,118,packed,packed_lz/ActFramesPack_007.bin,lz11 -> 198 B
+ActFramesPack_008,$D1:043F,$D1:04AF,113,packed,packed_lz/ActFramesPack_008.bin,lz11 -> 113 B
+ActFramesPack_009,$D1:04B0,$D1:04FB,76,packed,packed_lz/ActFramesPack_009.bin,lz11 -> 88 B
+ActFramesPack_010,$D1:04FC,$D1:0553,88,packed,packed_lz/ActFramesPack_010.bin,lz11 -> 107 B
+ActFramesPack_011,$D1:0554,$D1:058B,56,packed,packed_lz/ActFramesPack_011.bin,lz11 -> 78 B
+ActFramesPack_012,$D1:058C,$D1:0691,262,packed,packed_lz/ActFramesPack_012.bin,lz11 -> 273 B
+ActFramesPack_013,$D1:0692,$D1:073A,169,packed,packed_lz/ActFramesPack_013.bin,lz11 -> 238 B
+ActFramesPack_014,$D1:073B,$D1:079E,100,packed,packed_lz/ActFramesPack_014.bin,lz11 -> 126 B
+ActFramesPack_015,$D1:079F,$D1:0824,134,packed,packed_lz/ActFramesPack_015.bin,lz11 -> 165 B
+ActFramesPack_016,$D1:0825,$D1:0892,110,packed,packed_lz/ActFramesPack_016.bin,lz11 -> 140 B
+ActFramesPack_017,$D1:0893,$D1:091B,137,packed,packed_lz/ActFramesPack_017.bin,lz11 -> 205 B
+ActFramesPack_018,$D1:091C,$D1:095D,66,packed,packed_lz/ActFramesPack_018.bin,lz11 -> 80 B
+ActFramesPack_019,$D1:095E,$D1:09C5,104,packed,packed_lz/ActFramesPack_019.bin,lz11 -> 126 B
+ActFramesPack_020,$D1:09C6,$D1:0A48,131,packed,packed_lz/ActFramesPack_020.bin,lz11 -> 180 B
+ActFramesPack_021,$D1:0A49,$D1:0AAF,103,packed,packed_lz/ActFramesPack_021.bin,lz11 -> 115 B
+ActFramesPack_022,$D1:0AB0,$D1:0B28,121,packed,packed_lz/ActFramesPack_022.bin,lz11 -> 156 B
+ActFramesPack_023,$D1:0B29,$D1:0BB4,140,packed,packed_lz/ActFramesPack_023.bin,lz11 -> 184 B
+ActFramesPack_024,$D1:0BB5,$D1:0CEC,312,packed,packed_lz/ActFramesPack_024.bin,lz11 -> 375 B
+ActFramesPack_025,$D1:0CED,$D1:0D79,141,packed,packed_lz/ActFramesPack_025.bin,lz11 -> 156 B
+ActFramesPack_026,$D1:0D7A,$D1:0DB6,61,packed,packed_lz/ActFramesPack_026.bin,lz11 -> 126 B
+ActFramesPack_027,$D1:0DB7,$D1:0E30,122,packed,packed_lz/ActFramesPack_027.bin,lz11 -> 172 B
+ActFramesPack_028,$D1:0E31,$D1:0E91,97,packed,packed_lz/ActFramesPack_028.bin,lz11 -> 114 B
+ActFramesPack_029,$D1:0E92,$D1:0F4B,186,packed,packed_lz/ActFramesPack_029.bin,lz11 -> 235 B
+ActFramesPack_030,$D1:0F4C,$D1:1037,236,packed,packed_lz/ActFramesPack_030.bin,lz11 -> 320 B
+ActFramesPack_031,$D1:1038,$D1:10B3,124,packed,packed_lz/ActFramesPack_031.bin,lz11 -> 143 B
+ActFramesPack_032,$D1:10B4,$D1:111A,103,packed,packed_lz/ActFramesPack_032.bin,lz11 -> 121 B
+ActFramesPack_033,$D1:111B,$D1:11BB,161,packed,packed_lz/ActFramesPack_033.bin,lz11 -> 195 B
+ActFramesPack_034,$D1:11BC,$D1:126F,180,packed,packed_lz/ActFramesPack_034.bin,lz11 -> 248 B
+ActFramesPack_035,$D1:1270,$D1:1342,211,packed,packed_lz/ActFramesPack_035.bin,lz11 -> 232 B
+ActFramesPack_036,$D1:1343,$D1:13AB,105,packed,packed_lz/ActFramesPack_036.bin,lz11 -> 112 B
+ActFramesPack_037,$D1:13AC,$D1:1430,133,packed,packed_lz/ActFramesPack_037.bin,lz11 -> 170 B
+ActFramesPack_038,$D1:1431,$D1:1487,87,packed,packed_lz/ActFramesPack_038.bin,lz11 -> 108 B
+ActFramesPack_039,$D1:1488,$D1:1565,222,packed,packed_lz/ActFramesPack_039.bin,lz11 -> 271 B
+ActFramesPack_040,$D1:1566,$D1:15C6,97,packed,packed_lz/ActFramesPack_040.bin,lz11 -> 104 B
+ActFramesPack_041,$D1:15C7,$D1:1658,146,packed,packed_lz/ActFramesPack_041.bin,lz11 -> 152 B
+ActFramesPack_042,$D1:1659,$D1:16BD,101,packed,packed_lz/ActFramesPack_042.bin,lz11 -> 118 B
+ActFramesPack_043,$D1:16BE,$D1:1759,156,packed,packed_lz/ActFramesPack_043.bin,lz11 -> 180 B
+ActFramesPack_044,$D1:175A,$D1:182B,210,packed,packed_lz/ActFramesPack_044.bin,lz11 -> 216 B
+ActFramesPack_045,$D1:182C,$D1:18D8,173,packed,packed_lz/ActFramesPack_045.bin,lz11 -> 175 B
+ActFramesPack_046,$D1:18D9,$D1:19B7,223,packed,packed_lz/ActFramesPack_046.bin,lz11 -> 286 B
+ActFramesPack_047,$D1:19B8,$D1:1A03,76,packed,packed_lz/ActFramesPack_047.bin,lz11 -> 79 B
+ActFramesPack_048,$D1:1A04,$D1:1A34,49,packed,packed_lz/ActFramesPack_048.bin,lz11 -> 50 B
+ActFramesPack_049,$D1:1A35,$D1:1A65,49,packed,packed_lz/ActFramesPack_049.bin,lz11 -> 50 B
+ActFramesPack_050,$D1:1A66,$D1:1ADD,120,packed,packed_lz/ActFramesPack_050.bin,lz11 -> 152 B
+ActFramesPack_051,$D1:1ADE,$D1:1B2C,79,packed,packed_lz/ActFramesPack_051.bin,lz11 -> 87 B
+ActFramesPack_052,$D1:1B2D,$D1:1B45,25,packed,packed_lz/ActFramesPack_052.bin,lz11 -> 24 B
+ActFramesPack_053,$D1:1B46,$D1:1B6B,38,packed,packed_lz/ActFramesPack_053.bin,lz11 -> 48 B
+ActFramesPack_054,$D1:1B6C,$D1:1C98,301,packed,packed_lz/ActFramesPack_054.bin,lz11 -> 479 B
+ActFramesPack_055,$D1:1C99,$D1:1D0B,115,packed,packed_lz/ActFramesPack_055.bin,lz11 -> 134 B
+ActFramesPack_056,$D1:1D0C,$D1:1D24,25,packed,packed_lz/ActFramesPack_056.bin,lz11 -> 24 B
+ActFramesPack_057,$D1:1D25,$D1:1D55,49,packed,packed_lz/ActFramesPack_057.bin,lz11 -> 50 B
+ActFramesPack_058,$D1:1D56,$D1:1D9A,69,packed,packed_lz/ActFramesPack_058.bin,lz11 -> 102 B
+ActFramesPack_059,$D1:1D9B,$D1:1E1E,132,packed,packed_lz/ActFramesPack_059.bin,lz11 -> 173 B
+ActFramesPack_060,$D1:1E1F,$D1:1ED5,183,packed,packed_lz/ActFramesPack_060.bin,lz11 -> 198 B
+ActFramesPack_061,$D1:1ED6,$D1:1EEB,22,packed,packed_lz/ActFramesPack_061.bin,lz11 -> 18 B
+ActFramesPack_062,$D1:1EEC,$D1:1F14,41,packed,packed_lz/ActFramesPack_062.bin,lz11 -> 48 B
+ActFramesPack_063,$D1:1F15,$D1:1F2D,25,packed,packed_lz/ActFramesPack_063.bin,lz11 -> 24 B
+ActFramesPack_064,$D1:1F2E,$D1:1F90,99,packed,packed_lz/ActFramesPack_064.bin,lz11 -> 110 B
+ActFramesPack_065,$D1:1F91,$D1:1FFA,106,packed,packed_lz/ActFramesPack_065.bin,lz11 -> 122 B
+ActFramesPack_066,$D1:1FFB,$D1:2163,361,packed,packed_lz/ActFramesPack_066.bin,lz11 -> 688 B
+ActFramesPack_067,$D1:2164,$D1:21E7,132,packed,packed_lz/ActFramesPack_067.bin,lz11 -> 164 B
+ActFramesPack_068,$D1:21E8,$D1:2225,62,packed,packed_lz/ActFramesPack_068.bin,lz11 -> 98 B
+ActFramesPack_069,$D1:2226,$D1:2246,33,packed,packed_lz/ActFramesPack_069.bin,lz11 -> 30 B
+ActFramesPack_070,$D1:2247,$D1:2334,238,packed,packed_lz/ActFramesPack_070.bin,lz11 -> 310 B
+ActFramesPack_071,$D1:2335,$D1:238A,86,packed,packed_lz/ActFramesPack_071.bin,lz11 -> 108 B
+ActFramesPack_072,$D1:238B,$D1:23F8,110,packed,packed_lz/ActFramesPack_072.bin,lz11 -> 119 B
+ActFramesPack_073,$D1:23F9,$D1:248E,150,packed,packed_lz/ActFramesPack_073.bin,lz11 -> 215 B
+ActFramesPack_074,$D1:248F,$D1:252F,161,packed,packed_lz/ActFramesPack_074.bin,lz11 -> 169 B
+ActFramesPack_075,$D1:2530,$D1:255F,48,packed,packed_lz/ActFramesPack_075.bin,lz11 -> 66 B
+ActFramesPack_076,$D1:2560,$D1:2591,50,packed,packed_lz/ActFramesPack_076.bin,lz11 -> 39 B
+ActFramesPack_077,$D1:2592,$D1:25C8,55,packed,packed_lz/ActFramesPack_077.bin,lz11 -> 62 B
+ActFramesPack_078,$D1:25C9,$D1:263C,116,packed,packed_lz/ActFramesPack_078.bin,lz11 -> 158 B
+ActFramesPack_079,$D1:263D,$D1:268D,81,packed,packed_lz/ActFramesPack_079.bin,lz11 -> 110 B
+ActFramesPack_080,$D1:268E,$D1:26C3,54,packed,packed_lz/ActFramesPack_080.bin,lz11 -> 52 B
+ActFramesPack_081,$D1:26C4,$D1:2745,130,packed,packed_lz/ActFramesPack_081.bin,lz11 -> 131 B
+ActFramesPack_082,$D1:2746,$D1:27BD,120,packed,packed_lz/ActFramesPack_082.bin,lz11 -> 137 B
+ActFramesPack_083,$D1:27BE,$D1:2817,90,packed,packed_lz/ActFramesPack_083.bin,lz11 -> 111 B
+ActFramesPack_084,$D1:2818,$D1:2879,98,packed,packed_lz/ActFramesPack_084.bin,lz11 -> 130 B
+ActFramesPack_085,$D1:287A,$D1:2947,206,packed,packed_lz/ActFramesPack_085.bin,lz11 -> 288 B
+ActFramesPack_086,$D1:2948,$D1:29FD,182,packed,packed_lz/ActFramesPack_086.bin,lz11 -> 223 B
+ActFramesPack_087,$D1:29FE,$D1:2AB4,183,packed,packed_lz/ActFramesPack_087.bin,lz11 -> 228 B
+ActFramesPack_088,$D1:2AB5,$D1:2B5F,171,packed,packed_lz/ActFramesPack_088.bin,lz11 -> 231 B
+ActFramesPack_089,$D1:2B60,$D1:2B9F,64,packed,packed_lz/ActFramesPack_089.bin,lz11 -> 96 B
+ActFramesPack_090,$D1:2BA0,$D1:2BBE,31,packed,packed_lz/ActFramesPack_090.bin,lz11 -> 27 B
+ActFramesPack_091,$D1:2BBF,$D1:2C0F,81,packed,packed_lz/ActFramesPack_091.bin,lz11 -> 117 B
+ActFramesPack_092,$D1:2C10,$D1:2C73,100,packed,packed_lz/ActFramesPack_092.bin,lz11 -> 131 B
+ActFramesPack_093,$D1:2C74,$D1:2CD4,97,packed,packed_lz/ActFramesPack_093.bin,lz11 -> 104 B
+ActFramesPack_094,$D1:2CD5,$D1:2D3A,102,packed,packed_lz/ActFramesPack_094.bin,lz11 -> 111 B
+ActFramesPack_095,$D1:2D3B,$D1:2DDB,161,packed,packed_lz/ActFramesPack_095.bin,lz11 -> 195 B
+ActFramesPack_096,$D1:2DDC,$D1:2E2C,81,packed,packed_lz/ActFramesPack_096.bin,lz11 -> 94 B
+ActFramesPack_097,$D1:2E2D,$D1:2E82,86,packed,packed_lz/ActFramesPack_097.bin,lz11 -> 76 B
+ActFramesPack_098,$D1:2E83,$D1:2F3B,185,packed,packed_lz/ActFramesPack_098.bin,lz11 -> 280 B
+ActFramesPack_099,$D1:2F3C,$D1:2F5D,34,packed,packed_lz/ActFramesPack_099.bin,lz11 -> 36 B
+ActFramesPack_100,$D1:2F5E,$D1:2F87,42,packed,packed_lz/ActFramesPack_100.bin,lz11 -> 44 B
+ActFramesPack_101,$D1:2F88,$D1:3037,176,packed,packed_lz/ActFramesPack_101.bin,lz11 -> 194 B
+ActFramesPack_102,$D1:3038,$D1:308F,88,packed,packed_lz/ActFramesPack_102.bin,lz11 -> 86 B
+ActFramesPack_103,$D1:3090,$D1:30BB,44,packed,packed_lz/ActFramesPack_103.bin,lz11 -> 48 B
+ActFramesPack_104,$D1:30BC,$D1:3101,70,packed,packed_lz/ActFramesPack_104.bin,lz11 -> 95 B
+ActFramesPack_105,$D1:3102,$D1:3142,65,packed,packed_lz/ActFramesPack_105.bin,lz11 -> 67 B
+ActFramesPack_106,$D1:3143,$D1:31AF,109,packed,packed_lz/ActFramesPack_106.bin,lz11 -> 92 B
+ActFramesPack_107,$D1:31B0,$D1:3266,183,packed,packed_lz/ActFramesPack_107.bin,lz11 -> 285 B
+ActFramesPack_108,$D1:3267,$D1:32DE,120,packed,packed_lz/ActFramesPack_108.bin,lz11 -> 140 B
+ActFramesPack_109,$D1:32DF,$D1:3330,82,packed,packed_lz/ActFramesPack_109.bin,lz11 -> 80 B
+ActFramesPack_110,$D1:3331,$D1:3388,88,packed,packed_lz/ActFramesPack_110.bin,lz11 -> 96 B
+ActFramesPack_111,$D1:3389,$D1:33C1,57,packed,packed_lz/ActFramesPack_111.bin,lz11 -> 48 B
+ActFramesPack_112,$D1:33C2,$D1:3449,136,packed,packed_lz/ActFramesPack_112.bin,lz11 -> 136 B
+ActFramesPack_113,$D1:344A,$D1:3485,60,packed,packed_lz/ActFramesPack_113.bin,lz11 -> 59 B
+ActFramesPack_114,$D1:3486,$D1:3568,227,packed,packed_lz/ActFramesPack_114.bin,lz11 -> 208 B
+ActFramesPack_115,$D1:3569,$D1:35C1,89,packed,packed_lz/ActFramesPack_115.bin,lz11 -> 94 B
+ActFramesPack_116,$D1:35C2,$D1:3601,64,packed,packed_lz/ActFramesPack_116.bin,lz11 -> 94 B
+ActFramesPack_117,$D1:3602,$D1:36DC,219,packed,packed_lz/ActFramesPack_117.bin,lz11 -> 224 B
+ActFramesPack_118,$D1:36DD,$D1:3705,41,packed,packed_lz/ActFramesPack_118.bin,lz11 -> 39 B
+ActFramesPack_119,$D1:3706,$D1:3708,3,packed,packed_lz/ActFramesPack_119.bin,lz12 -> 0 B
+ActFramesPack_120,$D1:3709,$D1:370B,3,packed,packed_lz/ActFramesPack_120.bin,lz12 -> 0 B
+ActFramesPack_121,$D1:370C,$D1:370E,3,packed,packed_lz/ActFramesPack_121.bin,lz12 -> 0 B
+ActFramesPack_122,$D1:370F,$D1:3711,3,packed,packed_lz/ActFramesPack_122.bin,lz12 -> 0 B
+ActFramesPack_123,$D1:3712,$D1:3714,3,packed,packed_lz/ActFramesPack_123.bin,lz12 -> 0 B
+ActFramesPack_124,$D1:3715,$D1:3717,3,packed,packed_lz/ActFramesPack_124.bin,lz12 -> 0 B
+ActFramesPack_125,$D1:3718,$D1:371A,3,packed,packed_lz/ActFramesPack_125.bin,lz12 -> 0 B
+ActFramesPack_126,$D1:371B,$D1:371D,3,packed,packed_lz/ActFramesPack_126.bin,lz12 -> 0 B
+ActFramesPack_127,$D1:371E,$D1:3720,3,packed,packed_lz/ActFramesPack_127.bin,lz12 -> 0 B
+Padding_D13721,$D1:3721,$D1:38F0,464,fill,,$00
+Unknown_D138F1,$D1:38F1,$D1:38F1,1,extracted,unknown/Unknown_D138F1.bin,
+BattleRom_UnkColours38F2,$D1:38F2,$D1:38F9,8,extracted,palette/BattleRom_UnkColours38F2.bin,
+BattleRom_UnkColours38FA,$D1:38FA,$D1:38FF,6,extracted,palette/BattleRom_UnkColours38FA.bin,
+BattleRom_InitTiles4bpp,$D1:3900,$D1:40FF,2048,extracted,graphics/BattleRom_InitTiles4bpp.bin,
+BattleRom_PalSets6,$D1:4100,$D1:4345,582,extracted,palette/BattleRom_PalSets6.bin,
+Padding_D14346,$D1:4346,$D1:43FF,186,fill,,$00
+BattleRom_PalSets14,$D1:4400,$D1:49AF,1456,extracted,palette/BattleRom_PalSets14.bin,
+Padding_D149B0,$D1:49B0,$D1:4AFF,336,fill,,$00
+BattleRom_WeaponColours,$D1:4B00,$D1:4BBF,192,extracted,palette/BattleRom_WeaponColours.bin,
+Padding_D14BC0,$D1:4BC0,$D1:4C7F,192,fill,,$00
+Gfx_D14C80,$D1:4C80,$D1:4D7F,256,extracted,graphics/Gfx_D14C80.bin,
+BattleRom_HitNumColours,$D1:4D80,$D1:4D8F,16,extracted,palette/BattleRom_HitNumColours.bin,
+BattleRom_SpecialPals,$D1:4D90,$D1:50A1,786,extracted,palette/BattleRom_SpecialPals.bin,
+Table_D150A2,$D1:50A2,$D1:57FF,1886,extracted,table/Table_D150A2.bin,
+BattleRom_CommandWindowMap,$D1:5800,$D1:597F,384,extracted,tilemap/BattleRom_CommandWindowMap.bin,
+BattleRom_CursorGlow,$D1:5980,$D1:59FB,124,extracted,palette/BattleRom_CursorGlow.bin,
+BattleRom_CommandWindowFrame,$D1:59FC,$D1:5A4F,84,extracted,tilemap/BattleRom_CommandWindowFrame.bin,
+BattleRom_TechBoxMap,$D1:5A50,$D1:5BCF,384,extracted,tilemap/BattleRom_TechBoxMap.bin,
+BattleRom_ItemBoxMap,$D1:5BD0,$D1:5D4F,384,extracted,tilemap/BattleRom_ItemBoxMap.bin,
+BattleRom_InitMapRows,$D1:5D50,$D1:5E0F,192,extracted,tilemap/BattleRom_InitMapRows.bin,
+BattleRom_HitNumBounce,$D1:5E10,$D1:5E48,57,extracted,table/BattleRom_HitNumBounce.bin,
+BattleRom_HitNumBounceAlt,$D1:5E49,$D1:5E81,57,extracted,table/BattleRom_HitNumBounceAlt.bin,
+BattleRom_InitTilesC,$D1:5E82,$D1:5EC1,64,extracted,graphics/BattleRom_InitTilesC.bin,
+BattleRom_InitTilesB,$D1:5EC2,$D1:5F01,64,extracted,graphics/BattleRom_InitTilesB.bin,
+BattleRom_InitTilesD,$D1:5F02,$D1:5F41,64,extracted,graphics/BattleRom_InitTilesD.bin,
+BattleRom_PcKoFrame,$D1:5F42,$D1:5FFF,190,extracted,table/BattleRom_PcKoFrame.bin,
+BattleRom_FxColours,$D1:6000,$D1:623F,576,extracted,palette/BattleRom_FxColours.bin,
+BattleRom_FxScripts,$D1:6240,$D1:646B,556,extracted,table/BattleRom_FxScripts.bin,
+BattleRom_FxScriptPtrs,$D1:646C,$D1:A232,15815,extracted,battle_script/BattleRom_FxScriptPtrs.bin,
+BattleRom_FxRecords,$D1:A233,$D1:A574,834,extracted,table/BattleRom_FxRecords.bin,
+BattleRom_FxMapPtrs,$D1:A575,$D1:E709,16789,extracted,tilemap/BattleRom_FxMapPtrs.bin,
+Gfx_D20000,$D2:0000,$D2:72BF,29376,extracted,graphics/Gfx_D20000.bin,
+Gfx_D272C0,$D2:72C0,$D2:EE7F,31680,extracted,graphics/Gfx_D272C0.bin,
+SprTilesPack_236,$D2:EE80,$D2:F85D,2526,packed,packed_lz/SprTilesPack_236.bin,lz12 -> 2816 B
+SprTilesPack_227,$D2:F85E,$D2:FF93,1846,packed,packed_lz/SprTilesPack_227.bin,lz12 -> 2176 B
+Padding_D2FF94,$D2:FF94,$D2:FFFF,108,fill,,$00
+Gfx_D30000,$D3:0000,$D3:6B3F,27456,extracted,graphics/Gfx_D30000.bin,
+Gfx_D36B40,$D3:6B40,$D3:E27F,30528,extracted,graphics/Gfx_D36B40.bin,
+SprTilesPack_189,$D3:E280,$D3:E745,1222,packed,packed_lz/SprTilesPack_189.bin,lz12 -> 1600 B
+SprTilesPack_190,$D3:E746,$D3:E8A8,355,packed,packed_lz/SprTilesPack_190.bin,lz12 -> 384 B
+SprTilesPack_191,$D3:E8A9,$D3:EA5A,434,packed,packed_lz/SprTilesPack_191.bin,lz12 -> 608 B
+SprTilesPack_194,$D3:EA5B,$D3:EE13,953,packed,packed_lz/SprTilesPack_194.bin,lz12 -> 960 B
+SprTilesPack_195,$D3:EE14,$D3:EEAF,156,packed,packed_lz/SprTilesPack_195.bin,lz12 -> 160 B
+SprTilesPack_196,$D3:EEB0,$D3:F049,410,packed,packed_lz/SprTilesPack_196.bin,lz12 -> 448 B
+SprTilesPack_198,$D3:F04A,$D3:F0AB,98,packed,packed_lz/SprTilesPack_198.bin,lz12 -> 192 B
+SprTilesPack_199,$D3:F0AC,$D3:F19C,241,packed,packed_lz/SprTilesPack_199.bin,lz12 -> 288 B
+SprTilesPack_200,$D3:F19D,$D3:F2A6,266,packed,packed_lz/SprTilesPack_200.bin,lz12 -> 320 B
+SprTilesPack_201,$D3:F2A7,$D3:F3CB,293,packed,packed_lz/SprTilesPack_201.bin,lz12 -> 352 B
+SprTilesPack_202,$D3:F3CC,$D3:F5BC,497,packed,packed_lz/SprTilesPack_202.bin,lz12 -> 544 B
+SprTilesPack_204,$D3:F5BD,$D3:F638,124,packed,packed_lz/SprTilesPack_204.bin,lz12 -> 160 B
+SprTilesPack_215,$D3:F639,$D3:F670,56,packed,packed_lz/SprTilesPack_215.bin,lz12 -> 160 B
+SprTilesPack_218,$D3:F671,$D3:F70A,154,packed,packed_lz/SprTilesPack_218.bin,lz12 -> 288 B
+SprTilesPack_221,$D3:F70B,$D3:F7A6,156,packed,packed_lz/SprTilesPack_221.bin,lz12 -> 160 B
+SprTilesPack_222,$D3:F7A7,$D3:F995,495,packed,packed_lz/SprTilesPack_222.bin,lz12 -> 640 B
+SprTilesPack_210,$D3:F996,$D3:FB9D,520,packed,packed_lz/SprTilesPack_210.bin,lz12 -> 608 B
+SprTilesPack_212,$D3:FB9E,$D3:FC55,184,packed,packed_lz/SprTilesPack_212.bin,lz12 -> 320 B
+SprTilesPack_047,$D3:FC56,$D3:FDBA,357,packed,packed_lz/SprTilesPack_047.bin,lz12 -> 416 B
+SprTilesPack_240,$D3:FDBB,$D3:FE36,124,packed,packed_lz/SprTilesPack_240.bin,lz12 -> 160 B
+SprTilesPack_239,$D3:FE37,$D3:FEC8,146,packed,packed_lz/SprTilesPack_239.bin,lz12 -> 320 B
+SprTilesPack_241,$D3:FEC9,$D3:FFD7,271,packed,packed_lz/SprTilesPack_241.bin,lz12 -> 416 B
+Padding_D3FFD8,$D3:FFD8,$D3:FFFF,40,fill,,$00
+Gfx_D40000,$D4:0000,$D4:7C3F,31808,extracted,graphics/Gfx_D40000.bin,
+Gfx_D47C40,$D4:7C40,$D4:FAFF,32448,extracted,graphics/Gfx_D47C40.bin,
+SprTilesPack_179,$D4:FB00,$D4:FCFA,507,packed,packed_lz/SprTilesPack_179.bin,lz12 -> 672 B
+SprTilesPack_180,$D4:FCFB,$D4:FDAF,181,packed,packed_lz/SprTilesPack_180.bin,lz12 -> 384 B
+SprTilesPack_187,$D4:FDB0,$D4:FF72,451,packed,packed_lz/SprTilesPack_187.bin,lz12 -> 480 B
+Padding_D4FF73,$D4:FF73,$D4:FFFF,141,fill,,$00
+Gfx_D50000,$D5:0000,$D5:8BFF,35840,extracted,graphics/Gfx_D50000.bin,
+SprTilesPack_155,$D5:8C00,$D5:A03F,5184,packed,packed_lz/SprTilesPack_155.bin,lz12 -> 8192 B
+SprTilesPack_164,$D5:A040,$D5:B298,4697,packed,packed_lz/SprTilesPack_164.bin,lz12 -> 6368 B
+SprTilesPack_165,$D5:B299,$D5:E177,11999,packed,packed_lz/SprTilesPack_165.bin,lz12 -> 15712 B
+SprTilesPack_167,$D5:E178,$D5:E1B4,61,packed,packed_lz/SprTilesPack_167.bin,lz12 -> 448 B
+SprTilesPack_089,$D5:E1B5,$D5:F8F6,5954,packed,packed_lz/SprTilesPack_089.bin,lz12 -> 8192 B
+SprTilesPack_105,$D5:F8F7,$D5:FFF9,1795,packed,packed_lz/SprTilesPack_105.bin,lz12 -> 2368 B
+Padding_D5FFFA,$D5:FFFA,$D5:FFFF,6,fill,,$00
+SprTilesPack_090,$D6:0000,$D6:14EE,5359,packed,packed_lz/SprTilesPack_090.bin,lz12 -> 5824 B
+SprTilesPack_094,$D6:14EF,$D6:2961,5235,packed,packed_lz/SprTilesPack_094.bin,lz12 -> 7328 B
+SprTilesPack_114,$D6:2962,$D6:45F2,7313,packed,packed_lz/SprTilesPack_114.bin,lz12 -> 9312 B
+SprTilesPack_081,$D6:45F3,$D6:4CB9,1735,packed,packed_lz/SprTilesPack_081.bin,lz12 -> 3104 B
+SprTilesPack_097,$D6:4CBA,$D6:601D,4964,packed,packed_lz/SprTilesPack_097.bin,lz12 -> 6144 B
+SprTilesPack_098,$D6:601E,$D6:6A11,2548,packed,packed_lz/SprTilesPack_098.bin,lz12 -> 3488 B
+SprTilesPack_099,$D6:6A12,$D6:7FB5,5540,packed,packed_lz/SprTilesPack_099.bin,lz12 -> 6720 B
+SprTilesPack_100,$D6:7FB6,$D6:8BA2,3053,packed,packed_lz/SprTilesPack_100.bin,lz12 -> 3680 B
+SprTilesPack_101,$D6:8BA3,$D6:9789,3047,packed,packed_lz/SprTilesPack_101.bin,lz12 -> 4064 B
+SprTilesPack_102,$D6:978A,$D6:A28C,2819,packed,packed_lz/SprTilesPack_102.bin,lz12 -> 3616 B
+SprTilesPack_106,$D6:A28D,$D6:A939,1709,packed,packed_lz/SprTilesPack_106.bin,lz12 -> 3168 B
+SprTilesPack_108,$D6:A93A,$D6:B7D8,3743,packed,packed_lz/SprTilesPack_108.bin,lz12 -> 5504 B
+SprTilesPack_173,$D6:B7D9,$D6:C77D,4005,packed,packed_lz/SprTilesPack_173.bin,lz12 -> 5984 B
+SprTilesPack_087,$D6:C77E,$D6:EE09,9868,packed,packed_lz/SprTilesPack_087.bin,lz12 -> 12288 B
+SprTilesPack_104,$D6:EE0A,$D6:F3DD,1492,packed,packed_lz/SprTilesPack_104.bin,lz12 -> 1952 B
+SprTilesPack_093,$D6:F3DE,$D6:F9F7,1562,packed,packed_lz/SprTilesPack_093.bin,lz12 -> 2176 B
+Padding_D6F9F8,$D6:F9F8,$D6:FFFF,1544,fill,,$00
+SprTilesPack_103,$D7:0000,$D7:0500,1281,packed,packed_lz/SprTilesPack_103.bin,lz12 -> 1760 B
+SprTilesPack_110,$D7:0501,$D7:0D17,2071,packed,packed_lz/SprTilesPack_110.bin,lz12 -> 2720 B
+SprTilesPack_111,$D7:0D18,$D7:2AD7,7616,packed,packed_lz/SprTilesPack_111.bin,lz12 -> 10112 B
+SprTilesPack_112,$D7:2AD8,$D7:34F5,2590,packed,packed_lz/SprTilesPack_112.bin,lz12 -> 4096 B
+SprTilesPack_113,$D7:34F6,$D7:4EEE,6649,packed,packed_lz/SprTilesPack_113.bin,lz12 -> 8672 B
+SprTilesPack_096,$D7:4EEF,$D7:5410,1314,packed,packed_lz/SprTilesPack_096.bin,lz12 -> 1856 B
+SprTilesPack_095,$D7:5411,$D7:59BB,1451,packed,packed_lz/SprTilesPack_095.bin,lz12 -> 1728 B
+SprTilesPack_115,$D7:59BC,$D7:7EFF,9540,packed,packed_lz/SprTilesPack_115.bin,lz12 -> 12800 B
+SprTilesPack_091,$D7:7F00,$D7:8813,2324,packed,packed_lz/SprTilesPack_091.bin,lz12 -> 2432 B
+SprTilesPack_092,$D7:8814,$D7:934E,2875,packed,packed_lz/SprTilesPack_092.bin,lz12 -> 3648 B
+SprTilesPack_107,$D7:934F,$D7:9E72,2852,packed,packed_lz/SprTilesPack_107.bin,lz12 -> 3744 B
+SprTilesPack_083,$D7:9E73,$D7:BBB5,7491,packed,packed_lz/SprTilesPack_083.bin,lz12 -> 8928 B
+SprTilesPack_205,$D7:BBB6,$D7:BD32,381,packed,packed_lz/SprTilesPack_205.bin,lz12 -> 416 B
+SprTilesPack_206,$D7:BD33,$D7:C92F,3069,packed,packed_lz/SprTilesPack_206.bin,lz12 -> 3488 B
+SprTilesPack_207,$D7:C930,$D7:D52C,3069,packed,packed_lz/SprTilesPack_207.bin,lz12 -> 3488 B
+SprTilesPack_109,$D7:D52D,$D7:E896,4970,packed,packed_lz/SprTilesPack_109.bin,lz12 -> 8192 B
+SprTilesPack_078,$D7:E897,$D7:FEED,5719,packed,packed_lz/SprTilesPack_078.bin,lz12 -> 7104 B
+Padding_D7FEEE,$D7:FEEE,$D7:FFFF,274,fill,,$00
+SprTilesPack_086,$D8:0000,$D8:1807,6152,packed,packed_lz/SprTilesPack_086.bin,lz12 -> 8704 B
+SprTilesPack_088,$D8:1808,$D8:3485,7294,packed,packed_lz/SprTilesPack_088.bin,lz12 -> 8160 B
+SprTilesPack_079,$D8:3486,$D8:4147,3266,packed,packed_lz/SprTilesPack_079.bin,lz12 -> 3808 B
+SprTilesPack_080,$D8:4148,$D8:6E82,11579,packed,packed_lz/SprTilesPack_080.bin,lz12 -> 13888 B
+SprTilesPack_082,$D8:6E83,$D8:8BD2,7504,packed,packed_lz/SprTilesPack_082.bin,lz12 -> 9472 B
+SprTilesPack_084,$D8:8BD3,$D8:A951,7551,packed,packed_lz/SprTilesPack_084.bin,lz12 -> 9248 B
+SprTilesPack_085,$D8:A952,$D8:B80E,3773,packed,packed_lz/SprTilesPack_085.bin,lz12 -> 8192 B
+SprTilesPack_242,$D8:B80F,$D8:C2E9,2779,packed,packed_lz/SprTilesPack_242.bin,lz12 -> 3296 B
+SprTilesPack_243,$D8:C2EA,$D8:C628,831,packed,packed_lz/SprTilesPack_243.bin,lz12 -> 960 B
+SprTilesPack_244,$D8:C629,$D8:C895,621,packed,packed_lz/SprTilesPack_244.bin,lz12 -> 864 B
+SprTilesPack_245,$D8:C896,$D8:CB1C,647,packed,packed_lz/SprTilesPack_245.bin,lz12 -> 864 B
+SprTilesPack_246,$D8:CB1D,$D8:CDDB,703,packed,packed_lz/SprTilesPack_246.bin,lz12 -> 864 B
+SprTilesPack_247,$D8:CDDC,$D8:CF67,396,packed,packed_lz/SprTilesPack_247.bin,lz12 -> 416 B
+Padding_D8CF68,$D8:CF68,$D8:CFFF,152,fill,,$00
+Text_D8D000,$D8:D000,$D8:DD26,3367,extracted,text/Text_D8D000.bin,
+Padding_D8DD27,$D8:DD27,$D8:DD7F,89,fill,,$00
+Text_D8DD80,$D8:DD80,$D8:FFBD,8766,extracted,text/Text_D8DD80.bin,
+Padding_D8FFBE,$D8:FFBE,$D8:FFFF,66,fill,,$00
+SprTilesPack_007,$D9:0000,$D9:0726,1831,packed,packed_lz/SprTilesPack_007.bin,lz12 -> 2464 B
+SprTilesPack_008,$D9:0727,$D9:0DE5,1727,packed,packed_lz/SprTilesPack_008.bin,lz12 -> 2336 B
+SprTilesPack_009,$D9:0DE6,$D9:1330,1355,packed,packed_lz/SprTilesPack_009.bin,lz12 -> 2336 B
+SprTilesPack_010,$D9:1331,$D9:181D,1261,packed,packed_lz/SprTilesPack_010.bin,lz12 -> 2336 B
+SprTilesPack_011,$D9:181E,$D9:1DE1,1476,packed,packed_lz/SprTilesPack_011.bin,lz12 -> 2336 B
+SprTilesPack_012,$D9:1DE2,$D9:2391,1456,packed,packed_lz/SprTilesPack_012.bin,lz12 -> 2336 B
+SprTilesPack_013,$D9:2392,$D9:2979,1512,packed,packed_lz/SprTilesPack_013.bin,lz12 -> 2336 B
+SprTilesPack_014,$D9:297A,$D9:30E6,1901,packed,packed_lz/SprTilesPack_014.bin,lz12 -> 2336 B
+SprTilesPack_015,$D9:30E7,$D9:36B0,1482,packed,packed_lz/SprTilesPack_015.bin,lz12 -> 2336 B
+SprTilesPack_016,$D9:36B1,$D9:3D13,1635,packed,packed_lz/SprTilesPack_016.bin,lz12 -> 2336 B
+SprTilesPack_017,$D9:3D14,$D9:4384,1649,packed,packed_lz/SprTilesPack_017.bin,lz12 -> 2336 B
+SprTilesPack_018,$D9:4385,$D9:4A57,1747,packed,packed_lz/SprTilesPack_018.bin,lz12 -> 2336 B
+SprTilesPack_019,$D9:4A58,$D9:51FF,1960,packed,packed_lz/SprTilesPack_019.bin,lz12 -> 2336 B
+SprTilesPack_125,$D9:5200,$D9:5A9B,2204,packed,packed_lz/SprTilesPack_125.bin,lz12 -> 2656 B
+SprTilesPack_126,$D9:5A9C,$D9:61D2,1847,packed,packed_lz/SprTilesPack_126.bin,lz12 -> 2336 B
+SprTilesPack_138,$D9:61D3,$D9:6921,1871,packed,packed_lz/SprTilesPack_138.bin,lz12 -> 2464 B
+SprTilesPack_020,$D9:6922,$D9:6D62,1089,packed,packed_lz/SprTilesPack_020.bin,lz12 -> 1312 B
+SprTilesPack_021,$D9:6D63,$D9:7161,1023,packed,packed_lz/SprTilesPack_021.bin,lz12 -> 1312 B
+SprTilesPack_022,$D9:7162,$D9:7512,945,packed,packed_lz/SprTilesPack_022.bin,lz12 -> 1312 B
+SprTilesPack_023,$D9:7513,$D9:7946,1076,packed,packed_lz/SprTilesPack_023.bin,lz12 -> 1312 B
+SprTilesPack_024,$D9:7947,$D9:8207,2241,packed,packed_lz/SprTilesPack_024.bin,lz12 -> 2752 B
+SprTilesPack_025,$D9:8208,$D9:8B62,2395,packed,packed_lz/SprTilesPack_025.bin,lz12 -> 2560 B
+SprTilesPack_230,$D9:8B63,$D9:8DE2,640,packed,packed_lz/SprTilesPack_230.bin,lz12 -> 768 B
+SprTilesPack_027,$D9:8DE3,$D9:99DE,3068,packed,packed_lz/SprTilesPack_027.bin,lz12 -> 3904 B
+SprTilesPack_028,$D9:99DF,$D9:A29F,2241,packed,packed_lz/SprTilesPack_028.bin,lz12 -> 2592 B
+SprTilesPack_029,$D9:A2A0,$D9:B007,3432,packed,packed_lz/SprTilesPack_029.bin,lz12 -> 6656 B
+SprTilesPack_030,$D9:B008,$D9:B88D,2182,packed,packed_lz/SprTilesPack_030.bin,lz12 -> 3072 B
+SprTilesPack_039,$D9:B88E,$D9:C114,2183,packed,packed_lz/SprTilesPack_039.bin,lz12 -> 2560 B
+SprTilesPack_127,$D9:C115,$D9:C7C9,1717,packed,packed_lz/SprTilesPack_127.bin,lz12 -> 1728 B
+SprTilesPack_035,$D9:C7CA,$D9:D2BB,2802,packed,packed_lz/SprTilesPack_035.bin,lz12 -> 3936 B
+SprTilesPack_036,$D9:D2BC,$D9:DB65,2218,packed,packed_lz/SprTilesPack_036.bin,lz12 -> 2848 B
+SprTilesPack_026,$D9:DB66,$D9:E2CD,1896,packed,packed_lz/SprTilesPack_026.bin,lz12 -> 2400 B
+SprTilesPack_038,$D9:E2CE,$D9:EC5C,2447,packed,packed_lz/SprTilesPack_038.bin,lz12 -> 2528 B
+SprTilesPack_238,$D9:EC5D,$D9:FC5A,4094,packed,packed_lz/SprTilesPack_238.bin,lz12 -> 5024 B
+Padding_D9FC5B,$D9:FC5B,$D9:FFFF,933,fill,,$00
+SprTilesPack_033,$DA:0000,$DA:0BB8,3001,packed,packed_lz/SprTilesPack_033.bin,lz12 -> 3968 B
+SprTilesPack_032,$DA:0BB9,$DA:158C,2516,packed,packed_lz/SprTilesPack_032.bin,lz12 -> 3232 B
+SprTilesPack_043,$DA:158D,$DA:1837,683,packed,packed_lz/SprTilesPack_043.bin,lz12 -> 960 B
+SprTilesPack_077,$DA:1838,$DA:1921,234,packed,packed_lz/SprTilesPack_077.bin,lz12 -> 288 B
+SprTilesPack_116,$DA:1922,$DA:1988,103,packed,packed_lz/SprTilesPack_116.bin,lz12 -> 320 B
+SprTilesPack_117,$DA:1989,$DA:1C15,653,packed,packed_lz/SprTilesPack_117.bin,lz12 -> 768 B
+SprTilesPack_118,$DA:1C16,$DA:1CA4,143,packed,packed_lz/SprTilesPack_118.bin,lz12 -> 288 B
+SprTilesPack_119,$DA:1CA5,$DA:1D5C,184,packed,packed_lz/SprTilesPack_119.bin,lz12 -> 288 B
+SprTilesPack_120,$DA:1D5D,$DA:21B3,1111,packed,packed_lz/SprTilesPack_120.bin,lz12 -> 1344 B
+SprTilesPack_121,$DA:21B4,$DA:2337,388,packed,packed_lz/SprTilesPack_121.bin,lz12 -> 704 B
+SprTilesPack_122,$DA:2338,$DA:23EC,181,packed,packed_lz/SprTilesPack_122.bin,lz12 -> 448 B
+SprTilesPack_048,$DA:23ED,$DA:24A4,184,packed,packed_lz/SprTilesPack_048.bin,lz12 -> 224 B
+SprTilesPack_049,$DA:24A5,$DA:24E8,68,packed,packed_lz/SprTilesPack_049.bin,lz12 -> 160 B
+SprTilesPack_050,$DA:24E9,$DA:2603,283,packed,packed_lz/SprTilesPack_050.bin,lz12 -> 416 B
+SprTilesPack_051,$DA:2604,$DA:2670,109,packed,packed_lz/SprTilesPack_051.bin,lz12 -> 128 B
+SprTilesPack_052,$DA:2671,$DA:27F9,393,packed,packed_lz/SprTilesPack_052.bin,lz12 -> 480 B
+SprTilesPack_053,$DA:27FA,$DA:2AD1,728,packed,packed_lz/SprTilesPack_053.bin,lz12 -> 800 B
+SprTilesPack_054,$DA:2AD2,$DA:2B4A,121,packed,packed_lz/SprTilesPack_054.bin,lz12 -> 288 B
+SprTilesPack_055,$DA:2B4B,$DA:2C91,327,packed,packed_lz/SprTilesPack_055.bin,lz12 -> 480 B
+SprTilesPack_056,$DA:2C92,$DA:2D63,210,packed,packed_lz/SprTilesPack_056.bin,lz12 -> 352 B
+SprTilesPack_057,$DA:2D64,$DA:2F72,527,packed,packed_lz/SprTilesPack_057.bin,lz12 -> 992 B
+SprTilesPack_228,$DA:2F73,$DA:3207,661,packed,packed_lz/SprTilesPack_228.bin,lz12 -> 896 B
+SprTilesPack_058,$DA:3208,$DA:350A,771,packed,packed_lz/SprTilesPack_058.bin,lz12 -> 1024 B
+SprTilesPack_059,$DA:350B,$DA:35D1,199,packed,packed_lz/SprTilesPack_059.bin,lz12 -> 416 B
+SprTilesPack_060,$DA:35D2,$DA:39C3,1010,packed,packed_lz/SprTilesPack_060.bin,lz12 -> 1280 B
+SprTilesPack_061,$DA:39C4,$DA:3C81,702,packed,packed_lz/SprTilesPack_061.bin,lz12 -> 1376 B
+SprTilesPack_062,$DA:3C82,$DA:3D50,207,packed,packed_lz/SprTilesPack_062.bin,lz12 -> 416 B
+SprTilesPack_063,$DA:3D51,$DA:3DF7,167,packed,packed_lz/SprTilesPack_063.bin,lz12 -> 288 B
+SprTilesPack_064,$DA:3DF8,$DA:3E2A,51,packed,packed_lz/SprTilesPack_064.bin,lz12 -> 224 B
+SprTilesPack_065,$DA:3E2B,$DA:3EB1,135,packed,packed_lz/SprTilesPack_065.bin,lz12 -> 160 B
+SprTilesPack_066,$DA:3EB2,$DA:3F33,130,packed,packed_lz/SprTilesPack_066.bin,lz12 -> 288 B
+SprTilesPack_067,$DA:3F34,$DA:3F79,70,packed,packed_lz/SprTilesPack_067.bin,lz12 -> 160 B
+SprTilesPack_068,$DA:3F7A,$DA:3FD2,89,packed,packed_lz/SprTilesPack_068.bin,lz12 -> 160 B
+SprTilesPack_069,$DA:3FD3,$DA:405F,141,packed,packed_lz/SprTilesPack_069.bin,lz12 -> 160 B
+SprTilesPack_070,$DA:4060,$DA:40ED,142,packed,packed_lz/SprTilesPack_070.bin,lz12 -> 160 B
+SprTilesPack_071,$DA:40EE,$DA:4174,135,packed,packed_lz/SprTilesPack_071.bin,lz12 -> 160 B
+SprTilesPack_072,$DA:4175,$DA:41D8,100,packed,packed_lz/SprTilesPack_072.bin,lz12 -> 160 B
+SprTilesPack_073,$DA:41D9,$DA:42C1,233,packed,packed_lz/SprTilesPack_073.bin,lz12 -> 288 B
+SprTilesPack_074,$DA:42C2,$DA:434F,142,packed,packed_lz/SprTilesPack_074.bin,lz12 -> 160 B
+SprTilesPack_075,$DA:4350,$DA:43D0,129,packed,packed_lz/SprTilesPack_075.bin,lz12 -> 160 B
+SprTilesPack_076,$DA:43D1,$DA:4452,130,packed,packed_lz/SprTilesPack_076.bin,lz12 -> 160 B
+SprTilesPack_044,$DA:4453,$DA:47F9,935,packed,packed_lz/SprTilesPack_044.bin,lz12 -> 1184 B
+SprTilesPack_045,$DA:47FA,$DA:4AED,756,packed,packed_lz/SprTilesPack_045.bin,lz12 -> 800 B
+SprTilesPack_031,$DA:4AEE,$DA:50CF,1506,packed,packed_lz/SprTilesPack_031.bin,lz12 -> 1600 B
+SprTilesPack_128,$DA:50D0,$DA:58A3,2004,packed,packed_lz/SprTilesPack_128.bin,lz12 -> 2304 B
+SprTilesPack_040,$DA:58A4,$DA:617F,2268,packed,packed_lz/SprTilesPack_040.bin,lz12 -> 2432 B
+SprTilesPack_041,$DA:6180,$DA:66C3,1348,packed,packed_lz/SprTilesPack_041.bin,lz12 -> 1504 B
+SprTilesPack_129,$DA:66C4,$DA:68A0,477,packed,packed_lz/SprTilesPack_129.bin,lz12 -> 576 B
+SprTilesPack_046,$DA:68A1,$DA:6932,146,packed,packed_lz/SprTilesPack_046.bin,lz12 -> 256 B
+SprTilesPack_042,$DA:6933,$DA:6DD6,1188,packed,packed_lz/SprTilesPack_042.bin,lz12 -> 1376 B
+SprTilesPack_130,$DA:6DD7,$DA:7654,2174,packed,packed_lz/SprTilesPack_130.bin,lz12 -> 2496 B
+SprTilesPack_131,$DA:7655,$DA:7D2E,1754,packed,packed_lz/SprTilesPack_131.bin,lz12 -> 2016 B
+SprTilesPack_132,$DA:7D2F,$DA:8063,821,packed,packed_lz/SprTilesPack_132.bin,lz12 -> 1088 B
+SprTilesPack_134,$DA:8064,$DA:8455,1010,packed,packed_lz/SprTilesPack_134.bin,lz12 -> 1760 B
+SprTilesPack_136,$DA:8456,$DA:8A9F,1610,packed,packed_lz/SprTilesPack_136.bin,lz12 -> 1952 B
+SprTilesPack_135,$DA:8AA0,$DA:9255,1974,packed,packed_lz/SprTilesPack_135.bin,lz12 -> 2336 B
+SprTilesPack_037,$DA:9256,$DA:A107,3762,packed,packed_lz/SprTilesPack_037.bin,lz12 -> 4480 B
+SprTilesPack_137,$DA:A108,$DA:A5D2,1227,packed,packed_lz/SprTilesPack_137.bin,lz12 -> 1312 B
+SprTilesPack_147,$DA:A5D3,$DA:A97E,940,packed,packed_lz/SprTilesPack_147.bin,lz12 -> 928 B
+SprTilesPack_148,$DA:A97F,$DA:BA14,4246,packed,packed_lz/SprTilesPack_148.bin,lz12 -> 4992 B
+SprTilesPack_149,$DA:BA15,$DA:BAAC,152,packed,packed_lz/SprTilesPack_149.bin,lz12 -> 160 B
+SprTilesPack_150,$DA:BAAD,$DA:BE52,934,packed,packed_lz/SprTilesPack_150.bin,lz12 -> 1152 B
+SprTilesPack_151,$DA:BE53,$DA:BF4F,253,packed,packed_lz/SprTilesPack_151.bin,lz12 -> 288 B
+SprTilesPack_152,$DA:BF50,$DA:BFF0,161,packed,packed_lz/SprTilesPack_152.bin,lz12 -> 288 B
+SprTilesPack_157,$DA:BFF1,$DA:C1BD,461,packed,packed_lz/SprTilesPack_157.bin,lz12 -> 512 B
+SprTilesPack_153,$DA:C1BE,$DA:C266,169,packed,packed_lz/SprTilesPack_153.bin,lz12 -> 288 B
+SprTilesPack_156,$DA:C267,$DA:C322,188,packed,packed_lz/SprTilesPack_156.bin,lz12 -> 608 B
+SprTilesPack_158,$DA:C323,$DA:CF28,3078,packed,packed_lz/SprTilesPack_158.bin,lz12 -> 4096 B
+SprTilesPack_159,$DA:CF29,$DA:D037,271,packed,packed_lz/SprTilesPack_159.bin,lz12 -> 576 B
+SprTilesPack_160,$DA:D038,$DA:D0C2,139,packed,packed_lz/SprTilesPack_160.bin,lz12 -> 160 B
+SprTilesPack_168,$DA:D0C3,$DA:D28B,457,packed,packed_lz/SprTilesPack_168.bin,lz12 -> 960 B
+SprTilesPack_174,$DA:D28C,$DA:D2B2,39,packed,packed_lz/SprTilesPack_174.bin,lz12 -> 128 B
+SprTilesPack_169,$DA:D2B3,$DA:D36F,189,packed,packed_lz/SprTilesPack_169.bin,lz12 -> 224 B
+SprTilesPack_175,$DA:D370,$DA:D6DD,878,packed,packed_lz/SprTilesPack_175.bin,lz12 -> 1216 B
+SprTilesPack_178,$DA:D6DE,$DA:D806,297,packed,packed_lz/SprTilesPack_178.bin,lz12 -> 448 B
+SprTilesPack_186,$DA:D807,$DA:D859,83,packed,packed_lz/SprTilesPack_186.bin,lz12 -> 160 B
+SprTilesPack_188,$DA:D85A,$DA:D8A6,77,packed,packed_lz/SprTilesPack_188.bin,lz12 -> 192 B
+SprTilesPack_211,$DA:D8A7,$DA:DC27,897,packed,packed_lz/SprTilesPack_211.bin,lz12 -> 1312 B
+SprTilesPack_226,$DA:DC28,$DA:E04D,1062,packed,packed_lz/SprTilesPack_226.bin,lz12 -> 1312 B
+SprTilesPack_163,$DA:E04E,$DA:E532,1253,packed,packed_lz/SprTilesPack_163.bin,lz12 -> 1664 B
+SprTilesPack_224,$DA:E533,$DA:E877,837,packed,packed_lz/SprTilesPack_224.bin,lz12 -> 1216 B
+SprTilesPack_225,$DA:E878,$DA:F75A,3811,packed,packed_lz/SprTilesPack_225.bin,lz12 -> 5440 B
+SprTilesPack_231,$DA:F75B,$DA:F7AA,80,packed,packed_lz/SprTilesPack_231.bin,lz12 -> 160 B
+SprTilesPack_232,$DA:F7AB,$DA:F847,157,packed,packed_lz/SprTilesPack_232.bin,lz12 -> 256 B
+SprTilesPack_234,$DA:F848,$DA:FA68,545,packed,packed_lz/SprTilesPack_234.bin,lz12 -> 736 B
+SprTilesPack_237,$DA:FA69,$DA:FC28,448,packed,packed_lz/SprTilesPack_237.bin,lz12 -> 544 B
+Padding_DAFC29,$DA:FC29,$DA:FFFF,983,fill,,$00
+EvtPack_023,$DB:0000,$DB:00DA,219,packed,packed_lz/EvtPack_023.bin,lz11 -> 243 B
+EvtPack_024,$DB:00DB,$DB:00FD,35,packed,packed_lz/EvtPack_024.bin,lz11 -> 109 B
+EvtPack_025,$DB:00FE,$DB:01BB,190,packed,packed_lz/EvtPack_025.bin,lz11 -> 446 B
+EvtPack_026,$DB:01BC,$DB:05DD,1058,packed,packed_lz/EvtPack_026.bin,lz11 -> 1460 B
+EvtPack_027,$DB:05DE,$DB:0C72,1685,packed,packed_lz/EvtPack_027.bin,lz11 -> 2570 B
+EvtPack_028,$DB:0C73,$DB:156E,2300,packed,packed_lz/EvtPack_028.bin,lz11 -> 3145 B
+EvtPack_029,$DB:156F,$DB:1668,250,packed,packed_lz/EvtPack_029.bin,lz11 -> 507 B
+EvtPack_030,$DB:1669,$DB:185A,498,packed,packed_lz/EvtPack_030.bin,lz11 -> 850 B
+EvtPack_031,$DB:185B,$DB:1EF6,1692,packed,packed_lz/EvtPack_031.bin,lz11 -> 2835 B
+EvtPack_032,$DB:1EF7,$DB:2196,672,packed,packed_lz/EvtPack_032.bin,lz11 -> 1064 B
+EvtPack_033,$DB:2197,$DB:2495,767,packed,packed_lz/EvtPack_033.bin,lz11 -> 1319 B
+EvtPack_034,$DB:2496,$DB:26EF,602,packed,packed_lz/EvtPack_034.bin,lz11 -> 1077 B
+EvtPack_035,$DB:26F0,$DB:2962,627,packed,packed_lz/EvtPack_035.bin,lz11 -> 1142 B
+EvtPack_036,$DB:2963,$DB:2A21,191,packed,packed_lz/EvtPack_036.bin,lz11 -> 448 B
+EvtPack_037,$DB:2A22,$DB:2F04,1251,packed,packed_lz/EvtPack_037.bin,lz11 -> 2201 B
+EvtPack_038,$DB:2F05,$DB:31E2,734,packed,packed_lz/EvtPack_038.bin,lz11 -> 1479 B
+EvtPack_039,$DB:31E3,$DB:3465,643,packed,packed_lz/EvtPack_039.bin,lz11 -> 1045 B
+EvtPack_040,$DB:3466,$DB:369C,567,packed,packed_lz/EvtPack_040.bin,lz11 -> 972 B
+EvtPack_041,$DB:369D,$DB:3E31,1941,packed,packed_lz/EvtPack_041.bin,lz11 -> 3252 B
+EvtPack_042,$DB:3E32,$DB:4273,1090,packed,packed_lz/EvtPack_042.bin,lz11 -> 1627 B
+EvtPack_043,$DB:4274,$DB:4363,240,packed,packed_lz/EvtPack_043.bin,lz11 -> 578 B
+EvtPack_044,$DB:4364,$DB:446A,263,packed,packed_lz/EvtPack_044.bin,lz11 -> 582 B
+EvtPack_045,$DB:446B,$DB:44F0,134,packed,packed_lz/EvtPack_045.bin,lz11 -> 362 B
+EvtPack_046,$DB:44F1,$DB:45F3,259,packed,packed_lz/EvtPack_046.bin,lz11 -> 534 B
+EvtPack_047,$DB:45F4,$DB:47BE,459,packed,packed_lz/EvtPack_047.bin,lz11 -> 1036 B
+EvtPack_048,$DB:47BF,$DB:4936,376,packed,packed_lz/EvtPack_048.bin,lz11 -> 869 B
+EvtPack_049,$DB:4937,$DB:4A02,204,packed,packed_lz/EvtPack_049.bin,lz11 -> 486 B
+EvtPack_050,$DB:4A03,$DB:4BAD,427,packed,packed_lz/EvtPack_050.bin,lz11 -> 945 B
+EvtPack_051,$DB:4BAE,$DB:4F55,936,packed,packed_lz/EvtPack_051.bin,lz11 -> 1556 B
+EvtPack_052,$DB:4F56,$DB:5113,446,packed,packed_lz/EvtPack_052.bin,lz11 -> 788 B
+EvtPack_053,$DB:5114,$DB:523F,300,packed,packed_lz/EvtPack_053.bin,lz11 -> 676 B
+EvtPack_054,$DB:5240,$DB:53E9,426,packed,packed_lz/EvtPack_054.bin,lz11 -> 863 B
+EvtPack_055,$DB:53EA,$DB:549A,177,packed,packed_lz/EvtPack_055.bin,lz11 -> 435 B
+EvtPack_056,$DB:549B,$DB:5630,406,packed,packed_lz/EvtPack_056.bin,lz11 -> 749 B
+EvtPack_057,$DB:5631,$DB:5A80,1104,packed,packed_lz/EvtPack_057.bin,lz11 -> 1725 B
+EvtPack_058,$DB:5A81,$DB:5E02,898,packed,packed_lz/EvtPack_058.bin,lz11 -> 1239 B
+EvtPack_059,$DB:5E03,$DB:5EBA,184,packed,packed_lz/EvtPack_059.bin,lz11 -> 440 B
+EvtPack_060,$DB:5EBB,$DB:6024,362,packed,packed_lz/EvtPack_060.bin,lz11 -> 715 B
+EvtPack_061,$DB:6025,$DB:610C,232,packed,packed_lz/EvtPack_061.bin,lz11 -> 564 B
+EvtPack_062,$DB:610D,$DB:63BC,688,packed,packed_lz/EvtPack_062.bin,lz11 -> 1024 B
+EvtPack_063,$DB:63BD,$DB:6474,184,packed,packed_lz/EvtPack_063.bin,lz11 -> 440 B
+EvtPack_064,$DB:6475,$DB:652C,184,packed,packed_lz/EvtPack_064.bin,lz11 -> 440 B
+EvtPack_065,$DB:652D,$DB:6697,363,packed,packed_lz/EvtPack_065.bin,lz11 -> 715 B
+EvtPack_066,$DB:6698,$DB:6802,363,packed,packed_lz/EvtPack_066.bin,lz11 -> 715 B
+EvtPack_067,$DB:6803,$DB:6A91,655,packed,packed_lz/EvtPack_067.bin,lz11 -> 1064 B
+EvtPack_068,$DB:6A92,$DB:6CF8,615,packed,packed_lz/EvtPack_068.bin,lz11 -> 1292 B
+EvtPack_069,$DB:6CF9,$DB:6E1E,294,packed,packed_lz/EvtPack_069.bin,lz11 -> 337 B
+EvtPack_071,$DB:6E1F,$DB:75F7,2009,packed,packed_lz/EvtPack_071.bin,lz11 -> 2909 B
+EvtPack_072,$DB:75F8,$DB:7799,418,packed,packed_lz/EvtPack_072.bin,lz11 -> 627 B
+EvtPack_073,$DB:779A,$DB:788F,246,packed,packed_lz/EvtPack_073.bin,lz11 -> 625 B
+EvtPack_074,$DB:7890,$DB:7FF1,1890,packed,packed_lz/EvtPack_074.bin,lz11 -> 2781 B
+EvtPack_075,$DB:7FF2,$DB:7FF4,3,packed,packed_lz/EvtPack_075.bin,lz12 -> 0 B
+Padding_DB7FF5,$DB:7FF5,$DB:BFFF,16395,fill,,$00
+Unknown_DBC000,$DB:C000,$DB:C000,1,extracted,unknown/Unknown_DBC000.bin,
+Padding_DBC001,$DB:C001,$DB:FFFF,16383,fill,,$00
+SprLayout_DC0000,$DC:0000,$DC:FFFF,65536,extracted,sprite_layout/SprLayout_DC0000.bin,
+SprLayout_DD0000,$DD:0000,$DD:FFFF,65536,extracted,sprite_layout/SprLayout_DD0000.bin,
+SprLayout_DE0000,$DE:0000,$DE:BFFF,49152,extracted,sprite_layout/SprLayout_DE0000.bin,
+Text_DEC000,$DE:C000,$DE:E2B0,8881,extracted,text/Text_DEC000.bin,
+Padding_DEE2B1,$DE:E2B1,$DE:E2FF,79,fill,,$00
+Text_DEE300,$DE:E300,$DE:F96C,5741,extracted,text/Text_DEE300.bin,
+Padding_DEF96D,$DE:F96D,$DE:F9FF,147,fill,,$00
+TextWin_DictPtrs,$DE:FA00,$DE:FAFD,254,extracted,text/TextWin_DictPtrs.bin,
+Table_DEFAFE,$DE:FAFE,$DE:FAFF,2,extracted,table/Table_DEFAFE.bin,
+Text_DEFB00,$DE:FB00,$DE:FD00,513,extracted,text/Text_DEFB00.bin,
+Padding_DEFD01,$DE:FD01,$DE:FEFF,511,fill,,$00
+Text_DEFF00,$DE:FF00,$DE:FF52,83,extracted,text/Text_DEFF00.bin,
+Padding_DEFF53,$DE:FF53,$DE:FFFF,173,fill,,$00
+SprTilesPack_123,$DF:0000,$DF:2032,8243,packed,packed_lz/SprTilesPack_123.bin,lz12 -> 11392 B
+SprTilesPack_124,$DF:2033,$DF:2922,2288,packed,packed_lz/SprTilesPack_124.bin,lz12 -> 2944 B
+SprTilesPack_133,$DF:2923,$DF:4463,6977,packed,packed_lz/SprTilesPack_133.bin,lz12 -> 8512 B
+SprTilesPack_139,$DF:4464,$DF:6612,8623,packed,packed_lz/SprTilesPack_139.bin,lz12 -> 10528 B
+SprTilesPack_140,$DF:6613,$DF:853A,7976,packed,packed_lz/SprTilesPack_140.bin,lz12 -> 8832 B
+SprTilesPack_141,$DF:853B,$DF:9670,4406,packed,packed_lz/SprTilesPack_141.bin,lz12 -> 4768 B
+SprTilesPack_142,$DF:9671,$DF:A7FF,4495,packed,packed_lz/SprTilesPack_142.bin,lz12 -> 5664 B
+SprTilesPack_143,$DF:A800,$DF:BE58,5721,packed,packed_lz/SprTilesPack_143.bin,lz12 -> 6656 B
+SprTilesPack_144,$DF:BE59,$DF:BFF5,413,packed,packed_lz/SprTilesPack_144.bin,lz12 -> 512 B
+SprTilesPack_145,$DF:BFF6,$DF:C2C9,724,packed,packed_lz/SprTilesPack_145.bin,lz12 -> 1056 B
+SprTilesPack_146,$DF:C2CA,$DF:CE52,2953,packed,packed_lz/SprTilesPack_146.bin,lz12 -> 4096 B
+SprTilesPack_154,$DF:CE53,$DF:EA2C,7130,packed,packed_lz/SprTilesPack_154.bin,lz12 -> 9280 B
+SprTilesPack_182,$DF:EA2D,$DF:F75C,3376,packed,packed_lz/SprTilesPack_182.bin,lz12 -> 4320 B
+SprTilesPack_176,$DF:F75D,$DF:F912,438,packed,packed_lz/SprTilesPack_176.bin,lz12 -> 544 B
+SprTilesPack_223,$DF:F913,$DF:FB30,542,packed,packed_lz/SprTilesPack_223.bin,lz12 -> 768 B
+SprTilesPack_183,$DF:FB31,$DF:FF74,1092,packed,packed_lz/SprTilesPack_183.bin,lz12 -> 1728 B
+Unknown_DFFF75,$DF:FF75,$DF:FF75,1,extracted,unknown/Unknown_DFFF75.bin,
+Padding_DFFF76,$DF:FF76,$DF:FFFF,138,fill,,$00
+SprTilesPack_170,$E0:0000,$E0:0EBC,3773,packed,packed_lz/SprTilesPack_170.bin,lz12 -> 5024 B
+SprTilesPack_171,$E0:0EBD,$E0:1E2D,3953,packed,packed_lz/SprTilesPack_171.bin,lz12 -> 4384 B
+SprTilesPack_172,$E0:1E2E,$E0:2187,858,packed,packed_lz/SprTilesPack_172.bin,lz12 -> 1216 B
+SprTilesPack_161,$E0:2188,$E0:2564,989,packed,packed_lz/SprTilesPack_161.bin,lz12 -> 1248 B
+SprTilesPack_162,$E0:2565,$E0:332B,3527,packed,packed_lz/SprTilesPack_162.bin,lz12 -> 4992 B
+Pack_E0332C,$E0:332C,$E0:34E1,438,packed,packed_lz/Pack_E0332C.bin,lz12 -> 544 B
+SprTilesPack_177,$E0:34E2,$E0:3E6E,2445,packed,packed_lz/SprTilesPack_177.bin,lz12 -> 2624 B
+SprTilesPack_181,$E0:3E6F,$E0:60EC,8830,packed,packed_lz/SprTilesPack_181.bin,lz12 -> 10976 B
+SprTilesPack_166,$E0:60ED,$E0:847D,9105,packed,packed_lz/SprTilesPack_166.bin,lz12 -> 12384 B
+SprTilesPack_184,$E0:847E,$E0:8D73,2294,packed,packed_lz/SprTilesPack_184.bin,lz12 -> 3200 B
+SprTilesPack_185,$E0:8D74,$E0:A3FC,5769,packed,packed_lz/SprTilesPack_185.bin,lz12 -> 7296 B
+SprTilesPack_192,$E0:A3FD,$E0:CECB,10959,packed,packed_lz/SprTilesPack_192.bin,lz12 -> 11968 B
+SprTilesPack_197,$E0:CECC,$E0:D084,441,packed,packed_lz/SprTilesPack_197.bin,lz12 -> 640 B
+SprTilesPack_203,$E0:D085,$E0:F359,8917,packed,packed_lz/SprTilesPack_203.bin,lz12 -> 12288 B
+SprTilesPack_216,$E0:F35A,$E0:FD92,2617,packed,packed_lz/SprTilesPack_216.bin,lz12 -> 3264 B
+Pack_E0FD93,$E0:FD93,$E0:FF4B,441,packed,packed_lz/Pack_E0FD93.bin,lz12 -> 640 B
+Unknown_E0FF4C,$E0:FF4C,$E0:FF4C,1,extracted,unknown/Unknown_E0FF4C.bin,
+Padding_E0FF4D,$E0:FF4D,$E0:FFFF,179,fill,,$00
+SprTilesPack_229,$E1:0000,$E1:00A9,170,packed,packed_lz/SprTilesPack_229.bin,lz12 -> 192 B
+SprTilesPack_208,$E1:00AA,$E1:25D7,9518,packed,packed_lz/SprTilesPack_208.bin,lz12 -> 11296 B
+SprTilesPack_209,$E1:25D8,$E1:4AF6,9503,packed,packed_lz/SprTilesPack_209.bin,lz12 -> 11296 B
+SprTilesPack_214,$E1:4AF7,$E1:9318,18466,packed,packed_lz/SprTilesPack_214.bin,lz12 -> 23776 B
+SprTilesPack_193,$E1:9319,$E1:9994,1660,packed,packed_lz/SprTilesPack_193.bin,lz12 -> 2176 B
+SprTilesPack_034,$E1:9995,$E1:B7AB,7703,packed,packed_lz/SprTilesPack_034.bin,lz12 -> 10080 B
+SprTilesPack_213,$E1:B7AC,$E1:BF3D,1938,packed,packed_lz/SprTilesPack_213.bin,lz12 -> 2048 B
+SprTilesPack_217,$E1:BF3E,$E1:C12E,497,packed,packed_lz/SprTilesPack_217.bin,lz12 -> 608 B
+SprTilesPack_219,$E1:C12F,$E1:C4D8,938,packed,packed_lz/SprTilesPack_219.bin,lz12 -> 1184 B
+SprTilesPack_220,$E1:C4D9,$E1:C711,569,packed,packed_lz/SprTilesPack_220.bin,lz12 -> 832 B
+SprTilesPack_233,$E1:C712,$E1:D320,3087,packed,packed_lz/SprTilesPack_233.bin,lz12 -> 3552 B
+SprTilesPack_235,$E1:D321,$E1:DDB1,2705,packed,packed_lz/SprTilesPack_235.bin,lz12 -> 3104 B
+Unknown_E1DDB2,$E1:DDB2,$E1:DDB2,1,extracted,unknown/Unknown_E1DDB2.bin,
+Padding_E1DDB3,$E1:DDB3,$E1:DDFF,77,fill,,$00
+BattleRom_EnemyKindList,$E1:DE00,$E1:DE2B,44,extracted,table/BattleRom_EnemyKindList.bin,
+Padding_E1DE2C,$E1:DE2C,$E1:DE7F,84,fill,,$00
+BattleRom_UnkE1DE80,$E1:DE80,$E1:DF7A,251,extracted,table/BattleRom_UnkE1DE80.bin,
+Padding_E1DF7B,$E1:DF7B,$E1:DFFF,133,fill,,$00
+SprLayout_E1E000,$E1:E000,$E1:FFFF,8192,extracted,sprite_layout/SprLayout_E1E000.bin,
+LocGfxPack_181,$E2:0000,$E2:0C1D,3102,packed,packed_lz/LocGfxPack_181.bin,lz12 -> 4096 B
+LocGfxPack_182,$E2:0C1E,$E2:17E9,3020,packed,packed_lz/LocGfxPack_182.bin,lz12 -> 4096 B
+LocGfxPack_183,$E2:17EA,$E2:2581,3480,packed,packed_lz/LocGfxPack_183.bin,lz12 -> 4096 B
+LocGfxPack_184,$E2:2582,$E2:3403,3714,packed,packed_lz/LocGfxPack_184.bin,lz12 -> 4096 B
+LocGfxPack_185,$E2:3404,$E2:4078,3189,packed,packed_lz/LocGfxPack_185.bin,lz12 -> 4096 B
+LocGfxPack_186,$E2:4079,$E2:4B98,2848,packed,packed_lz/LocGfxPack_186.bin,lz12 -> 4096 B
+LocGfxPack_187,$E2:4B99,$E2:5844,3244,packed,packed_lz/LocGfxPack_187.bin,lz12 -> 4096 B
+LocGfxPack_188,$E2:5845,$E2:66E0,3740,packed,packed_lz/LocGfxPack_188.bin,lz12 -> 4096 B
+LocGfxPack_189,$E2:66E1,$E2:74B0,3536,packed,packed_lz/LocGfxPack_189.bin,lz12 -> 4096 B
+LocGfxPack_190,$E2:74B1,$E2:84DE,4142,packed,packed_lz/LocGfxPack_190.bin,lz12 -> 4096 B
+LocGfxPack_191,$E2:84DF,$E2:92C6,3560,packed,packed_lz/LocGfxPack_191.bin,lz12 -> 4096 B
+LocGfxPack_192,$E2:92C7,$E2:A1D9,3859,packed,packed_lz/LocGfxPack_192.bin,lz12 -> 4096 B
+LocGfxPack_193,$E2:A1DA,$E2:B003,3626,packed,packed_lz/LocGfxPack_193.bin,lz12 -> 4096 B
+LocGfxPack_194,$E2:B004,$E2:BDD8,3541,packed,packed_lz/LocGfxPack_194.bin,lz12 -> 4096 B
+LocGfxPack_195,$E2:BDD9,$E2:CB39,3425,packed,packed_lz/LocGfxPack_195.bin,lz12 -> 4096 B
+LocGfxPack_196,$E2:CB3A,$E2:D737,3070,packed,packed_lz/LocGfxPack_196.bin,lz12 -> 4096 B
+LocGfxPack_197,$E2:D738,$E2:E753,4124,packed,packed_lz/LocGfxPack_197.bin,lz12 -> 4096 B
+LocGfxPack_198,$E2:E754,$E2:F261,2830,packed,packed_lz/LocGfxPack_198.bin,lz12 -> 4096 B
+LocGfxPack_199,$E2:F262,$E2:FE45,3044,packed,packed_lz/LocGfxPack_199.bin,lz12 -> 4096 B
+Padding_E2FE46,$E2:FE46,$E2:FFFF,442,fill,,$00
+SprLayout_E30000,$E3:0000,$E3:FFFF,65536,extracted,sprite_layout/SprLayout_E30000.bin,
+Table_E40000,$E4:0000,$E4:1FFF,8192,extracted,table/Table_E40000.bin,
+BattleRom_SprTilesPtr,$E4:2000,$E4:22FF,768,table,,dl x 256
+BattleRom_SprFramesPtr,$E4:2300,$E4:25FF,768,extracted,table/BattleRom_SprFramesPtr.bin,
+BattleRom_SprAnimFrames,$E4:2600,$E4:27FF,512,extracted,table/BattleRom_SprAnimFrames.bin,
+BattleRom_SprAnimDurs,$E4:2800,$E4:29FF,512,extracted,table/BattleRom_SprAnimDurs.bin,
+Palette_E42A00,$E4:2A00,$E4:2FFF,1536,extracted,palette/Palette_E42A00.bin,
+Table_E43000,$E4:3000,$E4:A7FF,30720,extracted,table/Table_E43000.bin,
+Table_E4A800,$E4:A800,$E4:EFFF,18432,extracted,table/Table_E4A800.bin,
+RomE4_SprRec,$E4:F000,$E4:F521,1314,extracted,table/RomE4_SprRec.bin,
+Padding_E4F522,$E4:F522,$E4:F5FF,222,fill,,$00
+RomE4_EnemySprRec,$E4:F600,$E4:FFDF,2528,extracted,table/RomE4_EnemySprRec.bin,
+Table_E4FFE0,$E4:FFE0,$E4:FFED,14,extracted,table/Table_E4FFE0.bin,
+Padding_E4FFEE,$E4:FFEE,$E4:FFFF,18,fill,,$00
+ExitRom_LocOfs,$E5:0000,$E5:0401,1026,extracted,table/ExitRom_LocOfs.bin,
+MapData_E50402,$E5:0402,$E5:1A43,5698,extracted,map/MapData_E50402.bin,
+Padding_E51A44,$E5:1A44,$E5:1FFF,1468,fill,,$00
+LocGfxPack_000,$E5:2000,$E5:2361,866,packed,packed_lz/LocGfxPack_000.bin,lz12 -> 3968 B
+LocGfxPack_001,$E5:2362,$E5:26B8,855,packed,packed_lz/LocGfxPack_001.bin,lz12 -> 3968 B
+LocGfxPack_002,$E5:26B9,$E5:2A1A,866,packed,packed_lz/LocGfxPack_002.bin,lz12 -> 3968 B
+LocGfxPack_003,$E5:2A1B,$E5:2D12,760,packed,packed_lz/LocGfxPack_003.bin,lz12 -> 3072 B
+LocGfxPack_004,$E5:2D13,$E5:3226,1300,packed,packed_lz/LocGfxPack_004.bin,lz12 -> 3072 B
+LocGfxPack_005,$E5:3227,$E5:36BC,1174,packed,packed_lz/LocGfxPack_005.bin,lz12 -> 3968 B
+LocGfxPack_006,$E5:36BD,$E5:3C20,1380,packed,packed_lz/LocGfxPack_006.bin,lz12 -> 3072 B
+LocGfxPack_007,$E5:3C21,$E5:452E,2318,packed,packed_lz/LocGfxPack_007.bin,lz12 -> 3968 B
+LocGfxPack_008,$E5:452F,$E5:49DB,1197,packed,packed_lz/LocGfxPack_008.bin,lz12 -> 3072 B
+LocGfxPack_009,$E5:49DC,$E5:4D0D,818,packed,packed_lz/LocGfxPack_009.bin,lz12 -> 3968 B
+LocGfxPack_010,$E5:4D0E,$E5:4F45,568,packed,packed_lz/LocGfxPack_010.bin,lz12 -> 3968 B
+LocGfxPack_011,$E5:4F46,$E5:5272,813,packed,packed_lz/LocGfxPack_011.bin,lz12 -> 3968 B
+LocGfxPack_012,$E5:5273,$E5:5A3B,1993,packed,packed_lz/LocGfxPack_012.bin,lz12 -> 3072 B
+LocGfxPack_013,$E5:5A3C,$E5:6103,1736,packed,packed_lz/LocGfxPack_013.bin,lz12 -> 3968 B
+LocGfxPack_014,$E5:6104,$E5:6155,82,packed,packed_lz/LocGfxPack_014.bin,lz12 -> 256 B
+LocGfxPack_015,$E5:6156,$E5:66EB,1430,packed,packed_lz/LocGfxPack_015.bin,lz12 -> 3968 B
+LocGfxPack_016,$E5:66EC,$E5:69BF,724,packed,packed_lz/LocGfxPack_016.bin,lz12 -> 3968 B
+LocGfxPack_017,$E5:69C0,$E5:6F48,1417,packed,packed_lz/LocGfxPack_017.bin,lz12 -> 3968 B
+LocGfxPack_018,$E5:6F49,$E5:7CBE,3446,packed,packed_lz/LocGfxPack_018.bin,lz12 -> 3968 B
+LocGfxPack_019,$E5:7CBF,$E5:9596,6360,packed,packed_lz/LocGfxPack_019.bin,lz12 -> 8192 B
+LocGfxPack_020,$E5:9597,$E5:9935,927,packed,packed_lz/LocGfxPack_020.bin,lz12 -> 4096 B
+LocGfxPack_021,$E5:9936,$E5:AB41,4620,packed,packed_lz/LocGfxPack_021.bin,lz12 -> 8192 B
+LocGfxPack_022,$E5:AB42,$E5:B8D6,3477,packed,packed_lz/LocGfxPack_022.bin,lz12 -> 8192 B
+LocGfxPack_023,$E5:B8D7,$E5:CC22,4940,packed,packed_lz/LocGfxPack_023.bin,lz12 -> 8192 B
+LocGfxPack_024,$E5:CC23,$E5:D3A7,1925,packed,packed_lz/LocGfxPack_024.bin,lz12 -> 8192 B
+LocGfxPack_025,$E5:D3A8,$E5:DE38,2705,packed,packed_lz/LocGfxPack_025.bin,lz12 -> 4096 B
+LocGfxPack_026,$E5:DE39,$E5:EB9B,3427,packed,packed_lz/LocGfxPack_026.bin,lz12 -> 4096 B
+LocGfxPack_027,$E5:EB9C,$E5:F9B3,3608,packed,packed_lz/LocGfxPack_027.bin,lz12 -> 4096 B
+LocGfxPack_028,$E5:F9B4,$E5:FB9F,492,packed,packed_lz/LocGfxPack_028.bin,lz12 -> 4096 B
+Padding_E5FBA0,$E5:FBA0,$E5:FFFF,1120,fill,,$00
+LocGfxPack_029,$E6:0000,$E6:0C85,3206,packed,packed_lz/LocGfxPack_029.bin,lz12 -> 4096 B
+LocGfxPack_030,$E6:0C86,$E6:1501,2172,packed,packed_lz/LocGfxPack_030.bin,lz12 -> 4096 B
+LocGfxPack_031,$E6:1502,$E6:2081,2944,packed,packed_lz/LocGfxPack_031.bin,lz12 -> 4096 B
+LocGfxPack_032,$E6:2082,$E6:29C8,2375,packed,packed_lz/LocGfxPack_032.bin,lz12 -> 4096 B
+LocGfxPack_033,$E6:29C9,$E6:360E,3142,packed,packed_lz/LocGfxPack_033.bin,lz12 -> 4096 B
+LocGfxPack_034,$E6:360F,$E6:45A2,3988,packed,packed_lz/LocGfxPack_034.bin,lz12 -> 4096 B
+LocGfxPack_035,$E6:45A3,$E6:553A,3992,packed,packed_lz/LocGfxPack_035.bin,lz12 -> 4096 B
+LocGfxPack_036,$E6:553B,$E6:62CE,3476,packed,packed_lz/LocGfxPack_036.bin,lz12 -> 4096 B
+LocGfxPack_037,$E6:62CF,$E6:6B76,2216,packed,packed_lz/LocGfxPack_037.bin,lz12 -> 4096 B
+LocGfxPack_038,$E6:6B77,$E6:77F1,3195,packed,packed_lz/LocGfxPack_038.bin,lz12 -> 4096 B
+LocGfxPack_039,$E6:77F2,$E6:86D3,3810,packed,packed_lz/LocGfxPack_039.bin,lz12 -> 4096 B
+LocGfxPack_040,$E6:86D4,$E6:9340,3181,packed,packed_lz/LocGfxPack_040.bin,lz12 -> 4096 B
+LocGfxPack_041,$E6:9341,$E6:A257,3863,packed,packed_lz/LocGfxPack_041.bin,lz12 -> 4096 B
+LocGfxPack_042,$E6:A258,$E6:AF6A,3347,packed,packed_lz/LocGfxPack_042.bin,lz12 -> 4096 B
+LocGfxPack_043,$E6:AF6B,$E6:BE35,3787,packed,packed_lz/LocGfxPack_043.bin,lz12 -> 4096 B
+LocGfxPack_044,$E6:BE36,$E6:CBA7,3442,packed,packed_lz/LocGfxPack_044.bin,lz12 -> 4096 B
+LocGfxPack_045,$E6:CBA8,$E6:DAF9,3922,packed,packed_lz/LocGfxPack_045.bin,lz12 -> 4096 B
+LocGfxPack_046,$E6:DAFA,$E6:EA90,3991,packed,packed_lz/LocGfxPack_046.bin,lz12 -> 4096 B
+LocGfxPack_047,$E6:EA91,$E6:F7C5,3381,packed,packed_lz/LocGfxPack_047.bin,lz12 -> 4096 B
+LocGfxPack_048,$E6:F7C6,$E6:FEF8,1843,packed,packed_lz/LocGfxPack_048.bin,lz12 -> 4096 B
+Padding_E6FEF9,$E6:FEF9,$E6:FFFF,263,fill,,$00
+LocGfxPack_049,$E7:0000,$E7:0C76,3191,packed,packed_lz/LocGfxPack_049.bin,lz12 -> 4096 B
+LocGfxPack_050,$E7:0C77,$E7:1911,3227,packed,packed_lz/LocGfxPack_050.bin,lz12 -> 4096 B
+LocGfxPack_051,$E7:1912,$E7:241D,2828,packed,packed_lz/LocGfxPack_051.bin,lz12 -> 4096 B
+LocGfxPack_052,$E7:241E,$E7:2F65,2888,packed,packed_lz/LocGfxPack_052.bin,lz12 -> 4096 B
+LocGfxPack_053,$E7:2F66,$E7:3D01,3484,packed,packed_lz/LocGfxPack_053.bin,lz12 -> 4096 B
+LocGfxPack_054,$E7:3D02,$E7:4ACA,3529,packed,packed_lz/LocGfxPack_054.bin,lz12 -> 4096 B
+LocGfxPack_055,$E7:4ACB,$E7:5628,2910,packed,packed_lz/LocGfxPack_055.bin,lz12 -> 4096 B
+LocGfxPack_056,$E7:5629,$E7:6184,2908,packed,packed_lz/LocGfxPack_056.bin,lz12 -> 4096 B
+LocGfxPack_057,$E7:6185,$E7:6E05,3201,packed,packed_lz/LocGfxPack_057.bin,lz12 -> 4096 B
+LocGfxPack_058,$E7:6E06,$E7:7AC8,3267,packed,packed_lz/LocGfxPack_058.bin,lz12 -> 4096 B
+LocGfxPack_059,$E7:7AC9,$E7:88AF,3559,packed,packed_lz/LocGfxPack_059.bin,lz12 -> 4096 B
+LocGfxPack_060,$E7:88B0,$E7:96C7,3608,packed,packed_lz/LocGfxPack_060.bin,lz12 -> 4096 B
+LocGfxPack_061,$E7:96C8,$E7:A5B0,3817,packed,packed_lz/LocGfxPack_061.bin,lz12 -> 4096 B
+LocGfxPack_062,$E7:A5B1,$E7:B4A8,3832,packed,packed_lz/LocGfxPack_062.bin,lz12 -> 4096 B
+LocGfxPack_063,$E7:B4A9,$E7:C45D,4021,packed,packed_lz/LocGfxPack_063.bin,lz12 -> 4096 B
+LocGfxPack_064,$E7:C45E,$E7:D32C,3791,packed,packed_lz/LocGfxPack_064.bin,lz12 -> 4096 B
+LocGfxPack_065,$E7:D32D,$E7:E12B,3583,packed,packed_lz/LocGfxPack_065.bin,lz12 -> 4096 B
+LocGfxPack_066,$E7:E12C,$E7:F1B0,4229,packed,packed_lz/LocGfxPack_066.bin,lz12 -> 4096 B
+LocGfxPack_067,$E7:F1B1,$E7:FF08,3416,packed,packed_lz/LocGfxPack_067.bin,lz12 -> 4096 B
+Padding_E7FF09,$E7:FF09,$E7:FFFF,247,fill,,$00
+LocGfxPack_068,$E8:0000,$E8:1016,4119,packed,packed_lz/LocGfxPack_068.bin,lz12 -> 4096 B
+LocGfxPack_069,$E8:1017,$E8:1B9D,2951,packed,packed_lz/LocGfxPack_069.bin,lz12 -> 4096 B
+LocGfxPack_070,$E8:1B9E,$E8:298F,3570,packed,packed_lz/LocGfxPack_070.bin,lz12 -> 4096 B
+LocGfxPack_071,$E8:2990,$E8:3745,3510,packed,packed_lz/LocGfxPack_071.bin,lz12 -> 4096 B
+LocGfxPack_072,$E8:3746,$E8:41A4,2655,packed,packed_lz/LocGfxPack_072.bin,lz12 -> 4096 B
+LocGfxPack_073,$E8:41A5,$E8:4DDA,3126,packed,packed_lz/LocGfxPack_073.bin,lz12 -> 4096 B
+LocGfxPack_074,$E8:4DDB,$E8:5D76,3996,packed,packed_lz/LocGfxPack_074.bin,lz12 -> 4096 B
+LocGfxPack_075,$E8:5D77,$E8:6D28,4018,packed,packed_lz/LocGfxPack_075.bin,lz12 -> 4096 B
+LocGfxPack_076,$E8:6D29,$E8:7C54,3884,packed,packed_lz/LocGfxPack_076.bin,lz12 -> 4096 B
+LocGfxPack_077,$E8:7C55,$E8:8B92,3902,packed,packed_lz/LocGfxPack_077.bin,lz12 -> 4096 B
+LocGfxPack_078,$E8:8B93,$E8:9A7F,3821,packed,packed_lz/LocGfxPack_078.bin,lz12 -> 4096 B
+LocGfxPack_079,$E8:9A80,$E8:A711,3218,packed,packed_lz/LocGfxPack_079.bin,lz12 -> 4096 B
+LocGfxPack_080,$E8:A712,$E8:B304,3059,packed,packed_lz/LocGfxPack_080.bin,lz12 -> 4096 B
+LocGfxPack_081,$E8:B305,$E8:BEEB,3047,packed,packed_lz/LocGfxPack_081.bin,lz12 -> 4096 B
+LocGfxPack_082,$E8:BEEC,$E8:CB32,3143,packed,packed_lz/LocGfxPack_082.bin,lz12 -> 4096 B
+LocGfxPack_083,$E8:CB33,$E8:D897,3429,packed,packed_lz/LocGfxPack_083.bin,lz12 -> 4096 B
+LocGfxPack_084,$E8:D898,$E8:E7D7,3904,packed,packed_lz/LocGfxPack_084.bin,lz12 -> 4096 B
+LocGfxPack_085,$E8:E7D8,$E8:F6BD,3814,packed,packed_lz/LocGfxPack_085.bin,lz12 -> 4096 B
+LocGfxPack_086,$E8:F6BE,$E8:FF02,2117,packed,packed_lz/LocGfxPack_086.bin,lz12 -> 4096 B
+Padding_E8FF03,$E8:FF03,$E8:FFFF,253,fill,,$00
+LocGfxPack_087,$E9:0000,$E9:0B57,2904,packed,packed_lz/LocGfxPack_087.bin,lz12 -> 4096 B
+LocGfxPack_088,$E9:0B58,$E9:1847,3312,packed,packed_lz/LocGfxPack_088.bin,lz12 -> 4096 B
+LocGfxPack_089,$E9:1848,$E9:2765,3870,packed,packed_lz/LocGfxPack_089.bin,lz12 -> 4096 B
+LocGfxPack_090,$E9:2766,$E9:3216,2737,packed,packed_lz/LocGfxPack_090.bin,lz12 -> 4096 B
+LocGfxPack_091,$E9:3217,$E9:405F,3657,packed,packed_lz/LocGfxPack_091.bin,lz12 -> 4096 B
+LocGfxPack_092,$E9:4060,$E9:4CC7,3176,packed,packed_lz/LocGfxPack_092.bin,lz12 -> 4096 B
+LocGfxPack_093,$E9:4CC8,$E9:5A86,3519,packed,packed_lz/LocGfxPack_093.bin,lz12 -> 4096 B
+LocGfxPack_094,$E9:5A87,$E9:68E9,3683,packed,packed_lz/LocGfxPack_094.bin,lz12 -> 4096 B
+LocGfxPack_095,$E9:68EA,$E9:756E,3205,packed,packed_lz/LocGfxPack_095.bin,lz12 -> 4096 B
+LocGfxPack_096,$E9:756F,$E9:814E,3040,packed,packed_lz/LocGfxPack_096.bin,lz12 -> 4096 B
+LocGfxPack_097,$E9:814F,$E9:8A2A,2268,packed,packed_lz/LocGfxPack_097.bin,lz12 -> 4096 B
+LocGfxPack_098,$E9:8A2B,$E9:94C9,2719,packed,packed_lz/LocGfxPack_098.bin,lz12 -> 4096 B
+LocGfxPack_099,$E9:94CA,$E9:9EE1,2584,packed,packed_lz/LocGfxPack_099.bin,lz12 -> 4096 B
+LocGfxPack_100,$E9:9EE2,$E9:A9CC,2795,packed,packed_lz/LocGfxPack_100.bin,lz12 -> 4096 B
+LocGfxPack_101,$E9:A9CD,$E9:B892,3782,packed,packed_lz/LocGfxPack_101.bin,lz12 -> 4096 B
+LocGfxPack_102,$E9:B893,$E9:C55F,3277,packed,packed_lz/LocGfxPack_102.bin,lz12 -> 4096 B
+LocGfxPack_103,$E9:C560,$E9:CFD3,2676,packed,packed_lz/LocGfxPack_103.bin,lz12 -> 4096 B
+LocGfxPack_104,$E9:CFD4,$E9:D9F3,2592,packed,packed_lz/LocGfxPack_104.bin,lz12 -> 4096 B
+LocGfxPack_105,$E9:D9F4,$E9:E5AE,3003,packed,packed_lz/LocGfxPack_105.bin,lz12 -> 4096 B
+LocGfxPack_106,$E9:E5AF,$E9:F1B3,3077,packed,packed_lz/LocGfxPack_106.bin,lz12 -> 4096 B
+LocGfxPack_107,$E9:F1B4,$E9:FFD2,3615,packed,packed_lz/LocGfxPack_107.bin,lz12 -> 4096 B
+Padding_E9FFD3,$E9:FFD3,$E9:FFFF,45,fill,,$00
+LocGfxPack_108,$EA:0000,$EA:0CD3,3284,packed,packed_lz/LocGfxPack_108.bin,lz12 -> 4096 B
+LocGfxPack_109,$EA:0CD4,$EA:1A3E,3435,packed,packed_lz/LocGfxPack_109.bin,lz12 -> 4096 B
+LocGfxPack_110,$EA:1A3F,$EA:270B,3277,packed,packed_lz/LocGfxPack_110.bin,lz12 -> 4096 B
+LocGfxPack_111,$EA:270C,$EA:33F9,3310,packed,packed_lz/LocGfxPack_111.bin,lz12 -> 4096 B
+LocGfxPack_112,$EA:33FA,$EA:411D,3364,packed,packed_lz/LocGfxPack_112.bin,lz12 -> 4096 B
+LocGfxPack_113,$EA:411E,$EA:4D82,3173,packed,packed_lz/LocGfxPack_113.bin,lz12 -> 4096 B
+LocGfxPack_114,$EA:4D83,$EA:5A78,3318,packed,packed_lz/LocGfxPack_114.bin,lz12 -> 4096 B
+LocGfxPack_115,$EA:5A79,$EA:6B8B,4371,packed,packed_lz/LocGfxPack_115.bin,lz12 -> 4096 B
+LocGfxPack_116,$EA:6B8C,$EA:7884,3321,packed,packed_lz/LocGfxPack_116.bin,lz12 -> 4096 B
+LocGfxPack_117,$EA:7885,$EA:82C6,2626,packed,packed_lz/LocGfxPack_117.bin,lz12 -> 4096 B
+LocGfxPack_118,$EA:82C7,$EA:911B,3669,packed,packed_lz/LocGfxPack_118.bin,lz12 -> 4096 B
+LocGfxPack_119,$EA:911C,$EA:9FC1,3750,packed,packed_lz/LocGfxPack_119.bin,lz12 -> 4096 B
+LocGfxPack_120,$EA:9FC2,$EA:AD48,3463,packed,packed_lz/LocGfxPack_120.bin,lz12 -> 4096 B
+LocGfxPack_121,$EA:AD49,$EA:B679,2353,packed,packed_lz/LocGfxPack_121.bin,lz12 -> 4096 B
+LocGfxPack_122,$EA:B67A,$EA:C010,2455,packed,packed_lz/LocGfxPack_122.bin,lz12 -> 4096 B
+LocGfxPack_123,$EA:C011,$EA:CA0C,2556,packed,packed_lz/LocGfxPack_123.bin,lz12 -> 4096 B
+LocGfxPack_124,$EA:CA0D,$EA:D93E,3890,packed,packed_lz/LocGfxPack_124.bin,lz12 -> 4096 B
+LocGfxPack_125,$EA:D93F,$EA:E171,2099,packed,packed_lz/LocGfxPack_125.bin,lz12 -> 4096 B
+LocGfxPack_126,$EA:E172,$EA:ED9F,3118,packed,packed_lz/LocGfxPack_126.bin,lz12 -> 4096 B
+LocGfxPack_127,$EA:EDA0,$EA:EF8B,492,packed,packed_lz/LocGfxPack_127.bin,lz12 -> 4096 B
+LocGfxPack_128,$EA:EF8C,$EA:F419,1166,packed,packed_lz/LocGfxPack_128.bin,lz12 -> 1536 B
+LocGfxPack_129,$EA:F41A,$EA:FF49,2864,packed,packed_lz/LocGfxPack_129.bin,lz12 -> 4096 B
+Padding_EAFF4A,$EA:FF4A,$EA:FFFF,182,fill,,$00
+LocGfxPack_130,$EB:0000,$EB:0C54,3157,packed,packed_lz/LocGfxPack_130.bin,lz12 -> 4096 B
+LocGfxPack_131,$EB:0C55,$EB:19F4,3488,packed,packed_lz/LocGfxPack_131.bin,lz12 -> 4096 B
+LocGfxPack_132,$EB:19F5,$EB:27C1,3533,packed,packed_lz/LocGfxPack_132.bin,lz12 -> 4096 B
+LocGfxPack_133,$EB:27C2,$EB:34BB,3322,packed,packed_lz/LocGfxPack_133.bin,lz12 -> 4096 B
+LocGfxPack_134,$EB:34BC,$EB:43A6,3819,packed,packed_lz/LocGfxPack_134.bin,lz12 -> 4096 B
+LocGfxPack_135,$EB:43A7,$EB:4FF9,3155,packed,packed_lz/LocGfxPack_135.bin,lz12 -> 4096 B
+LocGfxPack_136,$EB:4FFA,$EB:5C52,3161,packed,packed_lz/LocGfxPack_136.bin,lz12 -> 4096 B
+LocGfxPack_137,$EB:5C53,$EB:67C6,2932,packed,packed_lz/LocGfxPack_137.bin,lz12 -> 4096 B
+LocGfxPack_138,$EB:67C7,$EB:733D,2935,packed,packed_lz/LocGfxPack_138.bin,lz12 -> 4096 B
+LocGfxPack_139,$EB:733E,$EB:7F1E,3041,packed,packed_lz/LocGfxPack_139.bin,lz12 -> 4096 B
+LocGfxPack_140,$EB:7F1F,$EB:8E6D,3919,packed,packed_lz/LocGfxPack_140.bin,lz12 -> 4096 B
+LocGfxPack_141,$EB:8E6E,$EB:9D77,3850,packed,packed_lz/LocGfxPack_141.bin,lz12 -> 4096 B
+LocGfxPack_142,$EB:9D78,$EB:ABAE,3639,packed,packed_lz/LocGfxPack_142.bin,lz12 -> 4096 B
+LocGfxPack_143,$EB:ABAF,$EB:B8F6,3400,packed,packed_lz/LocGfxPack_143.bin,lz12 -> 4096 B
+LocGfxPack_144,$EB:B8F7,$EB:C65C,3430,packed,packed_lz/LocGfxPack_144.bin,lz12 -> 4096 B
+LocGfxPack_145,$EB:C65D,$EB:D3C9,3437,packed,packed_lz/LocGfxPack_145.bin,lz12 -> 4096 B
+LocGfxPack_146,$EB:D3CA,$EB:E152,3465,packed,packed_lz/LocGfxPack_146.bin,lz12 -> 4096 B
+LocGfxPack_147,$EB:E153,$EB:ED00,2990,packed,packed_lz/LocGfxPack_147.bin,lz12 -> 4096 B
+LocGfxPack_148,$EB:ED01,$EB:FA11,3345,packed,packed_lz/LocGfxPack_148.bin,lz12 -> 4096 B
+LocGfxPack_149,$EB:FA12,$EB:FEF3,1250,packed,packed_lz/LocGfxPack_149.bin,lz12 -> 4096 B
+Padding_EBFEF4,$EB:FEF4,$EB:FFFF,268,fill,,$00
+LocGfxPack_150,$EC:0000,$EC:0E5C,3677,packed,packed_lz/LocGfxPack_150.bin,lz12 -> 4096 B
+LocGfxPack_151,$EC:0E5D,$EC:1B71,3349,packed,packed_lz/LocGfxPack_151.bin,lz12 -> 4096 B
+LocGfxPack_152,$EC:1B72,$EC:2785,3092,packed,packed_lz/LocGfxPack_152.bin,lz12 -> 4096 B
+LocGfxPack_153,$EC:2786,$EC:36D5,3920,packed,packed_lz/LocGfxPack_153.bin,lz12 -> 4096 B
+LocGfxPack_154,$EC:36D6,$EC:462D,3928,packed,packed_lz/LocGfxPack_154.bin,lz12 -> 4096 B
+LocGfxPack_155,$EC:462E,$EC:51AD,2944,packed,packed_lz/LocGfxPack_155.bin,lz12 -> 4096 B
+LocGfxPack_156,$EC:51AE,$EC:5F9D,3568,packed,packed_lz/LocGfxPack_156.bin,lz12 -> 4096 B
+LocGfxPack_157,$EC:5F9E,$EC:6E56,3769,packed,packed_lz/LocGfxPack_157.bin,lz12 -> 4096 B
+LocGfxPack_158,$EC:6E57,$EC:79C1,2923,packed,packed_lz/LocGfxPack_158.bin,lz12 -> 4096 B
+LocGfxPack_159,$EC:79C2,$EC:85F7,3126,packed,packed_lz/LocGfxPack_159.bin,lz12 -> 4096 B
+LocGfxPack_160,$EC:85F8,$EC:9116,2847,packed,packed_lz/LocGfxPack_160.bin,lz12 -> 4096 B
+LocGfxPack_161,$EC:9117,$EC:9C7E,2920,packed,packed_lz/LocGfxPack_161.bin,lz12 -> 4096 B
+LocGfxPack_162,$EC:9C7F,$EC:A8B3,3125,packed,packed_lz/LocGfxPack_162.bin,lz12 -> 4096 B
+LocGfxPack_163,$EC:A8B4,$EC:B4F8,3141,packed,packed_lz/LocGfxPack_163.bin,lz12 -> 4096 B
+LocGfxPack_164,$EC:B4F9,$EC:C045,2893,packed,packed_lz/LocGfxPack_164.bin,lz12 -> 4096 B
+LocGfxPack_165,$EC:C046,$EC:CDA7,3426,packed,packed_lz/LocGfxPack_165.bin,lz12 -> 4096 B
+LocGfxPack_166,$EC:CDA8,$EC:DA4F,3240,packed,packed_lz/LocGfxPack_166.bin,lz12 -> 4096 B
+LocGfxPack_167,$EC:DA50,$EC:E3F7,2472,packed,packed_lz/LocGfxPack_167.bin,lz12 -> 4096 B
+LocGfxPack_168,$EC:E3F8,$EC:EC66,2159,packed,packed_lz/LocGfxPack_168.bin,lz12 -> 4096 B
+LocGfxPack_169,$EC:EC67,$EC:F61C,2486,packed,packed_lz/LocGfxPack_169.bin,lz12 -> 4096 B
+LocGfxPack_170,$EC:F61D,$EC:FEB0,2196,packed,packed_lz/LocGfxPack_170.bin,lz12 -> 4096 B
+Padding_ECFEB1,$EC:FEB1,$EC:FFFF,335,fill,,$00
+LocMeta12Pack_000,$ED:0000,$ED:0DB5,3510,packed,packed_lz/LocMeta12Pack_000.bin,lz11 -> 4096 B
+LocMeta12Pack_001,$ED:0DB6,$ED:13C5,1552,packed,packed_lz/LocMeta12Pack_001.bin,lz11 -> 4096 B
+LocMeta12Pack_002,$ED:13C6,$ED:2148,3459,packed,packed_lz/LocMeta12Pack_002.bin,lz11 -> 4096 B
+LocMeta12Pack_003,$ED:2149,$ED:2DC7,3199,packed,packed_lz/LocMeta12Pack_003.bin,lz11 -> 4096 B
+LocMeta12Pack_004,$ED:2DC8,$ED:3C38,3697,packed,packed_lz/LocMeta12Pack_004.bin,lz11 -> 4096 B
+LocMeta12Pack_005,$ED:3C39,$ED:4765,2861,packed,packed_lz/LocMeta12Pack_005.bin,lz11 -> 4096 B
+LocMeta12Pack_006,$ED:4766,$ED:537D,3096,packed,packed_lz/LocMeta12Pack_006.bin,lz11 -> 4096 B
+LocMeta12Pack_007,$ED:537E,$ED:6011,3220,packed,packed_lz/LocMeta12Pack_007.bin,lz11 -> 4096 B
+LocMeta12Pack_008,$ED:6012,$ED:6B6E,2909,packed,packed_lz/LocMeta12Pack_008.bin,lz11 -> 4096 B
+LocMeta12Pack_009,$ED:6B6F,$ED:79B7,3657,packed,packed_lz/LocMeta12Pack_009.bin,lz11 -> 4096 B
+LocMeta12Pack_010,$ED:79B8,$ED:837F,2504,packed,packed_lz/LocMeta12Pack_010.bin,lz11 -> 4096 B
+LocMeta12Pack_011,$ED:8380,$ED:8F2F,2992,packed,packed_lz/LocMeta12Pack_011.bin,lz11 -> 4096 B
+LocMeta12Pack_012,$ED:8F30,$ED:9E44,3861,packed,packed_lz/LocMeta12Pack_012.bin,lz11 -> 4096 B
+LocMeta12Pack_013,$ED:9E45,$ED:AABF,3195,packed,packed_lz/LocMeta12Pack_013.bin,lz11 -> 4096 B
+LocMeta12Pack_014,$ED:AAC0,$ED:B8FB,3644,packed,packed_lz/LocMeta12Pack_014.bin,lz11 -> 4096 B
+LocMeta12Pack_015,$ED:B8FC,$ED:C310,2581,packed,packed_lz/LocMeta12Pack_015.bin,lz11 -> 4096 B
+LocMeta12Pack_016,$ED:C311,$ED:C318,8,packed,packed_lz/LocMeta12Pack_016.bin,lz11 -> 1 B
+LocMeta12Pack_017,$ED:C319,$ED:D2AC,3988,packed,packed_lz/LocMeta12Pack_017.bin,lz11 -> 4096 B
+LocMeta12Pack_018,$ED:D2AD,$ED:E141,3733,packed,packed_lz/LocMeta12Pack_018.bin,lz11 -> 4096 B
+LocMeta12Pack_019,$ED:E142,$ED:EFBE,3709,packed,packed_lz/LocMeta12Pack_019.bin,lz11 -> 4096 B
+LocMeta12Pack_020,$ED:EFBF,$ED:FF4B,3981,packed,packed_lz/LocMeta12Pack_020.bin,lz11 -> 4096 B
+Padding_EDFF4C,$ED:FF4C,$ED:FFFF,180,fill,,$00
+LocMeta12Pack_021,$EE:0000,$EE:0DEC,3565,packed,packed_lz/LocMeta12Pack_021.bin,lz11 -> 4096 B
+LocMeta12Pack_022,$EE:0DED,$EE:1AA0,3252,packed,packed_lz/LocMeta12Pack_022.bin,lz11 -> 4096 B
+LocMeta12Pack_023,$EE:1AA1,$EE:280E,3438,packed,packed_lz/LocMeta12Pack_023.bin,lz11 -> 4096 B
+LocMeta12Pack_024,$EE:280F,$EE:3656,3656,packed,packed_lz/LocMeta12Pack_024.bin,lz11 -> 4096 B
+LocMeta12Pack_025,$EE:3657,$EE:42E4,3214,packed,packed_lz/LocMeta12Pack_025.bin,lz11 -> 4096 B
+LocMeta12Pack_026,$EE:42E5,$EE:4F6D,3209,packed,packed_lz/LocMeta12Pack_026.bin,lz11 -> 4096 B
+LocMeta12Pack_027,$EE:4F6E,$EE:57DE,2161,packed,packed_lz/LocMeta12Pack_027.bin,lz11 -> 4096 B
+LocMeta12Pack_028,$EE:57DF,$EE:6450,3186,packed,packed_lz/LocMeta12Pack_028.bin,lz11 -> 4096 B
+LocMeta12Pack_029,$EE:6451,$EE:7394,3908,packed,packed_lz/LocMeta12Pack_029.bin,lz11 -> 4096 B
+LocMeta12Pack_030,$EE:7395,$EE:80CD,3385,packed,packed_lz/LocMeta12Pack_030.bin,lz11 -> 4096 B
+LocMeta12Pack_031,$EE:80CE,$EE:8946,2169,packed,packed_lz/LocMeta12Pack_031.bin,lz11 -> 4096 B
+LocMeta12Pack_032,$EE:8947,$EE:92BA,2420,packed,packed_lz/LocMeta12Pack_032.bin,lz11 -> 4096 B
+LocMeta12Pack_033,$EE:92BB,$EE:A14F,3733,packed,packed_lz/LocMeta12Pack_033.bin,lz11 -> 4096 B
+LocMeta12Pack_034,$EE:A150,$EE:ADCF,3200,packed,packed_lz/LocMeta12Pack_034.bin,lz11 -> 4096 B
+LocMeta12Pack_035,$EE:ADD0,$EE:B8FB,2860,packed,packed_lz/LocMeta12Pack_035.bin,lz11 -> 4096 B
+LocMeta12Pack_036,$EE:B8FC,$EE:BED8,1501,packed,packed_lz/LocMeta12Pack_036.bin,lz11 -> 4096 B
+LocMeta12Pack_037,$EE:BED9,$EE:C55D,1669,packed,packed_lz/LocMeta12Pack_037.bin,lz11 -> 4096 B
+LocMeta12Pack_038,$EE:C55E,$EE:D257,3322,packed,packed_lz/LocMeta12Pack_038.bin,lz11 -> 4096 B
+LocMeta12Pack_039,$EE:D258,$EE:DDA1,2890,packed,packed_lz/LocMeta12Pack_039.bin,lz11 -> 4096 B
+LocMeta12Pack_040,$EE:DDA2,$EE:E42E,1677,packed,packed_lz/LocMeta12Pack_040.bin,lz11 -> 4096 B
+LocMeta12Pack_041,$EE:E42F,$EE:F328,3834,packed,packed_lz/LocMeta12Pack_041.bin,lz11 -> 4096 B
+LocMeta12Pack_042,$EE:F329,$EE:F8D5,1453,packed,packed_lz/LocMeta12Pack_042.bin,lz11 -> 4096 B
+LocMeta12Pack_043,$EE:F8D6,$EE:FF8B,1718,packed,packed_lz/LocMeta12Pack_043.bin,lz11 -> 4096 B
+Padding_EEFF8C,$EE:FF8C,$EE:FFFF,116,fill,,$00
+LocMeta12Pack_044,$EF:0000,$EF:0CE1,3298,packed,packed_lz/LocMeta12Pack_044.bin,lz11 -> 4096 B
+LocMeta12Pack_045,$EF:0CE2,$EF:1ACD,3564,packed,packed_lz/LocMeta12Pack_045.bin,lz11 -> 4096 B
+LocMeta12Pack_046,$EF:1ACE,$EF:266C,2975,packed,packed_lz/LocMeta12Pack_046.bin,lz11 -> 4096 B
+LocMeta12Pack_047,$EF:266D,$EF:33CF,3427,packed,packed_lz/LocMeta12Pack_047.bin,lz11 -> 4096 B
+LocMeta12Pack_048,$EF:33D0,$EF:3E9E,2767,packed,packed_lz/LocMeta12Pack_048.bin,lz11 -> 4096 B
+LocMeta12Pack_049,$EF:3E9F,$EF:4BBD,3359,packed,packed_lz/LocMeta12Pack_049.bin,lz11 -> 4096 B
+LocMeta12Pack_050,$EF:4BBE,$EF:58F2,3381,packed,packed_lz/LocMeta12Pack_050.bin,lz11 -> 4096 B
+LocMeta12Pack_051,$EF:58F3,$EF:64A6,2996,packed,packed_lz/LocMeta12Pack_051.bin,lz11 -> 4096 B
+LocMeta12Pack_052,$EF:64A7,$EF:723A,3476,packed,packed_lz/LocMeta12Pack_052.bin,lz11 -> 4096 B
+LocMeta12Pack_053,$EF:723B,$EF:7AB4,2170,packed,packed_lz/LocMeta12Pack_053.bin,lz11 -> 4096 B
+LocMeta12Pack_054,$EF:7AB5,$EF:7EF8,1092,packed,packed_lz/LocMeta12Pack_054.bin,lz11 -> 4096 B
+LocMeta12Pack_055,$EF:7EF9,$EF:7F00,8,packed,packed_lz/LocMeta12Pack_055.bin,lz11 -> 1 B
+LocMeta12Pack_056,$EF:7F01,$EF:7F08,8,packed,packed_lz/LocMeta12Pack_056.bin,lz11 -> 1 B
+LocMeta12Pack_057,$EF:7F09,$EF:7F10,8,packed,packed_lz/LocMeta12Pack_057.bin,lz11 -> 1 B
+LocMeta12Pack_058,$EF:7F11,$EF:7F18,8,packed,packed_lz/LocMeta12Pack_058.bin,lz11 -> 1 B
+LocMeta12Pack_059,$EF:7F19,$EF:7F20,8,packed,packed_lz/LocMeta12Pack_059.bin,lz11 -> 1 B
+LocMeta12Pack_060,$EF:7F21,$EF:7F28,8,packed,packed_lz/LocMeta12Pack_060.bin,lz11 -> 1 B
+LocMeta12Pack_061,$EF:7F29,$EF:7F30,8,packed,packed_lz/LocMeta12Pack_061.bin,lz11 -> 1 B
+LocMeta12Pack_062,$EF:7F31,$EF:7F38,8,packed,packed_lz/LocMeta12Pack_062.bin,lz11 -> 1 B
+LocMeta12Pack_063,$EF:7F39,$EF:7F40,8,packed,packed_lz/LocMeta12Pack_063.bin,lz11 -> 1 B
+LocMeta3Pack_000,$EF:7F41,$EF:8459,1305,packed,packed_lz/LocMeta3Pack_000.bin,lz11 -> 2048 B
+LocMeta3Pack_001,$EF:845A,$EF:85BD,356,packed,packed_lz/LocMeta3Pack_001.bin,lz11 -> 2048 B
+LocMeta3Pack_002,$EF:85BE,$EF:8721,356,packed,packed_lz/LocMeta3Pack_002.bin,lz11 -> 2048 B
+LocMeta3Pack_003,$EF:8722,$EF:8894,371,packed,packed_lz/LocMeta3Pack_003.bin,lz11 -> 2048 B
+LocMeta3Pack_004,$EF:8895,$EF:8A86,498,packed,packed_lz/LocMeta3Pack_004.bin,lz11 -> 2048 B
+LocMeta3Pack_005,$EF:8A87,$EF:8C4B,453,packed,packed_lz/LocMeta3Pack_005.bin,lz11 -> 2048 B
+LocMeta3Pack_006,$EF:8C4C,$EF:8F47,764,packed,packed_lz/LocMeta3Pack_006.bin,lz11 -> 2048 B
+LocMeta3Pack_007,$EF:8F48,$EF:9571,1578,packed,packed_lz/LocMeta3Pack_007.bin,lz11 -> 2048 B
+LocMeta3Pack_008,$EF:9572,$EF:972A,441,packed,packed_lz/LocMeta3Pack_008.bin,lz11 -> 2048 B
+LocMeta3Pack_009,$EF:972B,$EF:9952,552,packed,packed_lz/LocMeta3Pack_009.bin,lz11 -> 2048 B
+LocMeta3Pack_010,$EF:9953,$EF:9A15,195,packed,packed_lz/LocMeta3Pack_010.bin,lz11 -> 2048 B
+LocMeta3Pack_011,$EF:9A16,$EF:9B7C,359,packed,packed_lz/LocMeta3Pack_011.bin,lz11 -> 2048 B
+LocMeta3Pack_012,$EF:9B7D,$EF:A0A2,1318,packed,packed_lz/LocMeta3Pack_012.bin,lz11 -> 2048 B
+LocMeta3Pack_013,$EF:A0A3,$EF:A56A,1224,packed,packed_lz/LocMeta3Pack_013.bin,lz11 -> 2048 B
+LocMeta3Pack_014,$EF:A56B,$EF:A6E4,378,packed,packed_lz/LocMeta3Pack_014.bin,lz11 -> 2048 B
+LocMeta3Pack_015,$EF:A6E5,$EF:A96B,647,packed,packed_lz/LocMeta3Pack_015.bin,lz11 -> 2048 B
+LocMeta3Pack_016,$EF:A96C,$EF:AA6C,257,packed,packed_lz/LocMeta3Pack_016.bin,lz11 -> 2048 B
+LocMeta3Pack_017,$EF:AA6D,$EF:AC90,548,packed,packed_lz/LocMeta3Pack_017.bin,lz11 -> 2048 B
+LocMeta3Pack_018,$EF:AC91,$EF:B167,1239,packed,packed_lz/LocMeta3Pack_018.bin,lz11 -> 2048 B
+Unknown_EFB168,$EF:B168,$EF:BFFF,3736,extracted,unknown/Unknown_EFB168.bin,
+LocGfxPack_171,$EF:C000,$EF:C1D2,467,packed,packed_lz/LocGfxPack_171.bin,lz12 -> 512 B
+LocGfxPack_172,$EF:C1D3,$EF:C805,1587,packed,packed_lz/LocGfxPack_172.bin,lz12 -> 4096 B
+LocGfxPack_173,$EF:C806,$EF:CDC2,1469,packed,packed_lz/LocGfxPack_173.bin,lz12 -> 4096 B
+LocGfxPack_174,$EF:CDC3,$EF:D02C,618,packed,packed_lz/LocGfxPack_174.bin,lz12 -> 4096 B
+LocGfxPack_175,$EF:D02D,$EF:D2AC,640,packed,packed_lz/LocGfxPack_175.bin,lz12 -> 4096 B
+LocGfxPack_176,$EF:D2AD,$EF:D91C,1648,packed,packed_lz/LocGfxPack_176.bin,lz12 -> 4096 B
+LocGfxPack_177,$EF:D91D,$EF:E5AA,3214,packed,packed_lz/LocGfxPack_177.bin,lz12 -> 4096 B
+LocGfxPack_178,$EF:E5AB,$EF:E80B,609,packed,packed_lz/LocGfxPack_178.bin,lz12 -> 4096 B
+LocGfxPack_179,$EF:E80C,$EF:F2E0,2773,packed,packed_lz/LocGfxPack_179.bin,lz12 -> 4096 B
+LocGfxPack_180,$EF:F2E1,$EF:FF17,3127,packed,packed_lz/LocGfxPack_180.bin,lz12 -> 4096 B
+Padding_EFFF18,$EF:FF18,$EF:FFFF,232,fill,,$00
+MapPropsPack_000,$F0:0000,$F0:004F,80,packed,packed_lz/MapPropsPack_000.bin,lz11 -> 522 B
+MapPropsPack_001,$F0:0050,$F0:0183,308,packed,packed_lz/MapPropsPack_001.bin,lz11 -> 778 B
+MapPropsPack_002,$F0:0184,$F0:03B3,560,packed,packed_lz/MapPropsPack_002.bin,lz11 -> 1489 B
+MapPropsPack_003,$F0:03B4,$F0:073A,903,packed,packed_lz/MapPropsPack_003.bin,lz11 -> 1993 B
+MapPropsPack_004,$F0:073B,$F0:0B61,1063,packed,packed_lz/MapPropsPack_004.bin,lz11 -> 2218 B
+MapPropsPack_005,$F0:0B62,$F0:0FED,1164,packed,packed_lz/MapPropsPack_005.bin,lz11 -> 2150 B
+MapPropsPack_006,$F0:0FEE,$F0:13DE,1009,packed,packed_lz/MapPropsPack_006.bin,lz11 -> 2165 B
+MapPropsPack_007,$F0:13DF,$F0:1808,1066,packed,packed_lz/MapPropsPack_007.bin,lz11 -> 3116 B
+MapPropsPack_008,$F0:1809,$F0:23F7,3055,packed,packed_lz/MapPropsPack_008.bin,lz11 -> 9030 B
+MapPropsPack_009,$F0:23F8,$F0:3C26,6191,packed,packed_lz/MapPropsPack_009.bin,lz11 -> 12187 B
+MapPropsPack_010,$F0:3C27,$F0:42C4,1694,packed,packed_lz/MapPropsPack_010.bin,lz11 -> 3644 B
+MapPropsPack_011,$F0:42C5,$F0:4C18,2388,packed,packed_lz/MapPropsPack_011.bin,lz11 -> 6089 B
+MapPropsPack_012,$F0:4C19,$F0:4FE6,974,packed,packed_lz/MapPropsPack_012.bin,lz11 -> 2295 B
+MapPropsPack_013,$F0:4FE7,$F0:55F7,1553,packed,packed_lz/MapPropsPack_013.bin,lz11 -> 4244 B
+MapPropsPack_014,$F0:55F8,$F0:5AEA,1267,packed,packed_lz/MapPropsPack_014.bin,lz11 -> 3063 B
+MapPropsPack_015,$F0:5AEB,$F0:5DF2,776,packed,packed_lz/MapPropsPack_015.bin,lz11 -> 2024 B
+MapPropsPack_016,$F0:5DF3,$F0:60D1,735,packed,packed_lz/MapPropsPack_016.bin,lz11 -> 1454 B
+MapPropsPack_017,$F0:60D2,$F0:6651,1408,packed,packed_lz/MapPropsPack_017.bin,lz11 -> 2544 B
+MapPropsPack_018,$F0:6652,$F0:6DED,1948,packed,packed_lz/MapPropsPack_018.bin,lz11 -> 3728 B
+MapPropsPack_019,$F0:6DEE,$F0:6FEE,513,packed,packed_lz/MapPropsPack_019.bin,lz11 -> 1036 B
+MapPropsPack_020,$F0:6FEF,$F0:72D0,738,packed,packed_lz/MapPropsPack_020.bin,lz11 -> 1217 B
+MapPropsPack_021,$F0:72D1,$F0:756B,667,packed,packed_lz/MapPropsPack_021.bin,lz11 -> 2478 B
+MapPropsPack_022,$F0:756C,$F0:7E0B,2208,packed,packed_lz/MapPropsPack_022.bin,lz11 -> 4371 B
+MapPropsPack_023,$F0:7E0C,$F0:8034,553,packed,packed_lz/MapPropsPack_023.bin,lz11 -> 1096 B
+MapPropsPack_024,$F0:8035,$F0:8319,741,packed,packed_lz/MapPropsPack_024.bin,lz11 -> 1137 B
+MapPropsPack_025,$F0:831A,$F0:8519,512,packed,packed_lz/MapPropsPack_025.bin,lz11 -> 792 B
+MapPropsPack_026,$F0:851A,$F0:883C,803,packed,packed_lz/MapPropsPack_026.bin,lz11 -> 2020 B
+MapPropsPack_027,$F0:883D,$F0:8AA3,615,packed,packed_lz/MapPropsPack_027.bin,lz11 -> 854 B
+MapPropsPack_028,$F0:8AA4,$F0:8C7C,473,packed,packed_lz/MapPropsPack_028.bin,lz11 -> 842 B
+MapPropsPack_029,$F0:8C7D,$F0:8D9A,286,packed,packed_lz/MapPropsPack_029.bin,lz11 -> 722 B
+MapPropsPack_030,$F0:8D9B,$F0:8E5E,196,packed,packed_lz/MapPropsPack_030.bin,lz11 -> 522 B
+MapPropsPack_031,$F0:8E5F,$F0:8E8F,49,packed,packed_lz/MapPropsPack_031.bin,lz11 -> 522 B
+MapPropsPack_032,$F0:8E90,$F0:9011,386,packed,packed_lz/MapPropsPack_032.bin,lz11 -> 1102 B
+MapPropsPack_033,$F0:9012,$F0:930A,761,packed,packed_lz/MapPropsPack_033.bin,lz11 -> 2503 B
+MapPropsPack_034,$F0:930B,$F0:953D,563,packed,packed_lz/MapPropsPack_034.bin,lz11 -> 1746 B
+MapPropsPack_035,$F0:953E,$F0:9815,728,packed,packed_lz/MapPropsPack_035.bin,lz11 -> 1149 B
+MapPropsPack_036,$F0:9816,$F0:9B12,765,packed,packed_lz/MapPropsPack_036.bin,lz11 -> 1852 B
+MapPropsPack_037,$F0:9B13,$F0:A694,2946,packed,packed_lz/MapPropsPack_037.bin,lz11 -> 12769 B
+MapPropsPack_038,$F0:A695,$F0:BAEE,5210,packed,packed_lz/MapPropsPack_038.bin,lz11 -> 12442 B
+MapPropsPack_039,$F0:BAEF,$F0:C8EE,3584,packed,packed_lz/MapPropsPack_039.bin,lz11 -> 10636 B
+MapPropsPack_040,$F0:C8EF,$F0:D376,2696,packed,packed_lz/MapPropsPack_040.bin,lz11 -> 6238 B
+MapPropsPack_041,$F0:D377,$F0:D9F3,1661,packed,packed_lz/MapPropsPack_041.bin,lz11 -> 3868 B
+MapPropsPack_042,$F0:D9F4,$F0:E80D,3610,packed,packed_lz/MapPropsPack_042.bin,lz11 -> 10056 B
+MapPropsPack_043,$F0:E80E,$F0:EF76,1897,packed,packed_lz/MapPropsPack_043.bin,lz11 -> 4092 B
+MapPropsPack_044,$F0:EF77,$F0:F10C,406,packed,packed_lz/MapPropsPack_044.bin,lz11 -> 793 B
+MapPropsPack_045,$F0:F10D,$F0:F393,647,packed,packed_lz/MapPropsPack_045.bin,lz11 -> 1602 B
+MapPropsPack_046,$F0:F394,$F0:F5E6,595,packed,packed_lz/MapPropsPack_046.bin,lz11 -> 1504 B
+Padding_F0F5E7,$F0:F5E7,$F0:FFFF,2585,fill,,$00
+MapPropsPack_047,$F1:0000,$F1:0139,314,packed,packed_lz/MapPropsPack_047.bin,lz11 -> 1038 B
+MapPropsPack_048,$F1:013A,$F1:02A5,364,packed,packed_lz/MapPropsPack_048.bin,lz11 -> 1371 B
+MapPropsPack_049,$F1:02A6,$F1:058F,746,packed,packed_lz/MapPropsPack_049.bin,lz11 -> 1791 B
+MapPropsPack_050,$F1:0590,$F1:0759,458,packed,packed_lz/MapPropsPack_050.bin,lz11 -> 1256 B
+MapPropsPack_051,$F1:075A,$F1:087F,294,packed,packed_lz/MapPropsPack_051.bin,lz11 -> 869 B
+MapPropsPack_052,$F1:0880,$F1:09D9,346,packed,packed_lz/MapPropsPack_052.bin,lz11 -> 602 B
+MapPropsPack_053,$F1:09DA,$F1:0B18,319,packed,packed_lz/MapPropsPack_053.bin,lz11 -> 1268 B
+MapPropsPack_054,$F1:0B19,$F1:14BF,2471,packed,packed_lz/MapPropsPack_054.bin,lz11 -> 4574 B
+MapPropsPack_055,$F1:14C0,$F1:163F,384,packed,packed_lz/MapPropsPack_055.bin,lz11 -> 701 B
+MapPropsPack_056,$F1:1640,$F1:2928,4841,packed,packed_lz/MapPropsPack_056.bin,lz11 -> 11929 B
+MapPropsPack_057,$F1:2929,$F1:2C99,881,packed,packed_lz/MapPropsPack_057.bin,lz11 -> 1679 B
+MapPropsPack_058,$F1:2C9A,$F1:2F89,752,packed,packed_lz/MapPropsPack_058.bin,lz11 -> 1435 B
+MapPropsPack_059,$F1:2F8A,$F1:325A,721,packed,packed_lz/MapPropsPack_059.bin,lz11 -> 2057 B
+MapPropsPack_060,$F1:325B,$F1:4951,5879,packed,packed_lz/MapPropsPack_060.bin,lz11 -> 16745 B
+MapPropsPack_061,$F1:4952,$F1:5E2F,5342,packed,packed_lz/MapPropsPack_061.bin,lz11 -> 15780 B
+MapPropsPack_062,$F1:5E30,$F1:63C4,1429,packed,packed_lz/MapPropsPack_062.bin,lz11 -> 3913 B
+MapPropsPack_063,$F1:63C5,$F1:6624,608,packed,packed_lz/MapPropsPack_063.bin,lz11 -> 1036 B
+MapPropsPack_064,$F1:6625,$F1:68D0,684,packed,packed_lz/MapPropsPack_064.bin,lz11 -> 3774 B
+MapPropsPack_065,$F1:68D1,$F1:6CB4,996,packed,packed_lz/MapPropsPack_065.bin,lz11 -> 2087 B
+MapPropsPack_066,$F1:6CB5,$F1:790E,3162,packed,packed_lz/MapPropsPack_066.bin,lz11 -> 10673 B
+MapPropsPack_067,$F1:790F,$F1:87C1,3763,packed,packed_lz/MapPropsPack_067.bin,lz11 -> 11226 B
+MapPropsPack_068,$F1:87C2,$F1:945B,3226,packed,packed_lz/MapPropsPack_068.bin,lz11 -> 11103 B
+MapPropsPack_069,$F1:945C,$F1:9733,728,packed,packed_lz/MapPropsPack_069.bin,lz11 -> 1370 B
+MapPropsPack_070,$F1:9734,$F1:9B99,1126,packed,packed_lz/MapPropsPack_070.bin,lz11 -> 3729 B
+MapPropsPack_071,$F1:9B9A,$F1:9E8A,753,packed,packed_lz/MapPropsPack_071.bin,lz11 -> 1130 B
+MapPropsPack_072,$F1:9E8B,$F1:A264,986,packed,packed_lz/MapPropsPack_072.bin,lz11 -> 1694 B
+MapPropsPack_073,$F1:A265,$F1:A361,253,packed,packed_lz/MapPropsPack_073.bin,lz11 -> 749 B
+MapPropsPack_074,$F1:A362,$F1:AD05,2468,packed,packed_lz/MapPropsPack_074.bin,lz11 -> 14964 B
+MapPropsPack_075,$F1:AD06,$F1:B794,2703,packed,packed_lz/MapPropsPack_075.bin,lz11 -> 10983 B
+MapPropsPack_076,$F1:B795,$F1:B91A,390,packed,packed_lz/MapPropsPack_076.bin,lz11 -> 1134 B
+MapPropsPack_077,$F1:B91B,$F1:CA71,4439,packed,packed_lz/MapPropsPack_077.bin,lz11 -> 11665 B
+MapPropsPack_078,$F1:CA72,$F1:D85D,3564,packed,packed_lz/MapPropsPack_078.bin,lz11 -> 8620 B
+MapPropsPack_079,$F1:D85E,$F1:DB05,680,packed,packed_lz/MapPropsPack_079.bin,lz11 -> 1009 B
+MapPropsPack_080,$F1:DB06,$F1:DDC5,704,packed,packed_lz/MapPropsPack_080.bin,lz11 -> 1222 B
+MapPropsPack_081,$F1:DDC6,$F1:EF20,4443,packed,packed_lz/MapPropsPack_081.bin,lz11 -> 7260 B
+MapPropsPack_082,$F1:EF21,$F1:F216,758,packed,packed_lz/MapPropsPack_082.bin,lz11 -> 1032 B
+MapPropsPack_083,$F1:F217,$F1:F6CB,1205,packed,packed_lz/MapPropsPack_083.bin,lz11 -> 3831 B
+MapPropsPack_084,$F1:F6CC,$F1:FE29,1886,packed,packed_lz/MapPropsPack_084.bin,lz11 -> 3742 B
+Padding_F1FE2A,$F1:FE2A,$F1:FFFF,470,fill,,$00
+MapPropsPack_085,$F2:0000,$F2:071E,1823,packed,packed_lz/MapPropsPack_085.bin,lz11 -> 6525 B
+MapPropsPack_086,$F2:071F,$F2:0AA6,904,packed,packed_lz/MapPropsPack_086.bin,lz11 -> 1667 B
+MapPropsPack_087,$F2:0AA7,$F2:0CB3,525,packed,packed_lz/MapPropsPack_087.bin,lz11 -> 982 B
+MapPropsPack_088,$F2:0CB4,$F2:1249,1430,packed,packed_lz/MapPropsPack_088.bin,lz11 -> 3111 B
+MapPropsPack_089,$F2:124A,$F2:201D,3540,packed,packed_lz/MapPropsPack_089.bin,lz11 -> 14447 B
+MapPropsPack_090,$F2:201E,$F2:23D8,955,packed,packed_lz/MapPropsPack_090.bin,lz11 -> 2647 B
+MapPropsPack_091,$F2:23D9,$F2:3727,4943,packed,packed_lz/MapPropsPack_091.bin,lz11 -> 18709 B
+MapPropsPack_092,$F2:3728,$F2:3937,528,packed,packed_lz/MapPropsPack_092.bin,lz11 -> 2478 B
+MapPropsPack_093,$F2:3938,$F2:3BAB,628,packed,packed_lz/MapPropsPack_093.bin,lz11 -> 2004 B
+MapPropsPack_094,$F2:3BAC,$F2:48FE,3411,packed,packed_lz/MapPropsPack_094.bin,lz11 -> 17504 B
+MapPropsPack_095,$F2:48FF,$F2:4B33,565,packed,packed_lz/MapPropsPack_095.bin,lz11 -> 2622 B
+MapPropsPack_096,$F2:4B34,$F2:4F9A,1127,packed,packed_lz/MapPropsPack_096.bin,lz11 -> 5256 B
+MapPropsPack_097,$F2:4F9B,$F2:53E7,1101,packed,packed_lz/MapPropsPack_097.bin,lz11 -> 5352 B
+MapPropsPack_098,$F2:53E8,$F2:570E,807,packed,packed_lz/MapPropsPack_098.bin,lz11 -> 5430 B
+MapPropsPack_099,$F2:570F,$F2:6169,2651,packed,packed_lz/MapPropsPack_099.bin,lz11 -> 4890 B
+MapPropsPack_100,$F2:616A,$F2:64CA,865,packed,packed_lz/MapPropsPack_100.bin,lz11 -> 1185 B
+MapPropsPack_101,$F2:64CB,$F2:7482,4024,packed,packed_lz/MapPropsPack_101.bin,lz11 -> 15564 B
+MapPropsPack_102,$F2:7483,$F2:821C,3482,packed,packed_lz/MapPropsPack_102.bin,lz11 -> 12306 B
+MapPropsPack_103,$F2:821D,$F2:8B66,2378,packed,packed_lz/MapPropsPack_103.bin,lz11 -> 7738 B
+MapPropsPack_104,$F2:8B67,$F2:9ECE,4968,packed,packed_lz/MapPropsPack_104.bin,lz11 -> 15891 B
+MapPropsPack_105,$F2:9ECF,$F2:A8B8,2538,packed,packed_lz/MapPropsPack_105.bin,lz11 -> 8025 B
+MapPropsPack_106,$F2:A8B9,$F2:B9A3,4331,packed,packed_lz/MapPropsPack_106.bin,lz11 -> 7385 B
+MapPropsPack_107,$F2:B9A4,$F2:DF1A,9591,packed,packed_lz/MapPropsPack_107.bin,lz11 -> 18720 B
+MapPropsPack_108,$F2:DF1B,$F2:E944,2602,packed,packed_lz/MapPropsPack_108.bin,lz11 -> 4866 B
+MapPropsPack_109,$F2:E945,$F2:F2D3,2447,packed,packed_lz/MapPropsPack_109.bin,lz11 -> 4249 B
+MapPropsPack_110,$F2:F2D4,$F2:F8A9,1494,packed,packed_lz/MapPropsPack_110.bin,lz11 -> 2794 B
+MapPropsPack_111,$F2:F8AA,$F2:FC10,871,packed,packed_lz/MapPropsPack_111.bin,lz11 -> 1893 B
+MapPropsPack_112,$F2:FC11,$F2:FE63,595,packed,packed_lz/MapPropsPack_112.bin,lz11 -> 1216 B
+Padding_F2FE64,$F2:FE64,$F2:FFFF,412,fill,,$00
+MapPropsPack_113,$F3:0000,$F3:03C9,970,packed,packed_lz/MapPropsPack_113.bin,lz11 -> 2410 B
+MapPropsPack_114,$F3:03CA,$F3:0AC2,1785,packed,packed_lz/MapPropsPack_114.bin,lz11 -> 2580 B
+MapPropsPack_115,$F3:0AC3,$F3:0DE6,804,packed,packed_lz/MapPropsPack_115.bin,lz11 -> 1235 B
+MapPropsPack_116,$F3:0DE7,$F3:1585,1951,packed,packed_lz/MapPropsPack_116.bin,lz11 -> 5889 B
+MapPropsPack_117,$F3:1586,$F3:2CA7,5922,packed,packed_lz/MapPropsPack_117.bin,lz11 -> 11925 B
+MapPropsPack_118,$F3:2CA8,$F3:3B76,3791,packed,packed_lz/MapPropsPack_118.bin,lz11 -> 8142 B
+MapPropsPack_119,$F3:3B77,$F3:40BA,1348,packed,packed_lz/MapPropsPack_119.bin,lz11 -> 4695 B
+MapPropsPack_120,$F3:40BB,$F3:5346,4748,packed,packed_lz/MapPropsPack_120.bin,lz11 -> 10270 B
+MapPropsPack_121,$F3:5347,$F3:5681,827,packed,packed_lz/MapPropsPack_121.bin,lz11 -> 1995 B
+MapPropsPack_122,$F3:5682,$F3:5AF5,1140,packed,packed_lz/MapPropsPack_122.bin,lz11 -> 2833 B
+MapPropsPack_123,$F3:5AF6,$F3:5D97,674,packed,packed_lz/MapPropsPack_123.bin,lz11 -> 1743 B
+MapPropsPack_124,$F3:5D98,$F3:6DB9,4130,packed,packed_lz/MapPropsPack_124.bin,lz11 -> 11330 B
+MapPropsPack_125,$F3:6DBA,$F3:7CA2,3817,packed,packed_lz/MapPropsPack_125.bin,lz11 -> 8995 B
+MapPropsPack_126,$F3:7CA3,$F3:A06A,9160,packed,packed_lz/MapPropsPack_126.bin,lz11 -> 14504 B
+MapPropsPack_127,$F3:A06B,$F3:A9FF,2453,packed,packed_lz/MapPropsPack_127.bin,lz11 -> 3373 B
+MapPropsPack_128,$F3:AA00,$F3:B3EC,2541,packed,packed_lz/MapPropsPack_128.bin,lz11 -> 7565 B
+MapPropsPack_129,$F3:B3ED,$F3:B7CA,990,packed,packed_lz/MapPropsPack_129.bin,lz11 -> 3172 B
+MapPropsPack_130,$F3:B7CB,$F3:D562,7576,packed,packed_lz/MapPropsPack_130.bin,lz11 -> 14830 B
+MapPropsPack_131,$F3:D563,$F3:DA84,1314,packed,packed_lz/MapPropsPack_131.bin,lz11 -> 3250 B
+MapPropsPack_132,$F3:DA85,$F3:E00D,1417,packed,packed_lz/MapPropsPack_132.bin,lz11 -> 3121 B
+MapPropsPack_133,$F3:E00E,$F3:F0D8,4299,packed,packed_lz/MapPropsPack_133.bin,lz11 -> 11677 B
+MapPropsPack_134,$F3:F0D9,$F3:FB81,2729,packed,packed_lz/MapPropsPack_134.bin,lz11 -> 6580 B
+MapPropsPack_135,$F3:FB82,$F3:FC3B,186,packed,packed_lz/MapPropsPack_135.bin,lz11 -> 710 B
+MapPropsPack_136,$F3:FC3C,$F3:FD04,201,packed,packed_lz/MapPropsPack_136.bin,lz11 -> 620 B
+MapPropsPack_137,$F3:FD05,$F3:FDFA,246,packed,packed_lz/MapPropsPack_137.bin,lz11 -> 1294 B
+Padding_F3FDFB,$F3:FDFB,$F3:FFFF,517,fill,,$00
+MapPropsPack_138,$F4:0000,$F4:0237,568,packed,packed_lz/MapPropsPack_138.bin,lz11 -> 939 B
+MapPropsPack_139,$F4:0238,$F4:03C4,397,packed,packed_lz/MapPropsPack_139.bin,lz11 -> 646 B
+MapPropsPack_140,$F4:03C5,$F4:0A37,1651,packed,packed_lz/MapPropsPack_140.bin,lz11 -> 5026 B
+MapPropsPack_141,$F4:0A38,$F4:0C93,604,packed,packed_lz/MapPropsPack_141.bin,lz11 -> 1045 B
+MapPropsPack_142,$F4:0C94,$F4:0E6C,473,packed,packed_lz/MapPropsPack_142.bin,lz11 -> 1006 B
+MapPropsPack_143,$F4:0E6D,$F4:1617,1963,packed,packed_lz/MapPropsPack_143.bin,lz11 -> 4393 B
+MapPropsPack_144,$F4:1618,$F4:1909,754,packed,packed_lz/MapPropsPack_144.bin,lz11 -> 1909 B
+MapPropsPack_145,$F4:190A,$F4:1B56,589,packed,packed_lz/MapPropsPack_145.bin,lz11 -> 2542 B
+MapPropsPack_146,$F4:1B57,$F4:1C8C,310,packed,packed_lz/MapPropsPack_146.bin,lz11 -> 950 B
+MapPropsPack_147,$F4:1C8D,$F4:1F3E,690,packed,packed_lz/MapPropsPack_147.bin,lz11 -> 1090 B
+MapPropsPack_148,$F4:1F3F,$F4:23AC,1134,packed,packed_lz/MapPropsPack_148.bin,lz11 -> 2223 B
+MapPropsPack_149,$F4:23AD,$F4:2D85,2521,packed,packed_lz/MapPropsPack_149.bin,lz11 -> 4938 B
+MapPropsPack_150,$F4:2D86,$F4:43C4,5695,packed,packed_lz/MapPropsPack_150.bin,lz11 -> 16022 B
+MapPropsPack_151,$F4:43C5,$F4:542F,4203,packed,packed_lz/MapPropsPack_151.bin,lz11 -> 12037 B
+MapPropsPack_152,$F4:5430,$F4:61D5,3494,packed,packed_lz/MapPropsPack_152.bin,lz11 -> 8279 B
+MapPropsPack_153,$F4:61D6,$F4:671A,1349,packed,packed_lz/MapPropsPack_153.bin,lz11 -> 2040 B
+MapPropsPack_154,$F4:671B,$F4:727E,2916,packed,packed_lz/MapPropsPack_154.bin,lz11 -> 11234 B
+MapPropsPack_155,$F4:727F,$F4:7FA0,3362,packed,packed_lz/MapPropsPack_155.bin,lz11 -> 10750 B
+MapPropsPack_156,$F4:7FA1,$F4:9066,4294,packed,packed_lz/MapPropsPack_156.bin,lz11 -> 12333 B
+MapPropsPack_157,$F4:9067,$F4:9315,687,packed,packed_lz/MapPropsPack_157.bin,lz11 -> 1511 B
+MapPropsPack_158,$F4:9316,$F4:9699,900,packed,packed_lz/MapPropsPack_158.bin,lz11 -> 2216 B
+MapPropsPack_159,$F4:969A,$F4:B1DB,6978,packed,packed_lz/MapPropsPack_159.bin,lz11 -> 11620 B
+MapPropsPack_160,$F4:B1DC,$F4:B561,902,packed,packed_lz/MapPropsPack_160.bin,lz11 -> 1273 B
+MapPropsPack_161,$F4:B562,$F4:D82F,8910,packed,packed_lz/MapPropsPack_161.bin,lz11 -> 14676 B
+MapPropsPack_162,$F4:D830,$F4:E3B0,2945,packed,packed_lz/MapPropsPack_162.bin,lz11 -> 8844 B
+MapPropsPack_163,$F4:E3B1,$F4:FA07,5719,packed,packed_lz/MapPropsPack_163.bin,lz11 -> 12222 B
+MapPropsPack_164,$F4:FA08,$F4:FDED,998,packed,packed_lz/MapPropsPack_164.bin,lz11 -> 2171 B
+Padding_F4FDEE,$F4:FDEE,$F4:FFFF,530,fill,,$00
+MapPropsPack_165,$F5:0000,$F5:029F,672,packed,packed_lz/MapPropsPack_165.bin,lz11 -> 1726 B
+MapPropsPack_166,$F5:02A0,$F5:04D8,569,packed,packed_lz/MapPropsPack_166.bin,lz11 -> 1114 B
+MapPropsPack_167,$F5:04D9,$F5:0F19,2625,packed,packed_lz/MapPropsPack_167.bin,lz11 -> 9108 B
+MapPropsPack_168,$F5:0F1A,$F5:1980,2663,packed,packed_lz/MapPropsPack_168.bin,lz11 -> 9088 B
+MapPropsPack_169,$F5:1981,$F5:239B,2587,packed,packed_lz/MapPropsPack_169.bin,lz11 -> 15125 B
+MapPropsPack_170,$F5:239C,$F5:2638,669,packed,packed_lz/MapPropsPack_170.bin,lz11 -> 2376 B
+MapPropsPack_171,$F5:2639,$F5:2AEE,1206,packed,packed_lz/MapPropsPack_171.bin,lz11 -> 4451 B
+MapPropsPack_172,$F5:2AEF,$F5:2ECB,989,packed,packed_lz/MapPropsPack_172.bin,lz11 -> 2866 B
+MapPropsPack_173,$F5:2ECC,$F5:3C66,3483,packed,packed_lz/MapPropsPack_173.bin,lz11 -> 8925 B
+MapPropsPack_174,$F5:3C67,$F5:411C,1206,packed,packed_lz/MapPropsPack_174.bin,lz11 -> 2999 B
+MapPropsPack_175,$F5:411D,$F5:4565,1097,packed,packed_lz/MapPropsPack_175.bin,lz11 -> 5081 B
+MapPropsPack_176,$F5:4566,$F5:5006,2721,packed,packed_lz/MapPropsPack_176.bin,lz11 -> 6919 B
+MapPropsPack_177,$F5:5007,$F5:57C4,1982,packed,packed_lz/MapPropsPack_177.bin,lz11 -> 7556 B
+MapPropsPack_178,$F5:57C5,$F5:5C3C,1144,packed,packed_lz/MapPropsPack_178.bin,lz11 -> 4500 B
+MapPropsPack_179,$F5:5C3D,$F5:6069,1069,packed,packed_lz/MapPropsPack_179.bin,lz11 -> 2204 B
+MapPropsPack_180,$F5:606A,$F5:62A6,573,packed,packed_lz/MapPropsPack_180.bin,lz11 -> 1256 B
+MapPropsPack_181,$F5:62A7,$F5:6564,702,packed,packed_lz/MapPropsPack_181.bin,lz11 -> 1812 B
+MapPropsPack_182,$F5:6565,$F5:68F1,909,packed,packed_lz/MapPropsPack_182.bin,lz11 -> 2325 B
+MapPropsPack_183,$F5:68F2,$F5:6E05,1300,packed,packed_lz/MapPropsPack_183.bin,lz11 -> 2302 B
+MapPropsPack_184,$F5:6E06,$F5:7042,573,packed,packed_lz/MapPropsPack_184.bin,lz11 -> 1256 B
+MapPropsPack_185,$F5:7043,$F5:73B7,885,packed,packed_lz/MapPropsPack_185.bin,lz11 -> 1591 B
+MapPropsPack_186,$F5:73B8,$F5:8993,5596,packed,packed_lz/MapPropsPack_186.bin,lz11 -> 9587 B
+MapPropsPack_187,$F5:8994,$F5:A07F,5868,packed,packed_lz/MapPropsPack_187.bin,lz11 -> 10101 B
+MapPropsPack_188,$F5:A080,$F5:A346,711,packed,packed_lz/MapPropsPack_188.bin,lz11 -> 1675 B
+MapPropsPack_189,$F5:A347,$F5:B0E3,3485,packed,packed_lz/MapPropsPack_189.bin,lz11 -> 7081 B
+MapPropsPack_190,$F5:B0E4,$F5:B939,2134,packed,packed_lz/MapPropsPack_190.bin,lz11 -> 3363 B
+MapPropsPack_191,$F5:B93A,$F5:C4DD,2980,packed,packed_lz/MapPropsPack_191.bin,lz11 -> 14480 B
+MapPropsPack_192,$F5:C4DE,$F5:D422,3909,packed,packed_lz/MapPropsPack_192.bin,lz11 -> 12168 B
+MapPropsPack_193,$F5:D423,$F5:D825,1027,packed,packed_lz/MapPropsPack_193.bin,lz11 -> 3797 B
+MapPropsPack_194,$F5:D826,$F5:DDA9,1412,packed,packed_lz/MapPropsPack_194.bin,lz11 -> 3972 B
+MapPropsPack_195,$F5:DDAA,$F5:DEF9,336,packed,packed_lz/MapPropsPack_195.bin,lz11 -> 1059 B
+MapPropsPack_196,$F5:DEFA,$F5:E5CC,1747,packed,packed_lz/MapPropsPack_196.bin,lz11 -> 6048 B
+MapPropsPack_197,$F5:E5CD,$F5:E792,454,packed,packed_lz/MapPropsPack_197.bin,lz11 -> 1889 B
+MapPropsPack_198,$F5:E793,$F5:EA0C,634,packed,packed_lz/MapPropsPack_198.bin,lz11 -> 1629 B
+MapPropsPack_199,$F5:EA0D,$F5:EC7B,623,packed,packed_lz/MapPropsPack_199.bin,lz11 -> 1112 B
+MapPropsPack_200,$F5:EC7C,$F5:EE01,390,packed,packed_lz/MapPropsPack_200.bin,lz11 -> 968 B
+Unknown_F5EE02,$F5:EE02,$F5:EFFF,510,extracted,unknown/Unknown_F5EE02.bin,
+TreasureRom_LocOfs,$F5:F000,$F5:F401,1026,extracted,table/TreasureRom_LocOfs.bin,
+MapData_F5F402,$F5:F402,$F5:F7E5,996,extracted,map/MapData_F5F402.bin,
+Unknown_F5F7E6,$F5:F7E6,$F5:FE03,1566,extracted,unknown/Unknown_F5F7E6.bin,
+Padding_F5FE04,$F5:FE04,$F5:FFFF,508,fill,,$00
+Table_F60000,$F6:0000,$F6:1BFF,7168,extracted,table/Table_F60000.bin,
+LocGfx_Lists,$F6:1C00,$F6:1DFF,512,extracted,table/LocGfx_Lists.bin,
+Map_PropsPtrs,$F6:1E00,$F6:20FF,768,table,,dl x 256
+LocGfx_Meta12Ptrs,$F6:2100,$F6:21BF,192,table,,dl x 64
+LocGfx_Meta3Ptrs,$F6:21C0,$F6:221F,96,table,,dl x 32
+LocGfx_PackPtrs,$F6:2220,$F6:24BF,672,table,,dl x 224
+LocPal_Rom,$F6:24C0,$F6:6CEF,18480,extracted,palette/LocPal_Rom.bin,
+Palette_F66CF0,$F6:6CF0,$F6:7B7F,3728,extracted,palette/Palette_F66CF0.bin,
+Padding_F67B80,$F6:7B80,$F6:7FFF,1152,fill,,$00
+LocGfxPack_211,$F6:8000,$F6:8D58,3417,packed,packed_lz/LocGfxPack_211.bin,lz11 -> 5408 B
+EvtPack_001,$F6:8D59,$F6:9039,737,packed,packed_lz/EvtPack_001.bin,lz11 -> 1180 B
+EvtPack_002,$F6:903A,$F6:9089,80,packed,packed_lz/EvtPack_002.bin,lz11 -> 292 B
+EvtPack_003,$F6:908A,$F6:92FB,626,packed,packed_lz/EvtPack_003.bin,lz11 -> 1266 B
+EvtPack_004,$F6:92FC,$F6:98EF,1524,packed,packed_lz/EvtPack_004.bin,lz11 -> 2528 B
+EvtPack_005,$F6:98F0,$F6:9A7C,397,packed,packed_lz/EvtPack_005.bin,lz11 -> 841 B
+EvtPack_006,$F6:9A7D,$F6:9B85,265,packed,packed_lz/EvtPack_006.bin,lz11 -> 611 B
+EvtPack_007,$F6:9B86,$F6:9FE8,1123,packed,packed_lz/EvtPack_007.bin,lz11 -> 1571 B
+Text_F69FE9,$F6:9FE9,$F6:9FFF,23,extracted,text/Text_F69FE9.bin,
+Text_F6A000,$F6:A000,$F6:B222,4643,extracted,text/Text_F6A000.bin,
+Text_F6B223,$F6:B223,$F6:B22F,13,extracted,text/Text_F6B223.bin,
+Text_F6B230,$F6:B230,$F6:C813,5604,extracted,text/Text_F6B230.bin,
+Text_F6C814,$F6:C814,$F6:C82F,28,extracted,text/Text_F6C814.bin,
+EvtPack_082,$F6:C830,$F6:CA54,549,packed,packed_lz/EvtPack_082.bin,lz11 -> 940 B
+EvtPack_083,$F6:CA55,$F6:CE5F,1035,packed,packed_lz/EvtPack_083.bin,lz11 -> 1584 B
+EvtPack_084,$F6:CE60,$F6:D48E,1583,packed,packed_lz/EvtPack_084.bin,lz11 -> 3225 B
+EvtPack_085,$F6:D48F,$F6:DC4E,1984,packed,packed_lz/EvtPack_085.bin,lz11 -> 3139 B
+EvtPack_086,$F6:DC4F,$F6:DE14,454,packed,packed_lz/EvtPack_086.bin,lz11 -> 605 B
+EvtPack_087,$F6:DE15,$F6:E875,2657,packed,packed_lz/EvtPack_087.bin,lz11 -> 3979 B
+EvtPack_088,$F6:E876,$F6:EB0D,664,packed,packed_lz/EvtPack_088.bin,lz11 -> 1025 B
+EvtPack_089,$F6:EB0E,$F6:ECF4,487,packed,packed_lz/EvtPack_089.bin,lz11 -> 743 B
+EvtPack_090,$F6:ECF5,$F6:ED33,63,packed,packed_lz/EvtPack_090.bin,lz11 -> 104 B
+EvtPack_091,$F6:ED34,$F6:EE00,205,packed,packed_lz/EvtPack_091.bin,lz11 -> 504 B
+EvtPack_094,$F6:EE01,$F6:EEF9,249,packed,packed_lz/EvtPack_094.bin,lz11 -> 567 B
+EvtPack_095,$F6:EEFA,$F6:EF73,122,packed,packed_lz/EvtPack_095.bin,lz11 -> 324 B
+EvtPack_096,$F6:EF74,$F6:F564,1521,packed,packed_lz/EvtPack_096.bin,lz11 -> 2432 B
+EvtPack_097,$F6:F565,$F6:F99B,1079,packed,packed_lz/EvtPack_097.bin,lz11 -> 1860 B
+EvtPack_098,$F6:F99C,$F6:FBBD,546,packed,packed_lz/EvtPack_098.bin,lz11 -> 839 B
+EvtPack_099,$F6:FBBE,$F6:FC79,188,packed,packed_lz/EvtPack_099.bin,lz11 -> 311 B
+EvtPack_100,$F6:FC7A,$F6:FDE3,362,packed,packed_lz/EvtPack_100.bin,lz11 -> 536 B
+EvtPack_101,$F6:FDE4,$F6:FFFB,536,packed,packed_lz/EvtPack_101.bin,lz11 -> 848 B
+Unknown_F6FFFC,$F6:FFFC,$F6:FFFF,4,extracted,unknown/Unknown_F6FFFC.bin,
+Text_F70000,$F7:0000,$F7:48B7,18616,extracted,text/Text_F70000.bin,
+Text_F748B8,$F7:48B8,$F7:48FF,72,extracted,text/Text_F748B8.bin,
+Text_F74900,$F7:4900,$F7:F870,44913,extracted,text/Text_F74900.bin,
+Padding_F7F871,$F7:F871,$F7:F97F,271,fill,,$00
+EvtPack_021,$F7:F980,$F7:FBE2,611,packed,packed_lz/EvtPack_021.bin,lz11 -> 1130 B
+EvtPack_022,$F7:FBE3,$F7:FFD0,1006,packed,packed_lz/EvtPack_022.bin,lz11 -> 1857 B
+Padding_F7FFD1,$F7:FFD1,$F7:FFFF,47,fill,,$00
+EvtPack_111,$F8:0000,$F8:0129,298,packed,packed_lz/EvtPack_111.bin,lz11 -> 529 B
+EvtPack_112,$F8:012A,$F8:0293,362,packed,packed_lz/EvtPack_112.bin,lz11 -> 747 B
+EvtPack_113,$F8:0294,$F8:0752,1215,packed,packed_lz/EvtPack_113.bin,lz11 -> 2603 B
+EvtPack_114,$F8:0753,$F8:0B8B,1081,packed,packed_lz/EvtPack_114.bin,lz11 -> 1601 B
+EvtPack_115,$F8:0B8C,$F8:0CE5,346,packed,packed_lz/EvtPack_115.bin,lz11 -> 693 B
+EvtPack_116,$F8:0CE6,$F8:13E1,1788,packed,packed_lz/EvtPack_116.bin,lz11 -> 4248 B
+EvtPack_117,$F8:13E2,$F8:17D4,1011,packed,packed_lz/EvtPack_117.bin,lz11 -> 1649 B
+EvtPack_118,$F8:17D5,$F8:19C1,493,packed,packed_lz/EvtPack_118.bin,lz11 -> 1231 B
+EvtPack_119,$F8:19C2,$F8:1AB5,244,packed,packed_lz/EvtPack_119.bin,lz11 -> 567 B
+EvtPack_120,$F8:1AB6,$F8:1B4C,151,packed,packed_lz/EvtPack_120.bin,lz11 -> 407 B
+EvtPack_121,$F8:1B4D,$F8:1BCD,129,packed,packed_lz/EvtPack_121.bin,lz11 -> 392 B
+EvtPack_122,$F8:1BCE,$F8:1D0E,321,packed,packed_lz/EvtPack_122.bin,lz11 -> 632 B
+EvtPack_123,$F8:1D0F,$F8:1E16,264,packed,packed_lz/EvtPack_123.bin,lz11 -> 687 B
+EvtPack_124,$F8:1E17,$F8:1F15,255,packed,packed_lz/EvtPack_124.bin,lz11 -> 537 B
+EvtPack_125,$F8:1F16,$F8:1FA0,139,packed,packed_lz/EvtPack_125.bin,lz11 -> 374 B
+EvtPack_126,$F8:1FA1,$F8:2187,487,packed,packed_lz/EvtPack_126.bin,lz11 -> 940 B
+EvtPack_127,$F8:2188,$F8:22B7,304,packed,packed_lz/EvtPack_127.bin,lz11 -> 543 B
+EvtPack_128,$F8:22B8,$F8:23B7,256,packed,packed_lz/EvtPack_128.bin,lz11 -> 577 B
+EvtPack_129,$F8:23B8,$F8:254B,404,packed,packed_lz/EvtPack_129.bin,lz11 -> 720 B
+EvtPack_130,$F8:254C,$F8:26B9,366,packed,packed_lz/EvtPack_130.bin,lz11 -> 618 B
+EvtPack_131,$F8:26BA,$F8:28EA,561,packed,packed_lz/EvtPack_131.bin,lz11 -> 1023 B
+EvtPack_132,$F8:28EB,$F8:2A66,380,packed,packed_lz/EvtPack_132.bin,lz11 -> 783 B
+EvtPack_133,$F8:2A67,$F8:2D68,770,packed,packed_lz/EvtPack_133.bin,lz11 -> 1327 B
+EvtPack_134,$F8:2D69,$F8:2F59,497,packed,packed_lz/EvtPack_134.bin,lz11 -> 1081 B
+EvtPack_135,$F8:2F5A,$F8:327E,805,packed,packed_lz/EvtPack_135.bin,lz11 -> 1472 B
+EvtPack_136,$F8:327F,$F8:36AA,1068,packed,packed_lz/EvtPack_136.bin,lz11 -> 1748 B
+EvtPack_137,$F8:36AB,$F8:36FF,85,packed,packed_lz/EvtPack_137.bin,lz11 -> 298 B
+EvtPack_138,$F8:3700,$F8:3C8D,1422,packed,packed_lz/EvtPack_138.bin,lz11 -> 2977 B
+EvtPack_139,$F8:3C8E,$F8:3FF0,867,packed,packed_lz/EvtPack_139.bin,lz11 -> 1894 B
+EvtPack_140,$F8:3FF1,$F8:4278,648,packed,packed_lz/EvtPack_140.bin,lz11 -> 1392 B
+EvtPack_141,$F8:4279,$F8:4539,705,packed,packed_lz/EvtPack_141.bin,lz11 -> 1481 B
+EvtPack_142,$F8:453A,$F8:458E,85,packed,packed_lz/EvtPack_142.bin,lz11 -> 298 B
+EvtPack_143,$F8:458F,$F8:45E3,85,packed,packed_lz/EvtPack_143.bin,lz11 -> 298 B
+EvtPack_144,$F8:45E4,$F8:4638,85,packed,packed_lz/EvtPack_144.bin,lz11 -> 298 B
+Padding_F84639,$F8:4639,$F8:464F,23,fill,,$00
+Text_F84650,$F8:4650,$F8:AAA6,25687,extracted,text/Text_F84650.bin,
+Unknown_F8AAA7,$F8:AAA7,$F8:AB71,203,extracted,unknown/Unknown_F8AAA7.bin,
+Pack_F8AB72,$F8:AB72,$F8:AD82,529,packed,packed_lz/Pack_F8AB72.bin,lz11 -> 1311 B
+Pack_F8AD83,$F8:AD83,$F8:AF6E,492,packed,packed_lz/Pack_F8AD83.bin,lz11 -> 1049 B
+Table_F8AF6F,$F8:AF6F,$F8:B16F,513,extracted,table/Table_F8AF6F.bin,
+EvtPack_145,$F8:B170,$F8:B46D,766,packed,packed_lz/EvtPack_145.bin,lz11 -> 1432 B
+EvtPack_146,$F8:B46E,$F8:B5C9,348,packed,packed_lz/EvtPack_146.bin,lz11 -> 831 B
+EvtPack_147,$F8:B5CA,$F8:B737,366,packed,packed_lz/EvtPack_147.bin,lz11 -> 809 B
+EvtPack_148,$F8:B738,$F8:B96F,568,packed,packed_lz/EvtPack_148.bin,lz11 -> 1465 B
+EvtPack_149,$F8:B970,$F8:BB0C,413,packed,packed_lz/EvtPack_149.bin,lz11 -> 874 B
+EvtPack_150,$F8:BB0D,$F8:BBCE,194,packed,packed_lz/EvtPack_150.bin,lz11 -> 342 B
+EvtPack_151,$F8:BBCF,$F8:BCE1,275,packed,packed_lz/EvtPack_151.bin,lz11 -> 587 B
+EvtPack_152,$F8:BCE2,$F8:BEF2,529,packed,packed_lz/EvtPack_152.bin,lz11 -> 1311 B
+EvtPack_153,$F8:BEF3,$F8:C0DE,492,packed,packed_lz/EvtPack_153.bin,lz11 -> 1049 B
+EvtPack_154,$F8:C0DF,$F8:C396,696,packed,packed_lz/EvtPack_154.bin,lz11 -> 1212 B
+EvtPack_155,$F8:C397,$F8:C426,144,packed,packed_lz/EvtPack_155.bin,lz11 -> 379 B
+EvtPack_156,$F8:C427,$F8:C5B4,398,packed,packed_lz/EvtPack_156.bin,lz11 -> 814 B
+EvtPack_157,$F8:C5B5,$F8:CAF5,1345,packed,packed_lz/EvtPack_157.bin,lz11 -> 2492 B
+EvtPack_158,$F8:CAF6,$F8:CD76,641,packed,packed_lz/EvtPack_158.bin,lz11 -> 1521 B
+EvtPack_159,$F8:CD77,$F8:D0C2,844,packed,packed_lz/EvtPack_159.bin,lz11 -> 1443 B
+EvtPack_160,$F8:D0C3,$F8:D5B1,1263,packed,packed_lz/EvtPack_160.bin,lz11 -> 3190 B
+EvtPack_161,$F8:D5B2,$F8:D79B,490,packed,packed_lz/EvtPack_161.bin,lz11 -> 940 B
+EvtPack_162,$F8:D79C,$F8:DA9D,770,packed,packed_lz/EvtPack_162.bin,lz11 -> 1509 B
+EvtPack_163,$F8:DA9E,$F8:DF76,1241,packed,packed_lz/EvtPack_163.bin,lz11 -> 2152 B
+EvtPack_164,$F8:DF77,$F8:E57A,1540,packed,packed_lz/EvtPack_164.bin,lz11 -> 3502 B
+EvtPack_165,$F8:E57B,$F8:E6A5,299,packed,packed_lz/EvtPack_165.bin,lz11 -> 511 B
+EvtPack_166,$F8:E6A6,$F8:EB73,1230,packed,packed_lz/EvtPack_166.bin,lz11 -> 1872 B
+EvtPack_167,$F8:EB74,$F8:EF18,933,packed,packed_lz/EvtPack_167.bin,lz11 -> 1841 B
+EvtPack_168,$F8:EF19,$F8:F051,313,packed,packed_lz/EvtPack_168.bin,lz11 -> 634 B
+EvtPack_169,$F8:F052,$F8:F206,437,packed,packed_lz/EvtPack_169.bin,lz11 -> 1307 B
+EvtPack_170,$F8:F207,$F8:F279,115,packed,packed_lz/EvtPack_170.bin,lz11 -> 289 B
+EvtPack_171,$F8:F27A,$F8:F463,490,packed,packed_lz/EvtPack_171.bin,lz11 -> 1556 B
+EvtPack_172,$F8:F464,$F8:F6F5,658,packed,packed_lz/EvtPack_172.bin,lz11 -> 2113 B
+EvtPack_173,$F8:F6F6,$F8:FA07,786,packed,packed_lz/EvtPack_173.bin,lz11 -> 1375 B
+EvtPack_174,$F8:FA08,$F8:FBDD,470,packed,packed_lz/EvtPack_174.bin,lz11 -> 1369 B
+EvtPack_175,$F8:FBDE,$F8:FE97,698,packed,packed_lz/EvtPack_175.bin,lz11 -> 1474 B
+EvtPack_176,$F8:FE98,$F8:FFF3,348,packed,packed_lz/EvtPack_176.bin,lz11 -> 570 B
+Padding_F8FFF4,$F8:FFF4,$F8:FFFF,12,fill,,$00
+EvtPack_177,$F9:0000,$F9:0616,1559,packed,packed_lz/EvtPack_177.bin,lz11 -> 2342 B
+EvtPack_178,$F9:0617,$F9:0C61,1611,packed,packed_lz/EvtPack_178.bin,lz11 -> 2946 B
+EvtPack_179,$F9:0C62,$F9:168F,2606,packed,packed_lz/EvtPack_179.bin,lz11 -> 4951 B
+EvtPack_180,$F9:1690,$F9:1A1B,908,packed,packed_lz/EvtPack_180.bin,lz11 -> 1750 B
+EvtPack_181,$F9:1A1C,$F9:1BFC,481,packed,packed_lz/EvtPack_181.bin,lz11 -> 822 B
+EvtPack_182,$F9:1BFD,$F9:1E82,646,packed,packed_lz/EvtPack_182.bin,lz11 -> 1063 B
+EvtPack_183,$F9:1E83,$F9:244F,1485,packed,packed_lz/EvtPack_183.bin,lz11 -> 2575 B
+EvtPack_184,$F9:2450,$F9:2571,290,packed,packed_lz/EvtPack_184.bin,lz11 -> 602 B
+EvtPack_185,$F9:2572,$F9:2B3C,1483,packed,packed_lz/EvtPack_185.bin,lz11 -> 2350 B
+EvtPack_186,$F9:2B3D,$F9:31C6,1674,packed,packed_lz/EvtPack_186.bin,lz11 -> 2137 B
+EvtPack_187,$F9:31C7,$F9:38DC,1814,packed,packed_lz/EvtPack_187.bin,lz11 -> 3301 B
+EvtPack_188,$F9:38DD,$F9:4085,1961,packed,packed_lz/EvtPack_188.bin,lz11 -> 2767 B
+EvtPack_189,$F9:4086,$F9:442B,934,packed,packed_lz/EvtPack_189.bin,lz11 -> 1523 B
+EvtPack_190,$F9:442C,$F9:4916,1259,packed,packed_lz/EvtPack_190.bin,lz11 -> 1666 B
+EvtPack_191,$F9:4917,$F9:4A18,258,packed,packed_lz/EvtPack_191.bin,lz11 -> 530 B
+EvtPack_192,$F9:4A19,$F9:4BF7,479,packed,packed_lz/EvtPack_192.bin,lz11 -> 1031 B
+EvtPack_193,$F9:4BF8,$F9:4D52,347,packed,packed_lz/EvtPack_193.bin,lz11 -> 673 B
+EvtPack_194,$F9:4D53,$F9:4E82,304,packed,packed_lz/EvtPack_194.bin,lz11 -> 600 B
+EvtPack_195,$F9:4E83,$F9:5168,742,packed,packed_lz/EvtPack_195.bin,lz11 -> 1168 B
+EvtPack_196,$F9:5169,$F9:5502,922,packed,packed_lz/EvtPack_196.bin,lz11 -> 1282 B
+EvtPack_197,$F9:5503,$F9:5805,771,packed,packed_lz/EvtPack_197.bin,lz11 -> 976 B
+EvtPack_198,$F9:5806,$F9:5B35,816,packed,packed_lz/EvtPack_198.bin,lz11 -> 1330 B
+EvtPack_199,$F9:5B36,$F9:5D35,512,packed,packed_lz/EvtPack_199.bin,lz11 -> 819 B
+EvtPack_201,$F9:5D36,$F9:60A5,880,packed,packed_lz/EvtPack_201.bin,lz11 -> 1425 B
+EvtPack_202,$F9:60A6,$F9:61A7,258,packed,packed_lz/EvtPack_202.bin,lz11 -> 578 B
+EvtPack_203,$F9:61A8,$F9:63C2,539,packed,packed_lz/EvtPack_203.bin,lz11 -> 1064 B
+EvtPack_204,$F9:63C3,$F9:66B2,752,packed,packed_lz/EvtPack_204.bin,lz11 -> 1190 B
+EvtPack_205,$F9:66B3,$F9:69CD,795,packed,packed_lz/EvtPack_205.bin,lz11 -> 1343 B
+EvtPack_206,$F9:69CE,$F9:6D7B,942,packed,packed_lz/EvtPack_206.bin,lz11 -> 1435 B
+EvtPack_207,$F9:6D7C,$F9:73C4,1609,packed,packed_lz/EvtPack_207.bin,lz11 -> 2738 B
+EvtPack_209,$F9:73C5,$F9:77B4,1008,packed,packed_lz/EvtPack_209.bin,lz11 -> 1828 B
+EvtPack_210,$F9:77B5,$F9:7894,224,packed,packed_lz/EvtPack_210.bin,lz11 -> 533 B
+EvtPack_211,$F9:7895,$F9:7941,173,packed,packed_lz/EvtPack_211.bin,lz11 -> 428 B
+EvtPack_212,$F9:7942,$F9:7B5A,537,packed,packed_lz/EvtPack_212.bin,lz11 -> 1172 B
+EvtPack_213,$F9:7B5B,$F9:7D26,460,packed,packed_lz/EvtPack_213.bin,lz11 -> 891 B
+EvtPack_214,$F9:7D27,$F9:7F40,538,packed,packed_lz/EvtPack_214.bin,lz11 -> 818 B
+EvtPack_215,$F9:7F41,$F9:8178,568,packed,packed_lz/EvtPack_215.bin,lz11 -> 886 B
+EvtPack_216,$F9:8179,$F9:82D9,353,packed,packed_lz/EvtPack_216.bin,lz11 -> 624 B
+EvtPack_217,$F9:82DA,$F9:873D,1124,packed,packed_lz/EvtPack_217.bin,lz11 -> 2249 B
+EvtPack_218,$F9:873E,$F9:8932,501,packed,packed_lz/EvtPack_218.bin,lz11 -> 874 B
+EvtPack_219,$F9:8933,$F9:89A7,117,packed,packed_lz/EvtPack_219.bin,lz11 -> 355 B
+EvtPack_220,$F9:89A8,$F9:8C69,706,packed,packed_lz/EvtPack_220.bin,lz11 -> 1169 B
+EvtPack_221,$F9:8C6A,$F9:8E43,474,packed,packed_lz/EvtPack_221.bin,lz11 -> 961 B
+EvtPack_222,$F9:8E44,$F9:920B,968,packed,packed_lz/EvtPack_222.bin,lz11 -> 1415 B
+EvtPack_223,$F9:920C,$F9:9C27,2588,packed,packed_lz/EvtPack_223.bin,lz11 -> 3509 B
+EvtPack_224,$F9:9C28,$F9:A033,1036,packed,packed_lz/EvtPack_224.bin,lz11 -> 1939 B
+EvtPack_225,$F9:A034,$F9:A126,243,packed,packed_lz/EvtPack_225.bin,lz11 -> 472 B
+EvtPack_226,$F9:A127,$F9:A23D,279,packed,packed_lz/EvtPack_226.bin,lz11 -> 565 B
+EvtPack_227,$F9:A23E,$F9:AFE8,3499,packed,packed_lz/EvtPack_227.bin,lz11 -> 4994 B
+Unknown_F9AFE9,$F9:AFE9,$F9:AFFF,23,extracted,unknown/Unknown_F9AFE9.bin,
+Text_F9B000,$F9:B000,$F9:FA75,19062,extracted,text/Text_F9B000.bin,
+Text_F9FA76,$F9:FA76,$F9:FFFF,1418,extracted,text/Text_F9FA76.bin,
+EvtPack_236,$FA:0000,$FA:020A,523,packed,packed_lz/EvtPack_236.bin,lz11 -> 975 B
+EvtPack_237,$FA:020B,$FA:032E,292,packed,packed_lz/EvtPack_237.bin,lz11 -> 654 B
+EvtPack_238,$FA:032F,$FA:065E,816,packed,packed_lz/EvtPack_238.bin,lz11 -> 1555 B
+EvtPack_239,$FA:065F,$FA:086A,524,packed,packed_lz/EvtPack_239.bin,lz11 -> 1151 B
+EvtPack_240,$FA:086B,$FA:12A6,2620,packed,packed_lz/EvtPack_240.bin,lz11 -> 3768 B
+EvtPack_241,$FA:12A7,$FA:1448,418,packed,packed_lz/EvtPack_241.bin,lz11 -> 867 B
+EvtPack_242,$FA:1449,$FA:1AB8,1648,packed,packed_lz/EvtPack_242.bin,lz11 -> 2640 B
+EvtPack_243,$FA:1AB9,$FA:20C7,1551,packed,packed_lz/EvtPack_243.bin,lz11 -> 2386 B
+EvtPack_244,$FA:20C8,$FA:23DB,788,packed,packed_lz/EvtPack_244.bin,lz11 -> 1901 B
+EvtPack_245,$FA:23DC,$FA:27C0,997,packed,packed_lz/EvtPack_245.bin,lz11 -> 2068 B
+EvtPack_246,$FA:27C1,$FA:2C67,1191,packed,packed_lz/EvtPack_246.bin,lz11 -> 2606 B
+EvtPack_247,$FA:2C68,$FA:2FF2,907,packed,packed_lz/EvtPack_247.bin,lz11 -> 1507 B
+EvtPack_248,$FA:2FF3,$FA:355B,1385,packed,packed_lz/EvtPack_248.bin,lz11 -> 4177 B
+EvtPack_249,$FA:355C,$FA:380A,687,packed,packed_lz/EvtPack_249.bin,lz11 -> 1600 B
+EvtPack_250,$FA:380B,$FA:3C35,1067,packed,packed_lz/EvtPack_250.bin,lz11 -> 1767 B
+EvtPack_251,$FA:3C36,$FA:4083,1102,packed,packed_lz/EvtPack_251.bin,lz11 -> 1977 B
+EvtPack_252,$FA:4084,$FA:42B0,557,packed,packed_lz/EvtPack_252.bin,lz11 -> 1125 B
+EvtPack_253,$FA:42B1,$FA:488A,1498,packed,packed_lz/EvtPack_253.bin,lz11 -> 2196 B
+EvtPack_254,$FA:488B,$FA:4C67,989,packed,packed_lz/EvtPack_254.bin,lz11 -> 1455 B
+EvtPack_255,$FA:4C68,$FA:509C,1077,packed,packed_lz/EvtPack_255.bin,lz11 -> 1654 B
+EvtPack_256,$FA:509D,$FA:54FE,1122,packed,packed_lz/EvtPack_256.bin,lz11 -> 2139 B
+EvtPack_257,$FA:54FF,$FA:5777,633,packed,packed_lz/EvtPack_257.bin,lz11 -> 1435 B
+EvtPack_258,$FA:5778,$FA:57FF,136,packed,packed_lz/EvtPack_258.bin,lz11 -> 364 B
+EvtPack_259,$FA:5800,$FA:5B02,771,packed,packed_lz/EvtPack_259.bin,lz11 -> 1397 B
+EvtPack_260,$FA:5B03,$FA:5BE0,222,packed,packed_lz/EvtPack_260.bin,lz11 -> 490 B
+EvtPack_261,$FA:5BE1,$FA:6414,2100,packed,packed_lz/EvtPack_261.bin,lz11 -> 3682 B
+EvtPack_262,$FA:6415,$FA:6531,285,packed,packed_lz/EvtPack_262.bin,lz11 -> 491 B
+EvtPack_263,$FA:6532,$FA:6575,68,packed,packed_lz/EvtPack_263.bin,lz11 -> 230 B
+EvtPack_264,$FA:6576,$FA:6615,160,packed,packed_lz/EvtPack_264.bin,lz11 -> 281 B
+EvtPack_265,$FA:6616,$FA:6857,578,packed,packed_lz/EvtPack_265.bin,lz11 -> 935 B
+EvtPack_266,$FA:6858,$FA:6DAD,1366,packed,packed_lz/EvtPack_266.bin,lz11 -> 3072 B
+EvtPack_267,$FA:6DAE,$FA:722B,1150,packed,packed_lz/EvtPack_267.bin,lz11 -> 2730 B
+EvtPack_268,$FA:722C,$FA:738B,352,packed,packed_lz/EvtPack_268.bin,lz11 -> 661 B
+EvtPack_269,$FA:738C,$FA:7B80,2037,packed,packed_lz/EvtPack_269.bin,lz11 -> 3358 B
+EvtPack_270,$FA:7B81,$FA:7D2E,430,packed,packed_lz/EvtPack_270.bin,lz11 -> 889 B
+EvtPack_271,$FA:7D2F,$FA:7F7E,592,packed,packed_lz/EvtPack_271.bin,lz11 -> 929 B
+EvtPack_272,$FA:7F7F,$FA:8135,439,packed,packed_lz/EvtPack_272.bin,lz11 -> 771 B
+EvtPack_273,$FA:8136,$FA:82AC,375,packed,packed_lz/EvtPack_273.bin,lz11 -> 723 B
+EvtPack_274,$FA:82AD,$FA:8805,1369,packed,packed_lz/EvtPack_274.bin,lz11 -> 3145 B
+EvtPack_275,$FA:8806,$FA:8F4E,1865,packed,packed_lz/EvtPack_275.bin,lz11 -> 3293 B
+EvtPack_276,$FA:8F4F,$FA:9751,2051,packed,packed_lz/EvtPack_276.bin,lz11 -> 3411 B
+EvtPack_277,$FA:9752,$FA:982D,220,packed,packed_lz/EvtPack_277.bin,lz11 -> 411 B
+EvtPack_278,$FA:982E,$FA:9A36,521,packed,packed_lz/EvtPack_278.bin,lz11 -> 781 B
+EvtPack_279,$FA:9A37,$FA:9CA0,618,packed,packed_lz/EvtPack_279.bin,lz11 -> 925 B
+EvtPack_280,$FA:9CA1,$FA:9D24,132,packed,packed_lz/EvtPack_280.bin,lz11 -> 326 B
+EvtPack_281,$FA:9D25,$FA:9F78,596,packed,packed_lz/EvtPack_281.bin,lz11 -> 1580 B
+EvtPack_282,$FA:9F79,$FA:A343,971,packed,packed_lz/EvtPack_282.bin,lz11 -> 1979 B
+EvtPack_283,$FA:A344,$FA:B19D,3674,packed,packed_lz/EvtPack_283.bin,lz11 -> 5882 B
+EvtPack_284,$FA:B19E,$FA:B913,1910,packed,packed_lz/EvtPack_284.bin,lz11 -> 3179 B
+EvtPack_285,$FA:B914,$FA:BFE8,1749,packed,packed_lz/EvtPack_285.bin,lz11 -> 2792 B
+EvtPack_286,$FA:BFE9,$FA:C834,2124,packed,packed_lz/EvtPack_286.bin,lz11 -> 4589 B
+EvtPack_287,$FA:C835,$FA:C88E,90,packed,packed_lz/EvtPack_287.bin,lz11 -> 296 B
+EvtPack_288,$FA:C88F,$FA:CBE9,859,packed,packed_lz/EvtPack_288.bin,lz11 -> 1757 B
+EvtPack_289,$FA:CBEA,$FA:CE79,656,packed,packed_lz/EvtPack_289.bin,lz11 -> 1258 B
+EvtPack_290,$FA:CE7A,$FA:D2D6,1117,packed,packed_lz/EvtPack_290.bin,lz11 -> 2295 B
+EvtPack_291,$FA:D2D7,$FA:D85C,1414,packed,packed_lz/EvtPack_291.bin,lz11 -> 2394 B
+EvtPack_292,$FA:D85D,$FA:DCC7,1131,packed,packed_lz/EvtPack_292.bin,lz11 -> 2039 B
+EvtPack_293,$FA:DCC8,$FA:E201,1338,packed,packed_lz/EvtPack_293.bin,lz11 -> 2361 B
+EvtPack_294,$FA:E202,$FA:E698,1175,packed,packed_lz/EvtPack_294.bin,lz11 -> 1801 B
+EvtPack_295,$FA:E699,$FA:E82A,402,packed,packed_lz/EvtPack_295.bin,lz11 -> 738 B
+EvtPack_296,$FA:E82B,$FA:EACE,676,packed,packed_lz/EvtPack_296.bin,lz11 -> 1138 B
+EvtPack_297,$FA:EACF,$FA:EB17,73,packed,packed_lz/EvtPack_297.bin,lz11 -> 224 B
+EvtPack_298,$FA:EB18,$FA:ECA0,393,packed,packed_lz/EvtPack_298.bin,lz11 -> 742 B
+EvtPack_299,$FA:ECA1,$FA:ED59,185,packed,packed_lz/EvtPack_299.bin,lz11 -> 422 B
+EvtPack_300,$FA:ED5A,$FA:EDF1,152,packed,packed_lz/EvtPack_300.bin,lz11 -> 407 B
+EvtPack_301,$FA:EDF2,$FA:EE33,66,packed,packed_lz/EvtPack_301.bin,lz11 -> 220 B
+EvtPack_302,$FA:EE34,$FA:EE6D,58,packed,packed_lz/EvtPack_302.bin,lz11 -> 216 B
+EvtPack_303,$FA:EE6E,$FA:EEA7,58,packed,packed_lz/EvtPack_303.bin,lz11 -> 216 B
+EvtPack_304,$FA:EEA8,$FA:EEE1,58,packed,packed_lz/EvtPack_304.bin,lz11 -> 216 B
+EvtPack_305,$FA:EEE2,$FA:EF99,184,packed,packed_lz/EvtPack_305.bin,lz11 -> 414 B
+EvtPack_306,$FA:EF9A,$FA:EFE9,80,packed,packed_lz/EvtPack_306.bin,lz11 -> 292 B
+EvtPack_307,$FA:EFEA,$FA:F157,366,packed,packed_lz/EvtPack_307.bin,lz11 -> 652 B
+EvtPack_308,$FA:F158,$FA:F1A7,80,packed,packed_lz/EvtPack_308.bin,lz11 -> 292 B
+EvtPack_309,$FA:F1A8,$FA:F363,444,packed,packed_lz/EvtPack_309.bin,lz11 -> 569 B
+EvtPack_310,$FA:F364,$FA:F403,160,packed,packed_lz/EvtPack_310.bin,lz11 -> 226 B
+EvtPack_311,$FA:F404,$FA:F4B1,174,packed,packed_lz/EvtPack_311.bin,lz11 -> 264 B
+EvtPack_312,$FA:F4B2,$FA:F532,129,packed,packed_lz/EvtPack_312.bin,lz11 -> 166 B
+EvtPack_313,$FA:F533,$FA:F5D3,161,packed,packed_lz/EvtPack_313.bin,lz11 -> 223 B
+EvtPack_314,$FA:F5D4,$FA:F651,126,packed,packed_lz/EvtPack_314.bin,lz11 -> 163 B
+EvtPack_315,$FA:F652,$FA:F6D1,128,packed,packed_lz/EvtPack_315.bin,lz11 -> 165 B
+EvtPack_316,$FA:F6D2,$FA:F769,152,packed,packed_lz/EvtPack_316.bin,lz11 -> 186 B
+EvtPack_317,$FA:F76A,$FA:F817,174,packed,packed_lz/EvtPack_317.bin,lz11 -> 231 B
+EvtPack_318,$FA:F818,$FA:F8B2,155,packed,packed_lz/EvtPack_318.bin,lz11 -> 250 B
+EvtPack_319,$FA:F8B3,$FA:FA9F,493,packed,packed_lz/EvtPack_319.bin,lz11 -> 697 B
+Unknown_FAFAA0,$FA:FAA0,$FA:FB32,147,extracted,unknown/Unknown_FAFAA0.bin,
+Pack_FAFB33,$FA:FB33,$FA:FB8B,89,packed,packed_lz/Pack_FAFB33.bin,lz11 -> 302 B
+Unknown_FAFB8C,$FA:FB8C,$FA:FBA3,24,extracted,unknown/Unknown_FAFB8C.bin,
+Pack_FAFBA4,$FA:FBA4,$FA:FC41,158,packed,packed_lz/Pack_FAFBA4.bin,lz11 -> 227 B
+Pack_FAFC42,$FA:FC42,$FA:FCEE,173,packed,packed_lz/Pack_FAFC42.bin,lz11 -> 265 B
+Pack_FAFCEF,$FA:FCEF,$FA:FD6E,128,packed,packed_lz/Pack_FAFCEF.bin,lz11 -> 167 B
+Pack_FAFD6F,$FA:FD6F,$FA:FE0C,158,packed,packed_lz/Pack_FAFD6F.bin,lz11 -> 224 B
+Pack_FAFE0D,$FA:FE0D,$FA:FE89,125,packed,packed_lz/Pack_FAFE0D.bin,lz11 -> 164 B
+Pack_FAFE8A,$FA:FE8A,$FA:FF08,127,packed,packed_lz/Pack_FAFE8A.bin,lz11 -> 166 B
+Pack_FAFF09,$FA:FF09,$FA:FF9F,151,packed,packed_lz/Pack_FAFF09.bin,lz11 -> 187 B
+Unknown_FAFFA0,$FA:FFA0,$FA:FFFF,96,extracted,unknown/Unknown_FAFFA0.bin,
+EvtPack_323,$FB:0000,$FB:051A,1307,packed,packed_lz/EvtPack_323.bin,lz11 -> 1994 B
+EvtPack_324,$FB:051B,$FB:0BA3,1673,packed,packed_lz/EvtPack_324.bin,lz11 -> 2413 B
+EvtPack_325,$FB:0BA4,$FB:103A,1175,packed,packed_lz/EvtPack_325.bin,lz11 -> 1931 B
+EvtPack_326,$FB:103B,$FB:119F,357,packed,packed_lz/EvtPack_326.bin,lz11 -> 784 B
+EvtPack_327,$FB:11A0,$FB:12FA,347,packed,packed_lz/EvtPack_327.bin,lz11 -> 653 B
+EvtPack_328,$FB:12FB,$FB:1394,154,packed,packed_lz/EvtPack_328.bin,lz11 -> 381 B
+EvtPack_329,$FB:1395,$FB:1439,165,packed,packed_lz/EvtPack_329.bin,lz11 -> 423 B
+EvtPack_330,$FB:143A,$FB:1659,544,packed,packed_lz/EvtPack_330.bin,lz11 -> 820 B
+EvtPack_331,$FB:165A,$FB:17CE,373,packed,packed_lz/EvtPack_331.bin,lz11 -> 662 B
+EvtPack_332,$FB:17CF,$FB:1983,437,packed,packed_lz/EvtPack_332.bin,lz11 -> 787 B
+EvtPack_333,$FB:1984,$FB:1ECE,1355,packed,packed_lz/EvtPack_333.bin,lz11 -> 2084 B
+EvtPack_334,$FB:1ECF,$FB:25D8,1802,packed,packed_lz/EvtPack_334.bin,lz11 -> 2471 B
+EvtPack_335,$FB:25D9,$FB:26A4,204,packed,packed_lz/EvtPack_335.bin,lz11 -> 458 B
+EvtPack_336,$FB:26A5,$FB:27FE,346,packed,packed_lz/EvtPack_336.bin,lz11 -> 681 B
+EvtPack_337,$FB:27FF,$FB:2B76,888,packed,packed_lz/EvtPack_337.bin,lz11 -> 1525 B
+EvtPack_338,$FB:2B77,$FB:2DBE,584,packed,packed_lz/EvtPack_338.bin,lz11 -> 1191 B
+EvtPack_339,$FB:2DBF,$FB:2E66,168,packed,packed_lz/EvtPack_339.bin,lz11 -> 446 B
+EvtPack_340,$FB:2E67,$FB:3068,514,packed,packed_lz/EvtPack_340.bin,lz11 -> 1004 B
+EvtPack_341,$FB:3069,$FB:317C,276,packed,packed_lz/EvtPack_341.bin,lz11 -> 532 B
+EvtPack_342,$FB:317D,$FB:322F,179,packed,packed_lz/EvtPack_342.bin,lz11 -> 408 B
+EvtPack_343,$FB:3230,$FB:3311,226,packed,packed_lz/EvtPack_343.bin,lz11 -> 525 B
+EvtPack_344,$FB:3312,$FB:346A,345,packed,packed_lz/EvtPack_344.bin,lz11 -> 632 B
+EvtPack_345,$FB:346B,$FB:3AC7,1629,packed,packed_lz/EvtPack_345.bin,lz11 -> 2171 B
+EvtPack_346,$FB:3AC8,$FB:3DD8,785,packed,packed_lz/EvtPack_346.bin,lz11 -> 1153 B
+EvtPack_347,$FB:3DD9,$FB:4A43,3179,packed,packed_lz/EvtPack_347.bin,lz11 -> 4365 B
+EvtPack_348,$FB:4A44,$FB:4EF7,1204,packed,packed_lz/EvtPack_348.bin,lz11 -> 2189 B
+EvtPack_349,$FB:4EF8,$FB:507C,389,packed,packed_lz/EvtPack_349.bin,lz11 -> 714 B
+EvtPack_350,$FB:507D,$FB:50FA,126,packed,packed_lz/EvtPack_350.bin,lz11 -> 360 B
+EvtPack_351,$FB:50FB,$FB:519D,163,packed,packed_lz/EvtPack_351.bin,lz11 -> 396 B
+EvtPack_352,$FB:519E,$FB:52EC,335,packed,packed_lz/EvtPack_352.bin,lz11 -> 788 B
+EvtPack_353,$FB:52ED,$FB:537A,142,packed,packed_lz/EvtPack_353.bin,lz11 -> 377 B
+EvtPack_354,$FB:537B,$FB:5570,502,packed,packed_lz/EvtPack_354.bin,lz11 -> 804 B
+EvtPack_355,$FB:5571,$FB:5F6C,2556,packed,packed_lz/EvtPack_355.bin,lz11 -> 4608 B
+EvtPack_356,$FB:5F6D,$FB:5FFC,144,packed,packed_lz/EvtPack_356.bin,lz11 -> 379 B
+EvtPack_357,$FB:5FFD,$FB:60F4,248,packed,packed_lz/EvtPack_357.bin,lz11 -> 587 B
+EvtPack_358,$FB:60F5,$FB:624B,343,packed,packed_lz/EvtPack_358.bin,lz11 -> 694 B
+EvtPack_359,$FB:624C,$FB:6CA8,2653,packed,packed_lz/EvtPack_359.bin,lz11 -> 4037 B
+EvtPack_360,$FB:6CA9,$FB:6EA1,505,packed,packed_lz/EvtPack_360.bin,lz11 -> 864 B
+EvtPack_361,$FB:6EA2,$FB:74C3,1570,packed,packed_lz/EvtPack_361.bin,lz11 -> 2388 B
+EvtPack_362,$FB:74C4,$FB:75B5,242,packed,packed_lz/EvtPack_362.bin,lz11 -> 379 B
+EvtPack_363,$FB:75B6,$FB:7833,638,packed,packed_lz/EvtPack_363.bin,lz11 -> 1225 B
+EvtPack_364,$FB:7834,$FB:8020,2029,packed,packed_lz/EvtPack_364.bin,lz11 -> 2678 B
+EvtPack_365,$FB:8021,$FB:8605,1509,packed,packed_lz/EvtPack_365.bin,lz11 -> 2392 B
+EvtPack_366,$FB:8606,$FB:8CA2,1693,packed,packed_lz/EvtPack_366.bin,lz11 -> 2389 B
+EvtPack_367,$FB:8CA3,$FB:8D94,242,packed,packed_lz/EvtPack_367.bin,lz11 -> 565 B
+EvtPack_368,$FB:8D95,$FB:911E,906,packed,packed_lz/EvtPack_368.bin,lz11 -> 1585 B
+EvtPack_369,$FB:911F,$FB:9268,330,packed,packed_lz/EvtPack_369.bin,lz11 -> 611 B
+EvtPack_370,$FB:9269,$FB:963D,981,packed,packed_lz/EvtPack_370.bin,lz11 -> 1630 B
+EvtPack_371,$FB:963E,$FB:9D78,1851,packed,packed_lz/EvtPack_371.bin,lz11 -> 2681 B
+EvtPack_372,$FB:9D79,$FB:9DC9,81,packed,packed_lz/EvtPack_372.bin,lz11 -> 295 B
+EvtPack_373,$FB:9DCA,$FB:A181,952,packed,packed_lz/EvtPack_373.bin,lz11 -> 1607 B
+EvtPack_374,$FB:A182,$FB:A566,997,packed,packed_lz/EvtPack_374.bin,lz11 -> 1780 B
+EvtPack_375,$FB:A567,$FB:A89A,820,packed,packed_lz/EvtPack_375.bin,lz11 -> 1535 B
+EvtPack_376,$FB:A89B,$FB:AB8B,753,packed,packed_lz/EvtPack_376.bin,lz11 -> 1392 B
+EvtPack_377,$FB:AB8C,$FB:AEB1,806,packed,packed_lz/EvtPack_377.bin,lz11 -> 1426 B
+EvtPack_378,$FB:AEB2,$FB:B186,725,packed,packed_lz/EvtPack_378.bin,lz11 -> 1154 B
+EvtPack_379,$FB:B187,$FB:B1D7,81,packed,packed_lz/EvtPack_379.bin,lz11 -> 295 B
+EvtPack_380,$FB:B1D8,$FB:B488,689,packed,packed_lz/EvtPack_380.bin,lz11 -> 1407 B
+EvtPack_381,$FB:B489,$FB:B73F,695,packed,packed_lz/EvtPack_381.bin,lz11 -> 1345 B
+EvtPack_382,$FB:B740,$FB:BA98,857,packed,packed_lz/EvtPack_382.bin,lz11 -> 1296 B
+EvtPack_383,$FB:BA99,$FB:BD90,760,packed,packed_lz/EvtPack_383.bin,lz11 -> 1467 B
+EvtPack_384,$FB:BD91,$FB:BFE1,593,packed,packed_lz/EvtPack_384.bin,lz11 -> 1148 B
+EvtPack_385,$FB:BFE2,$FB:C0CC,235,packed,packed_lz/EvtPack_385.bin,lz11 -> 491 B
+EvtPack_386,$FB:C0CD,$FB:C33F,627,packed,packed_lz/EvtPack_386.bin,lz11 -> 1362 B
+EvtPack_387,$FB:C340,$FB:C5E4,677,packed,packed_lz/EvtPack_387.bin,lz11 -> 1431 B
+EvtPack_388,$FB:C5E5,$FB:C876,658,packed,packed_lz/EvtPack_388.bin,lz11 -> 1241 B
+EvtPack_389,$FB:C877,$FB:CB52,732,packed,packed_lz/EvtPack_389.bin,lz11 -> 1375 B
+EvtPack_390,$FB:CB53,$FB:CEAB,857,packed,packed_lz/EvtPack_390.bin,lz11 -> 1542 B
+EvtPack_391,$FB:CEAC,$FB:CF3A,143,packed,packed_lz/EvtPack_391.bin,lz11 -> 379 B
+EvtPack_392,$FB:CF3B,$FB:D07A,320,packed,packed_lz/EvtPack_392.bin,lz11 -> 577 B
+EvtPack_393,$FB:D07B,$FB:D4F8,1150,packed,packed_lz/EvtPack_393.bin,lz11 -> 2087 B
+EvtPack_394,$FB:D4F9,$FB:D8D7,991,packed,packed_lz/EvtPack_394.bin,lz11 -> 2027 B
+EvtPack_395,$FB:D8D8,$FB:DC7C,933,packed,packed_lz/EvtPack_395.bin,lz11 -> 1985 B
+EvtPack_396,$FB:DC7D,$FB:DDAA,302,packed,packed_lz/EvtPack_396.bin,lz11 -> 568 B
+EvtPack_397,$FB:DDAB,$FB:E33D,1427,packed,packed_lz/EvtPack_397.bin,lz11 -> 2749 B
+EvtPack_398,$FB:E33E,$FB:E480,323,packed,packed_lz/EvtPack_398.bin,lz11 -> 604 B
+EvtPack_399,$FB:E481,$FB:E74F,719,packed,packed_lz/EvtPack_399.bin,lz11 -> 1228 B
+EvtPack_400,$FB:E750,$FB:E7D6,135,packed,packed_lz/EvtPack_400.bin,lz11 -> 342 B
+EvtPack_401,$FB:E7D7,$FB:E8B2,220,packed,packed_lz/EvtPack_401.bin,lz11 -> 441 B
+EvtPack_402,$FB:E8B3,$FB:EE57,1445,packed,packed_lz/EvtPack_402.bin,lz11 -> 2282 B
+EvtPack_403,$FB:EE58,$FB:F442,1515,packed,packed_lz/EvtPack_403.bin,lz11 -> 2243 B
+EvtPack_404,$FB:F443,$FB:F528,230,packed,packed_lz/EvtPack_404.bin,lz11 -> 510 B
+EvtPack_405,$FB:F529,$FB:F5AD,133,packed,packed_lz/EvtPack_405.bin,lz11 -> 394 B
+EvtPack_406,$FB:F5AE,$FB:FC9B,1774,packed,packed_lz/EvtPack_406.bin,lz11 -> 2544 B
+EvtPack_407,$FB:FC9C,$FB:FE1B,384,packed,packed_lz/EvtPack_407.bin,lz11 -> 832 B
+EvtPack_408,$FB:FE1C,$FB:FFCF,436,packed,packed_lz/EvtPack_408.bin,lz11 -> 916 B
+Unknown_FBFFD0,$FB:FFD0,$FB:FFFF,48,extracted,unknown/Unknown_FBFFD0.bin,
+EvtPack_409,$FC:0000,$FC:063C,1597,packed,packed_lz/EvtPack_409.bin,lz11 -> 2396 B
+EvtPack_410,$FC:063D,$FC:0A3C,1024,packed,packed_lz/EvtPack_410.bin,lz11 -> 1326 B
+EvtPack_411,$FC:0A3D,$FC:0C67,555,packed,packed_lz/EvtPack_411.bin,lz11 -> 834 B
+EvtPack_412,$FC:0C68,$FC:0F28,705,packed,packed_lz/EvtPack_412.bin,lz11 -> 1289 B
+EvtPack_413,$FC:0F29,$FC:105E,310,packed,packed_lz/EvtPack_413.bin,lz11 -> 935 B
+EvtPack_414,$FC:105F,$FC:11CD,367,packed,packed_lz/EvtPack_414.bin,lz11 -> 710 B
+EvtPack_415,$FC:11CE,$FC:1292,197,packed,packed_lz/EvtPack_415.bin,lz11 -> 461 B
+EvtPack_416,$FC:1293,$FC:1486,500,packed,packed_lz/EvtPack_416.bin,lz11 -> 989 B
+EvtPack_417,$FC:1487,$FC:196F,1257,packed,packed_lz/EvtPack_417.bin,lz11 -> 1811 B
+EvtPack_418,$FC:1970,$FC:1C49,730,packed,packed_lz/EvtPack_418.bin,lz11 -> 1217 B
+EvtPack_419,$FC:1C4A,$FC:1E40,503,packed,packed_lz/EvtPack_419.bin,lz11 -> 1079 B
+EvtPack_420,$FC:1E41,$FC:1F75,309,packed,packed_lz/EvtPack_420.bin,lz11 -> 590 B
+EvtPack_421,$FC:1F76,$FC:2302,909,packed,packed_lz/EvtPack_421.bin,lz11 -> 1253 B
+EvtPack_422,$FC:2303,$FC:260F,781,packed,packed_lz/EvtPack_422.bin,lz11 -> 1288 B
+EvtPack_423,$FC:2610,$FC:2929,794,packed,packed_lz/EvtPack_423.bin,lz11 -> 1470 B
+EvtPack_424,$FC:292A,$FC:29B7,142,packed,packed_lz/EvtPack_424.bin,lz11 -> 207 B
+EvtPack_425,$FC:29B8,$FC:2B3F,392,packed,packed_lz/EvtPack_425.bin,lz11 -> 645 B
+EvtPack_426,$FC:2B40,$FC:2C40,257,packed,packed_lz/EvtPack_426.bin,lz11 -> 458 B
+EvtPack_427,$FC:2C41,$FC:2D6C,300,packed,packed_lz/EvtPack_427.bin,lz11 -> 473 B
+EvtPack_428,$FC:2D6D,$FC:31BE,1106,packed,packed_lz/EvtPack_428.bin,lz11 -> 1834 B
+EvtPack_429,$FC:31BF,$FC:32F6,312,packed,packed_lz/EvtPack_429.bin,lz11 -> 736 B
+EvtPack_430,$FC:32F7,$FC:34E5,495,packed,packed_lz/EvtPack_430.bin,lz11 -> 937 B
+EvtPack_431,$FC:34E6,$FC:3688,419,packed,packed_lz/EvtPack_431.bin,lz11 -> 711 B
+EvtPack_432,$FC:3689,$FC:3771,233,packed,packed_lz/EvtPack_432.bin,lz11 -> 551 B
+EvtPack_433,$FC:3772,$FC:3814,163,packed,packed_lz/EvtPack_433.bin,lz11 -> 418 B
+EvtPack_434,$FC:3815,$FC:3906,242,packed,packed_lz/EvtPack_434.bin,lz11 -> 506 B
+EvtPack_435,$FC:3907,$FC:39EA,228,packed,packed_lz/EvtPack_435.bin,lz11 -> 475 B
+EvtPack_436,$FC:39EB,$FC:3C65,635,packed,packed_lz/EvtPack_436.bin,lz11 -> 1184 B
+EvtPack_437,$FC:3C66,$FC:3EC3,606,packed,packed_lz/EvtPack_437.bin,lz11 -> 936 B
+EvtPack_438,$FC:3EC4,$FC:40B6,499,packed,packed_lz/EvtPack_438.bin,lz11 -> 874 B
+EvtPack_439,$FC:40B7,$FC:425E,424,packed,packed_lz/EvtPack_439.bin,lz11 -> 861 B
+EvtPack_440,$FC:425F,$FC:42FF,161,packed,packed_lz/EvtPack_440.bin,lz11 -> 384 B
+EvtPack_441,$FC:4300,$FC:45D3,724,packed,packed_lz/EvtPack_441.bin,lz11 -> 1252 B
+EvtPack_442,$FC:45D4,$FC:46DF,268,packed,packed_lz/EvtPack_442.bin,lz11 -> 546 B
+EvtPack_443,$FC:46E0,$FC:4952,627,packed,packed_lz/EvtPack_443.bin,lz11 -> 1294 B
+EvtPack_444,$FC:4953,$FC:555D,3083,packed,packed_lz/EvtPack_444.bin,lz11 -> 4651 B
+EvtPack_445,$FC:555E,$FC:5B13,1462,packed,packed_lz/EvtPack_445.bin,lz11 -> 2461 B
+EvtPack_446,$FC:5B14,$FC:5EC8,949,packed,packed_lz/EvtPack_446.bin,lz11 -> 1322 B
+EvtPack_447,$FC:5EC9,$FC:5EF3,43,packed,packed_lz/EvtPack_447.bin,lz11 -> 118 B
+EvtPack_449,$FC:5EF4,$FC:60CC,473,packed,packed_lz/EvtPack_449.bin,lz11 -> 802 B
+EvtPack_453,$FC:60CD,$FC:6224,344,packed,packed_lz/EvtPack_453.bin,lz11 -> 623 B
+EvtPack_454,$FC:6225,$FC:6343,287,packed,packed_lz/EvtPack_454.bin,lz11 -> 569 B
+EvtPack_455,$FC:6344,$FC:6488,325,packed,packed_lz/EvtPack_455.bin,lz11 -> 700 B
+EvtPack_456,$FC:6489,$FC:661E,406,packed,packed_lz/EvtPack_456.bin,lz11 -> 872 B
+EvtPack_457,$FC:661F,$FC:67B0,402,packed,packed_lz/EvtPack_457.bin,lz11 -> 872 B
+EvtPack_458,$FC:67B1,$FC:6BEB,1083,packed,packed_lz/EvtPack_458.bin,lz11 -> 1549 B
+EvtPack_464,$FC:6BEC,$FC:6C6E,131,packed,packed_lz/EvtPack_464.bin,lz11 -> 357 B
+EvtPack_465,$FC:6C6F,$FC:74BC,2126,packed,packed_lz/EvtPack_465.bin,lz11 -> 3487 B
+EvtPack_467,$FC:74BD,$FC:7617,347,packed,packed_lz/EvtPack_467.bin,lz11 -> 631 B
+EvtPack_468,$FC:7618,$FC:7667,80,packed,packed_lz/EvtPack_468.bin,lz11 -> 292 B
+EvtPack_469,$FC:7668,$FC:79CC,869,packed,packed_lz/EvtPack_469.bin,lz11 -> 1662 B
+EvtPack_470,$FC:79CD,$FC:7E8B,1215,packed,packed_lz/EvtPack_470.bin,lz11 -> 2108 B
+EvtPack_471,$FC:7E8C,$FC:7F63,216,packed,packed_lz/EvtPack_471.bin,lz11 -> 434 B
+EvtPack_473,$FC:7F64,$FC:817A,535,packed,packed_lz/EvtPack_473.bin,lz11 -> 900 B
+EvtPack_474,$FC:817B,$FC:8444,714,packed,packed_lz/EvtPack_474.bin,lz11 -> 1130 B
+EvtPack_475,$FC:8445,$FC:8589,325,packed,packed_lz/EvtPack_475.bin,lz11 -> 628 B
+EvtPack_476,$FC:858A,$FC:87F9,624,packed,packed_lz/EvtPack_476.bin,lz11 -> 890 B
+EvtPack_477,$FC:87FA,$FC:8916,285,packed,packed_lz/EvtPack_477.bin,lz11 -> 544 B
+EvtPack_479,$FC:8917,$FC:8A33,285,packed,packed_lz/EvtPack_479.bin,lz11 -> 545 B
+EvtPack_480,$FC:8A34,$FC:8AC4,145,packed,packed_lz/EvtPack_480.bin,lz11 -> 400 B
+EvtPack_481,$FC:8AC5,$FC:8BF8,308,packed,packed_lz/EvtPack_481.bin,lz11 -> 675 B
+EvtPack_482,$FC:8BF9,$FC:8C94,156,packed,packed_lz/EvtPack_482.bin,lz11 -> 495 B
+EvtPack_483,$FC:8C95,$FC:8E61,461,packed,packed_lz/EvtPack_483.bin,lz11 -> 895 B
+EvtPack_484,$FC:8E62,$FC:8F8B,298,packed,packed_lz/EvtPack_484.bin,lz11 -> 629 B
+EvtPack_485,$FC:8F8C,$FC:9002,119,packed,packed_lz/EvtPack_485.bin,lz11 -> 377 B
+EvtPack_486,$FC:9003,$FC:9052,80,packed,packed_lz/EvtPack_486.bin,lz11 -> 292 B
+EvtPack_490,$FC:9053,$FC:9676,1572,packed,packed_lz/EvtPack_490.bin,lz11 -> 3097 B
+EvtPack_491,$FC:9677,$FC:98FB,645,packed,packed_lz/EvtPack_491.bin,lz11 -> 1051 B
+EvtPack_492,$FC:98FC,$FC:9ABD,450,packed,packed_lz/EvtPack_492.bin,lz11 -> 953 B
+EvtPack_493,$FC:9ABE,$FC:9C5C,415,packed,packed_lz/EvtPack_493.bin,lz11 -> 855 B
+EvtPack_494,$FC:9C5D,$FC:9D5B,255,packed,packed_lz/EvtPack_494.bin,lz11 -> 639 B
+EvtPack_495,$FC:9D5C,$FC:9EAE,339,packed,packed_lz/EvtPack_495.bin,lz11 -> 625 B
+EvtPack_496,$FC:9EAF,$FC:A018,362,packed,packed_lz/EvtPack_496.bin,lz11 -> 648 B
+EvtPack_497,$FC:A019,$FC:A14F,311,packed,packed_lz/EvtPack_497.bin,lz11 -> 691 B
+EvtPack_498,$FC:A150,$FC:A27F,304,packed,packed_lz/EvtPack_498.bin,lz11 -> 637 B
+EvtPack_499,$FC:A280,$FC:A6E4,1125,packed,packed_lz/EvtPack_499.bin,lz11 -> 1562 B
+EvtPack_500,$FC:A6E5,$FC:A777,147,packed,packed_lz/EvtPack_500.bin,lz11 -> 402 B
+EvtPack_501,$FC:A778,$FC:A818,161,packed,packed_lz/EvtPack_501.bin,lz11 -> 413 B
+EvtPack_502,$FC:A819,$FC:A99B,387,packed,packed_lz/EvtPack_502.bin,lz11 -> 833 B
+EvtPack_504,$FC:A99C,$FC:ABB8,541,packed,packed_lz/EvtPack_504.bin,lz11 -> 1127 B
+EvtPack_506,$FC:ABB9,$FC:AF9B,995,packed,packed_lz/EvtPack_506.bin,lz11 -> 1836 B
+EvtPack_507,$FC:AF9C,$FC:B1E8,589,packed,packed_lz/EvtPack_507.bin,lz11 -> 1248 B
+EvtPack_508,$FC:B1E9,$FC:B398,432,packed,packed_lz/EvtPack_508.bin,lz11 -> 913 B
+EvtPack_509,$FC:B399,$FC:B47F,231,packed,packed_lz/EvtPack_509.bin,lz11 -> 485 B
+EvtPack_510,$FC:B480,$FC:B6EF,624,packed,packed_lz/EvtPack_510.bin,lz11 -> 928 B
+EvtPack_512,$FC:B6F0,$FC:B9E7,760,packed,packed_lz/EvtPack_512.bin,lz11 -> 1452 B
+Text_FCB9E8,$FC:B9E8,$FC:B9FF,24,extracted,text/Text_FCB9E8.bin,
+Text_FCBA00,$FC:BA00,$FC:F9CE,16335,extracted,text/Text_FCBA00.bin,
+Text_FCF9CF,$FC:F9CF,$FC:F9EF,33,extracted,text/Text_FCF9CF.bin,
+Evt_PackPtrs,$FC:F9F0,$FC:FFF2,1539,table,,dl x 513
+Padding_FCFFF3,$FC:FFF3,$FC:FFFF,13,fill,,$00
+C3Pack_058,$FD:0000,$FD:0235,566,packed,packed_lz/C3Pack_058.bin,lz11 -> 1024 B
+C3Pack_059,$FD:0236,$FD:042C,503,packed,packed_lz/C3Pack_059.bin,lz11 -> 2048 B
+C3Pack_060,$FD:042D,$FD:055B,303,packed,packed_lz/C3Pack_060.bin,lz11 -> 320 B
+C3Pack_061,$FD:055C,$FD:0D83,2088,packed,packed_lz/C3Pack_061.bin,lz12 -> 2720 B
+C3Pack_062,$FD:0D84,$FD:0FCD,586,packed,packed_lz/C3Pack_062.bin,lz12 -> 4096 B
+C3Pack_063,$FD:0FCE,$FD:241E,5201,packed,packed_lz/C3Pack_063.bin,lz12 -> 6560 B
+C3Pack_064,$FD:241F,$FD:2454,54,packed,packed_lz/C3Pack_064.bin,lz11 -> 256 B
+C3Pack_065,$FD:2455,$FD:25D0,380,packed,packed_lz/C3Pack_065.bin,lz11 -> 512 B
+C3Pack_066,$FD:25D1,$FD:2F37,2407,packed,packed_lz/C3Pack_066.bin,lz12 -> 3072 B
+C3Pack_067,$FD:2F38,$FD:2FC7,144,packed,packed_lz/C3Pack_067.bin,lz11 -> 256 B
+C3Pack_068,$FD:2FC8,$FD:302E,103,packed,packed_lz/C3Pack_068.bin,lz11 -> 384 B
+C3Pack_069,$FD:302F,$FD:545D,9263,packed,packed_lz/C3Pack_069.bin,lz12 -> 11520 B
+C3Pack_070,$FD:545E,$FD:57EF,914,packed,packed_lz/C3Pack_070.bin,lz11 -> 4096 B
+C3Pack_071,$FD:57F0,$FD:58E0,241,packed,packed_lz/C3Pack_071.bin,lz11 -> 2048 B
+C3Pack_072,$FD:58E1,$FD:6692,3506,packed,packed_lz/C3Pack_072.bin,lz11 -> 19456 B
+Padding_FD6693,$FD:6693,$FD:67FF,365,fill,,$00
+LocGfxPack_200,$FD:6800,$FD:7466,3175,packed,packed_lz/LocGfxPack_200.bin,lz12 -> 4096 B
+LocGfxPack_201,$FD:7467,$FD:7E5B,2549,packed,packed_lz/LocGfxPack_201.bin,lz12 -> 4096 B
+LocGfxPack_202,$FD:7E5C,$FD:804E,499,packed,packed_lz/LocGfxPack_202.bin,lz12 -> 4096 B
+LocGfxPack_203,$FD:804F,$FD:8E63,3605,packed,packed_lz/LocGfxPack_203.bin,lz12 -> 4096 B
+Unknown_FD8E64,$FD:8E64,$FD:8FFF,412,extracted,unknown/Unknown_FD8E64.bin,
+EvtPack_008,$FD:9000,$FD:9162,355,packed,packed_lz/EvtPack_008.bin,lz11 -> 413 B
+EvtPack_010,$FD:9163,$FD:928A,296,packed,packed_lz/EvtPack_010.bin,lz11 -> 677 B
+EvtPack_011,$FD:928B,$FD:9494,522,packed,packed_lz/EvtPack_011.bin,lz11 -> 812 B
+EvtPack_012,$FD:9495,$FD:96AA,534,packed,packed_lz/EvtPack_012.bin,lz11 -> 811 B
+EvtPack_013,$FD:96AB,$FD:97B5,267,packed,packed_lz/EvtPack_013.bin,lz11 -> 614 B
+EvtPack_014,$FD:97B6,$FD:98A7,242,packed,packed_lz/EvtPack_014.bin,lz11 -> 587 B
+EvtPack_015,$FD:98A8,$FD:997B,212,packed,packed_lz/EvtPack_015.bin,lz11 -> 563 B
+EvtPack_016,$FD:997C,$FD:9A9B,288,packed,packed_lz/EvtPack_016.bin,lz11 -> 616 B
+EvtPack_017,$FD:9A9C,$FD:9BA5,266,packed,packed_lz/EvtPack_017.bin,lz11 -> 581 B
+EvtPack_018,$FD:9BA6,$FD:9CB4,271,packed,packed_lz/EvtPack_018.bin,lz11 -> 622 B
+EvtPack_019,$FD:9CB5,$FD:9F2B,631,packed,packed_lz/EvtPack_019.bin,lz11 -> 1030 B
+EvtPack_020,$FD:9F2C,$FD:9FEA,191,packed,packed_lz/EvtPack_020.bin,lz11 -> 545 B
+Unknown_FD9FEB,$FD:9FEB,$FD:9FFF,21,extracted,unknown/Unknown_FD9FEB.bin,
+Credits_Text,$FD:A000,$FD:A80A,2059,extracted,text/Credits_Text.bin,
+BattleRom_PcStatBlock,$FD:A80B,$FD:A848,62,extracted,table/BattleRom_PcStatBlock.bin,
+BattleRom_CmdPtr,$FD:A849,$FD:A84E,6,extracted,table/BattleRom_CmdPtr.bin,
+BattleRom_TechEntryPtr,$FD:A84F,$FD:A89C,78,extracted,table/BattleRom_TechEntryPtr.bin,
+BattleRom_CharFirstTech,$FD:A89D,$FD:A8A4,8,extracted,table/BattleRom_CharFirstTech.bin,
+C3Rom_PackPtrs,$FE:0000,$FE:00DD,222,table,,dl x 74
+Padding_FE00DE,$FE:00DE,$FE:00DF,2,fill,,$00
+C3Pack_002,$FE:00E0,$FE:0A4D,2414,packed,packed_lz/C3Pack_002.bin,lz11 -> 11776 B
+C3Pack_003,$FE:0A4E,$FE:0B12,197,packed,packed_lz/C3Pack_003.bin,lz12 -> 256 B
+C3Pack_004,$FE:0B13,$FE:1184,1650,packed,packed_lz/C3Pack_004.bin,lz11 -> 9216 B
+C3Pack_005,$FE:1185,$FE:1370,492,packed,packed_lz/C3Pack_005.bin,lz12 -> 512 B
+C3Pack_006,$FE:1371,$FE:1738,968,packed,packed_lz/C3Pack_006.bin,lz12 -> 1344 B
+C3Pack_007,$FE:1739,$FE:2C99,5473,packed,packed_lz/C3Pack_007.bin,lz12 -> 8192 B
+C3Pack_008,$FE:2C9A,$FE:326A,1489,packed,packed_lz/C3Pack_008.bin,lz11 -> 4096 B
+C3Pack_009,$FE:326B,$FE:3867,1533,packed,packed_lz/C3Pack_009.bin,lz11 -> 4096 B
+C3Pack_010,$FE:3868,$FE:38C3,92,packed,packed_lz/C3Pack_010.bin,lz11 -> 256 B
+C3Pack_011,$FE:38C4,$FE:3A06,323,packed,packed_lz/C3Pack_011.bin,lz11 -> 2048 B
+C3Pack_012,$FE:3A07,$FE:3A47,65,packed,packed_lz/C3Pack_012.bin,lz11 -> 256 B
+C3Pack_013,$FE:3A48,$FE:3B05,190,packed,packed_lz/C3Pack_013.bin,lz12 -> 272 B
+C3Pack_014,$FE:3B06,$FE:4649,2884,packed,packed_lz/C3Pack_014.bin,lz12 -> 4096 B
+C3Pack_015,$FE:464A,$FE:4ACB,1154,packed,packed_lz/C3Pack_015.bin,lz12 -> 1248 B
+C3Pack_016,$FE:4ACC,$FE:4B1A,79,packed,packed_lz/C3Pack_016.bin,lz11 -> 448 B
+C3Pack_017,$FE:4B1B,$FE:4B79,95,packed,packed_lz/C3Pack_017.bin,lz11 -> 512 B
+Palette_FE4B7A,$FE:4B7A,$FE:4C39,192,extracted,palette/Palette_FE4B7A.bin,
+C3Pack_022,$FE:4C3A,$FE:5306,1741,packed,packed_lz/C3Pack_022.bin,lz12 -> 2048 B
+C3Pack_023,$FE:5307,$FE:6001,3323,packed,packed_lz/C3Pack_023.bin,lz12 -> 6144 B
+C3Pack_024,$FE:6002,$FE:6C4E,3149,packed,packed_lz/C3Pack_024.bin,lz12 -> 5632 B
+C3Pack_025,$FE:6C4F,$FE:6D6C,286,packed,packed_lz/C3Pack_025.bin,lz11 -> 2048 B
+C3Pack_026,$FE:6D6D,$FE:6E33,199,packed,packed_lz/C3Pack_026.bin,lz11 -> 256 B
+C3Pack_027,$FE:6E34,$FE:6F31,254,packed,packed_lz/C3Pack_027.bin,lz12 -> 480 B
+C3Pack_028,$FE:6F32,$FE:7110,479,packed,packed_lz/C3Pack_028.bin,lz12 -> 448 B
+C3Pack_029,$FE:7111,$FE:7205,245,packed,packed_lz/C3Pack_029.bin,lz12 -> 480 B
+C3Pack_030,$FE:7206,$FE:7379,372,packed,packed_lz/C3Pack_030.bin,lz12 -> 480 B
+C3Pack_031,$FE:737A,$FE:73E5,108,packed,packed_lz/C3Pack_031.bin,lz12 -> 352 B
+C3Pack_032,$FE:73E6,$FE:740E,41,packed,packed_lz/C3Pack_032.bin,lz11 -> 32 B
+C3Pack_033,$FE:740F,$FE:77F5,999,packed,packed_lz/C3Pack_033.bin,lz11 -> 2048 B
+C3Pack_034,$FE:77F6,$FE:8617,3618,packed,packed_lz/C3Pack_034.bin,lz12 -> 8192 B
+C3Pack_035,$FE:8618,$FE:8C09,1522,packed,packed_lz/C3Pack_035.bin,lz11 -> 4096 B
+C3Pack_036,$FE:8C0A,$FE:8D14,267,packed,packed_lz/C3Pack_036.bin,lz11 -> 288 B
+Palette_FE8D15,$FE:8D15,$FE:8D34,32,extracted,palette/Palette_FE8D15.bin,
+C3Pack_038,$FE:8D35,$FE:9EB0,4476,packed,packed_lz/C3Pack_038.bin,lz12 -> 6144 B
+C3Pack_039,$FE:9EB1,$FE:9EF6,70,packed,packed_lz/C3Pack_039.bin,lz11 -> 224 B
+C3Pack_040,$FE:9EF7,$FE:9FDA,228,packed,packed_lz/C3Pack_040.bin,lz11 -> 1024 B
+C3Pack_041,$FE:9FDB,$FE:A75B,1921,packed,packed_lz/C3Pack_041.bin,lz11 -> 3072 B
+C3Pack_042,$FE:A75C,$FE:CEEE,10131,packed,packed_lz/C3Pack_042.bin,lz12 -> 16384 B
+C3Pack_043,$FE:CEEF,$FE:D783,2197,packed,packed_lz/C3Pack_043.bin,lz11 -> 4096 B
+C3Pack_044,$FE:D784,$FE:E2E0,2909,packed,packed_lz/C3Pack_044.bin,lz11 -> 4096 B
+C3Pack_045,$FE:E2E1,$FE:F216,3894,packed,packed_lz/C3Pack_045.bin,lz12 -> 8192 B
+C3Pack_046,$FE:F217,$FE:F272,92,packed,packed_lz/C3Pack_046.bin,lz11 -> 96 B
+C3Pack_047,$FE:F273,$FE:F91D,1707,packed,packed_lz/C3Pack_047.bin,lz12 -> 2560 B
+Palette_FEF91E,$FE:F91E,$FE:FFFF,1762,extracted,palette/Palette_FEF91E.bin,
+Gfx_FF0000,$FF:0000,$FF:205F,8288,extracted,graphics/Gfx_FF0000.bin,
+Font_FF2060,$FF:2060,$FF:385F,6144,extracted,font/Font_FF2060.bin,
+TextWinRom_FontRight,$FF:3860,$FF:445F,3072,extracted,font/TextWinRom_FontRight.bin,
+Text_FF4460,$FF:4460,$FF:583C,5085,extracted,text/Text_FF4460.bin,
+Text_FF583D,$FF:583D,$FF:585F,35,extracted,text/Text_FF583D.bin,
+Text_FF5860,$FF:5860,$FF:6AB5,4694,extracted,text/Text_FF5860.bin,
+Text_FF6AB6,$FF:6AB6,$FF:6AFF,74,extracted,text/Text_FF6AB6.bin,
+Text_FF6B00,$FF:6B00,$FF:83C4,6341,extracted,text/Text_FF6B00.bin,
+Text_FF83C5,$FF:83C5,$FF:83FF,59,extracted,text/Text_FF83C5.bin,
+Text_FF8400,$FF:8400,$FF:8C02,2051,extracted,text/Text_FF8400.bin,
+Unknown_FF8C03,$FF:8C03,$FF:8C5F,93,extracted,unknown/Unknown_FF8C03.bin,
+BattleRom_InitGfxA,$FF:8C60,$FF:8E5F,512,extracted,graphics/BattleRom_InitGfxA.bin,
+MenuRom_Font2bpp,$FF:8E60,$FF:925F,1024,extracted,graphics/MenuRom_Font2bpp.bin,
+FieldRom_Unk9260,$FF:9260,$FF:938F,304,extracted,graphics/FieldRom_Unk9260.bin,
+MenuRom_ShadowTiles,$FF:9390,$FF:9C67,2264,extracted,graphics/MenuRom_ShadowTiles.bin,
+BattleRom_ColoursA,$FF:9C68,$FF:9C6F,8,extracted,palette/BattleRom_ColoursA.bin,
+BattleRom_ColoursB,$FF:9C70,$FF:9C77,8,extracted,palette/BattleRom_ColoursB.bin,
+MenuRom_PalB,$FF:9C78,$FF:9CEF,120,extracted,palette/MenuRom_PalB.bin,
+BattleRom_ObjTilePieces,$FF:9CF0,$FF:9DEF,256,extracted,graphics/BattleRom_ObjTilePieces.bin,
+MenuRom_ObjPal,$FF:9DF0,$FF:9E09,26,extracted,palette/MenuRom_ObjPal.bin,
+BattleRom_ColoursC,$FF:9E0A,$FF:9E0F,6,extracted,palette/BattleRom_ColoursC.bin,
+MenuRom_WindowGfx,$FF:9E10,$FF:B20F,5120,extracted,graphics/MenuRom_WindowGfx.bin,
+FieldRom_PalRow0Sets,$FF:B210,$FF:B30F,256,extracted,palette/FieldRom_PalRow0Sets.bin,
+MenuRom_ItemTextPtrs,$FF:B310,$FF:BD17,2568,extracted,text/MenuRom_ItemTextPtrs.bin,
+MenuRom_DrawArgLens,$FF:BD18,$FF:BD2D,22,extracted,table/MenuRom_DrawArgLens.bin,
+MenuRom_MainIconList,$FF:BD2E,$FF:BD50,35,extracted,table/MenuRom_MainIconList.bin,
+MenuRom_MainConfirmList,$FF:BD51,$FF:BD5B,11,extracted,table/MenuRom_MainConfirmList.bin,
+MenuRom_MainIconOam,$FF:BD5C,$FF:BD73,24,extracted,table/MenuRom_MainIconOam.bin,
+MenuRom_Icon0List,$FF:BD74,$FF:BDCC,89,extracted,table/MenuRom_Icon0List.bin,
+MenuRom_Mode01List,$FF:BDCD,$FF:BDEE,34,extracted,table/MenuRom_Mode01List.bin,
+MenuRom_SlotsCloseList,$FF:BDEF,$FF:BE0D,31,extracted,table/MenuRom_SlotsCloseList.bin,
+MenuRom_MemberRowList,$FF:BE0E,$FF:BE14,7,extracted,table/MenuRom_MemberRowList.bin,
+MenuRom_EmptyRowList,$FF:BE15,$FF:BE1B,7,extracted,table/MenuRom_EmptyRowList.bin,
+MenuRom_StatusList,$FF:BE1C,$FF:BE25,10,extracted,table/MenuRom_StatusList.bin,
+MenuRom_SlotsSlideInList,$FF:BE26,$FF:BE5A,53,extracted,table/MenuRom_SlotsSlideInList.bin,
+MenuRom_SlotsSlideOutList,$FF:BE5B,$FF:BE6C,18,extracted,table/MenuRom_SlotsSlideOutList.bin,
+MenuRom_SlotsOpenList,$FF:BE6D,$FF:BEA3,55,extracted,table/MenuRom_SlotsOpenList.bin,
+MenuRom_ItemsSlideInList,$FF:BEA4,$FF:BEBC,25,extracted,table/MenuRom_ItemsSlideInList.bin,
+MenuRom_ItemsSlideOutList,$FF:BEBD,$FF:BEE1,37,extracted,table/MenuRom_ItemsSlideOutList.bin,
+MenuRom_CompareList,$FF:BEE2,$FF:BEEB,10,extracted,table/MenuRom_CompareList.bin,
+MenuRom_ItemsOpenList,$FF:BEEC,$FF:BF04,25,extracted,table/MenuRom_ItemsOpenList.bin,
+MenuRom_XchgListA,$FF:BF05,$FF:BF47,67,extracted,table/MenuRom_XchgListA.bin,
+MenuRom_XchgListB,$FF:BF48,$FF:BF7A,51,extracted,table/MenuRom_XchgListB.bin,
+MenuRom_XchgList,$FF:BF7B,$FF:BF9F,37,extracted,table/MenuRom_XchgList.bin,
+MenuRom_Icon2List,$FF:BFA0,$FF:BFD9,58,extracted,table/MenuRom_Icon2List.bin,
+MenuRom_Mode03List,$FF:BFDA,$FF:C01E,69,extracted,table/MenuRom_Mode03List.bin,
+MenuRom_TechRowList,$FF:C01F,$FF:C025,7,extracted,table/MenuRom_TechRowList.bin,
+MenuRom_TechNextList,$FF:C026,$FF:C02F,10,extracted,table/MenuRom_TechNextList.bin,
+MenuRom_TechEmptyRowList,$FF:C030,$FF:C036,7,extracted,table/MenuRom_TechEmptyRowList.bin,
+MenuRom_Icon2RedrawList,$FF:C037,$FF:C041,11,extracted,table/MenuRom_Icon2RedrawList.bin,
+MenuRom_TechMembersList,$FF:C042,$FF:C055,20,extracted,table/MenuRom_TechMembersList.bin,
+MenuRom_TechTargetList,$FF:C056,$FF:C05C,7,extracted,table/MenuRom_TechTargetList.bin,
+MenuRom_Icon1List,$FF:C05D,$FF:C0A5,73,extracted,table/MenuRom_Icon1List.bin,
+MenuRom_Mode02List,$FF:C0A6,$FF:C0D4,47,extracted,table/MenuRom_Mode02List.bin,
+MenuRom_EquipInfoList,$FF:C0D5,$FF:C0E3,15,extracted,table/MenuRom_EquipInfoList.bin,
+MenuRom_UseTargetsList,$FF:C0E4,$FF:C0EC,9,extracted,table/MenuRom_UseTargetsList.bin,
+MenuRom_LoadList,$FF:C0ED,$FF:C137,75,extracted,table/MenuRom_LoadList.bin,
+MenuRom_SaveList,$FF:C138,$FF:C15D,38,extracted,table/MenuRom_SaveList.bin,
+MenuRom_SlotDetailList,$FF:C15E,$FF:C167,10,extracted,table/MenuRom_SlotDetailList.bin,
+MenuRom_SlotMemberList,$FF:C168,$FF:C16E,7,extracted,table/MenuRom_SlotMemberList.bin,
+MenuRom_SaveAskList,$FF:C16F,$FF:C190,34,extracted,table/MenuRom_SaveAskList.bin,
+MenuRom_LoadAskClose,$FF:C191,$FF:C19B,11,extracted,table/MenuRom_LoadAskClose.bin,
+MenuRom_Icon3List,$FF:C19C,$FF:C1B8,29,extracted,table/MenuRom_Icon3List.bin,
+MenuRom_Icon3ListB,$FF:C1B9,$FF:C1F5,61,extracted,table/MenuRom_Icon3ListB.bin,
+MenuRom_Mode04List,$FF:C1F6,$FF:C212,29,extracted,table/MenuRom_Mode04List.bin,
+MenuRom_ShopList,$FF:C213,$FF:C2AF,157,extracted,table/MenuRom_ShopList.bin,
+MenuRom_ShopCloseList,$FF:C2B0,$FF:C2C0,17,extracted,table/MenuRom_ShopCloseList.bin,
+MenuRom_ShopBuyList,$FF:C2C1,$FF:C2CA,10,extracted,table/MenuRom_ShopBuyList.bin,
+MenuRom_ShopSellList,$FF:C2CB,$FF:C2D4,10,extracted,table/MenuRom_ShopSellList.bin,
+MenuRom_ShopMembersList,$FF:C2D5,$FF:C2DD,9,extracted,table/MenuRom_ShopMembersList.bin,
+MenuRom_ShopQtyList,$FF:C2DE,$FF:C2E7,10,extracted,table/MenuRom_ShopQtyList.bin,
+MenuRom_ShopQtyListA,$FF:C2E8,$FF:C2F4,13,extracted,table/MenuRom_ShopQtyListA.bin,
+MenuRom_ShopQtyListB,$FF:C2F5,$FF:C301,13,extracted,table/MenuRom_ShopQtyListB.bin,
+MenuRom_ShopQtyListC,$FF:C302,$FF:C308,7,extracted,table/MenuRom_ShopQtyListC.bin,
+MenuRom_ShopEquipList,$FF:C309,$FF:C317,15,extracted,table/MenuRom_ShopEquipList.bin,
+MenuRom_ShopCompareList,$FF:C318,$FF:C321,10,extracted,table/MenuRom_ShopCompareList.bin,
+MenuRom_LoadRowsList,$FF:C322,$FF:C36A,73,extracted,table/MenuRom_LoadRowsList.bin,
+MenuRom_LoadRow3List,$FF:C36B,$FF:C390,38,extracted,table/MenuRom_LoadRow3List.bin,
+MenuRom_LoadAskList,$FF:C391,$FF:C3BB,43,extracted,table/MenuRom_LoadAskList.bin,
+MenuRom_NameList,$FF:C3BC,$FF:C41E,99,extracted,table/MenuRom_NameList.bin,
+MenuRom_NameShowList,$FF:C41F,$FF:C428,10,extracted,table/MenuRom_NameShowList.bin,
+MenuRom_NameChoiceList,$FF:C429,$FF:C456,46,extracted,table/MenuRom_NameChoiceList.bin,
+MenuRom_StringPtrs,$FF:C457,$FF:C969,1299,extracted,text/MenuRom_StringPtrs.bin,
+MenuRom_EquipLabel3,$FF:C96A,$FF:C970,7,extracted,text/MenuRom_EquipLabel3.bin,
+MenuRom_EquipLabel0,$FF:C971,$FF:C979,9,extracted,text/MenuRom_EquipLabel0.bin,
+MenuRom_EquipLabel12,$FF:C97A,$FF:C9AB,50,extracted,text/MenuRom_EquipLabel12.bin,
+MenuRom_NameChars,$FF:C9AC,$FF:C9FB,80,extracted,table/MenuRom_NameChars.bin,
+MenuRom_Font2bppB,$FF:C9FC,$FF:CAFB,256,extracted,graphics/MenuRom_Font2bppB.bin,
+MenuRom_GlyphRows,$FF:CAFC,$FF:CB9B,160,extracted,graphics/MenuRom_GlyphRows.bin,
+MenuRom_HealNumberPal,$FF:CB9C,$FF:CBAB,16,extracted,palette/MenuRom_HealNumberPal.bin,
+MenuRom_Icon0Pal,$FF:CBAC,$FF:CBB3,8,extracted,palette/MenuRom_Icon0Pal.bin,
+MenuRom_Icon1PalB,$FF:CBB4,$FF:CBBB,8,extracted,palette/MenuRom_Icon1PalB.bin,
+MenuRom_PalC,$FF:CBBC,$FF:CBC3,8,extracted,palette/MenuRom_PalC.bin,
+MenuRom_Icon0RedrawPal,$FF:CBC4,$FF:CBE3,32,extracted,palette/MenuRom_Icon0RedrawPal.bin,
+MenuRom_Icon3Pal,$FF:CBE4,$FF:CC13,48,extracted,palette/MenuRom_Icon3Pal.bin,
+MenuRom_MainPalA,$FF:CC14,$FF:CC23,16,extracted,palette/MenuRom_MainPalA.bin,
+MenuRom_MainPalB,$FF:CC24,$FF:CC33,16,extracted,palette/MenuRom_MainPalB.bin,
+MenuRom_Icon1PalA,$FF:CC34,$FF:CC63,48,extracted,palette/MenuRom_Icon1PalA.bin,
+MenuRom_XchgPal,$FF:CC64,$FF:CC73,16,extracted,palette/MenuRom_XchgPal.bin,
+MenuRom_LoadPalA,$FF:CC74,$FF:CC83,16,extracted,palette/MenuRom_LoadPalA.bin,
+MenuRom_SlotIconPals,$FF:CC84,$FF:CDF3,368,extracted,palette/MenuRom_SlotIconPals.bin,
+MenuRom_Icon2PalC,$FF:CDF4,$FF:CE03,16,extracted,palette/MenuRom_Icon2PalC.bin,
+MenuRom_Icon2PalB,$FF:CE04,$FF:CE2F,44,extracted,palette/MenuRom_Icon2PalB.bin,
+MenuRom_LoadPalB,$FF:CE30,$FF:CE6F,64,extracted,palette/MenuRom_LoadPalB.bin,
+MenuRom_PortraitTiles,$FF:CE70,$FF:CE77,8,extracted,table/MenuRom_PortraitTiles.bin,
+MenuRom_PortraitPals,$FF:CE78,$FF:CE87,16,extracted,table/MenuRom_PortraitPals.bin,
+MenuRom_CharIconTiles,$FF:CE88,$FF:CE91,10,extracted,table/MenuRom_CharIconTiles.bin,
+MenuRom_CharIconPals,$FF:CE92,$FF:CE99,8,extracted,table/MenuRom_CharIconPals.bin,
+MenuRom_NameChoicePal,$FF:CE9A,$FF:CEB9,32,extracted,palette/MenuRom_NameChoicePal.bin,
+MenuRom_HealBounce,$FF:CEBA,$FF:CF0D,84,extracted,table/MenuRom_HealBounce.bin,
+MenuRom_ItemTablesA,$FF:CF0E,$FF:CF17,10,extracted,table/MenuRom_ItemTablesA.bin,
+MenuRom_ItemRecSizesA,$FF:CF18,$FF:CF1C,5,extracted,table/MenuRom_ItemRecSizesA.bin,
+MenuRom_ItemTablesB,$FF:CF1D,$FF:CF26,10,extracted,table/MenuRom_ItemTablesB.bin,
+MenuRom_ItemRecSizesB,$FF:CF27,$FF:CF2A,4,extracted,table/MenuRom_ItemRecSizesB.bin,
+MenuRom_StatItemStat,$FF:CF2B,$FF:CF2B,1,extracted,table/MenuRom_StatItemStat.bin,
+MenuRom_StatOrder,$FF:CF2C,$FF:CF31,6,extracted,table/MenuRom_StatOrder.bin,
+MenuRom_StatItemCap,$FF:CF32,$FF:CF32,1,extracted,table/MenuRom_StatItemCap.bin,
+MenuRom_NumLimits,$FF:CF33,$FF:CF3A,8,extracted,table/MenuRom_NumLimits.bin,
+MenuRom_NameStrings,$FF:CF3B,$FF:D03D,259,extracted,text/MenuRom_NameStrings.bin,
+MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,extracted,text/MenuRom_SlotStrings.bin,
+MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,extracted,table/MenuRom_SlotEraNibbles.bin,
+MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,extracted,text/MenuRom_SlotEraStrings.bin,
+MenuRom_CfgTextTable,$FF:D3FE,$FF:D553,342,extracted,text/MenuRom_CfgTextTable.bin,
+MenuRom_ButtonLetters,$FF:D554,$FF:D561,14,extracted,table/MenuRom_ButtonLetters.bin,
+MenuRom_CfgIcons,$FF:D562,$FF:D579,24,extracted,table/MenuRom_CfgIcons.bin,
+MenuRom_XchgUnkD57A,$FF:D57A,$FF:D5E3,106,extracted,table/MenuRom_XchgUnkD57A.bin,
+MenuRom_Tiles4bpp,$FF:D5E4,$FF:DBE3,1536,extracted,graphics/MenuRom_Tiles4bpp.bin,
+MenuRom_Tiles3bpp,$FF:DBE4,$FF:E8DB,3320,extracted,graphics/MenuRom_Tiles3bpp.bin,
+MenuRom_ScreenGfx,$FF:E8DC,$FF:EB87,684,packed,packed_lz/MenuRom_ScreenGfx.bin,lz12 -> 1536 B
+MenuRom_VramTiles,$FF:EB88,$FF:F007,1152,extracted,graphics/MenuRom_VramTiles.bin,
+MenuRom_NameChoiceMap,$FF:F008,$FF:F547,1344,extracted,tilemap/MenuRom_NameChoiceMap.bin,
