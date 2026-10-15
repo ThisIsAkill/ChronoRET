@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:4677,C3Mod_RaceTask,2026-10-09,rev186a,approved,c993bfac695c,"Verified A-quit, lap-8 SBC #$400 (C=1), phase==1, word $44/$45, side moves (CMP carry right, $80/AND), $1000-$8FFF hide test, FinishGap step, exits, $4857 caller"
+$7E:485D,C3Mod_RaceStepTask,2026-10-09,rev186a,approved,b990d6a3f5bc,"Derived all compares/carries $4861-$4C39 (lost path C=1, column, lead, caps, boost C, steer pushes/decays, gap, bumps incl. across $10/$20 asymmetry); exit A/DB, callers $4047/$46AD/$4752 ok"

@@ -955,13 +955,27 @@ describing it in source, with totals, order of work and estimates, is [DATA_PLAN
    at `$3689`, and models `JSR $B574` at `$82A5` as a call into `C3_BuildCopyCode`'s
    generated code (`GENERATED`): about 20.6 KB of code, no anomalies. The CALLERS rule now
    also wants the script opcodes that call a routine or add or remove it as a task, and the
-   `LDX #task` before the task-list calls. Next: `C3Mod_Rest3B48` (`$3B48`-`$A650`), the
-   programs and their tasks; about 6 KB of the module is reached by no trace and looks like
-   tables (`$3209`'s divide is reached only from the unused `C3Mod_DivSigned16`; the JMP at
-   `$78A8` after an RTS, probably dead). `C3_RandomByte`'s header (kernel, verified) still
-   says M=1 and that the module's site is not traced: five module calls are M=0 (see
-   `C3Mod_KernelRandom`). Re-review needed: the module headers changed in round 179's fixes
-   (`symbols/c3module_functions.csv` hashes differ from `symbols/reviews/r179.csv`). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   `LDX #task` before the task-list calls. Third batch (to review): program 0 (entries 0 and
+   9 of `C3Mod_ProgramTable`, the race) from `$3B48` to `$4D0C`: `C3Mod_Prog0` with its
+   graphics (`C3Mod_Prog0LoadGfx`, `C3Mod_CopyTileBlock`, `C3Mod_MirrorRows3`), its HDMA
+   lists and tables (the window wipe, the BG mode / colour math / scroll split at the
+   horizon), its scripts as data (`C3Mod_Prog0ScriptA`.., written with the `!C3Op_*` opcode
+   names of `module.inc`), the view tasks on page `$0A00`'s variables (`C3Mod_ViewTask`,
+   `C3Mod_TurnTask`, `C3Mod_SteerTask`, `C3Mod_ViewOffsetTask`, the NMI tasks that write the
+   scrolls and the split), the exit and wipe tasks, and the race itself:
+   `C3Mod_RaceStepTask` (speeds, boosts, the rival's steering, the score, the bumps, the
+   engine sound), `C3Mod_RaceFinish` (the result and the prizes in `C3_RaceResult` /
+   `C3_RacePrize` / `C3_ResultWord`), `C3Mod_RaceTask` and the four bump routines; plus
+   `C3Mod_LampUpload` (`$5261`). The race's direct-page words have names now
+   (`C3_Bike*`, `C3_Rival*`, `C3_Score`, ...; `C3_Unk0380`/`0381` became `C3_RaceResult` /
+   `C3_RacePrize`, so `C3Mod_Init` changed). Quirks: the bumps along the track take the
+   overlap's high word off both words of the other bike's distance; the carries the race
+   step leaves in its ADCs and SBCs; the map column saved as 20 bytes and written back as 19;
+   a horizon below 2 ends the split tables at once. Next: `C3Mod_Rest4D0D` (`$4D0D`-`$5260`:
+   the bikes' projection and sprites, `C3Mod_Unk51D1`'s scaled pictures, the NMI uploads) and
+   `C3Mod_Rest528B` on (the other programs); about 6 KB of the module is reached by no trace
+   and looks like tables (`$3209`'s divide is reached only from the unused
+   `C3Mod_DivSigned16`; the JMP at `$78A8` after an RTS, probably dead). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
    and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
    the module reads them. Re-review needed (verified headers edited by this batch):
