@@ -1,0 +1,6 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:357B,C3Mod_BuildM7Tables,2026-10-09,rev184a,approved,ef055808ff38,"Verified -sin/-cos signs vs $C0:F900 |sin| (negated 0-$1FF), M7A=M7D/M7B=-M7C store order, self-mod writers $3CDE/$7A17/$7A3A/$86EC/$8022/$8051/$8066/$45C5/$7A0C, callers, DP/DB, Exit"
+$7E:3B48,C3Mod_Prog0,2026-10-09,rev184a,approved,4b88dcfc0f95,"Fix verified: Init's $3148-$314E zero M7A/M7B after HideSprites, boot path $0404x0. Checked MVN/tile/mirror counts, DMA fills, wipe/window regs, $35FD/$3024 writes, DP/DB via BuildCopyCode"
+$7E:42CE,C3Mod_ViewTask,2026-10-09,rev184a,approved,c4cab92af657,"Checked 5 compares vs C3_ViewCache ($30-$38) and fall-in stores, ClearUnk1446 on scale change, callers $3F14/$412D (opcode $FA), DP/DB per RunTasks, both Exit paths"
+$7E:452B,C3Mod_MathHdma,2026-10-09,rev184a,approved,1087adfb6c23,"Bytes match: 2 counts to .sky, 15x2 lines .fade+34..+62 (14 to 0), 1 line first pair, end; $9008 record, $9090/$90A2 writers. nit: name HorizonNmiTask ($4506/$4515) as count writer"
+$7E:485D,C3Mod_RaceStepTask,2026-10-09,rev184a,changes,576068fd42fe,"Lead test is CMP #$1000/BMI (sign of low-$1000): low words $1000-$8FFF hide, not 'signed >= $1000'; same for lap-0 column ($1000-$8FFF). Say so. Rest checked (caps, boost carry, bumps, Exit)"
