@@ -9,8 +9,9 @@ order, banks), and the checker finds planted gaps, overlaps and bad sizes,
 and reads a hand-made Decomp_ToWram stream to its end.
 
 With the ROM and asar: the CSV covers exactly the bytes the source does not
-emit, and every packed_lz row is one stream that ends at the row's last byte
-and unpacks to the size its format gives.
+emit, every packed_lz row is one stream that ends at the row's last byte and
+unpacks to the size its format gives, and every 50th of them repacks
+byte-exact with tools/c3pack.py.
 """
 
 import shutil
@@ -80,6 +81,16 @@ class Rom(unittest.TestCase):
         rows = ds.read_rows()
         problems, _ = ds.pack_problems(rows, ds.ROM_PATH.read_bytes(), repack=False)
         self.assertEqual(problems, [])
+
+    def test_sample_of_packs_repacks_byte_exact(self):
+        # Every 50th packed_lz row (a fixed sample, about 30 streams) through the packer; the
+        # full run is `python3 tools/data_survey.py --packs` (about 20 s).
+        import c3pack
+        rows = [r for r in ds.read_rows() if r['kind'] == 'packed_lz'][::50]
+        self.assertGreater(len(rows), 20)
+        problems, repacked = ds.pack_problems(rows, ds.ROM_PATH.read_bytes())
+        self.assertEqual(problems, [])
+        self.assertEqual(repacked, len(rows))
 
 
 if __name__ == '__main__':
