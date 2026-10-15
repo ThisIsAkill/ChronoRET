@@ -7,16 +7,16 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $CE:0000-$CE:00FF (256 B), table, confirmed: 128 u16 offsets of subscripts (bank $CE)
 ; Read by BattleAct_OpCall.
 org $CE0000
 BattleRom_ActSubscripts:
-    incbin "../../build/assets/table/BattleRom_ActSubscripts.bin"
+    incbin "../../build/records/BattleRom_ActSubscripts.bin"          ; records: table 128 x 2 B
 
 ; $CE:0100-$CE:037F (640 B), palette, confirmed: BGR555 colours of the status colour cycles
 ; Read by BattleCF_StepFxColourCycle.
@@ -72,20 +72,26 @@ BattleRom_DissolveRec:
 ; Read by BattleCD_DissolveStep.
 org $CEEFEA
 BattleRom_DissolvePhaseStep:
-    incbin "../../build/assets/table/BattleRom_DissolvePhaseStep.bin"
+    incbin "../../build/records/BattleRom_DissolvePhaseStep.bin"          ; records: table 8 x 1 B
 
 ; $CE:EFF2-$CE:EFF9 (8 B), table, confirmed: 2 B per tile set 0-3: VRAM word address
 ; Read by BattleCD_LoadLayerFx.
 org $CEEFF2
 BattleRom_FxTileVram:
-    incbin "../../build/assets/table/BattleRom_FxTileVram.bin"
+    incbin "../../build/records/BattleRom_FxTileVram.bin"          ; records: table 4 x 2 B
 
-; $CE:EFFA-$CE:EFFD (4 B), table, confirmed: 1 B per colour-math case 0/1:
+; $CE:EFFA-$CE:EFFB (2 B), table, confirmed: 1 B per colour-math case 0/1:
 ; !Battle_PalAnimRec10's byte 0
 ; Read by BattleCD_FxRecSetup.
 org $CEEFFA
 BattleRom_FxRecByte0:
-    incbin "../../build/assets/table/BattleRom_FxRecByte0.bin"
+    incbin "../../build/records/BattleRom_FxRecByte0.bin"          ; records: table 2 x 1 B
+
+; $CE:EFFC-$CE:EFFD (2 B), unknown, unknown: 2 B after BattleRom_FxRecByte0 (past its reader's 2
+; records)
+org $CEEFFC
+Unknown_CEEFFC:
+    incbin "../../build/assets/unknown/Unknown_CEEFFC.bin"
 
 ; $CE:EFFE-$CE:F005 (8 B), table, confirmed: the same for BattleCD_LoadFxPalB
 ; Read by BattleCD_LoadFxPalB.
@@ -103,7 +109,7 @@ BattleRom_FxRecA:
 ; Read by BattleCD_BuildFxTilemap.
 org $CEF03E
 BattleRom_FxBitMask:
-    incbin "../../build/assets/table/BattleRom_FxBitMask.bin"
+    incbin "../../build/records/BattleRom_FxBitMask.bin"          ; records: table 8 x 1 B
 
 ; $CE:F046-$CE:F065 (32 B), table, confirmed: 1 B per column: byte offset in a tilemap row
 ; Read by BattleCD_BuildFxTilemap.
@@ -135,27 +141,27 @@ BattleRom_Op80PairA:
 ; Read by BattleFx_Op80Kind0.
 org $CEF146
 BattleRom_Op80PairB:
-    incbin "../../build/assets/table/BattleRom_Op80PairB.bin"
+    incbin "../../build/records/BattleRom_Op80PairB.bin"          ; records: table 8 x 2 B
 
 ; $CE:F156-$CE:F165 (16 B), table, confirmed: 2 B per frame layout: bytes of a decoded frame
 ; Read by BattleCD_EnemyDissolveFx.
 org $CEF156
 BattleRom_LayoutFrameBytes:
-    incbin "../../build/assets/table/BattleRom_LayoutFrameBytes.bin"
+    incbin "../../build/records/BattleRom_LayoutFrameBytes.bin"          ; records: table 8 x 2 B
 
 ; $CE:F166-$CE:F17B (22 B), table, confirmed: 2 B per battler slot: bank-$7E address of its
 ; decoded frame
 ; Read by BattleCD_DissolveStep, BattleCD_EnemyDissolveFx.
 org $CEF166
 BattleRom_SlotFrameBuf:
-    incbin "../../build/assets/table/BattleRom_SlotFrameBuf.bin"
+    incbin "../../build/records/BattleRom_SlotFrameBuf.bin"          ; records: table 11 x 2 B
 
 ; $CE:F17C-$CE:F191 (22 B), table, confirmed: 2 B per battler slot: the VRAM address its frame
 ; goes to
 ; Read by BattleCD_EnemyDissolveFx.
 org $CEF17C
 BattleRom_SlotFrameVram:
-    incbin "../../build/assets/table/BattleRom_SlotFrameVram.bin"
+    incbin "../../build/records/BattleRom_SlotFrameVram.bin"          ; records: table 11 x 2 B
 
 ; $CE:F192-$CE:F1C1 (48 B), table, confirmed: 8 B per frame layout: two (byte offset, tile
 ; count) word pairs
@@ -169,7 +175,7 @@ BattleRom_DissolveRanges:
 ; Read by BattleCD_DissolveStep.
 org $CEF1C2
 BattleRom_DissolveMask:
-    incbin "../../build/assets/table/BattleRom_DissolveMask.bin"
+    incbin "../../build/records/BattleRom_DissolveMask.bin"          ; records: table 8 x 2 B
 
 ; $CE:F1D2-$CE:F24D (124 B), table, confirmed: 256 B of signed bob steps (the read runs over the
 ; next rows, to $CE:F2D1)
@@ -197,7 +203,7 @@ BattleRom_HalfPlaneEdge:
 ; BattleFx_WaveWindowA, BattleFx_WaveWindowB_ByFrame.
 org $CEF48E
 BattleRom_AbsSine:
-    incbin "../../build/assets/table/BattleRom_AbsSine.bin"
+    incbin "../../build/records/BattleRom_AbsSine.bin"          ; records: table 256 x 1 B
 
 ; $CE:F58E-$CE:FFFF (2,674 B), table, confirmed: $14 B per HDMA set (ten words: table
 ; addresses), then the HDMA tables

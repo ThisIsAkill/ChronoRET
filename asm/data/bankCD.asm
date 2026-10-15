@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $CD:4000-$CD:4014 (21 B), table, confirmed: 21 B: PC attack script header
@@ -18,7 +18,7 @@
 ; Also BattleRom_PcAttackScript (a struct or label of the code source).
 org $CD4000
 Table_CD4000:
-    incbin "../../build/assets/table/Table_CD4000.bin"
+    incbin "../../build/records/Table_CD4000.bin"          ; records: table 1 x 21 B
 
 ; $CD:4015-$CD:451E (1,290 B), table, confirmed: 15 B per PC attack record: far, near and
 ; alternate (gfx A, gfx B, frames, palette, object)
@@ -72,7 +72,7 @@ Table_CD5526:
 ; Also BattleRom_Kind3Act (a struct or label of the code source).
 org $CD5C26
 Table_CD5C26:
-    incbin "../../build/assets/table/Table_CD5C26.bin"
+    incbin "../../build/records/Table_CD5C26.bin"          ; records: table 68 x 7 B
 
 ; $CD:5E02-$CD:5EC5 (196 B), padding, confirmed: 196 x $FF
 org $CD5E02
@@ -155,7 +155,7 @@ BattleRom_PcTechPals:
 ; Read by BattleAct_LoadAttack, BattleAct_LoadTech.
 org $CD6A2C
 BattleRom_EnemyActPals:
-    incbin "../../build/assets/table/BattleRom_EnemyActPals.bin"
+    incbin "../../build/records/BattleRom_EnemyActPals.bin"          ; records: table 256 x 2 B
 
 ; $CD:6C2C-$CD:6CEB (192 B), table, confirmed: u16 per palette index (96): palette-step offset
 ; in bank $CD ($FFFF none)

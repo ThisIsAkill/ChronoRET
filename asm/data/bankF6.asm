@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $F6:0000-$F6:1BFF (7,168 B), table, confirmed: 512 x 14 B location records (LocRom struct)
@@ -18,7 +18,7 @@
 ; LocLoad_UnkA33B, Map_InitMasksAndLimits.
 org $F60000
 Table_F60000:
-    incbin "../../build/assets/table/Table_F60000.bin"
+    incbin "../../build/records/Table_F60000.bin"          ; records: table 512 x 14 B
 
 ; $F6:1C00-$F6:1DFF (512 B), table, confirmed: 64 x 8 B graphics pack numbers per tileset
 ; Read by LocLoad_Unk0960.

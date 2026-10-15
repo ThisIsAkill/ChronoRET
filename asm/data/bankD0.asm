@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $D0:0000-$D0:DEBF (57,024 B), graphics, confirmed: action graphics source tiles (2bpp, some
@@ -96,7 +96,7 @@ BattleRom_GradColours:
 ; Read by BattleFx_LoadBgRows2To4.
 org $D0FD00
 Palette_D0FD00:
-    incbin "../../build/assets/palette/Palette_D0FD00.bin"
+    incbin "../../build/records/Palette_D0FD00.bin"          ; records: palette 48 x 2 B
 
 ; $D0:FD60-$D0:FFFF (672 B), padding, confirmed: 672 x $FF
 org $D0FD60

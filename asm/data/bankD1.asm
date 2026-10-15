@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $D1:0000-$D1:005F (96 B), table, confirmed: 2 B per !Battle_ActFramesIdx: packed sprite frames
@@ -930,17 +930,23 @@ org $D138F1
 Unknown_D138F1:
     incbin "../../build/assets/unknown/Unknown_D138F1.bin"
 
-; $D1:38F2-$D1:38F9 (8 B), palette, confirmed: 6 B (3 colours) -> !Battle_PaletteLive + $5A
+; $D1:38F2-$D1:38F7 (6 B), palette, confirmed: 6 B (3 colours) -> !Battle_PaletteLive + $5A
 ; Read by Battle_InitSceneGfx.
 org $D138F2
 BattleRom_UnkColours38F2:
-    incbin "../../build/assets/palette/BattleRom_UnkColours38F2.bin"
+    incbin "../../build/records/BattleRom_UnkColours38F2.bin"          ; records: palette 3 x 2 B
+
+; $D1:38F8-$D1:38F9 (2 B), unknown, unknown: 2 B after BattleRom_UnkColours38F2 (past its
+; reader's 3 records)
+org $D138F8
+Unknown_D138F8:
+    incbin "../../build/assets/unknown/Unknown_D138F8.bin"
 
 ; $D1:38FA-$D1:38FF (6 B), palette, confirmed: 6 B (3 colours) -> !Battle_PaletteLive + $7A
 ; Read by Battle_InitSceneGfx.
 org $D138FA
 BattleRom_UnkColours38FA:
-    incbin "../../build/assets/palette/BattleRom_UnkColours38FA.bin"
+    incbin "../../build/records/BattleRom_UnkColours38FA.bin"          ; records: palette 3 x 2 B
 
 ; $D1:3900-$D1:40FF (2,048 B), graphics, confirmed: 64 x 32 B 4bpp tiles
 ; Read by Battle_InitSceneGfx.
@@ -995,7 +1001,7 @@ Gfx_D14C80:
 ; Read by Battle_InitSceneGfx.
 org $D14D80
 BattleRom_HitNumColours:
-    incbin "../../build/assets/palette/BattleRom_HitNumColours.bin"
+    incbin "../../build/records/BattleRom_HitNumColours.bin"          ; records: palette 8 x 2 B
 
 ; $D1:4D90-$D1:50A1 (786 B), palette, confirmed: 24 B (12 colours) per entry: opcode $69's
 ; palette
@@ -1022,7 +1028,7 @@ BattleRom_CommandWindowMap:
 ; Read by BattleCF_FrameUpdate.
 org $D15980
 BattleRom_CursorGlow:
-    incbin "../../build/assets/palette/BattleRom_CursorGlow.bin"
+    incbin "../../build/records/BattleRom_CursorGlow.bin"          ; records: palette 62 x 2 B
 
 ; $D1:59FC-$D1:5A4F (84 B), tilemap, confirmed: 84 B: one 7x6 command-window frame, 2 B (tile,
 ; attribute) per cell
@@ -1082,11 +1088,17 @@ org $D15F02
 BattleRom_InitTilesD:
     incbin "../../build/assets/graphics/BattleRom_InitTilesD.bin"
 
-; $D1:5F42-$D1:5FFF (190 B), table, confirmed: 1 B per character * 4 + facing: KO frame id
+; $D1:5F42-$D1:5F5D (28 B), table, confirmed: 1 B per character * 4 + facing: KO frame id
 ; Read by BattleSys_RunAction.
 org $D15F42
 BattleRom_PcKoFrame:
-    incbin "../../build/assets/table/BattleRom_PcKoFrame.bin"
+    incbin "../../build/records/BattleRom_PcKoFrame.bin"          ; records: table 28 x 1 B
+
+; $D1:5F5E-$D1:5FFF (162 B), unknown, unknown: 162 B after BattleRom_PcKoFrame (past its
+; reader's 28 records)
+org $D15F5E
+Unknown_D15F5E:
+    incbin "../../build/assets/unknown/Unknown_D15F5E.bin"
 
 ; $D1:6000-$D1:623F (576 B), palette, confirmed: 8 B per colour set; bytes 2-7 (colours 1-3) are
 ; copied

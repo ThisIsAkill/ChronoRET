@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $CC:0000-$CC:05CB (1,484 B), table, confirmed: character records for a new game ($280 B), then
@@ -144,20 +144,20 @@ MenuRom_TechCosts:
 ; Read by BattleSys_RunPcAttack.
 org $CC2583
 BattleRom_PcAttackNum:
-    incbin "../../build/assets/table/BattleRom_PcAttackNum.bin"
+    incbin "../../build/records/BattleRom_PcAttackNum.bin"          ; records: table 7 x 1 B
 
 ; $CC:258A-$CC:25C1 (56 B), table, confirmed: 8 B per character id: HP growth (level, gain)
 ; pairs
 ; Read by BattleSys_GrowHpMp.
 org $CC258A
 BattleRom_HpGrowth:
-    incbin "../../build/assets/table/BattleRom_HpGrowth.bin"
+    incbin "../../build/records/BattleRom_HpGrowth.bin"          ; records: table 7 x 8 B
 
 ; $CC:25C2-$CC:25F9 (56 B), table, confirmed: 8 B per character id: MP growth pairs
 ; Read by BattleSys_GrowHpMp.
 org $CC25C2
 BattleRom_MpGrowth:
-    incbin "../../build/assets/table/BattleRom_MpGrowth.bin"
+    incbin "../../build/records/BattleRom_MpGrowth.bin"          ; records: table 7 x 8 B
 
 ; $CC:25FA-$CC:2631 (56 B), table, confirmed: 7 B per character id: stat growth per level
 ; Read by BattleSys_LevelUpStep.
@@ -176,14 +176,14 @@ BattleRom_ExpToLevel:
 ; Read by BattleSys_SpendTechPoints.
 org $CC26FA
 BattleRom_TechTpCost:
-    incbin "../../build/assets/table/BattleRom_TechTpCost.bin"
+    incbin "../../build/records/BattleRom_TechTpCost.bin"          ; records: table 7 x 16 B
 
 ; $CC:276A-$CC:2777 (14 B), table, confirmed: 2 B per character id: first single tech id, tech
 ; count
 ; Read by BattleSys_SpendTechPoints, BattleSys_TryNextTech.
 org $CC276A
 BattleRom_CharTechs:
-    incbin "../../build/assets/table/BattleRom_CharTechs.bin"
+    incbin "../../build/records/BattleRom_CharTechs.bin"          ; records: table 7 x 2 B
 
 ; $CC:2778-$CC:28DA (355 B), table, confirmed: 5 B per combo record, $FF-ended: member bits,
 ; first tech, count, requirement address
@@ -205,11 +205,17 @@ org $CC2935
 MenuRom_TechLineTiles:
     incbin "../../build/assets/table/MenuRom_TechLineTiles.bin"
 
-; $CC:2953-$CC:2962 (16 B), table, confirmed: 3 B per combo 0-4: tech bit numbers
+; $CC:2953-$CC:2961 (15 B), table, confirmed: 3 B per combo 0-4: tech bit numbers
 ; Read by BankFF_UnkF958.
 org $CC2953
 MenuRom_ComboNeeds:
-    incbin "../../build/assets/table/MenuRom_ComboNeeds.bin"
+    incbin "../../build/records/MenuRom_ComboNeeds.bin"          ; records: table 5 x 3 B
+
+; $CC:2962-$CC:2962 (1 B), unknown, unknown: 1 B after MenuRom_ComboNeeds (past its reader's 5
+; records)
+org $CC2962
+Unknown_CC2962:
+    incbin "../../build/assets/unknown/Unknown_CC2962.bin"
 
 ; $CC:2963-$CC:2978 (22 B), table, confirmed: 1 B per Menu_TechBits byte: character bits needed
 ; Read by BankFF_UnkF813, Menu_TechListBytes, Menu_TechPartners.
@@ -223,11 +229,17 @@ org $CC2979
 MenuRom_TechLineBits:
     incbin "../../build/assets/table/MenuRom_TechLineBits.bin"
 
-; $CC:2983-$CC:29D6 (84 B), table, confirmed: 1 B per combo 0-4: characters needed in the party
+; $CC:2983-$CC:2987 (5 B), table, confirmed: 1 B per combo 0-4: characters needed in the party
 ; Read by BankFF_UnkF958.
 org $CC2983
 MenuRom_ComboMembers:
-    incbin "../../build/assets/table/MenuRom_ComboMembers.bin"
+    incbin "../../build/records/MenuRom_ComboMembers.bin"          ; records: table 5 x 1 B
+
+; $CC:2988-$CC:29D6 (79 B), unknown, unknown: 79 B after MenuRom_ComboMembers (past its reader's
+; 5 records)
+org $CC2988
+Unknown_CC2988:
+    incbin "../../build/assets/unknown/Unknown_CC2988.bin"
 
 ; $CC:29D7-$CC:2A04 (46 B), table, confirmed: u16 per item info value: stat bits, amount
 ; Read by Menu_AddItemBoosts.
@@ -325,13 +337,19 @@ org $CC4700
 BattleRom_EnemyStats:
     incbin "../../build/assets/table/BattleRom_EnemyStats.bin"
 
-; $CC:5E00-$CC:64FF (1,792 B), table, confirmed: 7 B per enemy id: reward record
+; $CC:5E00-$CC:64F8 (1,785 B), table, confirmed: 7 B per enemy id: reward record
 ; (BattleRom_EnemyReward struct)
 ; Read by BattleFD_AddEnemyRewards.
 ; Also BattleRom_EnemyReward (a struct or label of the code source).
 org $CC5E00
 Table_CC5E00:
-    incbin "../../build/assets/table/Table_CC5E00.bin"
+    incbin "../../build/records/Table_CC5E00.bin"          ; records: table 255 x 7 B
+
+; $CC:64F9-$CC:64FF (7 B), unknown, unknown: 7 B after BattleRom_EnemyReward (past its reader's
+; 255 records)
+org $CC64F9
+Unknown_CC64F9:
+    incbin "../../build/assets/unknown/Unknown_CC64F9.bin"
 
 ; $CC:6500-$CC:6FC8 (2,761 B), text, confirmed: 11-byte enemy names (251)
 ; Read by Battle_InitScene, TextWin_ExtEnemyName.
@@ -358,11 +376,17 @@ org $CC7AC9
 BattleRom_EnemyEffectRecA:
     incbin "../../build/assets/table/BattleRom_EnemyEffectRecA.bin"
 
-; $CC:86C9-$CC:88CA (514 B), table, confirmed: 2 B per !Battle_UnkB18C: target mode, area number
+; $CC:86C9-$CC:88C8 (512 B), table, confirmed: 2 B per !Battle_UnkB18C: target mode, area number
 ; Read by BattleSys_UnkC1DD.
 org $CC86C9
 BattleRom_EnemyTechTarget:
-    incbin "../../build/assets/table/BattleRom_EnemyTechTarget.bin"
+    incbin "../../build/records/BattleRom_EnemyTechTarget.bin"          ; records: table 256 x 2 B
+
+; $CC:88C9-$CC:88CA (2 B), unknown, unknown: 2 B after BattleRom_EnemyTechTarget (past its
+; reader's 256 records)
+org $CC88C9
+Unknown_CC88C9:
+    incbin "../../build/assets/unknown/Unknown_CC88C9.bin"
 
 ; $CC:88CB-$CC:89C5 (251 B), table, confirmed: 11 B per !Battle_UnkB18C: action records
 ; Read by BattleFD_LoadUnkB18E2, BattleSys_UnkD8D1.
@@ -422,7 +446,7 @@ BattleRom_TechListBase:
 ; Read by BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow, Battle_InitScene.
 org $CCF395
 BattleRom_TechEntryBase:
-    incbin "../../build/assets/table/BattleRom_TechEntryBase.bin"
+    incbin "../../build/records/BattleRom_TechEntryBase.bin"          ; records: table 3 x 2 B
 
 ; $CC:F39B-$CC:F3A0 (6 B), table, confirmed: 2 B per visible tech row: offset of the row in the
 ; tech window map
@@ -505,12 +529,18 @@ org $CCF4CC
 BattleRom_Unk8C2DPattern:
     incbin "../../build/assets/table/BattleRom_Unk8C2DPattern.bin"
 
-; $CC:F4FC-$CC:F504 (9 B), table, confirmed: 1 B per frame layout 0-4: signed bytes after the
+; $CC:F4FC-$CC:F503 (8 B), table, confirmed: 1 B per frame layout 0-4: signed bytes after the
 ; frame's tilemap (cells / 2)
 ; Read by Battle_DrawBattlerFrameAnyLayout.
 org $CCF4FC
 BattleRom_FrameExtraCount:
-    incbin "../../build/assets/table/BattleRom_FrameExtraCount.bin"
+    incbin "../../build/records/BattleRom_FrameExtraCount.bin"          ; records: table 8 x 1 B
+
+; $CC:F504-$CC:F504 (1 B), unknown, unknown: 1 B after BattleRom_FrameExtraCount (past its
+; reader's 8 records)
+org $CCF504
+Unknown_CCF504:
+    incbin "../../build/assets/unknown/Unknown_CCF504.bin"
 
 ; $CC:F505-$CC:F509 (5 B), table, confirmed: 1 B per frame layout 0-4: sprite byte counts
 ; Read by Battle_InitScene.
@@ -525,12 +555,18 @@ org $CCF50A
 BattleRom_LayoutSprites:
     incbin "../../build/assets/table/BattleRom_LayoutSprites.bin"
 
-; $CC:F544-$CC:F593 (80 B), table, confirmed: 1 B per (move delay / 2) * 4 + move speed / 2: an
+; $CC:F544-$CC:F563 (32 B), table, confirmed: 1 B per (move delay / 2) * 4 + move speed / 2: an
 ; enemy's !Enemy_MoveInterval
 ; Read by Battle_InitScene.
 org $CCF544
 BattleRom_EnemyMoveInterval:
-    incbin "../../build/assets/table/BattleRom_EnemyMoveInterval.bin"
+    incbin "../../build/records/BattleRom_EnemyMoveInterval.bin"          ; records: table 32 x 1 B
+
+; $CC:F564-$CC:F593 (48 B), unknown, unknown: 48 B after BattleRom_EnemyMoveInterval (past its
+; reader's 32 records)
+org $CCF564
+Unknown_CCF564:
+    incbin "../../build/assets/unknown/Unknown_CCF564.bin"
 
 ; $CC:F594-$CC:F5BB (40 B), table, confirmed: the same for y
 ; Read by BattleCF_StepPathWalks.
@@ -557,21 +593,33 @@ BattleRom_HitNumDigitX:
 ; Battle_FxOverlay5, Battle_FxOverlay6, Battle_FxOverlay7.
 org $CCF5FD
 BattleRom_FxOverlayPeriod:
-    incbin "../../build/assets/table/BattleRom_FxOverlayPeriod.bin"
+    incbin "../../build/records/BattleRom_FxOverlayPeriod.bin"          ; records: table 7 x 1 B
 
-; $CC:F604-$CC:F63B (56 B), table, confirmed: 4 sprites x 4 B: command cursor
+; $CC:F604-$CC:F613 (16 B), table, confirmed: 4 sprites x 4 B: command cursor
 ; (BattleRom_CursorSprite struct)
 ; Read by BattleMenu_DrawCursorSprites.
 ; Also BattleRom_CursorSprite (a struct or label of the code source).
 org $CCF604
 Table_CCF604:
-    incbin "../../build/assets/table/Table_CCF604.bin"
+    incbin "../../build/records/Table_CCF604.bin"          ; records: table 4 x 4 B
 
-; $CC:F63C-$CC:F643 (8 B), table, confirmed: 1 B per character id 0-6: path-search flag
+; $CC:F614-$CC:F63B (40 B), unknown, unknown: 40 B after BattleRom_CursorSprite (past its
+; reader's 4 records)
+org $CCF614
+Unknown_CCF614:
+    incbin "../../build/assets/unknown/Unknown_CCF614.bin"
+
+; $CC:F63C-$CC:F642 (7 B), table, confirmed: 1 B per character id 0-6: path-search flag
 ; Read by BattleAct_CheckReach.
 org $CCF63C
 BattleRom_PcPathAlways:
-    incbin "../../build/assets/table/BattleRom_PcPathAlways.bin"
+    incbin "../../build/records/BattleRom_PcPathAlways.bin"          ; records: table 7 x 1 B
+
+; $CC:F643-$CC:F643 (1 B), unknown, unknown: 1 B after BattleRom_PcPathAlways (past its reader's
+; 7 records)
+org $CCF643
+Unknown_CCF643:
+    incbin "../../build/assets/unknown/Unknown_CCF643.bin"
 
 ; $CC:F644-$CC:F67B (56 B), table, confirmed: 16 B: one cell-map row template
 ; Read by Battle_InitScene.
@@ -639,7 +687,7 @@ BattleRom_Times16:
 ; Read by BattleAct_OpShowHitNumbers.
 org $CCF829
 BattleRom_HitSetOffset:
-    incbin "../../build/assets/table/BattleRom_HitSetOffset.bin"
+    incbin "../../build/records/BattleRom_HitSetOffset.bin"          ; records: table 6 x 1 B
 
 ; $CC:F82F-$CC:F836 (8 B), table, confirmed: 1 B per enemy: enemy * 8, its block in
 ; !Enemy_AnimTicks/Frames
@@ -665,7 +713,7 @@ BattleRom_SlotTimes5:
 ; Read by Battle_InitScene.
 org $CCF846
 BattleRom_CharTimes6:
-    incbin "../../build/assets/table/BattleRom_CharTimes6.bin"
+    incbin "../../build/records/BattleRom_CharTimes6.bin"          ; records: table 7 x 1 B
 
 ; $CC:F84D-$CC:F8EC (160 B), table, confirmed: 2 B per sprite index: address of the battler's
 ; sprite records
@@ -681,27 +729,27 @@ BattleRom_SprTileListPtr:
 ; BattleUI_UpdateNextPcPanel, Battle_PickStatusAnim.
 org $CCF8ED
 BattleRom_StatsOffset:
-    incbin "../../build/assets/table/BattleRom_StatsOffset.bin"
+    incbin "../../build/records/BattleRom_StatsOffset.bin"          ; records: table 11 x 2 B
 
 ; $CC:F903-$CC:F90C (10 B), table, confirmed: 10 B: tile for digits 0-9 ($73-$7C)
 ; Read by BattleMsg_FormatNumberDigits, BattleMsg_FormatTwoDigits.
 org $CCF903
 BattleRom_DigitTiles:
-    incbin "../../build/assets/table/BattleRom_DigitTiles.bin"
+    incbin "../../build/records/BattleRom_DigitTiles.bin"          ; records: table 10 x 1 B
 
 ; $CC:F90D-$CC:F916 (10 B), table, confirmed: 10 B: a second set of digit tiles 0-9 ($90-$99),
 ; read by BattleMsg_FormatNumber4Digits
 ; Read by BattleMsg_FormatNumber4Digits.
 org $CCF90D
 BattleRom_DigitTilesB:
-    incbin "../../build/assets/table/BattleRom_DigitTilesB.bin"
+    incbin "../../build/records/BattleRom_DigitTilesB.bin"          ; records: table 10 x 1 B
 
 ; $CC:F917-$CC:F92C (22 B), table, confirmed: 2 B per battler slot: slot * $10, offset of its
 ; !Battler_FrameExtra block
 ; Read by Battle_DrawBattlerFrameAnyLayout.
 org $CCF917
 BattleRom_SlotTimes16:
-    incbin "../../build/assets/table/BattleRom_SlotTimes16.bin"
+    incbin "../../build/records/BattleRom_SlotTimes16.bin"          ; records: table 11 x 2 B
 
 ; $CC:F92D-$CC:F938 (12 B), table, confirmed: 1 B per battler slot: slot * 3, offset into the
 ; 3-byte pointer arrays
@@ -715,76 +763,76 @@ BattleRom_SlotTimes3:
 ; Read by Battle_InitScene.
 org $CCF939
 BattleRom_EnemyRecOfs:
-    incbin "../../build/assets/table/BattleRom_EnemyRecOfs.bin"
+    incbin "../../build/records/BattleRom_EnemyRecOfs.bin"          ; records: table 8 x 1 B
 
 ; $CC:F941-$CC:F956 (22 B), table, confirmed: 2 B per battler slot: bank-$7E address of its
 ; decoded frame tiles
 ; Read by Battle_DrawBattlerFrameAnyLayout.
 org $CCF941
 BattleRom_FrameDestBase:
-    incbin "../../build/assets/table/BattleRom_FrameDestBase.bin"
+    incbin "../../build/records/BattleRom_FrameDestBase.bin"          ; records: table 11 x 2 B
 
 ; $CC:F957-$CC:F95E (8 B), table, confirmed: 2 B per graphics step 0-3: bank-$7E source of the
 ; first block
 ; Read by BattleCF_VblankUploads.
 org $CCF957
 BattleRom_GfxStepSrcA:
-    incbin "../../build/assets/table/BattleRom_GfxStepSrcA.bin"
+    incbin "../../build/records/BattleRom_GfxStepSrcA.bin"          ; records: table 4 x 2 B
 
 ; $CC:F95F-$CC:F966 (8 B), table, confirmed: 2 B per step: source of the second block
 ; Read by BattleCF_VblankUploads.
 org $CCF95F
 BattleRom_GfxStepSrcB:
-    incbin "../../build/assets/table/BattleRom_GfxStepSrcB.bin"
+    incbin "../../build/records/BattleRom_GfxStepSrcB.bin"          ; records: table 4 x 2 B
 
 ; $CC:F967-$CC:F96E (8 B), table, confirmed: 2 B per step: VRAM word address of the first block
 ; Read by BattleCF_VblankUploads.
 org $CCF967
 BattleRom_GfxStepVramA:
-    incbin "../../build/assets/table/BattleRom_GfxStepVramA.bin"
+    incbin "../../build/records/BattleRom_GfxStepVramA.bin"          ; records: table 4 x 2 B
 
 ; $CC:F96F-$CC:F976 (8 B), table, confirmed: 2 B per step: VRAM word address of the second block
 ; Read by BattleCF_VblankUploads.
 org $CCF96F
 BattleRom_GfxStepVramB:
-    incbin "../../build/assets/table/BattleRom_GfxStepVramB.bin"
+    incbin "../../build/records/BattleRom_GfxStepVramB.bin"          ; records: table 4 x 2 B
 
 ; $CC:F977-$CC:F97E (8 B), table, confirmed: 2 B per step: bytes in the first block
 ; Read by BattleCF_VblankUploads.
 org $CCF977
 BattleRom_GfxStepSizeA:
-    incbin "../../build/assets/table/BattleRom_GfxStepSizeA.bin"
+    incbin "../../build/records/BattleRom_GfxStepSizeA.bin"          ; records: table 4 x 2 B
 
 ; $CC:F97F-$CC:F986 (8 B), table, confirmed: 2 B per step: bytes in the second block; 0 = none
 ; (step 3)
 ; Read by BattleCF_VblankUploads.
 org $CCF97F
 BattleRom_GfxStepSizeB:
-    incbin "../../build/assets/table/BattleRom_GfxStepSizeB.bin"
+    incbin "../../build/records/BattleRom_GfxStepSizeB.bin"          ; records: table 4 x 2 B
 
 ; $CC:F987-$CC:F99C (22 B), table, confirmed: 2 B per battler slot: DMA source A
 ; Read by Battle_InitSceneGfx.
 org $CCF987
 BattleRom_FrameDmaSrcA:
-    incbin "../../build/assets/table/BattleRom_FrameDmaSrcA.bin"
+    incbin "../../build/records/BattleRom_FrameDmaSrcA.bin"          ; records: table 11 x 2 B
 
 ; $CC:F99D-$CC:F9B2 (22 B), table, confirmed: 2 B per battler slot: DMA source B
 ; Read by Battle_InitSceneGfx.
 org $CCF99D
 BattleRom_FrameDmaSrcB:
-    incbin "../../build/assets/table/BattleRom_FrameDmaSrcB.bin"
+    incbin "../../build/records/BattleRom_FrameDmaSrcB.bin"          ; records: table 11 x 2 B
 
 ; $CC:F9B3-$CC:F9C8 (22 B), table, confirmed: 2 B per battler slot: VRAM address A
 ; Read by Battle_InitSceneGfx.
 org $CCF9B3
 BattleRom_FrameDmaVramA:
-    incbin "../../build/assets/table/BattleRom_FrameDmaVramA.bin"
+    incbin "../../build/records/BattleRom_FrameDmaVramA.bin"          ; records: table 11 x 2 B
 
 ; $CC:F9C9-$CC:F9DE (22 B), table, confirmed: 2 B per battler slot: VRAM address B
 ; Read by Battle_InitSceneGfx.
 org $CCF9C9
 BattleRom_FrameDmaVramB:
-    incbin "../../build/assets/table/BattleRom_FrameDmaVramB.bin"
+    incbin "../../build/records/BattleRom_FrameDmaVramB.bin"          ; records: table 11 x 2 B
 
 ; $CC:F9DF-$CC:F9E8 (10 B), table, confirmed: 2 B per frame layout 0-4: !Battler_FrameDmaSizeA
 ; Read by Battle_InitSceneGfx.
@@ -809,34 +857,34 @@ BattleRom_PcBit:
 ; Read by BattleUI_HighlightPcName.
 org $CCFA23
 BattleRom_NameAttrL1:
-    incbin "../../build/assets/table/BattleRom_NameAttrL1.bin"
+    incbin "../../build/records/BattleRom_NameAttrL1.bin"          ; records: table 3 x 2 B
 
 ; $CC:FA29-$CC:FA2E (6 B), table, confirmed: 2 B per PC slot: same for layouts 0 and 2
 ; (BattleUI_HighlightPcName)
 ; Read by BattleUI_HighlightPcName.
 org $CCFA29
 BattleRom_NameAttrL02:
-    incbin "../../build/assets/table/BattleRom_NameAttrL02.bin"
+    incbin "../../build/records/BattleRom_NameAttrL02.bin"          ; records: table 3 x 2 B
 
 ; $CC:FA2F-$CC:FA34 (6 B), table, confirmed: 2 B per PC slot: map offset of the HP digits,
 ; layout 0
 ; Read by BattleUI_UpdateNextPcPanel.
 org $CCFA2F
 BattleRom_HpCellL0:
-    incbin "../../build/assets/table/BattleRom_HpCellL0.bin"
+    incbin "../../build/records/BattleRom_HpCellL0.bin"          ; records: table 3 x 2 B
 
 ; $CC:FA35-$CC:FA3A (6 B), table, confirmed: 2 B per PC slot: same, layout 1 (also the gauge
 ; base for every layout)
 ; Read by BattleUI_DrawSlotGaugeBar, BattleUI_UpdateNextPcPanel.
 org $CCFA35
 BattleRom_HpCellL1:
-    incbin "../../build/assets/table/BattleRom_HpCellL1.bin"
+    incbin "../../build/records/BattleRom_HpCellL1.bin"          ; records: table 3 x 2 B
 
 ; $CC:FA3B-$CC:FA40 (6 B), table, confirmed: 2 B per PC slot: same, layout 2
 ; Read by BattleUI_UpdateNextPcPanel.
 org $CCFA3B
 BattleRom_HpCellL2:
-    incbin "../../build/assets/table/BattleRom_HpCellL2.bin"
+    incbin "../../build/records/BattleRom_HpCellL2.bin"          ; records: table 3 x 2 B
 
 ; $CC:FA41-$CC:FA6A (42 B), tilemap, confirmed: 42 B: 6x7 command-list tiles (Attack / Tech /
 ; Item)
@@ -891,7 +939,7 @@ BattleRom_CmdOffset:
 ; Read by Battle_InitSceneGfx.
 org $CCFAF3
 BattleRom_SprRecInit:
-    incbin "../../build/assets/table/BattleRom_SprRecInit.bin"
+    incbin "../../build/records/BattleRom_SprRecInit.bin"          ; records: table 44 x 2 B
 
 ; $CC:FB4B-$CC:FB6E (36 B), table, confirmed: 2 x 18 B: the double- and triple-tech header lines
 ; (tile bytes)
@@ -904,13 +952,13 @@ BattleRom_TechFixedText:
 ; Read by BattleTgt_AreaCircle.
 org $CCFB6F
 BattleRom_Squares:
-    incbin "../../build/assets/table/BattleRom_Squares.bin"
+    incbin "../../build/records/BattleRom_Squares.bin"          ; records: table 16 x 1 B
 
 ; $CC:FB7F-$CC:FB8C (14 B), table, confirmed: 7 pairs of 1 B lerp weights adding to 8
 ; Read by BattleAct_CalcLerpToObj0, BattleAct_CalcLerpToTarget.
 org $CCFB7F
 BattleRom_ActLerpWeights:
-    incbin "../../build/assets/table/BattleRom_ActLerpWeights.bin"
+    incbin "../../build/records/BattleRom_ActLerpWeights.bin"          ; records: table 7 x 2 B
 
 ; $CC:FB8D-$CC:FB90 (4 B), table, confirmed: 4 B: high-table mask clearing x bit 8 of cursor
 ; sprite 0-3
@@ -942,7 +990,7 @@ BattleRom_GaugeLayoutByCfg:
 ; Read by BattleAct_BuildBattlerList.
 org $CCFBC8
 BattleRom_PcPartners:
-    incbin "../../build/assets/table/BattleRom_PcPartners.bin"
+    incbin "../../build/records/BattleRom_PcPartners.bin"          ; records: table 3 x 2 B
 
 ; $CC:FBCE-$CC:FC1D (80 B), table, confirmed: 1 B per n: n / 5 (checked for the first 32 bytes);
 ; duration byte -> frames
@@ -955,7 +1003,7 @@ BattleRom_Div5:
 ; Read by BattleCF_ExitBattle.
 org $CCFC1E
 BattleRom_CharRecOffset:
-    incbin "../../build/assets/table/BattleRom_CharRecOffset.bin"
+    incbin "../../build/records/BattleRom_CharRecOffset.bin"          ; records: table 7 x 2 B
 
 ; $CC:FC2C-$CC:FC4E (35 B), table, probable: small byte values and a word table like the one
 ; before

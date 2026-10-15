@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $C6:0000-$C6:07B5 (1,974 B), packed_lz, confirmed: lz12 -> 4096 B: scene sprite graphics
@@ -322,38 +322,38 @@ C2SceneRom_MapMarkerTiles:
 ; Read by C2Scene_MapView.
 org $C6F540
 C2SceneRom_MapViewObjPal:
-    incbin "../../build/assets/palette/C2SceneRom_MapViewObjPal.bin"
+    incbin "../../build/records/C2SceneRom_MapViewObjPal.bin"          ; records: palette 16 x 2 B
 
 ; $C6:F560-$C6:F59F (64 B), table, confirmed: 32 u16 divisors for M7A/M7B (zoom steps)
 ; Read by C2Scene_MapZoomIn, C2Scene_MapZoomOut.
 org $C6F560
 C2SceneRom_ZoomDivA:
-    incbin "../../build/assets/table/C2SceneRom_ZoomDivA.bin"
+    incbin "../../build/records/C2SceneRom_ZoomDivA.bin"          ; records: table 32 x 2 B
 
 ; $C6:F5A0-$C6:F5DF (64 B), table, confirmed: 32 u16 divisors for M7C/M7D (zoom steps)
 ; Read by C2Scene_MapZoomIn, C2Scene_MapZoomOut.
 org $C6F5A0
 C2SceneRom_ZoomDivB:
-    incbin "../../build/assets/table/C2SceneRom_ZoomDivB.bin"
+    incbin "../../build/records/C2SceneRom_ZoomDivB.bin"          ; records: table 32 x 2 B
 
 ; $C6:F5E0-$C6:F5FF (32 B), palette, confirmed: 16 colours (BGR555) object A fades to
 ; Read by C2Scene_ObjAScrArrive, C2Scene_ObjAScrLeave.
 org $C6F5E0
 C2SceneRom_ObjAPalA:
-    incbin "../../build/assets/palette/C2SceneRom_ObjAPalA.bin"
+    incbin "../../build/records/C2SceneRom_ObjAPalA.bin"          ; records: palette 16 x 2 B
 
 ; $C6:F600-$C6:F61F (32 B), palette, confirmed: 16 colours (BGR555) for palette 0
 ; Read by C2Scene_ObjAScrLeave.
 org $C6F600
 C2SceneRom_ObjAPalB:
-    incbin "../../build/assets/palette/C2SceneRom_ObjAPalB.bin"
+    incbin "../../build/records/C2SceneRom_ObjAPalB.bin"          ; records: palette 16 x 2 B
 
 ; $C6:F620-$C6:F63F (32 B), palette, confirmed: 16 colours (BGR555) for colours $F0-$FF (33 B
 ; copied: one byte past the row)
 ; Read by C2Scene_LoadVram, C2Scene_ObjAScrArrive, C2Scene_ObjAScrLeave.
 org $C6F620
 C2SceneRom_LastPalRow:
-    incbin "../../build/assets/palette/C2SceneRom_LastPalRow.bin"
+    incbin "../../build/records/C2SceneRom_LastPalRow.bin"          ; records: palette 16 x 2 B
 
 ; $C6:F640-$C6:F6BF (128 B), table, confirmed: 16 x 8 B: X and Y velocity words with fractions
 ; Read by C2Scene_RandomVelocity.

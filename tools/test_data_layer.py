@@ -66,6 +66,10 @@ def plants(root: Path) -> dict[str, tuple[str, str]]:
         'text_listed_twice': ('data/bankDE.asm', 'incbin "../../build/text/TextWin_DictPtrs.bin"'),
         'text_listed_other_bank': ('data/bankC4.asm', 'incbin "../../build/text/TextWin_DictPtrs.bin"'),
         'text_readable': ('data/bankDE.asm', 'incbin "../../build/assets/text/Dictionary.txt"'),
+        'records_not_listed': ('data/bankCC.asm', 'incbin "../../build/records/NotListed.bin"'),
+        'records_listed_twice': ('data/bankF6.asm', 'incbin "../../build/records/Table_F60000.bin"'),
+        'records_listed_other_bank': ('data/bankC4.asm', 'incbin "../../build/records/Table_F60000.bin"'),
+        'records_readable': ('data/bankF6.asm', 'incbin "../../build/assets/records/Table_F60000.tsv"'),
     }
 
 
@@ -95,14 +99,19 @@ class Manifest(unittest.TestCase):
                 self.assertNotIn('..', p['asset'])
             if p['piece'] == 'text':
                 self.assertRegex(p['asset'], ed.TEXT_ASSET)
+            if p['piece'] == 'records':
+                self.assertRegex(p['asset'], ed.RECORDS_ASSET)
 
     def test_hand_edits_refused(self):
         text = ed.MANIFEST.read_text()
         first = next(ln for ln in text.splitlines() if ',extracted,' in ln)
         words = next(ln for ln in text.splitlines() if ',text,' in ln)
+        recs = next(ln for ln in text.splitlines() if ',records,' in ln and not ln.startswith("Table_F60000,"))
         edits = {
             'text_path_out': text.replace(words, words.replace(words.split(',')[5], 'text/../../../roms/x.txt')),
             'text_unknown_unit': text.replace(words, words.replace(words.split(',')[5], 'text/NoSuchUnit.txt')),
+            'records_path_out': text.replace(recs, recs.replace(recs.split(',')[5], 'records/../../x.tsv')),
+            'records_other_label': text.replace(recs, recs.replace(recs.split(',')[5], 'records/Table_F60000.tsv')),
             'path_out': text.replace(first, first.replace(first.split(',')[5], '../../roms/chrono_trigger.sfc')),
             'added': text + 'Rom,$C0:0000,$C0:FFFF,65536,extracted,unknown/Rom.bin,\n',
             'renamed': text.replace(first, first.replace(first.split(',')[5],
@@ -157,6 +166,7 @@ class WithRom(unittest.TestCase):
         # absolute path out of it is opened, and strace refuses it.
         expect = {'rom_relative': "wasn't found", 'dotdot': "wasn't found",
                   'text_not_listed': "wasn't found", 'text_readable': "wasn't found",
+                  'records_not_listed': "wasn't found", 'records_readable': "wasn't found",
                   'not_listed': 'outside itself', 'not_listed_absolute': 'outside itself',
                   'rom_absolute': 'outside itself', 'listed_absolute': 'outside itself'}
         for case, why in expect.items():
@@ -205,22 +215,31 @@ class WithRom(unittest.TestCase):
         asset = ROOT / ed.ASSETS / raw['asset']
         lz = ROOT / ed.PACKS / f'{packed["label"]}.lz'
         words = next(p for p in pieces if p['piece'] == 'text')
+        table = next(p for p in pieces if p['piece'] == 'records')
+        readable_table = ROOT / ed.ASSETS / table['asset']
+        encoded_table = ROOT / ed.RECORDS_OUT / f'{table["label"]}.bin'
+        build_rom.build_records()
+        kept_table = readable_table.read_text(encoding='utf-8')
         readable = ROOT / ed.ASSETS / words['asset']
         encoded = ROOT / ed.TEXT_OUT / f'{words["label"]}.bin'
         build_rom.build_text()
         kept = readable.read_text(encoding='utf-8')
-        for path in (asset, lz, encoded):
+        for path in (asset, lz, encoded, encoded_table):
             data = bytearray(path.read_bytes())
             data[0] ^= 0xFF
             path.write_bytes(bytes(data))
         readable.write_text(kept.replace('@piece', '; @piece', 1), encoding='utf-8')
+        readable_table.write_text(kept_table.replace('Index', 'Indx', 1), encoding='utf-8')
         ed.extract()
         build_rom.build_packs()
         build_rom.build_text()
+        build_rom.build_records()
         self.assertEqual(asset.read_bytes(), rom[raw['offset']:raw['stop']])
         self.assertEqual(lz.read_bytes(), rom[packed['offset']:packed['stop']])
         self.assertEqual(readable.read_text(encoding='utf-8'), kept)
         self.assertEqual(encoded.read_bytes(), rom[words['offset']:words['stop']])
+        self.assertEqual(readable_table.read_text(encoding='utf-8'), kept_table)
+        self.assertEqual(encoded_table.read_bytes(), rom[table['offset']:table['stop']])
 
 
 if __name__ == '__main__':

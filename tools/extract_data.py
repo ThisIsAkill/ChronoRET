@@ -41,6 +41,12 @@ How each piece's bytes are made (the manifest's `piece` column):
              build/assets/packed_lz/<label>.bin with the mode in the
              manifest; the build packs them to build/packs/<label>.lz,
              which is incbin'd. Counted as "packed from extracted assets".
+  records    a table or palette row with a layout in tools/records.py (a
+             ROM struct, the reader's element width, BGR555 colours): its
+             records go to build/assets/records/<label>.tsv (checked to
+             encode back when written); the build encodes it to
+             build/records/<label>.bin, which is incbin'd. param: the row's
+             kind, then the record count and size. Counted as "records".
   text       a row of a text unit (tools/text.py's UNITS): the unit's
              readable text goes to build/assets/text/<unit>.txt (checked to
              encode back to the ROM's bytes when it is written); the build
@@ -83,6 +89,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import data_survey  # noqa: E402
+import records  # noqa: E402
 import text  # noqa: E402
 
 ROM_PATH = ROOT / 'roms' / 'chrono_trigger.sfc'
@@ -92,6 +99,7 @@ DATA_DIR = ROOT / 'asm' / 'data'
 ASSETS = Path('build/assets')          # relative to the repository root
 PACKS = Path('build/packs')
 TEXT_OUT = Path('build/text')          # the encoded text pieces (tools/build_rom.py)
+RECORDS_OUT = Path('build/records')    # the encoded records pieces (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
@@ -99,12 +107,15 @@ ROM_SIZE = 0x400000
 ASSET_PREFIX = '../../build/assets/'
 PACK_PREFIX = '../../build/packs/'
 TEXT_PREFIX = '../../build/text/'
+RECORDS_PREFIX = '../../build/records/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed', 'text')
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
+RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
+RECORDS_PARAM = re.compile(r'^(table|palette) (\d+) x (\d+) B$')
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
 FILL = re.compile(r'^(\d+) x \$([0-9A-F]{2})$')
 
@@ -279,6 +290,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
         if piece in ('extracted', 'packed'):
             kind = row['kind']
             asset = f'{kind}/{label}.bin'
+        elif piece == 'records':
+            asset = f'records/{label}.tsv'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
@@ -300,6 +313,14 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             if kind not in ('text', 'table'):
                 raise DataError(f'{row["start"]}: a {kind} row cannot be a text unit\'s')
             add(label, s, e, 'text', asset=f'text/{unit}.txt', param=fmt, row=row)
+        elif row['start'] not in TABLES and kind in ('table', 'palette') \
+                and records.layout_for(row['start'], kind) is not None:
+            lay = records.layout_for(row['start'], kind)
+            try:
+                n = records.check_extent(lay, e - s, row['start'])
+            except records.RecordsError as err:
+                raise DataError(f'symbols/data_survey.csv: {err}') from None
+            add(label, s, e, 'records', param=f'{kind} {n} x {lay.size} B', row=row)
         elif row['start'] in TABLES:
             size = TABLES[row['start']]
             whole = (e - s) // size * size
@@ -368,6 +389,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
                     or Path(p['asset']).stem != p['label']:
                 problems.append(f'{where}: the asset must be <kind>/<label>.bin, once: {p["asset"]!r}')
             seen_assets.add(p['asset'])
+        elif p['piece'] == 'records':
+            m = RECORDS_ASSET.match(p['asset'])
+            if not m or m.group(1) != p['label'] or not RECORDS_PARAM.match(p['param']):
+                problems.append(f'{where}: a records piece\'s asset is records/<label>.tsv and its param '
+                                f'"<kind> N x S B": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'text':
             m = TEXT_ASSET.match(p['asset'])
             if not m or m.group(1) not in text.UNITS:
@@ -397,6 +423,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
         elif p['piece'] == 'text':
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
+        elif p['piece'] == 'records':
+            out[f'{RECORDS_PREFIX}{p["label"]}.bin'] = p
     return out
 
 
@@ -412,6 +440,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
         elif p['piece'] == 'text':
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif p['piece'] == 'records':
+            out[RECORDS_OUT / f'{p["label"]}.bin'] = int(p['size'])
     return out
 
 
@@ -522,9 +552,9 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; confidence are there) at its address. fill and pointer tables are',
         '; source; incbin reads an asset that tools/extract_data.py writes',
         '; from your own ROM to build/assets/, a pack tools/build_rom.py',
-        '; makes from one in build/packs/, or text it encodes into',
-        '; build/text/ (symbols/data_assets.csv lists them; nothing here',
-        '; is ROM data).',
+        '; makes from one in build/packs/, or text or records it encodes',
+        '; into build/text/ and build/records/ (symbols/data_assets.csv',
+        '; lists them; nothing here is ROM data).',
         '; ============================================================',
     ]
     for p in pieces:
@@ -552,6 +582,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{ASSET_PREFIX}{p["asset"]}"')
         elif p['piece'] == 'packed':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}')
+        elif p['piece'] == 'records':
+            out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'text':
             out.append(f'    incbin "{TEXT_PREFIX}{p["label"]}.bin"          ; text unit '
                        f'{Path(p["asset"]).stem} ({p["param"]})')
@@ -653,6 +685,7 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(MANIFEST.read_bytes())
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
+    h.update(Path(records.__file__).read_bytes())      # the records' layouts
     return h.hexdigest()
 
 
@@ -683,7 +716,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         return out_dir
     rom = read_rom()
     stamp.unlink(missing_ok=True)
-    problems = extract_text(rom, out_dir, pieces)
+    problems = extract_text(rom, out_dir, pieces) + extract_records(rom, out_dir, pieces)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -691,7 +724,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             if rom[s:e] != bytes([value]) * (e - s):
                 problems.append(f'{p["label"]}: not uniform {p["param"]} fill in this ROM')
             continue
-        if p['piece'] in ('table', 'text'):
+        if p['piece'] in ('table', 'text', 'records'):
             continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -716,6 +749,22 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         n = len({p['asset'] for p in pieces if p['asset']})
         print(f'extract_data: {n:,} assets written to {ASSETS}/')
     return out_dir
+
+
+def extract_records(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:
+    """Write the readable file of every records piece (tools/records.py),
+    each checked to encode back to the ROM's bytes; the problems."""
+    import c3pack
+    try:
+        texts = records.extract_all(rom, pieces)
+    except records.RecordsError as err:
+        return [f'records: {err}']
+    for p in pieces:
+        if p['piece'] == 'records':
+            dest = out_dir / p['asset']
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            c3pack._write(dest, texts[p['label']].encode('utf-8'))
+    return []
 
 
 def extract_text(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:

@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $FF:0000-$FF:205F (8,288 B), graphics, probable: tile-like bytes (2bpp, by their look)
@@ -116,7 +116,7 @@ MenuRom_ShadowTiles:
 org $FF9C68
 BattleRom_ColoursA:
 MenuRom_PalA:
-    incbin "../../build/assets/palette/BattleRom_ColoursA.bin"
+    incbin "../../build/records/BattleRom_ColoursA.bin"          ; records: palette 4 x 2 B
 
 ; $FF:9C70-$FF:9C77 (8 B), palette, confirmed: 8 B (MenuRom_Mode01Pal): to
 ; !Battle_PaletteSavedLo + $18
@@ -126,13 +126,19 @@ org $FF9C70
 BattleRom_ColoursB:
 MenuRom_Icon2PalA:
 MenuRom_Mode01Pal:
-    incbin "../../build/assets/palette/BattleRom_ColoursB.bin"
+    incbin "../../build/records/BattleRom_ColoursB.bin"          ; records: palette 4 x 2 B
 
-; $FF:9C78-$FF:9CEF (120 B), palette, confirmed: 4 colours -> 16-19
+; $FF:9C78-$FF:9C7F (8 B), palette, confirmed: 4 colours -> 16-19
 ; Read by Menu_LoadGraphics.
 org $FF9C78
 MenuRom_PalB:
-    incbin "../../build/assets/palette/MenuRom_PalB.bin"
+    incbin "../../build/records/MenuRom_PalB.bin"          ; records: palette 4 x 2 B
+
+; $FF:9C80-$FF:9CEF (112 B), unknown, unknown: 112 B after MenuRom_PalB (past its reader's 4
+; records)
+org $FF9C80
+Unknown_FF9C80:
+    incbin "../../build/assets/unknown/Unknown_FF9C80.bin"
 
 ; $FF:9CF0-$FF:9DEF (256 B), graphics, confirmed: four 64-B pieces (FieldRom_Unk9CF0); stage 2
 ; sends the first two
@@ -148,7 +154,7 @@ MenuRom_ObjTiles:
 ; Read by Menu_LoadGraphics, Menu_MainMenuLoop.
 org $FF9DF0
 MenuRom_ObjPal:
-    incbin "../../build/assets/palette/MenuRom_ObjPal.bin"
+    incbin "../../build/records/MenuRom_ObjPal.bin"          ; records: palette 13 x 2 B
 
 ; $FF:9E0A-$FF:9E0F (6 B), palette, confirmed: 6 B (MenuRom_MainPalC): to !Battle_PaletteSavedLo
 ; + $13A
@@ -156,7 +162,7 @@ MenuRom_ObjPal:
 org $FF9E0A
 BattleRom_ColoursC:
 MenuRom_MainPalC:
-    incbin "../../build/assets/palette/BattleRom_ColoursC.bin"
+    incbin "../../build/records/BattleRom_ColoursC.bin"          ; records: palette 3 x 2 B
 
 ; $FF:9E10-$FF:B20F (5,120 B), graphics, confirmed: 8 window styles of $280 B (4bpp tiles)
 ; Read by Menu_LoadGraphics, Menu_LoadWindowGfx.
@@ -608,7 +614,7 @@ MenuRom_EquipLabel12:
 ; Read by Menu_NameAddChar, Menu_NameGridBuild.
 org $FFC9AC
 MenuRom_NameChars:
-    incbin "../../build/assets/table/MenuRom_NameChars.bin"
+    incbin "../../build/records/MenuRom_NameChars.bin"          ; records: table 8 x 10 B
 
 ; $FF:C9FC-$FF:CAFB (256 B), graphics, confirmed: $100 B: 16 2bpp tiles
 ; Read by Menu_LoadGraphics.
@@ -623,48 +629,60 @@ org $FFCAFC
 MenuRom_GlyphRows:
     incbin "../../build/assets/graphics/MenuRom_GlyphRows.bin"
 
-; $FF:CB9C-$FF:CBAB (16 B), palette, confirmed: 4 colours -> $84-$87 for the HP / MP numbers
+; $FF:CB9C-$FF:CBA3 (8 B), palette, confirmed: 4 colours -> $84-$87 for the HP / MP numbers
 ; Read by Menu_UseHealOn.
 org $FFCB9C
 MenuRom_HealNumberPal:
-    incbin "../../build/assets/palette/MenuRom_HealNumberPal.bin"
+    incbin "../../build/records/MenuRom_HealNumberPal.bin"          ; records: palette 4 x 2 B
+
+; $FF:CBA4-$FF:CBAB (8 B), unknown, unknown: 8 B after MenuRom_HealNumberPal (past its reader's
+; 4 records)
+org $FFCBA4
+Unknown_FFCBA4:
+    incbin "../../build/assets/unknown/Unknown_FFCBA4.bin"
 
 ; $FF:CBAC-$FF:CBB3 (8 B), palette, confirmed: 4 colours -> $24-$27
 ; Read by Menu_ApplyStatItem, Menu_Icon0Preview, Menu_ShopInit.
 org $FFCBAC
 MenuRom_Icon0Pal:
-    incbin "../../build/assets/palette/MenuRom_Icon0Pal.bin"
+    incbin "../../build/records/MenuRom_Icon0Pal.bin"          ; records: palette 4 x 2 B
 
 ; $FF:CBB4-$FF:CBBB (8 B), palette, confirmed: 4 colours -> $20-$23
 ; Read by Menu_Icon1Preview, Menu_Icon2Preview, Menu_Icon3Preview, Menu_UnkC9E5.
 org $FFCBB4
 MenuRom_Icon1PalB:
-    incbin "../../build/assets/palette/MenuRom_Icon1PalB.bin"
+    incbin "../../build/records/MenuRom_Icon1PalB.bin"          ; records: palette 4 x 2 B
 
 ; $FF:CBBC-$FF:CBC3 (8 B), palette, confirmed: 4 colours -> 20-23
 ; Read by Menu_LoadGraphics.
 org $FFCBBC
 MenuRom_PalC:
-    incbin "../../build/assets/palette/MenuRom_PalC.bin"
+    incbin "../../build/records/MenuRom_PalC.bin"          ; records: palette 4 x 2 B
 
-; $FF:CBC4-$FF:CBE3 (32 B), palette, confirmed: 8 colours -> $70-$77
+; $FF:CBC4-$FF:CBD3 (16 B), palette, confirmed: 8 colours -> $70-$77
 ; Read by Menu_Icon0Redraw, Menu_LoadGraphics.
 org $FFCBC4
 MenuRom_Icon0RedrawPal:
 MenuRom_PalD:
-    incbin "../../build/assets/palette/MenuRom_Icon0RedrawPal.bin"
+    incbin "../../build/records/MenuRom_Icon0RedrawPal.bin"          ; records: palette 8 x 2 B
+
+; $FF:CBD4-$FF:CBE3 (16 B), unknown, unknown: 16 B after MenuRom_Icon0RedrawPal (past its
+; reader's 8 records)
+org $FFCBD4
+Unknown_FFCBD4:
+    incbin "../../build/assets/unknown/Unknown_FFCBD4.bin"
 
 ; $FF:CBE4-$FF:CC13 (48 B), palette, confirmed: 24 colours -> $50-$67
 ; Read by Menu_Icon3Preview.
 org $FFCBE4
 MenuRom_Icon3Pal:
-    incbin "../../build/assets/palette/MenuRom_Icon3Pal.bin"
+    incbin "../../build/records/MenuRom_Icon3Pal.bin"          ; records: palette 24 x 2 B
 
 ; $FF:CC14-$FF:CC23 (16 B), palette, confirmed: 8 colours -> $80-$87
 ; Read by Menu_MainMenuIcons.
 org $FFCC14
 MenuRom_MainPalA:
-    incbin "../../build/assets/palette/MenuRom_MainPalA.bin"
+    incbin "../../build/records/MenuRom_MainPalA.bin"          ; records: palette 8 x 2 B
 
 ; $FF:CC24-$FF:CC33 (16 B), palette, confirmed: 8 colours per icon -> $88-$8F
 ; Read by Menu_MainMenuIcons.
@@ -672,23 +690,29 @@ org $FFCC24
 MenuRom_MainPalB:
     incbin "../../build/assets/palette/MenuRom_MainPalB.bin"
 
-; $FF:CC34-$FF:CC63 (48 B), palette, confirmed: 8 colours -> $50-$57
+; $FF:CC34-$FF:CC43 (16 B), palette, confirmed: 8 colours -> $50-$57
 ; Read by Menu_Icon1Preview.
 org $FFCC34
 MenuRom_Icon1PalA:
-    incbin "../../build/assets/palette/MenuRom_Icon1PalA.bin"
+    incbin "../../build/records/MenuRom_Icon1PalA.bin"          ; records: palette 8 x 2 B
+
+; $FF:CC44-$FF:CC63 (32 B), unknown, unknown: 32 B after MenuRom_Icon1PalA (past its reader's 8
+; records)
+org $FFCC44
+Unknown_FFCC44:
+    incbin "../../build/assets/unknown/Unknown_FFCC44.bin"
 
 ; $FF:CC64-$FF:CC73 (16 B), palette, confirmed: 8 colours -> $60-$67
 ; Read by Menu_UnkC9E5.
 org $FFCC64
 MenuRom_XchgPal:
-    incbin "../../build/assets/palette/MenuRom_XchgPal.bin"
+    incbin "../../build/records/MenuRom_XchgPal.bin"          ; records: palette 8 x 2 B
 
 ; $FF:CC74-$FF:CC83 (16 B), palette, confirmed: 8 colours -> $20-$27
 ; Read by Menu_LoadInit, Menu_UnkD065.
 org $FFCC74
 MenuRom_LoadPalA:
-    incbin "../../build/assets/palette/MenuRom_LoadPalA.bin"
+    incbin "../../build/records/MenuRom_LoadPalA.bin"          ; records: palette 8 x 2 B
 
 ; $FF:CC84-$FF:CDF3 (368 B), palette, confirmed: 16 colours per character for its slot icon
 ; Read by Menu_SlotMemberIcon.
@@ -701,19 +725,31 @@ MenuRom_SlotIconPals:
 ; Read by Menu_Icon2Preview.
 org $FFCDF4
 MenuRom_Icon2PalC:
-    incbin "../../build/assets/palette/MenuRom_Icon2PalC.bin"
+    incbin "../../build/records/MenuRom_Icon2PalC.bin"          ; records: palette 8 x 2 B
 
-; $FF:CE04-$FF:CE2F (44 B), palette, confirmed: 8 colours -> $50-$57
+; $FF:CE04-$FF:CE13 (16 B), palette, confirmed: 8 colours -> $50-$57
 ; Read by Menu_Icon2Preview.
 org $FFCE04
 MenuRom_Icon2PalB:
-    incbin "../../build/assets/palette/MenuRom_Icon2PalB.bin"
+    incbin "../../build/records/MenuRom_Icon2PalB.bin"          ; records: palette 8 x 2 B
 
-; $FF:CE30-$FF:CE6F (64 B), palette, confirmed: 16 colours -> $70-$7F
+; $FF:CE14-$FF:CE2F (28 B), unknown, unknown: 28 B after MenuRom_Icon2PalB (past its reader's 8
+; records)
+org $FFCE14
+Unknown_FFCE14:
+    incbin "../../build/assets/unknown/Unknown_FFCE14.bin"
+
+; $FF:CE30-$FF:CE4F (32 B), palette, confirmed: 16 colours -> $70-$7F
 ; Read by Menu_LoadInit.
 org $FFCE30
 MenuRom_LoadPalB:
-    incbin "../../build/assets/palette/MenuRom_LoadPalB.bin"
+    incbin "../../build/records/MenuRom_LoadPalB.bin"          ; records: palette 16 x 2 B
+
+; $FF:CE50-$FF:CE6F (32 B), unknown, unknown: 32 B after MenuRom_LoadPalB (past its reader's 16
+; records)
+org $FFCE50
+Unknown_FFCE50:
+    incbin "../../build/assets/unknown/Unknown_FFCE50.bin"
 
 ; $FF:CE70-$FF:CE77 (8 B), table, confirmed: 8 B: first tile per portrait
 ; Read by Menu_DrawPortrait.
@@ -743,7 +779,7 @@ MenuRom_CharIconPals:
 ; Read by Menu_NameChoiceInit.
 org $FFCE9A
 MenuRom_NameChoicePal:
-    incbin "../../build/assets/palette/MenuRom_NameChoicePal.bin"
+    incbin "../../build/records/MenuRom_NameChoicePal.bin"          ; records: palette 16 x 2 B
 
 ; $FF:CEBA-$FF:CF0D (84 B), table, confirmed: per frame the numbers' lift in lines; negative:
 ; the end
@@ -757,20 +793,20 @@ MenuRom_HealBounce:
 ; Read by Menu_ItemDataPtrA.
 org $FFCF0E
 MenuRom_ItemTablesA:
-    incbin "../../build/assets/table/MenuRom_ItemTablesA.bin"
+    incbin "../../build/records/MenuRom_ItemTablesA.bin"          ; records: table 5 x 2 B
 
 ; $FF:CF18-$FF:CF1C (5 B), table, confirmed: 5 bytes: its record size (Menu_ItemDataPtrA)
 ; Read by Menu_ItemDataPtrA.
 org $FFCF18
 MenuRom_ItemRecSizesA:
-    incbin "../../build/assets/table/MenuRom_ItemRecSizesA.bin"
+    incbin "../../build/records/MenuRom_ItemRecSizesA.bin"          ; records: table 5 x 1 B
 
 ; $FF:CF1D-$FF:CF26 (10 B), table, confirmed: the same for a second set of tables
 ; (Menu_ItemDataPtrB)
 ; Read by Menu_ItemDataPtrB.
 org $FFCF1D
 MenuRom_ItemTablesB:
-    incbin "../../build/assets/table/MenuRom_ItemTablesB.bin"
+    incbin "../../build/records/MenuRom_ItemTablesB.bin"          ; records: table 5 x 2 B
 
 ; $FF:CF27-$FF:CF2A (4 B), table, confirmed: bytes: record sizes of the second item tables
 ; Read by Menu_ItemDataPtrB.
@@ -857,7 +893,7 @@ MenuRom_ButtonLetters:
 ; Read by Menu_CfgEntryIcon.
 org $FFD562
 MenuRom_CfgIcons:
-    incbin "../../build/assets/table/MenuRom_CfgIcons.bin"
+    incbin "../../build/records/MenuRom_CfgIcons.bin"          ; records: table 12 x 2 B
 
 ; $FF:D57A-$FF:D5E3 (106 B), table, confirmed: 12 B copied to Menu_XchgUnk0F12
 ; Read by Menu_XchgStartWave.
