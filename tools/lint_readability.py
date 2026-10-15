@@ -22,6 +22,21 @@ asm/include/ and are exempt):
   PLUMB  no test/scaffolding plumbing in game code: print/assert/warnpc/
          error directives, or label-only `org` stubs (those belong in
          asm/include/unmatched.asm).
+  FILEREAD no bytes read from a file: in every file under asm/
+         (asm/include/ too) no incbin, readfile*, canreadfile*, filesize or
+         getfilestatus anywhere in a line's code, but the two lines
+         ALLOWED_READS names (bankC3.asm's incbin of the packed $C3 module,
+         and the ROM's bytes of its unmatched parts in module.inc's
+         %C3ModRomBytes); incsrc/incbin/table paths literal, relative and
+         inside asm/; only .asm and .inc files and no symlink under asm/;
+         !C3Mod_RomImage set nowhere but module.inc, no other define
+         holding a file path, and no name built by pasting defines
+         together (`!a!b`, `!{...}`), which could spell a file read. These
+         reduce the risk; they cannot close it (asar can build text in
+         other ways): tools/isolated.py's strace check is the guarantee,
+         and CI requires it. Cannot be opted out of. tools/isolated.py enforces the same at
+         assembly time (verify.py and c3pack.source_bytes assemble a copy of
+         asm/ that cannot reach the ROM).
   HEADER every routine's header (the comment block tools/asm_source.py
          attributes to its label) has an Entry line and an Exit line: a
          comment line starting `Entry`, `On entry`, `Exit` or `Entry/Exit`,
@@ -81,6 +96,12 @@ SPC700 (asm/spc700/*.asm, the sound driver): the same rules where they
 apply (ADDR, CALL, CONST, WIDTH, OPCODE, PLUMB, HEADER, SIZE), STATE in
 place of DPDB (the Entry line states P, the direct-page flag), and a check
 of the hand-written callers in place of CALLERS. See tools/lint_spc700.py.
+
+The packed $C3 module (asm/bankC3/packed/module.asm, matched unpacked): the
+instruction rules, HEADER, DPDB and SIZE (by its WRAM addresses), a check
+of the hand-written callers in place of CALLERS, and KERNEL (the defines
+that stand for labels across its separate assembly). See
+tools/lint_c3module.py.
 
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
 mandatory and is what review checks); for HEADER that line is the label
@@ -144,6 +165,25 @@ def literal_value(text: str):
     return int(m.group(3))
 
 
+# FILEREAD: the only file reads allowed in the source, as (file, the code
+# of the line exactly): the packed $C3 module, which tools/c3pack.py builds
+# from asm/bankC3/packed/, and the ROM's bytes of its parts not matched yet.
+ALLOWED_READS = {
+    ('asm/bankC3/bankC3.asm', 'incbin "../../build/c3pack/module.lz"'),
+    ('asm/bankC3/packed/module.inc', 'incbin "!C3Mod_RomImage":<start>-!C3Mod_Code..<end>-!C3Mod_Code'),
+    ('asm/bankC3/packed/module.inc', '!C3Mod_RomImage = "../../../build/c3pack/rom_module.bin"'),
+}
+FILE_READ = re.compile(r'(?<![A-Za-z0-9_!.])(?:incbin|(?:can)?readfile\d*|filesize|getfilestatus)\b', re.I)
+PATH_DIRECTIVE = re.compile(r'(?<![A-Za-z0-9_!.])(incsrc|incbin|table)\s+(?:"([^"]*)"|([^\s:]+))', re.I)
+SOURCE_SUFFIXES = ('.asm', '.inc')
+# Ways round the words above that the text can still show (they reduce the
+# risk, they do not close it: asar can build text in more ways than these;
+# tools/isolated.py's strace check is the guarantee):
+DEFINE_SET = re.compile(r'^!([A-Za-z_][A-Za-z0-9_]*)\s*(?:[?:#+])?=\s*(.*)$')     # !name = value
+PATH_STRING = re.compile(r'"[^"]*(?:/|\\|\.[A-Za-z0-9]{1,4}")')                 # "dir/file", "x.bin"
+BUILT_NAME = re.compile(r'![A-Za-z_][A-Za-z0-9_]*!|!\{|![A-Za-z_][A-Za-z0-9_]*\s*\(')   # !a!b, !{..}, !f(..)
+
+
 def split_comment(line: str) -> tuple[str, str]:
     idx = line.find(';')
     return (line, '') if idx < 0 else (line[:idx], line[idx + 1:])
@@ -195,6 +235,9 @@ def lint_file(path: Path):
             continue
         if lower in PLUMBING:
             report('PLUMB')
+            continue
+        if lower == 'incbin':
+            emitted_since_org = True    # emits; which incbins may exist is FILEREAD's
             continue
         if lower in ('db', 'dw', 'dl', 'dd'):
             emitted_since_org = True
@@ -577,13 +620,73 @@ def _index_findings():
     return _INDEX[0]
 
 
+def file_read_findings(root: Path = Path('asm')):
+    """FILEREAD: (path, function, line, rule, text). Bytes read from a file
+    are not source: every file under asm/ (asm/include/ and the stubs
+    included) is scanned, and incbin, readfile*/canreadfile*, filesize and
+    getfilestatus are allowed nowhere in a line's code (labelled or not, in
+    a macro or a function too) but in ALLOWED_READS. An incsrc, incbin or
+    table path must be literal, relative and inside asm/ (ALLOWED_READS'
+    lines apart). Only .asm and .inc files, and no symlink, may be under
+    asm/. Cannot be opted out of. (tools/isolated.py makes such reads fail
+    the build whatever the text; this rule says where they are.)"""
+    out = []
+    base = root.resolve()
+    for path in sorted(root.rglob('*')):
+        if path.is_symlink():
+            out.append((str(path), '<file>', 0, 'FILEREAD', f'{path} is a symlink'))
+            continue
+        if not path.is_file():
+            continue
+        if path.suffix not in SOURCE_SUFFIXES:
+            out.append((str(path), '<file>', 0, 'FILEREAD',
+                        f'{path}: only .asm and .inc files belong under asm/ (no data files)'))
+            continue
+        for no, raw in enumerate(path.read_text(errors='replace').splitlines(), 1):
+            code = split_comment(raw)[0].strip()
+            if not code or (f'asm/{path.relative_to(root).as_posix()}', code) in ALLOWED_READS:
+                continue
+            if FILE_READ.search(code):
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'bytes read from a file are not source: {code}'))
+                continue
+            d = DEFINE_SET.match(code)
+            if d and d.group(1) == 'C3Mod_RomImage':
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'!C3Mod_RomImage is set only in module.inc (it names the ROM\'s module): {code}'))
+                continue
+            if d and PATH_STRING.search(d.group(2)):
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'a define holding a file path: {code}'))
+                continue
+            if BUILT_NAME.search(code):
+                out.append((str(path), '<file>', no, 'FILEREAD',
+                            f'a name built from defines (it could spell a file read): {code}'))
+                continue
+            for m in PATH_DIRECTIVE.finditer(code):
+                target = m.group(2) if m.group(2) is not None else m.group(3)
+                bad = None
+                if not target or '!' in target or '<' in target:
+                    bad = 'a path that is not literal'
+                elif target.startswith('/') or Path(target).is_absolute():
+                    bad = 'an absolute path'
+                else:
+                    real = (path.parent / target).resolve()
+                    if real != base and base not in real.parents:
+                        bad = 'a path outside asm/'
+                if bad:
+                    out.append((str(path), '<file>', no, 'FILEREAD', f'{m.group(1)} of {bad}: {code}'))
+    return out
+
+
 def collect():
     findings = []
     for path in sorted(Path('.').glob(ASM_GLOB)):
         for function, no, rule, text in lint_file(path) + header_findings(path):
             findings.append((str(path), function, no, rule, text))
     import lint_spc700          # the SPC700 driver, asm/spc700/ (its rules: lint_spc700.py)
-    return findings + lint_spc700.collect()
+    import lint_c3module        # the packed $C3 module, asm/bankC3/packed/ (lint_c3module.py)
+    return findings + lint_spc700.collect() + lint_c3module.collect() + file_read_findings()
 
 
 def by_function(findings):

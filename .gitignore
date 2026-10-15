@@ -11,6 +11,7 @@ site/
 # read them (tools/generated.py); never committed
 symbols/functions.csv
 symbols/spc700_functions.csv
+symbols/c3module_functions.csv
 symbols/progress.json
 symbols/.generated
 

@@ -17,6 +17,7 @@ check-rom:
 build: check-rom
 	@mkdir -p $(BUILD_DIR)
 	cp $(ROM) $(OUT_ROM)
+	python3 tools/c3pack.py build
 	asar --fix-checksum=off $(MAIN_ASM) $(OUT_ROM)
 	@echo "Built -> $(OUT_ROM)"
 
@@ -66,7 +67,8 @@ test-hooks:
 
 # The analysis tools' regression tests: xref's verdicts (including the
 # held-out score), the lint's INDEX and SIZE rules, the SPC700 decoder and
-# the lint's SPC700 rules.
+# the lint's SPC700 rules, the packer of the $C3 module (tools/c3pack.py), its
+# trace and the lint's module rules (tools/c3module.py, tools/lint_c3module.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -75,6 +77,8 @@ test-tools:
 	python3 tools/test_lint_size.py
 	python3 tools/test_spc700.py
 	python3 tools/test_lint_spc700.py
+	python3 tools/test_c3pack.py
+	python3 tools/test_c3module.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]

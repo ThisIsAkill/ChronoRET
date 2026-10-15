@@ -37,7 +37,9 @@ A routine goes to `main` only when it is **matched, readable and reviewed**. Its
 `symbols/functions.csv` is computed by `tools/progress.py`, never set by hand (routines of the
 SPC700 sound driver, `asm/spc700/`, are rows of `symbols/spc700_functions.csv` instead, by ARAM
 and ROM address, with their own progress figure; the lint's SPC700 rules are in
-`tools/lint_spc700.py`, and their reviews are rows of the same log); each level
+`tools/lint_spc700.py`, and their reviews are rows of the same log; likewise the packed `$C3`
+module's, `asm/bankC3/packed/`, in `symbols/c3module_functions.csv` by WRAM address, with
+`tools/lint_c3module.py`); each level
 includes the one before. (`functions.csv` and `progress.json` are generated and not tracked:
 every tool that reads them regenerates them when they are stale, and
 `python3 tools/progress.py --update` writes them on disk.)
@@ -76,6 +78,15 @@ every tool that reads them regenerates them when they are stale, and
 
 ## Workflow tools
 
+- `tools/verify.py` (and progress, which uses it) assembles the source in an isolated copy of
+  `asm/` (`tools/isolated.py`: no `roms/` or `build/`, symlinks refused). With `strace`
+  installed (Linux) it also checks every file asar opens: that check is what guarantees no byte
+  read from the ROM counts as source, and CI requires it (`CHRONORET_REQUIRE_STRACE=1`). The
+  lint's FILEREAD rule flags file reads in the text and the known ways of hiding them, which
+  reduces the risk but cannot close it (asar can build a file read from text in ways no text
+  rule sees). Without strace (macOS, Windows) everything works, the pre-commit hook included,
+  but the figures are marked unchecked: a warning, verify's "UNCHECKED" line and
+  `"file_check": "none"` in `symbols/progress.json`; only `"strace"` figures get published.
 - `make draft ADDR=C1:3714` (`tools/draft.py`) starts a match from source instead of raw
   bytes. It disassembles the routine from that address until it ends (every path has returned
   or jumped away and no branch of its own reaches further; `END=C1:373A` fixes the end),

@@ -27,11 +27,3 @@
 org $FFD024
 MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the string of a save's
                     ; SRAM +$0603 byte is the last entry not above it
-org $C31313
-BankC3_PackedModule: ; packed data (Decomp_ToWram's format, 12-bit mode), $C3:1313-$C3:7A2B
-                    ; (26,393 bytes): the bank $C3 module, 65816 code and its data, which
-                    ; C3_BootModule unpacks to C3Mod_Code ($7E:3000-$7E:B57E, $857F bytes) and
-                    ; jumps to. Pointed to by C3Rom_PackPtrs entry 1 ($FE:0003). Kept as ROM
-                    ; bytes: matching its code needs it unpacked (and a packer that rebuilds
-                    ; these exact bytes). $C3:1200-$C3:1312 before it is another pack
-                    ; (C3Rom_PackPtrs entry 0; $400 bytes unpacked; user not traced).
