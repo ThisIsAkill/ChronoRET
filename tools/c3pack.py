@@ -329,14 +329,11 @@ def _inputs_hash(root: Path) -> str:
     return h.hexdigest()
 
 
-def _assemble(root: Path, fill: int, out: Path, sym: Path | None = None,
-              image: Path | None = None) -> None:
-    """Assemble the module onto a $857F-byte image of `fill`; `image` replaces
-    the ROM's module as the source of the bytes not matched yet."""
+def _assemble(root: Path, fill: int, out: Path, sym: Path | None = None) -> None:
+    """Assemble the module onto a $857F-byte image of `fill` (the build,
+    which reads the ROM's module for the bytes not matched yet)."""
     out.write_bytes(bytes([fill]) * MODULE_SIZE)
     cmd = ['asar', '--no-title-check', '--fix-checksum=off']
-    if image is not None:
-        cmd.append(f'-DC3Mod_RomImage={image.resolve()}')
     if sym is not None:
         cmd += ['--symbols=wla', f'--symbols-path={sym.resolve()}']
     r = subprocess.run(cmd + [str(MODULE_SOURCE), str(out.resolve())],
@@ -388,31 +385,49 @@ def build(root: Path = Path('.'), quiet: bool = True) -> Path:
 
 
 def _write(path: Path, data: bytes) -> None:
-    """Write a file whole or not at all (a temporary file, then a rename)."""
-    tmp = path.with_name(path.name + '.tmp')
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    """Write a file whole or not at all: a temporary file of its own (so
+    builds running at once do not share one), then a rename."""
+    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=path.name + '.', suffix='.tmp',
+                                     delete=False) as f:
+        f.write(data)
+    try:
+        os.replace(f.name, path)
+    except OSError:
+        os.unlink(f.name)
+        raise
 
 
 def source_bytes(root: Path = Path('.')) -> list[int]:
     """Offsets into the module of the bytes its source writes itself (not
-    incbin'd from the ROM's module): the source assembled twice, onto an
-    image all $00 and all $FF, the bytes that agree. Each assembly runs in a
-    copy of asm/ with no roms/ beside it and build/c3pack/rom_module.bin
-    (and the image the define points to) made of the fill byte, so no path
-    in the source can read the ROM's bytes there. (lint_c3module.py's
-    ROMBYTES rule keeps file reads out of the source in the first place.)"""
+    from the ROM's module): the source assembled twice, onto images all $00
+    and all $FF, the bytes that agree. Each assembly is isolated
+    (tools/isolated.py): a copy of asm/ with no symlink, no roms/ and no
+    real build/ beside it, build/c3pack/rom_module.bin made of the fill
+    byte, and every file asar opens checked to be inside that copy; so no
+    path in the source, absolute, relative or through a macro or function,
+    can make the ROM's bytes count as source. Raises PackError otherwise."""
+    import isolated
     ensure_built(root)
+    built = []
     with tempfile.TemporaryDirectory() as tmp:
-        tree = Path(tmp) / 'tree'
-        shutil.copytree(Path(root) / 'asm', tree / 'asm')
-        (tree / BUILD_DIR).mkdir(parents=True)
-        built = []
         for fill in (0x00, 0xFF):
-            image, out = tree / ROM_MODULE, Path(tmp) / f'out{fill:02x}.bin'
-            image.write_bytes(bytes([fill]) * MODULE_SIZE)
-            _assemble(tree, fill, out, image=image)
-            built.append(out.read_bytes())
+            iso = Path(tmp) / f'isolated_{fill:02x}'
+            iso.mkdir()
+            try:
+                tree = isolated.make_tree(Path(root), iso)
+                image = tree / ROM_MODULE
+                image.parent.mkdir(parents=True)
+                image.write_bytes(bytes([fill]) * MODULE_SIZE)
+                out = iso / 'out.bin'
+                out.write_bytes(bytes([fill]) * MODULE_SIZE)
+                isolated.run_asar(['--no-title-check', '--fix-checksum=off', str(MODULE_SOURCE),
+                                   str(out.resolve())], tree, iso)
+            except isolated.IsolationError as e:
+                raise PackError(str(e)) from None
+            data = out.read_bytes()
+            if len(data) != MODULE_SIZE:
+                raise PackError(f'{MODULE_SOURCE} writes past the module')
+            built.append(data)
     return [i for i in range(MODULE_SIZE) if built[0][i] == built[1][i]]
 
 

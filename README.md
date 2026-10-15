@@ -89,6 +89,7 @@ Target: US 1.0, unheadered, 4 MiB. SHA-256:
 
 - `asar` 1.91 (65816 assembler)
 - Python 3.10+
+- `strace` (tools/verify.py checks that the source reads no file but its own, tools/isolated.py)
 - A SNES emulator with a debugger for tracing (bsnes-hd or Mesen-S recommended)
 - `make`
 

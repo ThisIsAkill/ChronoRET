@@ -24,7 +24,7 @@ is a wrong guess at a width, or data; so is any path that runs into a
 dropped one. Paths queued from a dropped path (its branch and call
 targets) are still traced on their own. The anomalies found so far are
 handled in CALL_EXITS ($45D6 returns with M=0, so C3Mod_Prog0's BIT at
-$3C57 is 16-bit) and DATA_RANGES (the staff text, which a JSR $B574 at
+$3C57 is 16-bit) and DATA_RANGES (the staff texts, which a JSR $B574 at
 $82A5 reaches; its path, $8280 on, is kept but looks mis-decoded: a PLB
 with no PHB follows; open).
 
@@ -81,7 +81,8 @@ CALL_EXITS = {
 # Data no path may enter: (first, last, what). A path that reaches it is
 # dropped as an anomaly.
 DATA_RANGES = [
-    (0xAADE, 0xB57E, 'the staff text ("EXECUTIVE PRODUCER/..." to "CODE END 7E")'),
+    (0xA651, 0xB57E, 'the staff texts: "PRODUCER/KAZU`KO AOKI@..." ($A651-$AADB, "`" for HI),'
+                     ' then "EXECUTIVE PRODUCER/..." to "CODE END 7E"'),
 ]
 
 BRANCHES = {'BPL', 'BMI', 'BVC', 'BVS', 'BCC', 'BCS', 'BNE', 'BEQ'}

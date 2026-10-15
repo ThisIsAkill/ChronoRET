@@ -356,10 +356,17 @@ def analyse() -> dict:
     # The packed $C3 module is counted apart too (under "c3module"): its
     # packed bytes, BankC3_PackedModule, are built from the unpacked source
     # in asm/bankC3/packed/ (tools/c3pack.py).
+    # (verify.assemble_onto gives the incbin a placeholder: the packed bytes
+    # count when tools/c3pack.py's build of them is the ROM's.)
     pack_block = set(range(c3pack.MODULE_ROM, c3pack.MODULE_ROM + c3pack.MODULE_PACKED_SIZE))
-    pack_emitted = len(emitted & pack_block)
     emitted = emitted - pack_block
-    mod_source = set(c3pack.source_bytes())
+    rom = ROM_PATH.read_bytes()
+    built = c3pack.MODULE_LZ.read_bytes()
+    pack_emitted = len(built) if built == rom[c3pack.MODULE_ROM:c3pack.MODULE_ROM + len(built)] else 0
+    try:
+        mod_source = set(c3pack.source_bytes())
+    except c3pack.PackError as e:
+        raise SystemExit(f'progress: {e}') from None
     c3_rows = c3module_functions(mod_source, c3pack.module_labels())
 
     starts = sorted((off, name) for name, off in addrs.items() if name in source)

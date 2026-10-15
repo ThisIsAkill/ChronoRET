@@ -8,16 +8,17 @@ and its lint rules (tools/lint_c3module.py).
 Without the ROM: the lint's header rules on a small synthetic source (SIZE
 and CALLERS against a given layout and call sites, a placeholder block
 exempt), the KERNEL rule against given labels, and planted file reads
-caught: an incbin or readfile in the module's files (ROMBYTES) and an
-incbin of the ROM in a bank file (PLUMB; only bankC3.asm's module.lz line
-is allowed).
+caught by the lint's FILEREAD rule: round 178's T2 (a function reading
+the file), T3 (an incsrc'd include with an absolute incbin), T5 (a
+symlink), T7 (a labelled incbin in the stubs) and T4b (a macro reading the
+ROM, in a bank file).
 
 With the ROM: the trace reaches the module's entry, its program table's
 targets and the kernel's entries, and finds the call sites the headers
 name (C3Mod_Init from $3000, C3Mod_AudioSend from $3187); with asar too,
-the module's source passes every rule (tools/lint_c3module.py), and a raw
-incbin of the ROM's module in place of %C3ModRomBytes is not counted as
-source by c3pack.source_bytes(). The trace's known anomalies are handled
+the module's source passes every rule (tools/lint_c3module.py); and with
+strace, the same five plants are refused by the isolated assemblies
+(tools/isolated.py) of c3pack.source_bytes() and verify.assemble_onto(). The trace's known anomalies are handled
 ($3C57 decoded 16-bit, nothing decoded in the staff text).
 """
 
@@ -94,38 +95,80 @@ class Rules(unittest.TestCase):
         self.assertEqual(sorted(f[3] for f in bad), ['KERNEL', 'KERNEL'])
 
 
+ABS_MODULE = str(Path('build/c3pack/rom_module.bin').resolve())
+MODULE_HOLE = '    %C3ModRomBytes($7E31BF, $7E377A)'
+
+
+def plant(root: Path, case: str) -> None:
+    """Plant one of the audit's ways of passing ROM bytes off as source
+    (round 178) in a copy of asm/ at root."""
+    asm = root / 'asm'
+    mod = asm / 'bankC3/packed/module.asm'
+
+    def module_hole(text):
+        src = mod.read_text()
+        assert MODULE_HOLE in src
+        mod.write_text(src.replace(MODULE_HOLE, text))
+
+    if case == 'T2':        # a function reading the file, defined in an include
+        with (asm / 'include/macros.inc').open('a') as f:
+            f.write(f'\nfunction romb(o) = readfile1("{ABS_MODULE}", o)\n')
+        module_hole('\n'.join(f'    db romb(${o:X})' for o in range(0x1BF, 0x1C7))
+                    + '\n    %C3ModRomBytes($7E31C7, $7E377A)')
+    elif case == 'T3':      # an incsrc'd include with an absolute incbin
+        (asm / 'include/evil.inc').write_text(f'incbin "{ABS_MODULE}":$1BF..$77A\n')
+        module_hole('    incsrc "../../include/evil.inc"')
+    elif case == 'T5':      # a symlink under asm/
+        (asm / 'include/tiles.bin').symlink_to(ABS_MODULE)
+        module_hole('    incbin "../../include/tiles.bin":$1BF..$77A')
+    elif case == 'T7':      # a labelled incbin in the stubs file
+        with (asm / 'bankC3/packed/unmatched.asm').open('a') as f:
+            f.write(f'%C3ModOrg($7E31BF)\nC3Mod_Junk: incbin "{ABS_MODULE}":$1BF..$1C7\n')
+    elif case == 'T4b':     # a macro in include/ reading the ROM, used in a bank file
+        with (asm / 'include/macros.inc').open('a') as f:
+            f.write('\nmacro DataBlock(a, b)\n    incbin "../../roms/chrono_trigger.sfc":<a>..<b>\n'
+                    'endmacro\n')
+        bank = asm / 'bankC3/bankC3.asm'
+        bank.write_text(bank.read_text() + '\n; $C3:1200 — C3Rom_Pack0 (275 bytes, $1200–$1312)\n'
+                        '; A pack. Entry: none. Exit: none.\norg $C31200\nC3Rom_Pack0:\n'
+                        '    %DataBlock($31200, $31313)\n')
+    else:
+        raise ValueError(case)
+
+
+CASES = ('T2', 'T3', 'T5', 'T7', 'T4b')
+
+
 class FileReads(unittest.TestCase):
-    """Bytes read from a file are never source: ROMBYTES in the module's
-    files, PLUMB in the bank files (and module.asm)."""
+    """Bytes read from a file are never source (round 178's audit): the
+    lint names every such read (FILEREAD), wherever and however written."""
 
-    def test_rombytes(self):
+    def test_lexical(self):
+        import lint_readability as L
+        for case in CASES:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                shutil.copytree('asm', root / 'asm', symlinks=True)
+                self.assertEqual(L.file_read_findings(root / 'asm'), [])
+                plant(root, case)
+                found = L.file_read_findings(root / 'asm')
+                self.assertTrue(found)
+                self.assertEqual({f[3] for f in found}, {'FILEREAD'})
+
+    def test_the_tree_is_clean(self):
+        import lint_readability as L
+        self.assertEqual(L.file_read_findings(), [])
+
+    def test_allowed_lines_only_there(self):
         import lint_readability as L
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / 'module.inc').write_text(
-                'macro C3ModRomBytes(start, end)\n    ' + lint_c3module.ROMBYTES_LINE + '\nendmacro\n'
-                'macro Other()\n    incbin "x.bin"\nendmacro\n')
-            (root / 'module.asm').write_text(
-                'C3Mod_Rest31BF:\n    incbin "../../../build/c3pack/rom_module.bin":$1BF..$77A\n'
-                'C3Mod_Other:\n    db readfile1("../../../roms/chrono_trigger.sfc", 0)\n')
-            found = [(Path(p).name, no) for p, _, no, rule, _ in lint_c3module.rombytes_findings(root)]
-            self.assertEqual(sorted(found), [('module.asm', 2), ('module.asm', 4), ('module.inc', 5)])
-            rules = [rule for _, _, rule, _ in L.lint_file(root / 'module.asm')]
-            self.assertEqual(rules.count('PLUMB'), 2)
-
-    def test_bank_incbin(self):
-        import lint_readability as L
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'bankC3.asm'
-            path.write_text('; $C3:1200 — BankC3_Pack0 (10 bytes, $1200–$1209)\n'
-                            'org $C31200\nBankC3_Pack0:\n'
-                            '    incbin "../../roms/chrono_trigger.sfc":$31200..$3120A\n'
-                            '    incbin "../../build/c3pack/module.lz"   ; lint-ok: not here\n')
-            found = [(no, rule) for _, no, rule, _ in L.lint_file(path)]
-            self.assertEqual(found, [(4, 'PLUMB'), (5, 'PLUMB')])
-        real = Path('asm/bankC3/bankC3.asm')
-        if real.exists():
-            self.assertFalse([f for f in L.lint_file(real) if f[2] == 'PLUMB'])
+            asm = Path(tmp) / 'asm'
+            asm.mkdir()
+            (asm / 'bank.asm').write_text('    incbin "../../build/c3pack/module.lz"   ; lint-ok: no\n'
+                                          'X: db filesize("a.inc")\n    incsrc "/etc/a.inc"\n'
+                                          '    incsrc "../outside.inc"\n    incsrc "!evil"\n')
+            found = sorted(f[2] for f in L.file_read_findings(asm))
+            self.assertEqual(found, [1, 2, 3, 4, 5])
 
 
 @unittest.skipUnless(HAVE_ROM, 'needs the ROM')
@@ -170,22 +213,35 @@ class Source(unittest.TestCase):
     def test_clean(self):
         self.assertEqual(lint_c3module.collect(), [])
 
-    def test_source_bytes_cannot_read_the_rom(self):
-        # A raw incbin of the ROM's module in place of %C3ModRomBytes builds
-        # the same bytes, but those bytes do not count as source.
-        real = len(c3pack.source_bytes())
+    def isolated_root(self, tmp, case):
+        root = Path(tmp)
+        shutil.copytree('asm', root / 'asm', symlinks=True)
+        (root / 'roms').mkdir()
+        (root / 'roms' / 'chrono_trigger.sfc').symlink_to(c3pack.ROM_PATH.resolve())
+        plant(root, case)
+        return root
+
+    @unittest.skipUnless(shutil.which('strace'), 'needs strace')
+    def test_module_reads_rejected(self):
+        # The module's ROM bytes read any other way than %C3ModRomBytes never
+        # count as source: source_bytes() refuses (a read outside the copy,
+        # or a symlink).
+        for case in ('T2', 'T3', 'T5', 'T7'):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                root = self.isolated_root(tmp, case)
+                c3pack.build(root)
+                with self.assertRaises(c3pack.PackError):
+                    c3pack.source_bytes(root)
+
+    @unittest.skipUnless(shutil.which('strace'), 'needs strace')
+    def test_bank_read_rejected(self):
+        import verify
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            shutil.copytree('asm', root / 'asm')
-            (root / 'roms').mkdir()
-            (root / 'roms' / 'chrono_trigger.sfc').symlink_to(c3pack.ROM_PATH.resolve())
-            src = root / c3pack.MODULE_SOURCE
-            text = src.read_text()
-            line = '    %C3ModRomBytes($7E31BF, $7E377A)'
-            self.assertIn(line, text)
-            src.write_text(text.replace(line, '    incbin "../../../build/c3pack/rom_module.bin":$1BF..$77A'))
-            c3pack.build(root)
-            self.assertEqual(len(c3pack.source_bytes(root)), real)
+            root = self.isolated_root(tmp, 'T4b')
+            work = Path(tmp) / 'work'
+            work.mkdir()
+            with self.assertRaises(SystemExit):
+                verify.assemble_onto(0x00, work, root)
 
 
 if __name__ == '__main__':

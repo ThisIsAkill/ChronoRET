@@ -23,9 +23,11 @@ macro C3ModOrg(addr)
 endmacro
 
 ; The ROM's module, unpacked by tools/c3pack.py: the bytes the source
-; does not cover yet come from it (the tool points the define elsewhere
-; to find which bytes the source writes itself).
-!C3Mod_RomImage ?= "../../../build/c3pack/rom_module.bin"
+; does not cover yet come from it. To find which bytes the source writes
+; itself, the tool assembles a copy of asm/ in which this file is made of
+; a fill byte (c3pack.source_bytes, tools/isolated.py). This and the
+; incbin below are the only file reads the lint allows in the module.
+!C3Mod_RomImage = "../../../build/c3pack/rom_module.bin"
 
 ; The ROM's bytes for module addresses start to end-1, at the current
 ; position.

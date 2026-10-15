@@ -19,28 +19,43 @@ Exit status is non-zero on any mismatch or assembler error.
 
 import argparse
 import json
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import c3pack  # noqa: E402
+import isolated  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
 ROM_SIZE = 0x400000
 
 
-def assemble_onto(fill: int, workdir: Path) -> bytes:
-    c3pack.ensure_built()               # the packed $C3 module, incbin'd by bankC3.asm
-    out = workdir / f'base_{fill:02x}.sfc'
+def assemble_onto(fill: int, workdir: Path, root: Path = Path('.')) -> bytes:
+    """The source assembled onto an image of `fill`, where it cannot read the
+    ROM (tools/isolated.py: a copy of asm/ only, no roms/ or build/, every
+    file asar opens checked). The packed $C3 module's incbin gets a
+    placeholder of the fill byte, so its bytes are not "emitted by source"
+    here; main() checks them on their own."""
+    c3pack.ensure_built(root)           # the packed $C3 module, checked against the ROM in main()
+    iso = Path(workdir) / f'isolated_{fill:02x}'
+    iso.mkdir()
+    try:
+        tree = isolated.make_tree(root, iso)
+    except isolated.IsolationError as e:
+        sys.stderr.write(f'verify: {e}\n')
+        sys.exit(2)
+    placeholder = tree / c3pack.MODULE_LZ
+    placeholder.parent.mkdir(parents=True)
+    placeholder.write_bytes(bytes([fill]) * c3pack.MODULE_PACKED_SIZE)
+    out = iso / f'base_{fill:02x}.sfc'
     out.write_bytes(bytes([fill]) * ROM_SIZE)
-    result = subprocess.run(
-        ['asar', '--no-title-check', '--fix-checksum=off', str(MAIN_ASM), str(out)],
-        capture_output=True, text=True)
-    if result.returncode != 0:
-        sys.stderr.write(result.stdout + result.stderr)
+    try:
+        isolated.run_asar(['--no-title-check', '--fix-checksum=off', str(MAIN_ASM), str(out.resolve())],
+                          tree, iso)
+    except isolated.IsolationError as e:
+        sys.stderr.write(f'verify: {e}\n')
         sys.exit(2)
     return out.read_bytes()
 
@@ -81,12 +96,16 @@ def main() -> int:
     emitted = [i for i in range(ROM_SIZE) if lo[i] == hi[i]]
     mismatched = [i for i in emitted if lo[i] != rom[i]]
 
-    # The packed $C3 module is emitted whole (bankC3.asm incbins what
-    # tools/c3pack.py packs from the module's source); it is checked like
-    # every other byte but reported apart, with how much of the unpacked
-    # module is source.
+    # The packed $C3 module: bankC3.asm incbins what tools/c3pack.py packs
+    # from the module's source (a placeholder in the isolated assemblies), so
+    # it is checked here on its own: the packed bytes must be the ROM's. How
+    # much of the unpacked module is source comes from c3pack.source_bytes(),
+    # isolated the same way.
     packed = range(c3pack.MODULE_ROM, c3pack.MODULE_ROM + c3pack.MODULE_PACKED_SIZE)
-    packed_emitted = sum(1 for i in packed if lo[i] == hi[i])
+    built = c3pack.MODULE_LZ.read_bytes()
+    packed_emitted = len(built)
+    mismatched += [c3pack.MODULE_ROM + k for k in range(len(packed))
+                   if k >= len(built) or built[k] != rom[c3pack.MODULE_ROM + k]]
     per_bank: dict[str, int] = {}
     for i in emitted:
         if i in packed:
@@ -106,21 +125,31 @@ def main() -> int:
         for name in sorted(per_bank):
             print(f'  {name:<16} {per_bank[name]:>7,} bytes emitted by source')
         if packed_emitted:
-            source = len(c3pack.source_bytes())
+            try:
+                source = len(c3pack.source_bytes())
+            except c3pack.PackError as e:
+                sys.stderr.write(f'verify: {e}\n')
+                return 2
             print(f'  {"$C3 packed":<16} {packed_emitted:>7,} bytes packed by tools/c3pack.py from the '
                   f'module ({source:,} of its {c3pack.MODULE_SIZE:,} unpacked bytes from source, '
                   f'the rest the ROM\'s)')
-        print(f'  {"total":<16} {len(emitted):>7,} bytes')
+        print(f'  {"total":<16} {len(emitted) + packed_emitted:>7,} bytes')
         if args.ranges:
             for s, e in to_ranges(emitted):
                 print(f'    0x{s:06X}-0x{e - 1:06X}  ({e - s} B)')
 
+    if len(built) != len(packed):
+        print(f'MISMATCH: {c3pack.MODULE_LZ} is {len(built):,} bytes, the ROM\'s pack '
+              f'{len(packed):,}', file=sys.stderr)
+        return 1
+    mismatched.sort()
     if mismatched:
         print(f'MISMATCH: {len(mismatched)} emitted byte(s) differ from the ROM:', file=sys.stderr)
         for s, e in to_ranges(mismatched)[:20]:
             print(f'  0x{s:06X}-0x{e - 1:06X}', file=sys.stderr)
         return 1
-    print('VERIFIED: every source-emitted byte matches the ROM.')
+    print('VERIFIED: every source-emitted byte matches the ROM.',
+          file=sys.stderr if args.json else sys.stdout)
     return 0
 
 
