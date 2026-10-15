@@ -3917,7 +3917,8 @@ C3Mod_ModeHdma:
 ; from C3Mod_MathValues' first pair (held to the bottom), then the end.
 ; The HDMA record at $9008 (DMAP $41 to CGADSUB, in code not matched
 ; yet) points here too (its address at $900A), and $9090 and $90A2
-; write the first and second counts ($452B, $452E).
+; write the first and second counts ($452B, $452E), as
+; C3Mod_HorizonNmiTask does ($4506, $4515).
 C3Mod_MathHdma:
     db 0 : dw C3Mod_MathValues_sky
     db 0 : dw C3Mod_MathValues_sky
@@ -4139,7 +4140,8 @@ C3Mod_RestoreColumnTask:                ; header: see C3Mod_ClearColumnTask
 ;     frame (rounded down to $80), not while C3_SongBusy (then
 ;     straight to C3Mod_RaceStep); program 0 clears C3_BikeHidden,
 ;     sets C3_RivalHidden = 1 once the low words' C3_BikeDist -
-;     C3_RivalDist is $1000 or more (BMI) and, unless C3_SongBusy,
+;     C3_RivalDist is $1000-$8FFF (CMP #$1000 / BMI: the sign of the
+;     difference minus $1000) and, unless C3_SongBusy,
 ;     moves C3_BikeSide to $4000 the same way (with C3_SongBusy set it
 ;     goes straight to C3Mod_RaceStep, skipping the C3_FinishGap step
 ;     below too);
@@ -4440,25 +4442,28 @@ C3Mod_RaceFinish:
 
 ; $7E:485D — C3Mod_RaceStepTask (994 bytes with C3Mod_RaceStep, $485D–$4C3E)
 ; A task, from the end of the count-down (C3Mod_Prog0ScriptB): one
-; frame of the race. C3_RaceFrames + 1; when the bike's laps (C3_BikeDist's
-; high word) reach 8, JMP C3Mod_RaceFinish; when the rival's do, the
-; race is lost: C3_RaceResult = 2, C3Mod_SteerTask removed, an RTS
+; frame of the race. C3_RaceFrames + 1; when the bike's laps
+; (C3_BikeDist's high word) reach 8, JMP C3Mod_RaceFinish; when the
+; rival's do, the race is lost: C3_RaceResult = 2 (a word store, so
+; C3_RacePrize = 0 too, as it already is), C3Mod_SteerTask removed, an RTS
 ; (Op_RTS) written over $510D, the shared end of the routines at $50F1
 ; and $5100 (code not matched yet), which place the sprite lists at
 ; $538D / $5391 with X from each bike's lap progress and Y = its
-; side's high byte / 8 + $C0 (the word at the side + 1), next to $5116's boost icons: probably the HUD's progress
-; markers, so they are no longer drawn (not traced further); the view's
+; side's high byte / 8 + $C0 (the word at the side + 1), next to
+; $5116's boost icons: probably the HUD's progress markers, so they
+; are no longer drawn (not traced further); the view's
 ; X speed = the two speeds' sum / 2048, C3Mod_SkyNmiTask (NMI) and
 ; C3Mod_CountDownTask (the score counted down) added, page $0A00 on
 ; C3Mod_Prog0Quit, and the task ends (C3Mod_TaskEnd). Else:
 ;   - C3_ColumnCleared: the map column is put back
 ;     (C3Mod_RestoreColumnTask) once the pack (C3_PackDist) is in lap
-;     0 at $1000 or more, and cleared (C3Mod_ClearColumnTask) once it
-;     is in lap 7 at $F200 or more;
-;   - C3_BikeHidden = C3_RivalHidden = 1 when the bike is ahead by
-;     $1000 or more (the difference's high word not negative and its
-;     low word $1000 or more, signed: a lead of a whole lap with a
-;     small low word does not count), else 0;
+;     0 at $1000-$8FFF (CMP #$1000 / BMI: the sign of the low word
+;     minus $1000), and cleared (C3Mod_ClearColumnTask) once it is in
+;     lap 7 at $F200 or more (SBC / BCC, unsigned);
+;   - C3_BikeHidden = C3_RivalHidden = 1 when the bike is ahead: the
+;     difference's high word not negative and its low word $1000-$8FFF
+;     (the same CMP / BMI), else 0; a lead of a whole lap with a low
+;     word outside that range does not count;
 ; then C3Mod_RaceStep ($48FD, also C3Mod_RaceTask's tail):
 ;   - both speeds - $80 (to at least 0), then + the accelerations
 ;     (the rival's only while C3_RivalControl bit 15 is set); the
