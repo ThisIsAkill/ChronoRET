@@ -170,8 +170,8 @@ endmacro
 !C3_Bg3ScrollX = $1434                   ; 16-bit: BG3HOFS
 !C3_Bg3ScrollY = $1436                   ; 16-bit: BG3VOFS
 !C3_Unk143E = $143E                      ; 16-bit: added to the sky's scroll by C3Mod_SkyNmiTask
-!C3_ViewOffsetX = $1440                  ; 16-bit: sin(angle) x distance / 256 (C3Mod_ViewOffsetTask)
-!C3_ViewOffsetY = $1442                  ; 16-bit: cos(angle) x distance / 256
+!C3_ViewOffsetX = $1440                  ; 16-bit: -sin(angle) x distance / 256 (C3Mod_ViewOffsetTask)
+!C3_ViewOffsetY = $1442                  ; 16-bit: -cos(angle) x distance / 256
 !C3_Unk1444 = $1444                      ; 16-bit: C3Mod_Prog0Vars clears it, C3Mod_RaceTask steps it
 !C3_Unk1446 = $1446                      ; 256 bytes ($1446-$1545): cleared by C3Mod_ClearUnk1446
 !C3_Unk1446Bytes = $0100                 ; its size

@@ -104,7 +104,8 @@ C3Mod_ProgramTable:
 ; Sets the module up from whatever the field left:
 ;   - sets its variables: C3_FadeStep and C3_FadeTimer =
 ;     C3_FadeStepInit; the pause words, C3_NoSoftReset, C3_SongBusy,
-;     C3_Brightness, C3_HdmaEnable, C3_RaceResult/0381/0366 = 0;
+;     C3_Brightness, C3_HdmaEnable, C3_RaceResult, C3_RacePrize and
+;     C3_Unk0366 = 0;
 ;   - clears the direct page $0000-$00FF with DMA channel 7, reading
 ;     MPYL (M7A x M7B = $0404 x 0 = 0) the way ClearRAMDMA does;
 ;   - with C3_BootIrqOn in C3_EntryArg (entered from the field hook,
@@ -649,11 +650,11 @@ C3Mod_TableRandom:
     RTS
 
 ; $7E:3461 — C3Mod_Cosine (25 bytes with C3Mod_Sine, $3461–$3479)
-; The sine of the angle in A (1,024 steps per turn) as a signed 16-bit
-; value of magnitude 0-$FF from Rom_SineTable's |sin| bytes, negative
-; for angles $000-$1FF and positive for $200-$3FF (so -sin, probably
-; for the screen's downward y). C3Mod_Cosine adds a quarter turn and
-; falls into C3Mod_Sine ($3465).
+; Minus the sine of the angle in A (1,024 steps per turn) as a signed
+; 16-bit value of magnitude 0-$FF from Rom_SineTable's |sin| bytes,
+; negative for angles $000-$1FF and positive for $200-$3FF (so -sin,
+; probably for the screen's downward y). C3Mod_Cosine adds a quarter
+; turn and falls into C3Mod_Sine ($3465), so it gives -cos.
 ; Callers note: C3Mod_BuildM7Tables ($357F), C3Mod_ViewOffsetTask
 ;   ($444F) and $4D19, $56B6, $5867, $5BD7, $5BFB, $5CBC, $73C9, $76DB,
 ;   $994A, $9990, $99DB and $9B01 (code not matched yet). C3Mod_Sine:
@@ -974,8 +975,9 @@ C3Mod_M7HdmaCDNext:
 ; Fills C3_M7ABLines / C3_M7CDLines with a mode-7 matrix per line for a
 ; plane turned by C3_M7Angle and seen in perspective: for each line,
 ; with a divisor X that steps from line to line (up, by default), M7A =
-; M7D = the scaled cosine / X and M7B = -M7C = the scaled sine / X (the
-; signs as the angle gives them): a ground plane in perspective,
+; M7D = C3Mod_Cosine's value (-cos) scaled / X and M7B = -M7C =
+; C3Mod_Sine's value (-sin) scaled / X (the signs as the angle gives
+; them): a ground plane in perspective,
 ; probably (the race track). The hardware
 ; divider does the divisions (DP = DP_CPU inside): each line starts the
 ; next division while it stores the last quotient.
@@ -1007,8 +1009,9 @@ C3Mod_M7HdmaCDNext:
 ;     vertical resolution).
 ; Quirk: the STX to WRDIVB writes 16 bits, so HTIMEL ($4207) gets X's
 ; high byte (0) each time.
-; Callers note: JMP (a tail call) from $4306, $82F2 and $9AF0 (code not
-;   matched yet; script routines, with their page as DP).
+; Callers note: JMP (a tail call) from C3Mod_ViewTask ($4306) and $82F2
+;   and $9AF0 (code not matched yet): tasks that set DP = $0A00
+;   themselves (LDA #$0A00 / TCD at $42CE, $82D1 and $9ABD).
 ; Entry: M=0, X=0 (16-bit X and Y), DP = the script's page
 ;        (C3_M7Angle, C3_M7Scale; C3Math_A.. at $F0 of it), DB any
 ;        (set to $7E: PHK / PLB).
@@ -1465,8 +1468,10 @@ C3Mod_AudioSend:
 ; source pointer saved for the second). The row count lives in the
 ; caller's direct page (C3_RowCount). What the bitmap is (probably a
 ; picture for C3_ScaleBitmap, which reads 64-byte rows) is not traced.
-;   Its JSL callers each call C3Mod_UnpackPack ($3691) first (code not
-; matched yet), which probably puts the picture at $7F:0200.
+;   Its JSL callers each call C3Mod_UnpackPack ($3691) first; at
+; C3Mod_Prog0LoadGfx's calls ($3DED, $3DFA) that puts the pack at
+; $7F:0200 (C3Mod_Unk89ED set Decomp_Dest there); at $7908 and $87B3
+; (code not matched yet), probably the same.
 ; Callers note: JSL from C3Mod_Prog0LoadGfx ($3DED, $3DFA) and $7908
 ;   and $87B3 (code not matched yet).
 ; Entry: M any (REP #$20 here), X=0 (MVN's 16-bit X and Y), DP any
@@ -2368,8 +2373,7 @@ C3Mod_SprListMixed:
 ;     counts the 12 calls);
 ;   - $7E:F000-$FFFF and $7E:0C00-$1DFF filled from MPYL by DMA (B to
 ;     A), so zeroed if M7A x M7B is 0 (C3Mod_Init's C3Mod_HideSprites
-;     leaves M7A = 1, M7B = 0; not on the C3_BootIrqOn path, which
-;     skips it); C3Scale_PrevEnd = $0A00; the HDMA channels of
+;     leaves M7A = 1, M7B = 0); C3Scale_PrevEnd = $0A00; the HDMA channels of
 ;     C3Mod_Prog0Hdma (C3Mod_SetupHdma) and C3_HdmaEnable = channels
 ;     0-5; C3Mod_Prog0Vars;
 ;   - C3_EntryArg bit 6 clear: page $0A00 runs C3Mod_Prog0ScriptA and
@@ -3168,7 +3172,10 @@ C3Mod_Prog0WipeB:
 ; C3Mod_Prog0WipeB): adds the tasks of C3Mod_Prog0ScriptA, with
 ; C3Mod_WipeTask in place of C3Mod_FadeInTask and without
 ; C3Mod_PadDelayTask, and its NMI tasks but C3Mod_ClearColumnTask;
-; X speed $11, angle 0, horizon $38; returns (opcode $F4).
+; X speed $11, angle 0, horizon $38; returns (opcode $F4). The $F3's
+; return point goes to C3Script_Ret ($30), which is also
+; C3_ViewCache's first word: C3Mod_ViewTask then sees a changed scale
+; and rebuilds once more (and clears C3_Unk1446).
 C3Mod_Prog0Start:
     db !C3Op_TaskAdd : dw C3Mod_ViewTask
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
@@ -3451,9 +3458,9 @@ C3Mod_PadDelayTask:
 ; Callers note: a task added by script opcode $FA at $3F14
 ;   (C3Mod_Prog0ScriptA) and $412D (C3Mod_Prog0Start).
 ; Entry: a task: M=0, X=0 (C3Mod_BuildM7Tables'), DP any (set to $0A00
-;        here, restored by C3Mod_RunTasks), DB any (absolute only in
-;        C3Mod_ClearUnk1446's MVN and C3Mod_BuildM7Tables, which set
-;        it).
+;        here, restored by C3Mod_RunTasks), DB=$00 (a task's: the STZ
+;        before C3Mod_ClearUnk1446's MVN is absolute, so DB must map
+;        low WRAM; C3Mod_BuildM7Tables sets its own).
 ; Exit:  unchanged: RTS with A = the step mode; else as
 ;        C3Mod_BuildM7Tables leaves them (M=0, X=0, DP = DP_CPU, DB =
 ;        $7E).
@@ -3530,7 +3537,7 @@ C3Mod_SidePlusPads:
     dw !C3_PadUp, !C3_PadUp|!C3_PadRight, !C3_PadRight, !C3_PadDown|!C3_PadRight
 
 ; $7E:4339 — C3Mod_SteerTask (127 bytes, $4339–$43B7)
-; A task (and a subroutine) of the view, on page $0A00:
+; A task of the view, on page $0A00:
 ;   - program 9 only (C3_Prog9): the L and R buttons (C3_PadHeld) turn
 ;     the view: C3_ViewLeanR / C3_ViewLeanL count up while R / L is
 ;     held (to 12) and down otherwise (C3Mod_LeanR, C3Mod_LeanL), and
@@ -3547,7 +3554,9 @@ C3Mod_SidePlusPads:
 ;   and $4876 (C3Mod_RaceStepTask).
 ; Entry: a task (C3Mod_RunTasks): M=0, X=0 (16-bit counters), DP any
 ;        (set to $0A00 here, restored by C3Mod_RunTasks), DB=$00
-;        (C3_Prog9, C3_PadHeld and C3_FrameCount are read absolute).
+;        (C3_Prog9, C3_PadHeld and C3_FrameCount are read absolute; the
+;        16-bit LDA of the byte C3_Prog9 also reads $45, 0 from
+;        C3Mod_Init's clear).
 ; Exit:  M=0, X=0, DP = $0A00; A, X changed (X = the pad table index);
 ;        Y unchanged; C3_TmpF0/F2 of page $0A00 changed in program 9.
 ; Calls: C3Mod_LeanR, C3Mod_LeanL.
@@ -3713,8 +3722,9 @@ C3Mod_ScrollNmiTask:
     RTS
 
 ; $7E:4447 — C3Mod_ViewOffsetTask (85 bytes, $4447–$449B)
-; A task: from page $0A00's view, C3_ViewOffsetY = cos(angle) x
-; distance / 256 and C3_ViewOffsetX = the same with C3Mod_Sine
+; A task: from page $0A00's view, C3_ViewOffsetY = -cos(angle) x
+; distance / 256 (C3Mod_Cosine's value, which is -cos) and
+; C3_ViewOffsetX = -sin(angle) x distance / 256 (C3Mod_Sine's)
 ; (C3Mod_MulSigned16's product bits 8-23, in page $0A00's C3Math_*),
 ; which C3Mod_TurnTask adds to the plane's position; the sky's vertical
 ; scroll C3_SkyScrollY = $17 - the horizon and C3_Bg3ScrollY = $15 -
@@ -3778,7 +3788,10 @@ C3Mod_ViewOffsetTask:
 ; C3_Unk143E,
 ; C3_Bg2ScrollX = C3_SkyScrollX / 4 and C3_Bg3ScrollX = C3_SkyScrollX
 ; x 3/8 (/ 4 + / 8, plus the carry of the shift). Quirk: no CLC before
-; the ADCs, so the bits the LSRs shift out are added in.
+; the ADCs: C3_ViewX's shifted-out bit 0 is added (and the first ADC's
+; carry-out goes into the + $88), and so is the bit the last LSR of
+; C3_SkyScrollX shifts out; the bits C3_PackDist's LSRs shift out are
+; lost (the STA in between).
 ; Callers note: an NMI task added by LDX #C3Mod_SkyNmiTask / JSR
 ;   C3Mod_NmiTaskAdd at $4894 (C3Mod_RaceStepTask, when the race is
 ;   lost).
@@ -3899,6 +3912,9 @@ C3Mod_ModeHdma:
 ; the horizon's lines from C3Mod_MathValues (.sky), then 15 entries of
 ; two lines from .fade + 34 on (one pair each, 30 lines), then one line
 ; from C3Mod_MathValues' first pair (held to the bottom), then the end.
+; The HDMA record at $9008 (DMAP $41 to CGADSUB, in code not matched
+; yet) points here too (its address at $900A), and $9090 writes the
+; first count.
 C3Mod_MathHdma:
     db 0 : dw C3Mod_MathValues_sky
     db 0 : dw C3Mod_MathValues_sky
@@ -3997,9 +4013,11 @@ C3Mod_Prog0Setup:
 
 ; $7E:45D6 — C3Mod_Prog0Vars (109 bytes, $45D6–$4642)
 ; Program 0's race variables (called by C3Mod_Prog0): program 9
-; (C3_Prog9) writes $D8 over the operands at $53A0, $4F74 and $50DA,
-; $E8 over $53A4, 6 over $5395 and 1 over $53AE (code not matched
-; yet); program 0 sets C3_BoostTimer = $80 and C3_BoostsLeft = 3.
+; (C3_Prog9) writes $D8 over the low byte of the LDA #$00B8 operands
+; at $4F74 and $50DA (they load $00D8) and into sprite-list data: $D8
+; and $E8 into the X bytes at $53A0 and $53A4, 6 and 1 into the counts
+; at $5395 and $53AE (the lists $5116 passes by LDA #$5395 at $514B
+; and LDA #$53AE at $5152; code not matched yet); program 0 sets C3_BoostTimer = $80 and C3_BoostsLeft = 3.
 ; Then the words: C3_BikeTopSpeed = C3_BikeTopBehind = $4000,
 ; C3_RivalTopSpeed = $3000, C3_RivalTopAhead = $5000, C3_BikeSteer =
 ; 0, C3_BikeSide = $6000, C3_RivalSide = $2000, C3_BumpLast = $20,
@@ -4119,7 +4137,9 @@ C3Mod_RestoreColumnTask:                ; header: see C3Mod_ClearColumnTask
 ;     straight to C3Mod_RaceStep); program 0 clears C3_BikeHidden,
 ;     sets C3_RivalHidden = 1 once the low words' C3_BikeDist -
 ;     C3_RivalDist is $1000 or more (BMI) and, unless C3_SongBusy,
-;     moves C3_BikeSide to $4000 the same way;
+;     moves C3_BikeSide to $4000 the same way (with C3_SongBusy set it
+;     goes straight to C3Mod_RaceStep, skipping the C3_FinishGap step
+;     below too);
 ;   - C3_FinishGap (a byte) one step towards 0; once the word
 ;     C3_FinishGap is 0, C3_RivalHidden is set and C3_BikeSide (bit 0
 ;     aside) is $4000: C3_BikeSideUp = C3_BikeSideDown = 0 and
@@ -4420,8 +4440,11 @@ C3Mod_RaceFinish:
 ; frame of the race. C3_RaceFrames + 1; when the bike's laps (C3_BikeDist's
 ; high word) reach 8, JMP C3Mod_RaceFinish; when the rival's do, the
 ; race is lost: C3_RaceResult = 2, C3Mod_SteerTask removed, an RTS
-; (Op_RTS) written over $510D (the end of the bikes' shadow
-; drawing, C3Mod_Unk50F1/C3Mod_Unk5100: no more shadows), the view's
+; (Op_RTS) written over $510D, the shared end of the routines at $50F1
+; and $5100 (code not matched yet), which place the sprite lists at
+; $538D / $5391 with X from each bike's lap progress and Y = its side /
+; 8 + $C0, next to $5116's boost icons: probably the HUD's progress
+; markers, so they are no longer drawn (not traced further); the view's
 ; X speed = the two speeds' sum / 2048, C3Mod_SkyNmiTask (NMI) and
 ; C3Mod_CountDownTask (the score counted down) added, page $0A00 on
 ; C3Mod_Prog0Quit, and the task ends (C3Mod_TaskEnd). Else:
