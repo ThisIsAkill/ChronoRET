@@ -24,12 +24,16 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import c3pack  # noqa: E402
+
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
 ROM_SIZE = 0x400000
 
 
 def assemble_onto(fill: int, workdir: Path) -> bytes:
+    c3pack.ensure_built()               # the packed $C3 module, incbin'd by bankC3.asm
     out = workdir / f'base_{fill:02x}.sfc'
     out.write_bytes(bytes([fill]) * ROM_SIZE)
     result = subprocess.run(

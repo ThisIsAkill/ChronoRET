@@ -914,10 +914,17 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    services of the packed module: `C3_ScaleBitmap`, `C3_ModuleNmi`/`C3_ModuleFrame`, the script
    interpreter `C3_RunScript` and its task lists, the sprite builders, `C3_BuildCopyCode`,
    `C3_ReadPad`, `C3_MulSigned`, `C3_FindDivisor`, the staff text, the "CODE END C3" marker).
-   The rest of the bank stays ROM bytes: the packs at `$C3:1200` and `$C3:1313`
-   (`BankC3_PackedModule`, the jet-bike race module, unpacked to `$7E:3000`-`$B57E`) and the
-   scene data after them. Next: the module itself needs a packer that rebuilds the exact packed
-   bytes (or matching it as data) before its code can be matched; the module routines the kernel
+   The pack at `$C3:1200` and the scene data after the module stay ROM bytes. The module,
+   `BankC3_PackedModule` (`$C3:1313`-`$7A2B`, the jet-bike race program, unpacked to
+   `$7E:3000`-`$B57E`), is built from source: `asm/bankC3/packed/module.asm` is the unpacked
+   module, assembled on its own at base `$7E:3000` by `tools/c3pack.py build` (run by `make
+   build` and by every tool that assembles `asm/main.asm`), packed with the original packer's
+   rules (Okumura's LZSS with a zeroed ring buffer; the tool's docstring has them, and it rebuilds
+   all 60 packs of C3Rom_PackPtrs in the format byte for byte) to `build/c3pack/module.lz`, which
+   bankC3.asm incbins. What the source does not cover yet is incbin'd from the ROM's module
+   (`%C3ModRomBytes`, from `build/c3pack/rom_module.bin`), as unmatched bytes stay ROM bytes
+   elsewhere; it is counted apart like the SPC700 driver (`tools/progress.py`'s "packed $C3
+   module" line). Next: match its code in unpacked form; the module routines the kernel
    calls by address are stubs (`!C3Mod_AudioCommand`, `!C3Mod_CallW`, `!C3Mod_RunTasks`,
    `!C3Mod_RunNmiTasks` in ram_engine.inc). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`

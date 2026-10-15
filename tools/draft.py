@@ -66,6 +66,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 from disasm import _OPCODES  # noqa: E402
+import c3pack  # noqa: E402
 
 ROM_PATH = ROOT / 'roms' / 'chrono_trigger.sfc'
 INCLUDE = ROOT / 'asm' / 'include'
@@ -1266,6 +1267,7 @@ def source_chunks(path: Path):
 
 
 def assemble(tree: Path, fill: int | None, rom: bytes, out: Path):
+    c3pack.ensure_built(tree)           # the packed $C3 module, incbin'd by bankC3.asm
     out.write_bytes(rom if fill is None else bytes([fill]) * len(rom))
     r = subprocess.run(['asar', '--no-title-check', '--fix-checksum=off', 'asm/main.asm', str(out)],
                        cwd=tree, capture_output=True, text=True)
@@ -1460,6 +1462,7 @@ def main() -> int:
         raise SystemExit('start is not a ROM address')
     rom = ROM_PATH.read_bytes()
 
+    c3pack.ensure_built()
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / 'sym.sfc'
         out.write_bytes(rom)

@@ -65,6 +65,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asm_source  # noqa: E402
+import c3pack  # noqa: E402
 import generated  # noqa: E402
 import lint_readability  # noqa: E402
 import review_log  # noqa: E402
@@ -307,6 +308,13 @@ def analyse() -> dict:
     spc_block = set(range(spc700.DRIVER_ROM, first + size))
     spc_emitted = len(emitted & spc_block)
     emitted = emitted - spc_block
+    # The packed $C3 module is counted apart too (under "c3module"): its
+    # packed bytes, BankC3_PackedModule, are built from the unpacked source
+    # in asm/bankC3/packed/ (tools/c3pack.py).
+    pack_block = set(range(c3pack.MODULE_ROM, c3pack.MODULE_ROM + c3pack.MODULE_PACKED_SIZE))
+    pack_emitted = len(emitted & pack_block)
+    emitted = emitted - pack_block
+    module = c3pack.module_figures()
 
     starts = sorted((off, name) for name, off in addrs.items() if name in source)
     functions = []
@@ -399,7 +407,8 @@ def analyse() -> dict:
                        'code_bytes': sum(hi - lo + 1 for lo, hi in spc700.CODE_RANGES),
                        'data_bytes': sum(hi - lo + 1 for lo, hi in spc700.DATA_RANGES),
                        'totals': level_totals(spc_rows)},
-            'spc700_functions': spc_rows}
+            'spc700_functions': spc_rows,
+            'c3module': {'emitted_bytes': pack_emitted, **module}}
 
 
 # ── Outputs ──────────────────────────────────────────────────────────────────
@@ -431,9 +440,10 @@ def render_spc700_csv(result) -> str:
 def render_progress_json(result) -> str:
     # "spc700" (added beside schema 3's keys; nothing else changed): the
     # driver's code and data bytes and its totals per level, apart from the
-    # 65816 figures.
+    # 65816 figures. "c3module" likewise for the packed $C3 module: its
+    # packed bytes emitted, and of its unpacked bytes those from source.
     data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'surveyed_code_bytes', 'totals',
-                                   'banks', 'slices', 'spc700')}
+                                   'banks', 'slices', 'spc700', 'c3module')}
     return json.dumps({'schema': SCHEMA, **data}, indent=2) + '\n'
 
 
@@ -486,6 +496,13 @@ def render_spc700_line(result) -> str:
             f'routines, plus {t["matched"]["data_bytes"]:,} of {s["data_bytes"]:,} bytes of data); '
             f'{t["readable"]["functions"]} of those meet the readability standard and '
             f'{t["verified"]["functions"]} are verified by independent review.')
+
+
+def render_c3module_line(result) -> str:
+    s = result['c3module']
+    return (f'packed $C3 module (counted apart): {s["source_bytes"]:,} of {s["unpacked_bytes"]:,} unpacked '
+            f'bytes from source, the rest incbin\'d from the ROM\'s module; the build packs it back to '
+            f'the {s["emitted_bytes"]:,} packed bytes in ROM.')
 
 
 def write_generated(result) -> None:
@@ -574,6 +591,7 @@ def main() -> int:
     print()
     print(render_status_line(result))
     print(render_spc700_line(result))
+    print(render_c3module_line(result))
     return 0
 
 

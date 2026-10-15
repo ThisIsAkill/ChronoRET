@@ -103,6 +103,9 @@ asm/        65816 source, organized by bank; main.asm includes them all
             targeting, action scripts)
   bankC2/   Bank $C2 — menu/scene bank (entry vectors, scene engine and its
             script, text windows)
+  bankC3/   Bank $C3 — the kernel (decompressor, module boot, window effects);
+            packed/ is the packed module's source in unpacked form, built and
+            packed back to the ROM's bytes by tools/c3pack.py
   bankCC/   Bank $CC — battle helpers (a copy of the 8×8 multiply so far)
   bankCF/   Bank $CF — battle support (a sine lookup, number formatting)
   bankFD/   Bank $FD — MainInit (hardware init from reset), battle setup helpers

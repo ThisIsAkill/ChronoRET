@@ -209,7 +209,7 @@ def lint_file(path: Path):
                              'namespace', 'pushpc', 'pullpc', 'base',
                              'fillbyte', 'fill', 'padbyte', 'pad', 'table',
                              'cleartable', 'check', 'math', 'warn'):
-            if stripped.startswith('%'):
+            if stripped.startswith('%') or lower == 'incbin':
                 emitted_since_org = True
             continue
 
