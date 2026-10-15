@@ -25,12 +25,13 @@ jobs:
         run: python3 tools/progress.py --check
       # The data layer without assets: the manifest is what
       # tools/extract_data.py makes from the survey, asm/data/ matches it
-      # (the pointer tables' entries are compared in the match job), and the
-      # lint's planted-read tests.
+      # (the pointer tables' entries are compared in the match job), the
+      # lint's planted-read tests, and the text encoder on synthetic strings.
       - name: Data layer manifest and placement (no ROM)
         run: |
           python3 tools/extract_data.py check
           python3 tools/test_data_layer.py
+          python3 tools/test_text.py
 
   match:
     name: Reassemble and diff

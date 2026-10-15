@@ -134,7 +134,8 @@ Scene7200Pack_000,$C6:DA76,$C6:DB72,253,packed,packed_lz/Scene7200Pack_000.bin,l
 Scene7200Pack_001,$C6:DB73,$C6:DC3B,201,packed,packed_lz/Scene7200Pack_001.bin,lz11 -> 3072 B
 Scene7200Pack_002,$C6:DC3C,$C6:DD04,201,packed,packed_lz/Scene7200Pack_002.bin,lz11 -> 3072 B
 Padding_C6DD05,$C6:DD05,$C6:DFFF,763,fill,,$00
-Text_C6F000,$C6:F000,$C6:F3FF,1024,text,text/SceneLabels.txt,strings
+Text_C6F000,$C6:F000,$C6:F355,854,text,text/SceneLabels.txt,strings
+Padding_C6F356,$C6:F356,$C6:F3FF,170,fill,,$00
 C2SceneRom_LabelStrings,$C6:F400,$C6:F4FF,256,text,text/SceneLabels.txt,ptrs ptr
 C2SceneRom_MapMarkerTiles,$C6:F500,$C6:F53F,64,extracted,graphics/C2SceneRom_MapMarkerTiles.bin,
 C2SceneRom_MapViewObjPal,$C6:F540,$C6:F55F,32,extracted,palette/C2SceneRom_MapViewObjPal.bin,
@@ -363,19 +364,27 @@ BattleRom_TechWaitNib,$CC:2BDC,$CC:2C6C,145,extracted,table/BattleRom_TechWaitNi
 MenuRom_ShopLists,$CC:2C6D,$CC:2D68,252,extracted,table/MenuRom_ShopLists.bin,
 MenuRom_Char5Attack,$CC:2D69,$CC:2E30,200,extracted,table/MenuRom_Char5Attack.bin,
 BattleRom_UnkCC2E31,$CC:2E31,$CC:2EB0,128,extracted,table/BattleRom_UnkCC2E31.bin,
-MenuRom_DescStrTable,$CC:2EB1,$CC:3A08,2904,text,text/MenuDescriptions.txt,strtable
-BattleRom_TechInfoStrings,$CC:3A09,$CC:43AE,2470,text,text/TechInfo.txt,strtable
+MenuRom_DescStrTable,$CC:2EB1,$CC:36F3,2115,text,text/MenuDescriptions.txt,strtable
+Padding_CC36F4,$CC:36F4,$CC:37FF,268,fill,,$FF
+Unknown_CC3800,$CC:3800,$CC:3A08,521,extracted,unknown/Unknown_CC3800.bin,
+BattleRom_TechInfoStrings,$CC:3A09,$CC:3AFA,242,text,text/TechInfo.txt,ptrs ptr
+Unknown_CC3AFB,$CC:3AFB,$CC:3B0C,18,extracted,unknown/Unknown_CC3AFB.bin,
+Text_CC3B0D,$CC:3B0D,$CC:43AE,2210,text,text/TechInfo.txt,strings
 Padding_CC43AF,$CC:43AF,$CC:46FF,849,fill,,$FF
 BattleRom_EnemyStats,$CC:4700,$CC:5DFF,5888,extracted,table/BattleRom_EnemyStats.bin,
 Table_CC5E00,$CC:5E00,$CC:64FF,1792,extracted,table/Table_CC5E00.bin,
-BattleRom_EnemyNames,$CC:6500,$CC:6FCA,2763,text,text/EnemyNames.txt,records 11 $EF
+BattleRom_EnemyNames,$CC:6500,$CC:6FC8,2761,text,text/EnemyNames.txt,records 11 $EF
+Unknown_CC6FC9,$CC:6FC9,$CC:6FCA,2,extracted,unknown/Unknown_CC6FC9.bin,
 BattleRom_UnkCC6FCB,$CC:6FCB,$CC:7AC8,2814,extracted,table/BattleRom_UnkCC6FCB.bin,
 BattleRom_EnemyEffectRecA,$CC:7AC9,$CC:86C8,3072,extracted,table/BattleRom_EnemyEffectRecA.bin,
 BattleRom_EnemyTechTarget,$CC:86C9,$CC:88CA,514,extracted,table/BattleRom_EnemyTechTarget.bin,
 BattleRom_UnkCC88CB,$CC:88CB,$CC:89C5,251,extracted,table/BattleRom_UnkCC88CB.bin,
 BattleRom_EnemyEffectRecB,$CC:89C6,$CC:8B07,322,extracted,table/BattleRom_EnemyEffectRecB.bin,
 BattleRom_AiScriptPtrs,$CC:8B08,$CC:CBC8,16577,extracted,battle_script/BattleRom_AiScriptPtrs.bin,
-BattleRom_ScriptMsgStrings,$CC:CBC9,$CC:DFFF,5175,text,text/EnemyScriptMessages.txt,strtable
+BattleRom_ScriptMsgStrings,$CC:CBC9,$CC:CD8E,454,text,text/EnemyScriptMessages.txt,ptrs ptr
+Unknown_CCCD8F,$CC:CD8F,$CC:CD8F,1,extracted,unknown/Unknown_CCCD8F.bin,
+Text_CCCD90,$CC:CD90,$CC:DDC5,4150,text,text/EnemyScriptMessages.txt,strings
+Unknown_CCDDC6,$CC:DDC6,$CC:DFFF,570,extracted,unknown/Unknown_CCDDC6.bin,
 Table_CCF383,$CC:F383,$CC:F38B,9,extracted,table/Table_CCF383.bin,
 BattleRom_TechListBase,$CC:F38C,$CC:F394,9,extracted,table/BattleRom_TechListBase.bin,
 BattleRom_TechEntryBase,$CC:F395,$CC:F39A,6,extracted,table/BattleRom_TechEntryBase.bin,
@@ -2048,7 +2057,8 @@ EvtPack_018,$FD:9BA6,$FD:9CB4,271,packed,packed_lz/EvtPack_018.bin,lz11 -> 622 B
 EvtPack_019,$FD:9CB5,$FD:9F2B,631,packed,packed_lz/EvtPack_019.bin,lz11 -> 1030 B
 EvtPack_020,$FD:9F2C,$FD:9FEA,191,packed,packed_lz/EvtPack_020.bin,lz11 -> 545 B
 Unknown_FD9FEB,$FD:9FEB,$FD:9FFF,21,extracted,unknown/Unknown_FD9FEB.bin,
-Credits_Text,$FD:A000,$FD:A80A,2059,text,text/Credits.txt,ascii
+Credits_Text,$FD:A000,$FD:A7D0,2001,text,text/Credits.txt,ascii
+Unknown_FDA7D1,$FD:A7D1,$FD:A80A,58,extracted,unknown/Unknown_FDA7D1.bin,
 BattleRom_PcStatBlock,$FD:A80B,$FD:A848,62,extracted,table/BattleRom_PcStatBlock.bin,
 BattleRom_CmdPtr,$FD:A849,$FD:A84E,6,extracted,table/BattleRom_CmdPtr.bin,
 BattleRom_TechEntryPtr,$FD:A84F,$FD:A89C,78,extracted,table/BattleRom_TechEntryPtr.bin,
@@ -2217,7 +2227,8 @@ MenuRom_StatItemStat,$FF:CF2B,$FF:CF2B,1,extracted,table/MenuRom_StatItemStat.bi
 MenuRom_StatOrder,$FF:CF2C,$FF:CF31,6,extracted,table/MenuRom_StatOrder.bin,
 MenuRom_StatItemCap,$FF:CF32,$FF:CF32,1,extracted,table/MenuRom_StatItemCap.bin,
 MenuRom_NumLimits,$FF:CF33,$FF:CF3A,8,extracted,table/MenuRom_NumLimits.bin,
-MenuRom_NameStrings,$FF:CF3B,$FF:D03D,259,text,text/MenuNameTexts.txt,strtable
+MenuRom_NameStrings,$FF:CF3B,$FF:D023,233,text,text/MenuNameTexts.txt,strtable
+Unknown_FFD024,$FF:D024,$FF:D03D,26,extracted,unknown/Unknown_FFD024.bin,
 MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,text,text/MenuSlotTexts.txt,strtable
 MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,extracted,table/MenuRom_SlotEraNibbles.bin,
 MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,text,text/MenuEraTexts.txt,strtable

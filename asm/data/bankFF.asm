@@ -806,12 +806,18 @@ MenuRom_NumLimits:
 MenuRom_StatCaps:
     incbin "../../build/assets/table/MenuRom_NumLimits.bin"
 
-; $FF:CF3B-$FF:D03D (259 B), text, confirmed: string table (TextWin_StrTable) of mode $0D's and
+; $FF:CF3B-$FF:D023 (233 B), text, confirmed: string table (TextWin_StrTable) of mode $0D's and
 ; $0E's texts
 ; Read by Menu_LoadAskSlot, Menu_NameChoiceText, Menu_NameInit, Menu_XchgPreviewA.
 org $FFCF3B
 MenuRom_NameStrings:
     incbin "../../build/text/MenuRom_NameStrings.bin"          ; text unit MenuNameTexts (strtable)
+
+; $FF:D024-$FF:D03D (26 B), unknown, unknown: 26 bytes rising from $00 to $D6 (a table,
+; probably)
+org $FFD024
+Unknown_FFD024:
+    incbin "../../build/assets/unknown/Unknown_FFD024.bin"
 
 ; $FF:D03E-$FF:D295 (600 B), text, confirmed: string table (TextWin_StrTable) of the slot texts
 ; Read by Menu_DrawSlotText.

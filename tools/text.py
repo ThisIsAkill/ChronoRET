@@ -31,16 +31,20 @@ handlers of TextWin_CodeTable, TextWin_CodeExt, TextWin_State1):
             is read from asm/bankC2/bankC2.asm, so the tags follow the
             matched handlers (HANDLERS below).
 
-The dictionary rule. The original text uses 41,838 dictionary bytes over
-4,579 strings. Every run of glyphs between two control codes (or a pointer
-target) is exactly what a greedy longest match gives, left to right, over
-dictionary entries 0-126 *except 116-118*: those three are in the
+The dictionary rule. The 15 message tables (4,579 pointers) use 41,838
+dictionary bytes. Each of their 10,883 runs of glyphs between two control
+codes (or pointer targets) is exactly what a greedy longest match gives,
+left to right, over dictionary entries 0-126 *except 116-118*: those three are in the
 dictionary but no string uses them (with them, 171 runs would come out
 different). Entries never tie (no two have the same text), so the rule is
 deterministic: GREEDY_SKIP. The readable text is therefore stored fully
 expanded and recompressed by the encoder. A run the rule does not give (none
 in the message tables; possible in stale bytes) is written explicitly as
 «...» with [xyz] for each dictionary entry, which the encoder takes as is.
+
+A unit holds text only: its strings, their pointer tables, the dictionary,
+the names and the credits. Bytes in a unit's rows that are not text make
+extraction fail; they belong in their own survey rows (extracted as data).
 
 The readable form, one UTF-8 file per unit (build/assets/text/<unit>.txt):
 
@@ -57,13 +61,11 @@ The readable form, one UTF-8 file per unit (build/assets/text/<unit>.txt):
   @d TEXT                a dictionary entry: a length byte, then the glyphs
   @records SIZE $PP      fixed-size records follow, padded with $PP
   @r TEXT                one record
-  @bytes XX XX ...       bytes that are not text (where a survey row runs
-                         past its text)
-  @fill COUNT $VV        COUNT bytes of $VV
   other lines            text; a line break in the file is not a byte.
                          Tags: {end} {line} {wait 03} {char0} ... (CODES);
                          {gXX} a glyph by number; {$XX} a raw byte; [xyz] a
-                         dictionary entry by its text; «...» glyphs taken
+                         dictionary entry by its text; {ext [xyz]} the same
+                         entry through code $12 (TextWin_CodeExt); «...» glyphs taken
                          literally (no dictionary), with [xyz] inside.
 
     python3 tools/text.py check          extract every unit from the ROM
@@ -218,8 +220,8 @@ UNITS: dict[str, list[tuple[str, str]]] = {
     'TreasureMessages': [('$DE:FF00', 'strtable')],
     'SceneLabels': [('$C6:F000', 'strings'), ('$C6:F400', 'ptrs ptr')],
     'MenuDescriptions': [('$CC:2EB1', 'strtable')],
-    'TechInfo': [('$CC:3A09', 'strtable')],
-    'EnemyScriptMessages': [('$CC:CBC9', 'strtable')],
+    'TechInfo': [('$CC:3A09', 'ptrs ptr'), ('$CC:3B0D', 'strings')],
+    'EnemyScriptMessages': [('$CC:CBC9', 'ptrs ptr'), ('$CC:CD90', 'strings')],
     'BattleMessages': [('$CE:EF11', 'strtable')],
     'MenuNameTexts': [('$FF:CF3B', 'strtable')],
     'MenuSlotTexts': [('$FF:D03E', 'strtable')],
@@ -251,6 +253,11 @@ class Dictionary:
     def __init__(self, entries: list[bytes]):
         self.entries = entries
         self.by_text = {}
+        self.all_by_text = {}       # every entry, the one code $12 alone reaches too
+        for k, e in enumerate(entries):
+            t = glyph_text(e, strict=True)
+            if t is not None:
+                self.all_by_text.setdefault(t, k)
         for k, e in enumerate(entries):
             t = glyph_text(e, strict=True)
             if t is not None and k < DICT_ENTRIES:
@@ -313,7 +320,7 @@ def _tokens(data: bytes) -> list[tuple]:
     return out
 
 
-def _code_tag(code: int, arg: int | None) -> str:
+def _code_tag(code: int, arg: int | None, dic: 'Dictionary | None' = None) -> str:
     if arg is None:
         return '{' + CODE_TAGS[code] + '}'
     if code in WIDE:
@@ -322,6 +329,11 @@ def _code_tag(code: int, arg: int | None) -> str:
         return f'{{wait {arg:02X}}}'
     if code == EXT and arg in EXT_TAGS:
         return '{' + EXT_TAGS[arg] + '}'
+    if code == EXT and dic is not None and arg >= CODE12_DICT:
+        k = CODE12_BASE + arg - CODE12_DICT
+        t = glyph_text(dic.entries[k], strict=True) if k < len(dic.entries) else None
+        if t is not None and dic.all_by_text.get(t) == k:
+            return f'{{ext [{t}]}}'
     return f'{{ext {arg:02X}}}'
 
 
@@ -365,7 +377,7 @@ def decode_msg(data: bytes, dic: Dictionary, stats: dict | None = None, compress
         if t[0] == 'raw':
             out.append(f'{{${t[1]:02X}}}')
             continue
-        out.append(_code_tag(t[1], t[2]))
+        out.append(_code_tag(t[1], t[2], dic))
         if t[1] in BREAK_AFTER:
             out.append('\n')
     flush()
@@ -375,7 +387,13 @@ def decode_msg(data: bytes, dic: Dictionary, stats: dict | None = None, compress
 TAG = re.compile(r'\{([^{}]*)\}|\[([^\[\]]*)\]|«([^«»]*)»|(.)', re.S)
 
 
-def _parse_tag(tag: str, where: str) -> bytes:
+def _parse_tag(tag: str, where: str, dic: 'Dictionary | None' = None) -> bytes:
+    m = re.fullmatch(r'ext \[([^\[\]]*)\]', tag)
+    if m:
+        k = dic.all_by_text.get(m.group(1)) if dic is not None else None
+        if k is None or not CODE12_BASE <= k < CODE12_BASE + 256 - CODE12_DICT:
+            raise TextError(f'{where}: {{{tag}}}: no dictionary entry code $12 reaches')
+        return bytes([EXT, k - CODE12_BASE + CODE12_DICT])
     if tag in TAG_CODES:
         return bytes([TAG_CODES[tag]])
     if tag in EXT_TAGS.values():
@@ -455,7 +473,7 @@ def encode_msg(text: str, dic: Dictionary, where: str, compress: bool = True) ->
             continue
         flush()
         if tag is not None:
-            out.extend(_parse_tag(tag, where))
+            out.extend(_parse_tag(tag, where, dic))
         elif ref is not None:
             if ref not in dic.by_text:
                 raise TextError(f'{where}: [{ref}] is no dictionary entry')
@@ -708,12 +726,8 @@ def extract_unit(rom: bytes, unit: str, pieces: list[dict], dic: Dictionary | No
                         mode = 'records'
                     out.append(('@r ' + glyph_text(body)) if body else '@r')
                 else:
-                    chunk = bytes(rom[a:z])
-                    if len(chunk) >= 16 and len(set(chunk)) == 1:
-                        out.append(f'@fill {len(chunk)} ${chunk[0]:02X}')
-                    else:
-                        for k in range(0, len(chunk), 16):
-                            out.append('@bytes ' + ' '.join(f'{b:02X}' for b in chunk[k:k + 16]))
+                    raise TextError(f'{p["label"]}: {snes(a)}-{snes(z - 1)} ({z - a} B) is not text: '
+                                    f'its own row of symbols/data_survey.csv, not part of the unit')
     stats['strings'] = stats.get('strings', 0) + strings
     return '\n'.join(out) + '\n'
 
@@ -786,12 +800,6 @@ def parse_unit(text: str, name: str = '<unit>') -> list[dict]:
                 if not re.fullmatch(r'\$[0-9A-Fa-f]{2}', args[1]):
                     raise ValueError
                 records = (int(args[0]), int(args[1][1:], 16))
-            elif word == 'bytes':
-                items.append(('bytes', bytes(int(a, 16) for a in args), no))
-            elif word == 'fill':
-                if not re.fullmatch(r'\$[0-9A-Fa-f]{2}', args[1]):
-                    raise ValueError
-                items.append(('bytes', bytes([int(args[1][1:], 16)]) * int(args[0]), no))
             else:
                 raise TextError(f'{where}: unknown directive @{word}')
         except (ValueError, IndexError):
@@ -856,8 +864,6 @@ def encode_unit(text: str, pieces: list[dict], dic: Dictionary | None, name: str
                 if len(body) > size:
                     raise TextError(f'{where}: a record of {len(body)} bytes; at most {size}')
                 buf += body + bytes([pad]) * (size - len(body))
-            elif kind == 'bytes':
-                buf += item[1]
     starts = {label: offset for label, offset in want}
     for tname, (label, pos, count) in tables.items():
         bank = 0xC0 + (starts[label] >> 16)

@@ -10,31 +10,31 @@ and verify counts apart).
 
 ## What is left
 
-3,887,869 bytes (92.69% of the 4,194,304-byte ROM) in 2,216 rows. Shares are of the whole ROM.
+3,887,869 bytes (92.69% of the 4,194,304-byte ROM) in 2,227 rows. Shares are of the whole ROM.
 
 | kind | bytes | share | rows | confirmed / probable / unknown |
 |---|---:|---:|---:|---|
 | packed_lz | 2,349,626 | 56.02% | 1,515 | 2,346,617 / 3,009 / 0 |
 | graphics (raw tiles) | 336,704 | 8.03% | 28 | 328,416 / 8,288 / 0 |
 | sprite_layout | 253,952 | 6.05% | 5 | 253,952 / 0 / 0 |
-| text | 208,460 | 4.97% | 47 | 206,681 / 1,779 / 0 |
+| text | 206,826 | 4.93% | 49 | 205,047 / 1,779 / 0 |
 | brr_sample | 203,202 | 4.84% | 66 | 203,202 / 0 / 0 |
 | table | 177,653 | 4.24% | 298 | 174,997 / 2,134 / 522 |
 | music_sequence | 107,721 | 2.57% | 87 | 104,092 / 3,629 / 0 |
 | battle_script | 102,763 | 2.45% | 12 | 102,763 / 0 / 0 |
-| padding | 64,953 | 1.55% | 76 | 62,206 / 2,747 / 0 |
+| padding | 65,391 | 1.56% | 78 | 62,206 / 3,185 / 0 |
 | palette | 32,292 | 0.77% | 46 | 25,042 / 7,250 / 0 |
 | tilemap | 19,717 | 0.47% | 10 | 19,717 / 0 / 0 |
 | font | 9,216 | 0.22% | 2 | 9,216 / 0 / 0 |
 | event_script (scene animation table) | 7,946 | 0.19% | 1 | 7,946 / 0 / 0 |
-| unknown | 6,888 | 0.16% | 18 | 0 / 0 / 6,888 |
+| unknown | 8,084 | 0.19% | 25 | 0 / 0 / 8,084 |
 | map (exit and treasure records) | 6,694 | 0.16% | 2 | 6,694 / 0 / 0 |
 | spc_data | 82 | 0.00% | 3 | 82 / 0 / 0 |
 
-Confidence over all 3,887,869 bytes: confirmed 3,851,623 (99.07%), probable 28,836 (0.74%),
-unknown 7,410 (0.19%). "Confirmed" means a matched routine, or a pointer table a matched routine
-reads, reaches the region and the code fixes its format. Of the confirmed bytes, 494,340
-(12.8%) are in rows whose start is reached but whose end is inferred (it runs to the next known
+Confidence over all 3,887,869 bytes: confirmed 3,849,989 (99.03%), probable 29,274 (0.75%),
+unknown 8,606 (0.22%). "Confirmed" means a matched routine, or a pointer table a matched routine
+reads, reaches the region and the code fixes its format. Of the confirmed bytes, 480,920
+(12.5%) are in rows whose start is reached but whose end is inferred (it runs to the next known
 region; the row's notes say so). In the tables that share is 42% (74,852 of 177,653 bytes). How
 far each named table really runs is the main thing the per-kind work below still has to settle.
 
@@ -95,7 +95,7 @@ repacks byte-exact with the packer of `tools/c3pack.py`:
    confirmed only where the reader's index range ends before it (else probable); where a reader's
    index range covers such bytes (offset tables with $FFFF entries, `BattleRom_Kind3Act`,
    `BattleRom_InitTiles2bpp`) they stay in the table.
-6. The rest is listed one row each, with what is known (`unknown`, 18 rows).
+6. The rest is listed one row each, with what is known (`unknown`, 25 rows).
 
 ## Per kind: what a byte-exact round trip needs
 
@@ -208,11 +208,11 @@ kind and address). `symbols/data_assets.csv` is its manifest. Pieces:
 
 | piece | bytes | how |
 |---|---:|---|
-| fill | 64,953 | the 76 padding rows, `fill` of the value in the survey (source) |
+| fill | 65,391 | the 78 padding rows, `fill` of the value in the survey (source) |
 | table | 5,044 | 20 pointer tables of labels (source; below) |
-| extracted | 1,263,717 | 570 blobs (562 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
+| extracted | 1,264,913 | 577 blobs (569 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
 | packed | 2,349,626 | 1,515 streams packed at build time from their unpacked assets |
-| text | 204,529 | 43 rows in 31 text units, encoded at build time from readable text (step 5, below) |
+| text | 202,895 | 45 rows in 31 text units, encoded at build time from readable text (step 5, below) |
 
 `tools/verify.py` reports these five apart from the code figures, which do not change; with
 the code's 306,435 bytes they account for all 4,194,304. The tables written as labels are the
@@ -260,7 +260,7 @@ tool holds the character map, the tag names and which survey rows form which uni
   `@table`, and each string carries the entries that point at it (`@at 455 456 457`), so shared
   and mid-string entries (after a `{wait 00}`) need no address. Extraction checks that the
   file encodes back to the ROM's bytes.
-- **The dictionary rule.** Every run of glyphs in the 4,579 strings of the message tables is
+- **The dictionary rule.** Each of the 10,883 runs of glyphs in the message tables (4,579 pointers) is
   what a greedy longest match gives, left to right, over dictionary entries 0-126 without
   116-118 (no string uses those three; with them 171 runs would differ). Entries never tie, so
   the encoder recompresses the expanded text byte-exact, with no dictionary tag anywhere in the
@@ -269,15 +269,23 @@ tool holds the character map, the tag names and which survey rows form which uni
 - **Build and verify.** `tools/build_rom.py` encodes every unit (the dictionary first) to
   `build/text/<label>.bin`, which `asm/data/` incbins like a pack (the manifest's piece kind
   `text`, the same FILEREAD rule and tests); a piece whose size changes fails the build.
-  `tools/verify.py` counts these bytes apart ("text ... encoded by the build from text extracted
-  from the ROM"), never as emitted by source.
-- **Rows that run past their text** (ends inferred, written as `@bytes` in the readable form, to
-  split in step 6): `$CC:2EB1` (strings end at `$CC:36F3`; then `$FF` fill and other data),
-  `$CC:3A09` (123 pointers, then 14 bytes that are no pointers), `$CC:CBC9` (one byte between
-  table and strings; the strings end at `$CC:DDC5`, 570 bytes of other data follow), `$FF:CF3B`
-  (26 bytes of a rising table after the strings), `$CC:6500` (251 names and 2 bytes), `$FD:A000`
-  (the credits end at the last block mark; the rest is not ASCII). The last string of `$CE:EF11`
-  ends at `$CE:EFE0`, the first byte of `BattleRom_DissolveRec` (a byte its reader skips).
+  `tools/verify.py` counts these bytes apart, never as emitted by source: its "text" figure is
+  every byte of the text units' rows, which hold text only (strings, their pointer tables, the
+  dictionary and its pointers, the 11-byte names, the credits). Extraction fails on a byte in a
+  unit that is not text. 16 entries of the map labels' table (`C2SceneRom_LabelStrings` entries
+  112-127, 32 bytes) hold `$0000` and point at no string; the readable file keeps them as `@set`
+  values, and they count as text with the rest of their table.
+- **Survey rows settled.** Rows whose ends were inferred ran past their text; the non-text bytes
+  are now rows of their own (extracted as data, counted as "extracted"): `$CC:36F4`-`$37FF`
+  (`$FF` fill) and `$CC:3800`-`$3A08` (a word table and bytes) after `MenuRom_DescStrTable`;
+  `$CC:3AFB`-`$3B0C` (18 bytes between `BattleRom_TechInfoStrings`' 121 pointers and its
+  strings, now the row `$CC:3B0D`); `$CC:CD8F` (one byte between `BattleRom_ScriptMsgStrings`'
+  227 pointers and its strings, `$CC:CD90`) and `$CC:DDC6`-`$DFFF` (570 bytes after them);
+  `$C6:F356`-`$F3FF` (`$00` fill after the map labels); `$CC:6FC9`-`$6FCA` (2 bytes after the
+  251st enemy name); `$FD:A7D1`-`$A80A` (after the last credits block); `$FF:D024`-`$D03D` (a
+  rising table after `MenuRom_NameStrings`). The last string of `$CE:EF11` ends with its `$00`
+  at `$CE:EFE0`, the first byte of `BattleRom_DissolveRec` (a byte its reader skips): that byte
+  stays in the extracted record, so the text piece ends one byte before its last terminator.
   `$DE:FAFE` (the 128th dictionary pointer) is a `table` row but part of the dictionary unit.
 - **Left:** the menu formats that are not TextWin strings (`MenuRom_ItemTextPtrs`,
   `MenuRom_StringPtrs`, the equipment labels at `$FF:C96A`-`$FF:C9AB`) stay extracted blobs;
@@ -375,6 +383,7 @@ None found beyond what is already known:
 - 12 packs (3,009 bytes) that repack byte-exact but that no pointer reaches (`$E0:332C`,
   `$E0:FD93`, `$F8:AB72`, `$F8:AD83`, eight in `$FA:FB33`-`$FF09`): reached through data the
   survey did not follow (no word or long pointer to them is in ROM or source), or unused.
-- 18 unknown rows (6,888 bytes), each described in its notes: stale bytes beside unused pointer
+- 25 unknown rows (8,084 bytes), each described in its notes (seven of them are the non-text
+  bytes split off the text rows in step 5): stale bytes beside unused pointer
   entries, four single bytes of the same value right after a run of packs, and small gaps.
 - The internal layout of the sprite frame records and of `$E4:0000`-`$1FFF`.

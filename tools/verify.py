@@ -322,8 +322,9 @@ def main() -> int:
               f'(build/assets/, incbin)')
         print(f'  {"packed":<16} {data["packed_bytes"]:>9,} bytes packed by the build from extracted '
               f'assets (build/packs/, incbin)')
-        print(f'  {"text":<16} {data["text_bytes"]:>9,} bytes encoded by the build from text extracted '
-              f'from the ROM (build/assets/text/ -> build/text/, incbin)')
+        print(f'  {"text":<16} {data["text_bytes"]:>9,} bytes of text (strings, their pointer tables, the '
+              f'dictionary, names, credits) encoded by the build from text extracted from the ROM '
+              f'(build/assets/text/ -> build/text/, incbin)')
         whole = len(emitted) + packed_emitted + sum(data.values())
         print(f'  {"whole ROM":<16} {whole:>9,} of {ROM_SIZE:,} bytes accounted for')
         if args.ranges:

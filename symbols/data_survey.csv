@@ -140,7 +140,8 @@ $C6:DA76,$C6:DB72,253,$C6,packed_lz,lz11 -> 3072 B: scene data unpacked to $7200
 $C6:DB73,$C6:DC3B,201,$C6,packed_lz,lz11 -> 3072 B: scene data unpacked to $7200 (use not traced),C2Scene_LoadUnk7200,confirmed,via C2SceneRom_Unk7200Packs[1]; repacks byte-exact (c3pack)
 $C6:DC3C,$C6:DD04,201,$C6,packed_lz,lz11 -> 3072 B: scene data unpacked to $7200 (use not traced),C2Scene_LoadUnk7200,confirmed,via C2SceneRom_Unk7200Packs[2]; repacks byte-exact (c3pack)
 $C6:DD05,$C6:DFFF,763,$C6,padding,763 x $00,,confirmed,uniform fill; nothing points into it
-$C6:F000,$C6:F3FF,1024,$C6,text,strings of C2SceneRom_LabelStrings (TextWin format),"C2Scene_LabelWait, C2Scene_MapViewLabel",confirmed,the map labels; their table follows at $C6:F400
+$C6:F000,$C6:F355,854,$C6,text,strings of C2SceneRom_LabelStrings (TextWin format),"C2Scene_LabelWait, C2Scene_MapViewLabel",confirmed,the map labels; their table follows at $C6:F400; extent: to the end of the last string (tools/text.py)
+$C6:F356,$C6:F3FF,170,$C6,padding,170 x $00,,probable,uniform fill after the last map label; the table's other 16 entries are $0000
 $C6:F400,$C6:F4FF,256,$C6,text,u16 string pointers (bank $C6) for TextWin_StrTable,"C2Scene_LabelWait, C2Scene_MapViewLabel",confirmed,named C2SceneRom_LabelStrings; extent to the next named table (end inferred)
 $C6:F500,$C6:F53F,64,$C6,graphics,two 4bpp tiles: sprite tiles 0 and 2 of the map view,C2Scene_MapView,confirmed,named C2SceneRom_MapMarkerTiles; extent to the next named table (end inferred)
 $C6:F540,$C6:F55F,32,$C6,palette,16 colours (BGR555): sprite palette 0 of the map view,C2Scene_MapView,confirmed,named C2SceneRom_MapViewObjPal; extent to the next named table (end inferred)
@@ -361,19 +362,27 @@ $CC:2BDC,$CC:2C6C,145,$CC,table,1 B per !Battle_UnkB18C: two gauge-reload nibble
 $CC:2C6D,$CC:2D68,252,$CC,table,u16 per shop: bank-$CC address of its 32 item ids,Menu_ShopInit,confirmed,named MenuRom_ShopLists; extent to the next named table (end inferred)
 $CC:2D69,$CC:2E30,200,$CC,table,u16 per record byte $12 value,Menu_AttackFormulaC,confirmed,named MenuRom_Char5Attack; extent to the next named table (end inferred)
 $CC:2E31,$CC:2EB0,128,$CC,table,16 B per config value: one byte per battler parameter,BattleFD_UnkB7EB,confirmed,named BattleRom_UnkCC2E31; extent to the next named table (end inferred)
-$CC:2EB1,$CC:3A08,2904,$CC,text,"string table (u16 pointers, then TextWin strings)",Menu_DrawDescText,confirmed,named MenuRom_DescStrTable; extent to the next named table (end inferred)
-$CC:3A09,$CC:43AE,2470,$CC,text,"string table (u16 pointers, then TextWin strings)","BattleCD_ShowTechInfo, Menu_TechTextSetup",confirmed,"named BattleRom_TechInfoStrings, MenuRom_TechTextTable; extent to the next named table (end inferred)"
+$CC:2EB1,$CC:36F3,2115,$CC,text,"string table (u16 pointers, then TextWin strings)",Menu_DrawDescText,confirmed,named MenuRom_DescStrTable; extent: to the end of its last string (tools/text.py)
+$CC:36F4,$CC:37FF,268,$CC,padding,268 x $FF,,probable,uniform fill after the last string of the table before it (tools/text.py); not text
+$CC:3800,$CC:3A08,521,$CC,unknown,"a word table (15 words point at $CC:3904-$39F9, the rest past $CC:3A09), then bytes",,unknown,no reader found; after the last string of the table before it (tools/text.py); not text
+$CC:3A09,$CC:3AFA,242,$CC,text,121 u16 string pointers (bank $CC) to the strings at $CC:3B0D,"BattleCD_ShowTechInfo, Menu_TechTextSetup",confirmed,"named BattleRom_TechInfoStrings, MenuRom_TechTextTable; extent: the entries that point at its strings (tools/text.py)"
+$CC:3AFB,$CC:3B0C,18,$CC,unknown,18 bytes between the pointer table and its strings; no pointer,,unknown,not text and no pointer into the strings (tools/text.py); reader unknown
+$CC:3B0D,$CC:43AE,2210,$CC,text,TextWin strings of BattleRom_TechInfoStrings,"BattleCD_ShowTechInfo, Menu_TechTextSetup",confirmed,the strings the table at $CC:3A09 points at; extent to the next named table (end inferred)
 $CC:43AF,$CC:46FF,849,$CC,padding,849 x $FF,,probable,fill after the region before it ($CC:3A09): the reader's extent is not settled: these bytes may still be read
 $CC:4700,$CC:5DFF,5888,$CC,table,23 B per enemy id: stat record,BattleFD_UnkB438,confirmed,named BattleRom_EnemyStats; extent to the next named table (end inferred)
 $CC:5E00,$CC:64FF,1792,$CC,table,7 B per enemy id: reward record (BattleRom_EnemyReward struct),BattleFD_AddEnemyRewards,confirmed,named BattleRom_EnemyReward; extent to the next named table (end inferred)
-$CC:6500,$CC:6FCA,2763,$CC,text,11-byte enemy names,"Battle_InitScene, TextWin_ExtEnemyName",confirmed,"named BattleRom_EnemyNames, TextWinRom_EnemyNames; extent to the next named table (end inferred)"
+$CC:6500,$CC:6FC8,2761,$CC,text,11-byte enemy names (251),"Battle_InitScene, TextWin_ExtEnemyName",confirmed,"named BattleRom_EnemyNames, TextWinRom_EnemyNames; extent: 251 whole names (tools/text.py)"
+$CC:6FC9,$CC:6FCA,2,$CC,unknown,2 bytes after the last whole enemy name,,unknown,not a whole 11-byte name; reader unknown
 $CC:6FCB,$CC:7AC8,2814,$CC,table,11 B per !Battle_UnkB18C: action records (TechRec layout from 2 B earlier),"BattleFD_LoadUnkB18E, BattleSys_UnkD7C4",confirmed,named BattleRom_UnkCC6FCB; extent to the next named table (end inferred)
 $CC:7AC9,$CC:86C8,3072,$CC,table,12 B per part number: effect records,BattleSys_UnkD7C4,confirmed,named BattleRom_EnemyEffectRecA; extent to the next named table (end inferred)
 $CC:86C9,$CC:88CA,514,$CC,table,"2 B per !Battle_UnkB18C: target mode, area number",BattleSys_UnkC1DD,confirmed,named BattleRom_EnemyTechTarget; extent to the next named table (end inferred)
 $CC:88CB,$CC:89C5,251,$CC,table,11 B per !Battle_UnkB18C: action records,"BattleFD_LoadUnkB18E2, BattleSys_UnkD8D1",confirmed,named BattleRom_UnkCC88CB; extent to the next named table (end inferred)
 $CC:89C6,$CC:8B07,322,$CC,table,12 B per part number: effect records,BattleSys_UnkD8D1,confirmed,named BattleRom_EnemyEffectRecB; extent to the next named table (end inferred)
 $CC:8B08,$CC:CBC8,16577,$CC,battle_script,u16 per enemy id: bank-$CC address of its behaviour script; then the scripts,"BattleAi_FindReactPart, BattleAi_RunMainPart",confirmed,named BattleRom_AiScriptPtrs; extent to the next named table (end inferred)
-$CC:CBC9,$CC:DFFF,5175,$CC,text,"string table (u16 pointers, then TextWin strings)",BattleCD_ShowScriptMessage,confirmed,named BattleRom_ScriptMsgStrings; extent to the next named table (end inferred)
+$CC:CBC9,$CC:CD8E,454,$CC,text,227 u16 string pointers (bank $CC) to the strings at $CC:CD90,BattleCD_ShowScriptMessage,confirmed,named BattleRom_ScriptMsgStrings; extent: its 227 entries (the first points past them)
+$CC:CD8F,$CC:CD8F,1,$CC,unknown,1 byte between the pointer table and its strings,,unknown,no pointer reaches it (tools/text.py); reader unknown
+$CC:CD90,$CC:DDC5,4150,$CC,text,TextWin strings of BattleRom_ScriptMsgStrings,BattleCD_ShowScriptMessage,confirmed,the strings the table at $CC:CBC9 points at; extent: to the end of the last string (tools/text.py)
+$CC:DDC6,$CC:DFFF,570,$CC,unknown,"570 bytes, not TextWin text",,unknown,reader unknown; after the last string of the table before it (tools/text.py); not text
 $CC:F383,$CC:F38B,9,$CC,table,small byte values,,unknown,between the end of the code ($F382) and BattleRom_TechListBase; no reader found
 $CC:F38C,$CC:F394,9,$CC,table,1 B per PC slot: first line in the tech lists,"BattleMenu_BuildTechAvailFlags, BattleMenu_RenderTechListRows, BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow, Battle_InitScene",confirmed,named BattleRom_TechListBase; extent to the next named table (end inferred)
 $CC:F395,$CC:F39A,6,$CC,table,2 B per PC slot: offset of its Tech_MenuEntry block,"BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow, Battle_InitScene",confirmed,named BattleRom_TechEntryBase; extent to the next named table (end inferred)
@@ -2046,7 +2055,8 @@ $FD:9BA6,$FD:9CB4,271,$FD,packed_lz,lz11 -> 622 B: location event script (Evt_Da
 $FD:9CB5,$FD:9F2B,631,$FD,packed_lz,lz11 -> 1030 B: location event script (Evt_Data),LocLoad_Unk56D4,confirmed,via Evt_PackPtrs[19]; repacks byte-exact (c3pack)
 $FD:9F2C,$FD:9FEA,191,$FD,packed_lz,lz11 -> 545 B: location event script (Evt_Data),LocLoad_Unk56D4,confirmed,via Evt_PackPtrs[20]; repacks byte-exact (c3pack)
 $FD:9FEB,$FD:9FFF,21,$FD,unknown,mixed bytes,,unknown,after the last pack before the credits text
-$FD:A000,$FD:A80A,2059,$FD,text,"staff credits in ASCII: '/' ends a line, a byte >= $80 ends a block","Evt_Op29_StartCredits, Field_ServiceUnk54",confirmed,named Credits_Text; extent to the next named table (end inferred)
+$FD:A000,$FD:A7D0,2001,$FD,text,"staff credits in ASCII: '/' ends a line, a byte >= $80 ends a block","Evt_Op29_StartCredits, Field_ServiceUnk54",confirmed,named Credits_Text; extent: to its last block end (tools/text.py)
+$FD:A7D1,$FD:A80A,58,$FD,unknown,58 bytes after the last credits block ($00 bytes and a few others),,unknown,not ASCII text; reader unknown
 $FD:A80B,$FD:A848,62,$FD,table,2 B per battler slot: stat block address,"BattleAi_AddPcByByte, BattleAi_RunAddStatBytes, BattleAi_RunAddStatsTech, BattleAi_RunKoSelf, BattleAi_RunLeave, BattleAi_RunSetStatByte, BattleAi_RunSetStatBytes, BattleAi_RunSetStatsTech, BattleAi_RunSwapInEnemy, BattleAi_TargetLowestHpEnemy, BattleAi_TargetLowestHpOtherEnemy, BattleAi_TestHpAtMost, BattleAi_TestHpHalfOrLess, BattleAi_TestStatByteAtLeast, BattleAi_TestStatByteAtMost, BattleAi_TestStatByteBits, BattleAi_TestStatByteEquals, BattleFD_RestoreEnemies, BattleFD_UnkAE52, BattleFD_UnkAEF2, BattleFD_UnkB7EB, BattleSys_UnkBC60, BattleSys_UnkCE3A, BattleSys_UnkCF15, Battle_SetupBattle",confirmed,named BattleRom_PcStatBlock; extent to the next named table (end inferred)
 $FD:A849,$FD:A84E,6,$FD,table,2 B per PC slot: BattleCmd record address,"BattleSys_ResetTechUsers, BattleSys_UnkB967, BattleSys_UnkBCE1_ClearRecords, BattleSys_UpdateKo",confirmed,named BattleRom_CmdPtr; extent to the next named table (end inferred)
 $FD:A84F,$FD:A89C,78,$FD,table,2 B per PC slot: Tech_MenuEntry block address,"BattleSys_UnkC96A, BattleSys_UnkCA1A, BattleSys_UnkCCCB",confirmed,named BattleRom_TechEntryPtr; extent to the next named table (end inferred)
@@ -2215,7 +2225,8 @@ $FF:CF2B,$FF:CF2B,1,$FF,table,"1 B: stat index (read at stat kind 1-6, over the 
 $FF:CF2C,$FF:CF31,6,$FF,table,7 B: stat numbers in visit order (the last byte is also MenuRom_StatItemCap),"Menu_AddItemBoosts, Menu_CharCalcStats",confirmed,named MenuRom_StatOrder; extent to the next named table (end inferred); 7 B read; the 7th is the next row (MenuRom_StatItemCap)
 $FF:CF32,$FF:CF32,1,$FF,table,"1 B: the cap a stat item stops at (read at stat kind 1-6, over the next row)",Menu_StatTargetCheck,confirmed,"named MenuRom_StatItemCap; extent to the next named table (end inferred); indexed by stat kind 1-6, so the reads run over the next row"
 $FF:CF33,$FF:CF3A,8,$FF,table,7 B: stat caps (also number limits),"Menu_TextNumberOrBar, Menu_CharCalcStats",confirmed,"named MenuRom_NumLimits, MenuRom_StatCaps; extent to the next named table (end inferred)"
-$FF:CF3B,$FF:D03D,259,$FF,text,string table (TextWin_StrTable) of mode $0D's and $0E's texts,"Menu_LoadAskSlot, Menu_NameChoiceText, Menu_NameInit, Menu_XchgPreviewA",confirmed,named MenuRom_NameStrings; extent to the next named table (end inferred)
+$FF:CF3B,$FF:D023,233,$FF,text,string table (TextWin_StrTable) of mode $0D's and $0E's texts,"Menu_LoadAskSlot, Menu_NameChoiceText, Menu_NameInit, Menu_XchgPreviewA",confirmed,named MenuRom_NameStrings; extent: to the end of its last string (tools/text.py)
+$FF:D024,$FF:D03D,26,$FF,unknown,"26 bytes rising from $00 to $D6 (a table, probably)",,unknown,reader unknown; after the last string of the table before it (tools/text.py); not text
 $FF:D03E,$FF:D295,600,$FF,text,string table (TextWin_StrTable) of the slot texts,Menu_DrawSlotText,confirmed,named MenuRom_SlotStrings; extent to the next named table (end inferred)
 $FF:D296,$FF:D395,256,$FF,table,a nibble per location: era string index,Menu_UnkD36C,confirmed,named MenuRom_SlotEraNibbles; extent to the next named table (end inferred)
 $FF:D396,$FF:D3FD,104,$FF,text,string table (TextWin_StrTable) of those strings,Menu_UnkD36C,confirmed,named MenuRom_SlotEraStrings; extent to the next named table (end inferred)

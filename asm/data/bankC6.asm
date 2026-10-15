@@ -290,12 +290,18 @@ Padding_C6DD05:
     fillbyte $00
     fill 763
 
-; $C6:F000-$C6:F3FF (1,024 B), text, confirmed: strings of C2SceneRom_LabelStrings (TextWin
+; $C6:F000-$C6:F355 (854 B), text, confirmed: strings of C2SceneRom_LabelStrings (TextWin
 ; format)
 ; Read by C2Scene_LabelWait, C2Scene_MapViewLabel.
 org $C6F000
 Text_C6F000:
     incbin "../../build/text/Text_C6F000.bin"          ; text unit SceneLabels (strings)
+
+; $C6:F356-$C6:F3FF (170 B), padding, probable: 170 x $00
+org $C6F356
+Padding_C6F356:
+    fillbyte $00
+    fill 170
 
 ; $C6:F400-$C6:F4FF (256 B), text, confirmed: u16 string pointers (bank $C6) for
 ; TextWin_StrTable

@@ -274,20 +274,44 @@ org $CC2E31
 BattleRom_UnkCC2E31:
     incbin "../../build/assets/table/BattleRom_UnkCC2E31.bin"
 
-; $CC:2EB1-$CC:3A08 (2,904 B), text, confirmed: string table (u16 pointers, then TextWin
+; $CC:2EB1-$CC:36F3 (2,115 B), text, confirmed: string table (u16 pointers, then TextWin
 ; strings)
 ; Read by Menu_DrawDescText.
 org $CC2EB1
 MenuRom_DescStrTable:
     incbin "../../build/text/MenuRom_DescStrTable.bin"          ; text unit MenuDescriptions (strtable)
 
-; $CC:3A09-$CC:43AE (2,470 B), text, confirmed: string table (u16 pointers, then TextWin
-; strings)
+; $CC:36F4-$CC:37FF (268 B), padding, probable: 268 x $FF
+org $CC36F4
+Padding_CC36F4:
+    fillbyte $FF
+    fill 268
+
+; $CC:3800-$CC:3A08 (521 B), unknown, unknown: a word table (15 words point at $CC:3904-$39F9,
+; the rest past $CC:3A09), then bytes
+org $CC3800
+Unknown_CC3800:
+    incbin "../../build/assets/unknown/Unknown_CC3800.bin"
+
+; $CC:3A09-$CC:3AFA (242 B), text, confirmed: 121 u16 string pointers (bank $CC) to the strings
+; at $CC:3B0D
 ; Read by BattleCD_ShowTechInfo, Menu_TechTextSetup.
 org $CC3A09
 BattleRom_TechInfoStrings:
 MenuRom_TechTextTable:
-    incbin "../../build/text/BattleRom_TechInfoStrings.bin"          ; text unit TechInfo (strtable)
+    incbin "../../build/text/BattleRom_TechInfoStrings.bin"          ; text unit TechInfo (ptrs ptr)
+
+; $CC:3AFB-$CC:3B0C (18 B), unknown, unknown: 18 bytes between the pointer table and its
+; strings; no pointer
+org $CC3AFB
+Unknown_CC3AFB:
+    incbin "../../build/assets/unknown/Unknown_CC3AFB.bin"
+
+; $CC:3B0D-$CC:43AE (2,210 B), text, confirmed: TextWin strings of BattleRom_TechInfoStrings
+; Read by BattleCD_ShowTechInfo, Menu_TechTextSetup.
+org $CC3B0D
+Text_CC3B0D:
+    incbin "../../build/text/Text_CC3B0D.bin"          ; text unit TechInfo (strings)
 
 ; $CC:43AF-$CC:46FF (849 B), padding, probable: 849 x $FF
 org $CC43AF
@@ -309,12 +333,17 @@ org $CC5E00
 Table_CC5E00:
     incbin "../../build/assets/table/Table_CC5E00.bin"
 
-; $CC:6500-$CC:6FCA (2,763 B), text, confirmed: 11-byte enemy names
+; $CC:6500-$CC:6FC8 (2,761 B), text, confirmed: 11-byte enemy names (251)
 ; Read by Battle_InitScene, TextWin_ExtEnemyName.
 org $CC6500
 BattleRom_EnemyNames:
 TextWinRom_EnemyNames:
     incbin "../../build/text/BattleRom_EnemyNames.bin"          ; text unit EnemyNames (records 11 $EF)
+
+; $CC:6FC9-$CC:6FCA (2 B), unknown, unknown: 2 bytes after the last whole enemy name
+org $CC6FC9
+Unknown_CC6FC9:
+    incbin "../../build/assets/unknown/Unknown_CC6FC9.bin"
 
 ; $CC:6FCB-$CC:7AC8 (2,814 B), table, confirmed: 11 B per !Battle_UnkB18C: action records
 ; (TechRec layout from 2 B earlier)
@@ -354,12 +383,28 @@ org $CC8B08
 BattleRom_AiScriptPtrs:
     incbin "../../build/assets/battle_script/BattleRom_AiScriptPtrs.bin"
 
-; $CC:CBC9-$CC:DFFF (5,175 B), text, confirmed: string table (u16 pointers, then TextWin
-; strings)
+; $CC:CBC9-$CC:CD8E (454 B), text, confirmed: 227 u16 string pointers (bank $CC) to the strings
+; at $CC:CD90
 ; Read by BattleCD_ShowScriptMessage.
 org $CCCBC9
 BattleRom_ScriptMsgStrings:
-    incbin "../../build/text/BattleRom_ScriptMsgStrings.bin"          ; text unit EnemyScriptMessages (strtable)
+    incbin "../../build/text/BattleRom_ScriptMsgStrings.bin"          ; text unit EnemyScriptMessages (ptrs ptr)
+
+; $CC:CD8F-$CC:CD8F (1 B), unknown, unknown: 1 byte between the pointer table and its strings
+org $CCCD8F
+Unknown_CCCD8F:
+    incbin "../../build/assets/unknown/Unknown_CCCD8F.bin"
+
+; $CC:CD90-$CC:DDC5 (4,150 B), text, confirmed: TextWin strings of BattleRom_ScriptMsgStrings
+; Read by BattleCD_ShowScriptMessage.
+org $CCCD90
+Text_CCCD90:
+    incbin "../../build/text/Text_CCCD90.bin"          ; text unit EnemyScriptMessages (strings)
+
+; $CC:DDC6-$CC:DFFF (570 B), unknown, unknown: 570 bytes, not TextWin text
+org $CCDDC6
+Unknown_CCDDC6:
+    incbin "../../build/assets/unknown/Unknown_CCDDC6.bin"
 
 ; $CC:F383-$CC:F38B (9 B), table, unknown: small byte values
 org $CCF383
