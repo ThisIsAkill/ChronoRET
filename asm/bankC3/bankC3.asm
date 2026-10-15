@@ -654,13 +654,20 @@ WinFx_StepWipe:
 ; subtracted in, each with the carry of the step before, and the result
 ; stored back.
 ; Callers (1 JSL site): WinFx_StepWipe ($C3:024A).
-; Callers note: the unpacked module also JSLs here (from $7E:3443).
-; Entry: M=1 (8-bit adds; WinFx_StepWipe has it, the module's site is
-;        not traced), X any (only its low byte is used), DP any (none
-;        used), DB = $00 or a bank that maps both low WRAM and the PPU
-;        registers (all operands are absolute).
-; Exit:  M as on entry; A = C3_RandSeed = the new value; flags from the
-;        last SBC; X, Y, DP, DB unchanged.
+; Callers note: the unpacked module also JSLs here, from
+;   C3Mod_KernelRandom ($7E:3443), whose twelve JSR sites
+;   tools/c3module.py's trace reaches: M=1 at seven, M=0 at $7F85,
+;   $7FA0, $80D3, $98E3 and $98EE.
+; Entry: M=1 or M=0 (WinFx_StepWipe and seven of the module's calls
+;        have M=1; with M=0 every add is 16-bit: X is used whole, each
+;        read takes the next register or byte as its high byte, and the
+;        seed is written as a word, $0386-$0387, the module's callers
+;        masking the result with an AND), X any (only its low byte is
+;        used at M=1), DP any (none used), DB = $00 or a bank that maps
+;        both low WRAM and the PPU registers (all operands are
+;        absolute).
+; Exit:  M as on entry; A = C3_RandSeed = the new value (a word at
+;        M=0); flags from the last SBC; X, Y, DP, DB unchanged.
 C3_RandomByte:
     ROL A
     ADC.w !C3_RandSeed
