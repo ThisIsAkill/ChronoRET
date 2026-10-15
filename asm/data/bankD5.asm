@@ -7,9 +7,10 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text or records it encodes
-; into build/text/ and build/records/ (symbols/data_assets.csv
-; lists them; nothing here is ROM data).
+; makes from one in build/packs/ (event scripts assembled from
+; their disassembly first), or text or records it encodes into
+; build/text/ and build/records/ (symbols/data_assets.csv lists
+; them; nothing here is ROM data).
 ; ============================================================
 
 ; $D5:0000-$D5:8BFF (35,840 B), graphics, confirmed: 4bpp 8x8 tiles, uncompressed (32 B per

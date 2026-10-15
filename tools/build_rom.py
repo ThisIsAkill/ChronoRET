@@ -72,10 +72,11 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] != 'packed':
+        if p['piece'] not in ('packed', 'events'):
             continue
         mode = int(extract_data.PACK_PARAM.match(p['param']).group(1))
-        src = root / extract_data.ASSETS / p['asset']
+        src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
+               else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
         sizes[p['label']] = int(p['size'])
@@ -137,6 +138,41 @@ def build_text(root: Path = ROOT) -> int:
     return written
 
 
+def build_events(root: Path = ROOT) -> int:
+    """Assemble every `events` piece's disassembly (build/assets/events/
+    <label>.evt, tools/events.py) to its unpacked bytes in build/events/
+    <label>.bin, which build_packs packs; returns how many files were
+    written (a file is rewritten only when its bytes change)."""
+    import events
+    root = Path(root)
+    pieces = extract_data.read_manifest()
+    evp = [p for p in pieces if p['piece'] == 'events']
+    if not evp:
+        return 0
+    names = events.opcode_names()
+    addrs = {p['label']: 0xC00000 + p['offset'] for p in pieces if p['piece'] == 'text'}
+    out_dir = root / extract_data.EVENTS_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written, wrong = 0, []
+    for p in evp:
+        text = (root / extract_data.ASSETS / p['asset']).read_text()
+        try:
+            data = events.assemble(text, names, addrs, p['label'])
+        except events.EventsError as e:
+            raise BuildError(f'events: {e}') from None
+        size = int(extract_data.PACK_PARAM.match(p['param']).group(2))
+        if len(data) != size:
+            wrong.append(f'{p["label"]}: {len(data)} B unpacked, its pack holds {size} B')
+            continue
+        path = out_dir / f'{p["label"]}.bin'
+        if not path.exists() or path.read_bytes() != data:
+            c3pack._write(path, data)
+            written += 1
+    if wrong:
+        raise BuildError('event scripts that do not fit their place:\n  ' + '\n  '.join(wrong))
+    return written
+
+
 def build_records(root: Path = ROOT) -> int:
     """Encode every `records` piece (see the docstring); returns how many
     files were written."""
@@ -191,6 +227,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
         c3pack.ensure_built(Path('.'))
     finally:
         os.chdir(cwd)
+    build_events(root)
     build_packs(root, quiet=quiet)
     build_text(root)
     build_records(root)

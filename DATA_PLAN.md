@@ -211,11 +211,12 @@ kind and address). `symbols/data_assets.csv` is its manifest. Pieces:
 | fill | 65,391 | the 78 padding rows, `fill` of the value in the survey (source) |
 | table | 5,044 | 20 pointer tables of labels (source; below) |
 | extracted | 1,248,980 | 493 blobs (485 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
-| packed | 2,349,626 | 1,515 streams packed at build time from their unpacked assets |
+| packed | 2,031,791 | 1,053 streams packed at build time from their unpacked assets |
+| events | 317,835 | the 462 location event script packs, packed at build time from scripts assembled from their disassembly (step 7, below) |
 | text | 202,895 | 45 rows in 31 text units, encoded at build time from readable text (step 5, below) |
 | records | 15,933 | 101 rows: 73 tables (15,245 B) and 28 palettes (688 B), encoded at build time from readable records (step 6, below) |
 
-`tools/verify.py` reports these six apart from the code figures, which do not change; with
+`tools/verify.py` reports these seven apart from the code figures, which do not change; with
 the code's 306,435 bytes they account for all 4,194,304. The tables written as labels are the
 ten `C2SceneRom_*Packs`, `BattleRom_BgMapPtrs`, `BattleRom_PcAttackFrames` and
 `BattleRom_ActFrames` (words), `BattleRom_SprTilesPtr`, `Map_PropsPtrs`, `LocGfx_Meta12Ptrs`,
@@ -291,8 +292,8 @@ tool holds the character map, the tag names and which survey rows form which uni
 - **Left:** the menu formats that are not TextWin strings (`MenuRom_ItemTextPtrs`,
   `MenuRom_StringPtrs`, the equipment labels at `$FF:C96A`-`$FF:C9AB`) stay extracted blobs;
   editing text needs extraction to keep an edited file (it restores every asset now) and a
-  layout pass for strings whose length changes; the event scripts' op `$B8` addresses into the
-  tables become labels with the event script disassembly (step 7).
+  layout pass for strings whose length changes. (The event scripts' op `$B8` addresses into the
+  tables are labels in their disassembly since step 7.)
 
 ## Tables and palettes (step 6, first part)
 
@@ -350,6 +351,36 @@ incbins it through the manifest (the same FILEREAD rule and tests as packs and t
   18 palette rows without a fixed copy length. 204 table rows (157,019 B, with the 8 tails of
   the pointer tables of labels) and 18 palette rows (31,374 B) are still extracted.
 
+## Location event scripts (step 7, first part)
+
+On the `data-events` branch. The 462 packs `Evt_PackPtrs` reaches are `events` pieces: `extract`
+writes a disassembly of each to `build/assets/events/<label>.evt` (checked to assemble back;
+cached in `build/events/cache/`, since a first extraction takes about six minutes), the build
+assembles it to the unpacked bytes and packs them as before, and `tools/verify.py` counts them
+as "events", never as source, with how much is disassembled.
+
+- **The opcodes come from the matched interpreter.** `tools/events.py` reads `Evt_OpcodeTable`
+  from the source, and `tools/absint.py` runs each handler's assembled code (an assembly of
+  `asm/main.asm`, not the ROM's bytes) with Y = the opcode's offset and the script known,
+  everything else unknown: both ways of a branch on an unknown value, states joined in loops
+  that keep changing, a callee it cannot follow (a dispatch on game state, a block move of
+  unknown size, a long run) taken as returning with A, X and Y unknown. An opcode's operands
+  are the script bytes it reads (a block move's source included); its length is where it goes
+  on when that place is not computed from a script byte (else the bytes it reads); each return
+  is next, stay (a wait), a jump (a place computed from an operand byte, whose encoding is
+  found by changing that byte) or an end (opcode `$00`, the warps and scene exits). Every
+  fixed length the handlers' headers state is the one derived; `$2E`, `$4E`, `$88`, `$F1` and
+  `$FF` vary with their operands, as their handlers do.
+- **The readable form.** Per pack the object count, the 16 function entries of each object as
+  labels, the jump encodings used, then the opcodes by their handlers' names, jumps as labels,
+  `$B8`'s pointer as the message table's label (all 416 of them), bytes no opcode reaches as
+  `@bytes`, and an opcode a jump reaches inside another's operands as an `@inner` line.
+- **Results.** 461 of 462 packs disassemble and assemble back byte-exact (the 462nd is empty):
+  142,406 opcodes; of the 568,478 unpacked bytes 565,436 are code and headers and 3,042 bytes
+  are never reached by an opcode (data).
+- **Left:** the battle scripts, the scene scripts and the music sequences (step 7); a
+  message's string number is still a number (the text units' strings have no names yet).
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
@@ -377,7 +408,7 @@ incbins it through the manifest (the same FILEREAD rule and tests as packs and t
 5. **Text** (done, above): the encoder and the dictionary question; the pointer tables.
 6. **Tables and palettes** (first part done, below; 2-4 sessions left): the tables still
    extracted, and the inferred table ends.
-7. **Script languages**: battle scripts (3-5), location event scripts (3-6, depends on 3),
+7. **Script languages**: battle scripts (3-5), location event scripts (done, below),
    scene scripts (2-3), music sequences (2-3).
 8. **Readable assets**: tile and palette converters (2-3), sprite frames (2), maps if wanted.
 9. **Unknown and probable rows** (1).

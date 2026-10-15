@@ -41,6 +41,13 @@ How each piece's bytes are made (the manifest's `piece` column):
              build/assets/packed_lz/<label>.bin with the mode in the
              manifest; the build packs them to build/packs/<label>.lz,
              which is incbin'd. Counted as "packed from extracted assets".
+  events     a location event script pack (a Decomp_ToWram stream reached
+             through Evt_PackPtrs): build/assets/events/<label>.evt holds
+             its disassembly (tools/events.py; checked to assemble back
+             when written; a pack the disassembler cannot follow is kept
+             there as bytes); the build assembles it to build/events/
+             <label>.bin and packs that to build/packs/<label>.lz, which is
+             incbin'd. param as for packed. Counted as "event scripts".
   records    a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
@@ -110,10 +117,13 @@ TEXT_PREFIX = '../../build/text/'
 RECORDS_PREFIX = '../../build/records/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records')
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
+EVENTS_ASSET = re.compile(r'^events/([A-Za-z_][A-Za-z0-9_]*)\.evt$')
+EVENTS_OUT = Path('build/events')      # the assembled (unpacked) event scripts (tools/build_rom.py)
+EVENT_PACK = re.compile(r'\bvia Evt_PackPtrs\[')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
 RECORDS_PARAM = re.compile(r'^(table|palette) (\d+) x (\d+) B$')
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
@@ -292,6 +302,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'{kind}/{label}.bin'
         elif piece == 'records':
             asset = f'records/{label}.tsv'
+        elif piece == 'events':
+            asset = f'events/{label}.evt'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
@@ -307,7 +319,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             add(label, s, e, 'fill', param=f'${m.group(2)}', row=row)
         elif kind == 'packed_lz':
             m = data_survey.PACK_FORMAT.match(row['format'])
-            add(label, s, e, 'packed', param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
+            add(label, s, e, 'events' if EVENT_PACK.search(row['notes']) else 'packed',
+                param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
         elif row['start'] in text.ROWS:
             unit, fmt = text.ROWS[row['start']]
             if kind not in ('text', 'table'):
@@ -389,6 +402,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
                     or Path(p['asset']).stem != p['label']:
                 problems.append(f'{where}: the asset must be <kind>/<label>.bin, once: {p["asset"]!r}')
             seen_assets.add(p['asset'])
+        elif p['piece'] == 'events':
+            m = EVENTS_ASSET.match(p['asset'])
+            if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
+                problems.append(f'{where}: an events piece\'s asset is events/<label>.evt and its param '
+                                f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'records':
             m = RECORDS_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or not RECORDS_PARAM.match(p['param']):
@@ -419,7 +437,7 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSET_PREFIX + p['asset']] = p
-        elif p['piece'] == 'packed':
+        elif p['piece'] in ('packed', 'events'):
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
         elif p['piece'] == 'text':
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
@@ -436,7 +454,7 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSETS / p['asset']] = int(p['size'])
-        elif p['piece'] == 'packed':
+        elif p['piece'] in ('packed', 'events'):
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
         elif p['piece'] == 'text':
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
@@ -552,9 +570,10 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; confidence are there) at its address. fill and pointer tables are',
         '; source; incbin reads an asset that tools/extract_data.py writes',
         '; from your own ROM to build/assets/, a pack tools/build_rom.py',
-        '; makes from one in build/packs/, or text or records it encodes',
-        '; into build/text/ and build/records/ (symbols/data_assets.csv',
-        '; lists them; nothing here is ROM data).',
+        '; makes from one in build/packs/ (event scripts assembled from',
+        '; their disassembly first), or text or records it encodes into',
+        '; build/text/ and build/records/ (symbols/data_assets.csv lists',
+        '; them; nothing here is ROM data).',
         '; ============================================================',
     ]
     for p in pieces:
@@ -582,6 +601,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{ASSET_PREFIX}{p["asset"]}"')
         elif p['piece'] == 'packed':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}')
+        elif p['piece'] == 'events':
+            out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, event script')
         elif p['piece'] == 'records':
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'text':
@@ -686,6 +707,8 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
+    for tool in ('events.py', 'absint.py', 'disasm.py'):   # the event scripts' disassembly
+        h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
 
@@ -717,6 +740,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     rom = read_rom()
     stamp.unlink(missing_ok=True)
     problems = extract_text(rom, out_dir, pieces) + extract_records(rom, out_dir, pieces)
+    problems += extract_events(rom, out_dir, pieces, root, quiet)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -725,6 +749,8 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
                 problems.append(f'{p["label"]}: not uniform {p["param"]} fill in this ROM')
             continue
         if p['piece'] in ('table', 'text', 'records'):
+            continue
+        if p['piece'] == 'events':
             continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -749,6 +775,73 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         n = len({p['asset'] for p in pieces if p['asset']})
         print(f'extract_data: {n:,} assets written to {ASSETS}/')
     return out_dir
+
+
+def unpack_piece(rom: bytes, p: dict) -> tuple[bytes | None, str | None]:
+    """(the unpacked bytes of a packed or events piece, or None and why)."""
+    import c3pack
+    mode, size = (int(x) for x in PACK_PARAM.match(p['param']).groups())
+    try:
+        data, end, got = c3pack.unpack(rom, p['offset'])
+    except c3pack.PackError as err:
+        return None, f'{p["label"]}: {err}'
+    if end != p['stop'] or got != mode or len(data) != size:
+        return None, (f'{p["label"]}: the stream ends at {addr(end - 1)}, mode {got}, '
+                      f'{len(data)} B; the manifest says {p["end"]}, {p["param"]}')
+    return data, None
+
+
+def extract_events(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = ROOT,
+                   quiet: bool = True) -> list[str]:
+    """Write the disassembly of every events piece (tools/events.py), each
+    checked to assemble back to the unpacked bytes; the problems. A pack's
+    disassembly is cached (build/events/cache/, by its bytes and the
+    tools), since following every handler takes minutes."""
+    import c3pack
+    import events
+    evp = [p for p in pieces if p['piece'] == 'events']
+    if not evp:
+        return []
+    texts_pieces = [(p['label'], 0xC00000 + p['offset'], 0xC00000 + p['stop'])
+                    for p in pieces if p['piece'] == 'text']
+    addrs = {n: a for n, a, _ in texts_pieces}
+    names = events.opcode_names()
+    tools = hashlib.sha256()
+    for tool in ('events.py', 'absint.py', 'disasm.py'):
+        tools.update((ROOT / 'tools' / tool).read_bytes())
+    tools.update(events._asm_hash(Path(root)).encode())
+    cache = Path(root) / EVENTS_OUT / 'cache'
+    cache.mkdir(parents=True, exist_ok=True)
+    interp, problems, done = None, [], 0
+    for p in evp:
+        data, why = unpack_piece(rom, p)
+        if data is None:
+            problems.append(why)
+            continue
+        key = hashlib.sha256(tools.digest() + p['label'].encode() + b'\0' + data).hexdigest()
+        hit = cache / f'{key}.evt'
+        text = hit.read_text() if hit.exists() else None
+        if text is not None:
+            try:
+                if events.assemble(text, names, addrs, p['label']) != data:
+                    text = None
+            except events.EventsError:
+                text = None
+        if text is None:
+            if interp is None:
+                interp = events.Interpreter(Path(root))
+            text = events.extract_pack(interp, names, data, p['label'], texts_pieces)
+            if events.assemble(text, names, addrs, p['label']) != data:
+                problems.append(f'{p["label"]}: the event script does not assemble back')
+                continue
+            c3pack._write(hit, text.encode())
+            done += 1
+            if not quiet and done % 50 == 0:
+                print(f'extract_data: {done} event scripts disassembled')
+        dest = out_dir / p['asset']
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        c3pack._write(dest, text.encode())
+    return problems
 
 
 def extract_records(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:

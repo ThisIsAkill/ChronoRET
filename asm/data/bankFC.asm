@@ -7,9 +7,10 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text or records it encodes
-; into build/text/ and build/records/ (symbols/data_assets.csv
-; lists them; nothing here is ROM data).
+; makes from one in build/packs/ (event scripts assembled from
+; their disassembly first), or text or records it encodes into
+; build/text/ and build/records/ (symbols/data_assets.csv lists
+; them; nothing here is ROM data).
 ; ============================================================
 
 ; $FC:0000-$FC:063C (1,597 B), packed_lz, confirmed: lz11 -> 2396 B: location event script
@@ -17,602 +18,602 @@
 ; Read by LocLoad_Unk56D4.
 org $FC0000
 EvtPack_409:
-    incbin "../../build/packs/EvtPack_409.lz"          ; lz11 -> 2396 B
+    incbin "../../build/packs/EvtPack_409.lz"          ; lz11 -> 2396 B, event script
 
 ; $FC:063D-$FC:0A3C (1,024 B), packed_lz, confirmed: lz11 -> 1326 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC063D
 EvtPack_410:
-    incbin "../../build/packs/EvtPack_410.lz"          ; lz11 -> 1326 B
+    incbin "../../build/packs/EvtPack_410.lz"          ; lz11 -> 1326 B, event script
 
 ; $FC:0A3D-$FC:0C67 (555 B), packed_lz, confirmed: lz11 -> 834 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC0A3D
 EvtPack_411:
-    incbin "../../build/packs/EvtPack_411.lz"          ; lz11 -> 834 B
+    incbin "../../build/packs/EvtPack_411.lz"          ; lz11 -> 834 B, event script
 
 ; $FC:0C68-$FC:0F28 (705 B), packed_lz, confirmed: lz11 -> 1289 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC0C68
 EvtPack_412:
-    incbin "../../build/packs/EvtPack_412.lz"          ; lz11 -> 1289 B
+    incbin "../../build/packs/EvtPack_412.lz"          ; lz11 -> 1289 B, event script
 
 ; $FC:0F29-$FC:105E (310 B), packed_lz, confirmed: lz11 -> 935 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC0F29
 EvtPack_413:
-    incbin "../../build/packs/EvtPack_413.lz"          ; lz11 -> 935 B
+    incbin "../../build/packs/EvtPack_413.lz"          ; lz11 -> 935 B, event script
 
 ; $FC:105F-$FC:11CD (367 B), packed_lz, confirmed: lz11 -> 710 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC105F
 EvtPack_414:
-    incbin "../../build/packs/EvtPack_414.lz"          ; lz11 -> 710 B
+    incbin "../../build/packs/EvtPack_414.lz"          ; lz11 -> 710 B, event script
 
 ; $FC:11CE-$FC:1292 (197 B), packed_lz, confirmed: lz11 -> 461 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC11CE
 EvtPack_415:
-    incbin "../../build/packs/EvtPack_415.lz"          ; lz11 -> 461 B
+    incbin "../../build/packs/EvtPack_415.lz"          ; lz11 -> 461 B, event script
 
 ; $FC:1293-$FC:1486 (500 B), packed_lz, confirmed: lz11 -> 989 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC1293
 EvtPack_416:
-    incbin "../../build/packs/EvtPack_416.lz"          ; lz11 -> 989 B
+    incbin "../../build/packs/EvtPack_416.lz"          ; lz11 -> 989 B, event script
 
 ; $FC:1487-$FC:196F (1,257 B), packed_lz, confirmed: lz11 -> 1811 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC1487
 EvtPack_417:
-    incbin "../../build/packs/EvtPack_417.lz"          ; lz11 -> 1811 B
+    incbin "../../build/packs/EvtPack_417.lz"          ; lz11 -> 1811 B, event script
 
 ; $FC:1970-$FC:1C49 (730 B), packed_lz, confirmed: lz11 -> 1217 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC1970
 EvtPack_418:
-    incbin "../../build/packs/EvtPack_418.lz"          ; lz11 -> 1217 B
+    incbin "../../build/packs/EvtPack_418.lz"          ; lz11 -> 1217 B, event script
 
 ; $FC:1C4A-$FC:1E40 (503 B), packed_lz, confirmed: lz11 -> 1079 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC1C4A
 EvtPack_419:
-    incbin "../../build/packs/EvtPack_419.lz"          ; lz11 -> 1079 B
+    incbin "../../build/packs/EvtPack_419.lz"          ; lz11 -> 1079 B, event script
 
 ; $FC:1E41-$FC:1F75 (309 B), packed_lz, confirmed: lz11 -> 590 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC1E41
 EvtPack_420:
-    incbin "../../build/packs/EvtPack_420.lz"          ; lz11 -> 590 B
+    incbin "../../build/packs/EvtPack_420.lz"          ; lz11 -> 590 B, event script
 
 ; $FC:1F76-$FC:2302 (909 B), packed_lz, confirmed: lz11 -> 1253 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC1F76
 EvtPack_421:
-    incbin "../../build/packs/EvtPack_421.lz"          ; lz11 -> 1253 B
+    incbin "../../build/packs/EvtPack_421.lz"          ; lz11 -> 1253 B, event script
 
 ; $FC:2303-$FC:260F (781 B), packed_lz, confirmed: lz11 -> 1288 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC2303
 EvtPack_422:
-    incbin "../../build/packs/EvtPack_422.lz"          ; lz11 -> 1288 B
+    incbin "../../build/packs/EvtPack_422.lz"          ; lz11 -> 1288 B, event script
 
 ; $FC:2610-$FC:2929 (794 B), packed_lz, confirmed: lz11 -> 1470 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC2610
 EvtPack_423:
-    incbin "../../build/packs/EvtPack_423.lz"          ; lz11 -> 1470 B
+    incbin "../../build/packs/EvtPack_423.lz"          ; lz11 -> 1470 B, event script
 
 ; $FC:292A-$FC:29B7 (142 B), packed_lz, confirmed: lz11 -> 207 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC292A
 EvtPack_424:
-    incbin "../../build/packs/EvtPack_424.lz"          ; lz11 -> 207 B
+    incbin "../../build/packs/EvtPack_424.lz"          ; lz11 -> 207 B, event script
 
 ; $FC:29B8-$FC:2B3F (392 B), packed_lz, confirmed: lz11 -> 645 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC29B8
 EvtPack_425:
-    incbin "../../build/packs/EvtPack_425.lz"          ; lz11 -> 645 B
+    incbin "../../build/packs/EvtPack_425.lz"          ; lz11 -> 645 B, event script
 
 ; $FC:2B40-$FC:2C40 (257 B), packed_lz, confirmed: lz11 -> 458 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC2B40
 EvtPack_426:
-    incbin "../../build/packs/EvtPack_426.lz"          ; lz11 -> 458 B
+    incbin "../../build/packs/EvtPack_426.lz"          ; lz11 -> 458 B, event script
 
 ; $FC:2C41-$FC:2D6C (300 B), packed_lz, confirmed: lz11 -> 473 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC2C41
 EvtPack_427:
-    incbin "../../build/packs/EvtPack_427.lz"          ; lz11 -> 473 B
+    incbin "../../build/packs/EvtPack_427.lz"          ; lz11 -> 473 B, event script
 
 ; $FC:2D6D-$FC:31BE (1,106 B), packed_lz, confirmed: lz11 -> 1834 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC2D6D
 EvtPack_428:
-    incbin "../../build/packs/EvtPack_428.lz"          ; lz11 -> 1834 B
+    incbin "../../build/packs/EvtPack_428.lz"          ; lz11 -> 1834 B, event script
 
 ; $FC:31BF-$FC:32F6 (312 B), packed_lz, confirmed: lz11 -> 736 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC31BF
 EvtPack_429:
-    incbin "../../build/packs/EvtPack_429.lz"          ; lz11 -> 736 B
+    incbin "../../build/packs/EvtPack_429.lz"          ; lz11 -> 736 B, event script
 
 ; $FC:32F7-$FC:34E5 (495 B), packed_lz, confirmed: lz11 -> 937 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC32F7
 EvtPack_430:
-    incbin "../../build/packs/EvtPack_430.lz"          ; lz11 -> 937 B
+    incbin "../../build/packs/EvtPack_430.lz"          ; lz11 -> 937 B, event script
 
 ; $FC:34E6-$FC:3688 (419 B), packed_lz, confirmed: lz11 -> 711 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC34E6
 EvtPack_431:
-    incbin "../../build/packs/EvtPack_431.lz"          ; lz11 -> 711 B
+    incbin "../../build/packs/EvtPack_431.lz"          ; lz11 -> 711 B, event script
 
 ; $FC:3689-$FC:3771 (233 B), packed_lz, confirmed: lz11 -> 551 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC3689
 EvtPack_432:
-    incbin "../../build/packs/EvtPack_432.lz"          ; lz11 -> 551 B
+    incbin "../../build/packs/EvtPack_432.lz"          ; lz11 -> 551 B, event script
 
 ; $FC:3772-$FC:3814 (163 B), packed_lz, confirmed: lz11 -> 418 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC3772
 EvtPack_433:
-    incbin "../../build/packs/EvtPack_433.lz"          ; lz11 -> 418 B
+    incbin "../../build/packs/EvtPack_433.lz"          ; lz11 -> 418 B, event script
 
 ; $FC:3815-$FC:3906 (242 B), packed_lz, confirmed: lz11 -> 506 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC3815
 EvtPack_434:
-    incbin "../../build/packs/EvtPack_434.lz"          ; lz11 -> 506 B
+    incbin "../../build/packs/EvtPack_434.lz"          ; lz11 -> 506 B, event script
 
 ; $FC:3907-$FC:39EA (228 B), packed_lz, confirmed: lz11 -> 475 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC3907
 EvtPack_435:
-    incbin "../../build/packs/EvtPack_435.lz"          ; lz11 -> 475 B
+    incbin "../../build/packs/EvtPack_435.lz"          ; lz11 -> 475 B, event script
 
 ; $FC:39EB-$FC:3C65 (635 B), packed_lz, confirmed: lz11 -> 1184 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC39EB
 EvtPack_436:
-    incbin "../../build/packs/EvtPack_436.lz"          ; lz11 -> 1184 B
+    incbin "../../build/packs/EvtPack_436.lz"          ; lz11 -> 1184 B, event script
 
 ; $FC:3C66-$FC:3EC3 (606 B), packed_lz, confirmed: lz11 -> 936 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC3C66
 EvtPack_437:
-    incbin "../../build/packs/EvtPack_437.lz"          ; lz11 -> 936 B
+    incbin "../../build/packs/EvtPack_437.lz"          ; lz11 -> 936 B, event script
 
 ; $FC:3EC4-$FC:40B6 (499 B), packed_lz, confirmed: lz11 -> 874 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC3EC4
 EvtPack_438:
-    incbin "../../build/packs/EvtPack_438.lz"          ; lz11 -> 874 B
+    incbin "../../build/packs/EvtPack_438.lz"          ; lz11 -> 874 B, event script
 
 ; $FC:40B7-$FC:425E (424 B), packed_lz, confirmed: lz11 -> 861 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC40B7
 EvtPack_439:
-    incbin "../../build/packs/EvtPack_439.lz"          ; lz11 -> 861 B
+    incbin "../../build/packs/EvtPack_439.lz"          ; lz11 -> 861 B, event script
 
 ; $FC:425F-$FC:42FF (161 B), packed_lz, confirmed: lz11 -> 384 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC425F
 EvtPack_440:
-    incbin "../../build/packs/EvtPack_440.lz"          ; lz11 -> 384 B
+    incbin "../../build/packs/EvtPack_440.lz"          ; lz11 -> 384 B, event script
 
 ; $FC:4300-$FC:45D3 (724 B), packed_lz, confirmed: lz11 -> 1252 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC4300
 EvtPack_441:
-    incbin "../../build/packs/EvtPack_441.lz"          ; lz11 -> 1252 B
+    incbin "../../build/packs/EvtPack_441.lz"          ; lz11 -> 1252 B, event script
 
 ; $FC:45D4-$FC:46DF (268 B), packed_lz, confirmed: lz11 -> 546 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC45D4
 EvtPack_442:
-    incbin "../../build/packs/EvtPack_442.lz"          ; lz11 -> 546 B
+    incbin "../../build/packs/EvtPack_442.lz"          ; lz11 -> 546 B, event script
 
 ; $FC:46E0-$FC:4952 (627 B), packed_lz, confirmed: lz11 -> 1294 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC46E0
 EvtPack_443:
-    incbin "../../build/packs/EvtPack_443.lz"          ; lz11 -> 1294 B
+    incbin "../../build/packs/EvtPack_443.lz"          ; lz11 -> 1294 B, event script
 
 ; $FC:4953-$FC:555D (3,083 B), packed_lz, confirmed: lz11 -> 4651 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC4953
 EvtPack_444:
-    incbin "../../build/packs/EvtPack_444.lz"          ; lz11 -> 4651 B
+    incbin "../../build/packs/EvtPack_444.lz"          ; lz11 -> 4651 B, event script
 
 ; $FC:555E-$FC:5B13 (1,462 B), packed_lz, confirmed: lz11 -> 2461 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC555E
 EvtPack_445:
-    incbin "../../build/packs/EvtPack_445.lz"          ; lz11 -> 2461 B
+    incbin "../../build/packs/EvtPack_445.lz"          ; lz11 -> 2461 B, event script
 
 ; $FC:5B14-$FC:5EC8 (949 B), packed_lz, confirmed: lz11 -> 1322 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC5B14
 EvtPack_446:
-    incbin "../../build/packs/EvtPack_446.lz"          ; lz11 -> 1322 B
+    incbin "../../build/packs/EvtPack_446.lz"          ; lz11 -> 1322 B, event script
 
 ; $FC:5EC9-$FC:5EF3 (43 B), packed_lz, confirmed: lz11 -> 118 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC5EC9
 EvtPack_447:
-    incbin "../../build/packs/EvtPack_447.lz"          ; lz11 -> 118 B
+    incbin "../../build/packs/EvtPack_447.lz"          ; lz11 -> 118 B, event script
 
 ; $FC:5EF4-$FC:60CC (473 B), packed_lz, confirmed: lz11 -> 802 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC5EF4
 EvtPack_449:
-    incbin "../../build/packs/EvtPack_449.lz"          ; lz11 -> 802 B
+    incbin "../../build/packs/EvtPack_449.lz"          ; lz11 -> 802 B, event script
 
 ; $FC:60CD-$FC:6224 (344 B), packed_lz, confirmed: lz11 -> 623 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC60CD
 EvtPack_453:
-    incbin "../../build/packs/EvtPack_453.lz"          ; lz11 -> 623 B
+    incbin "../../build/packs/EvtPack_453.lz"          ; lz11 -> 623 B, event script
 
 ; $FC:6225-$FC:6343 (287 B), packed_lz, confirmed: lz11 -> 569 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC6225
 EvtPack_454:
-    incbin "../../build/packs/EvtPack_454.lz"          ; lz11 -> 569 B
+    incbin "../../build/packs/EvtPack_454.lz"          ; lz11 -> 569 B, event script
 
 ; $FC:6344-$FC:6488 (325 B), packed_lz, confirmed: lz11 -> 700 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC6344
 EvtPack_455:
-    incbin "../../build/packs/EvtPack_455.lz"          ; lz11 -> 700 B
+    incbin "../../build/packs/EvtPack_455.lz"          ; lz11 -> 700 B, event script
 
 ; $FC:6489-$FC:661E (406 B), packed_lz, confirmed: lz11 -> 872 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC6489
 EvtPack_456:
-    incbin "../../build/packs/EvtPack_456.lz"          ; lz11 -> 872 B
+    incbin "../../build/packs/EvtPack_456.lz"          ; lz11 -> 872 B, event script
 
 ; $FC:661F-$FC:67B0 (402 B), packed_lz, confirmed: lz11 -> 872 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC661F
 EvtPack_457:
-    incbin "../../build/packs/EvtPack_457.lz"          ; lz11 -> 872 B
+    incbin "../../build/packs/EvtPack_457.lz"          ; lz11 -> 872 B, event script
 
 ; $FC:67B1-$FC:6BEB (1,083 B), packed_lz, confirmed: lz11 -> 1549 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC67B1
 EvtPack_458:
-    incbin "../../build/packs/EvtPack_458.lz"          ; lz11 -> 1549 B
+    incbin "../../build/packs/EvtPack_458.lz"          ; lz11 -> 1549 B, event script
 
 ; $FC:6BEC-$FC:6C6E (131 B), packed_lz, confirmed: lz11 -> 357 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC6BEC
 EvtPack_464:
-    incbin "../../build/packs/EvtPack_464.lz"          ; lz11 -> 357 B
+    incbin "../../build/packs/EvtPack_464.lz"          ; lz11 -> 357 B, event script
 
 ; $FC:6C6F-$FC:74BC (2,126 B), packed_lz, confirmed: lz11 -> 3487 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC6C6F
 EvtPack_465:
-    incbin "../../build/packs/EvtPack_465.lz"          ; lz11 -> 3487 B
+    incbin "../../build/packs/EvtPack_465.lz"          ; lz11 -> 3487 B, event script
 
 ; $FC:74BD-$FC:7617 (347 B), packed_lz, confirmed: lz11 -> 631 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC74BD
 EvtPack_467:
-    incbin "../../build/packs/EvtPack_467.lz"          ; lz11 -> 631 B
+    incbin "../../build/packs/EvtPack_467.lz"          ; lz11 -> 631 B, event script
 
 ; $FC:7618-$FC:7667 (80 B), packed_lz, confirmed: lz11 -> 292 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC7618
 EvtPack_468:
-    incbin "../../build/packs/EvtPack_468.lz"          ; lz11 -> 292 B
+    incbin "../../build/packs/EvtPack_468.lz"          ; lz11 -> 292 B, event script
 
 ; $FC:7668-$FC:79CC (869 B), packed_lz, confirmed: lz11 -> 1662 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC7668
 EvtPack_469:
-    incbin "../../build/packs/EvtPack_469.lz"          ; lz11 -> 1662 B
+    incbin "../../build/packs/EvtPack_469.lz"          ; lz11 -> 1662 B, event script
 
 ; $FC:79CD-$FC:7E8B (1,215 B), packed_lz, confirmed: lz11 -> 2108 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC79CD
 EvtPack_470:
-    incbin "../../build/packs/EvtPack_470.lz"          ; lz11 -> 2108 B
+    incbin "../../build/packs/EvtPack_470.lz"          ; lz11 -> 2108 B, event script
 
 ; $FC:7E8C-$FC:7F63 (216 B), packed_lz, confirmed: lz11 -> 434 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC7E8C
 EvtPack_471:
-    incbin "../../build/packs/EvtPack_471.lz"          ; lz11 -> 434 B
+    incbin "../../build/packs/EvtPack_471.lz"          ; lz11 -> 434 B, event script
 
 ; $FC:7F64-$FC:817A (535 B), packed_lz, confirmed: lz11 -> 900 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC7F64
 EvtPack_473:
-    incbin "../../build/packs/EvtPack_473.lz"          ; lz11 -> 900 B
+    incbin "../../build/packs/EvtPack_473.lz"          ; lz11 -> 900 B, event script
 
 ; $FC:817B-$FC:8444 (714 B), packed_lz, confirmed: lz11 -> 1130 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC817B
 EvtPack_474:
-    incbin "../../build/packs/EvtPack_474.lz"          ; lz11 -> 1130 B
+    incbin "../../build/packs/EvtPack_474.lz"          ; lz11 -> 1130 B, event script
 
 ; $FC:8445-$FC:8589 (325 B), packed_lz, confirmed: lz11 -> 628 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8445
 EvtPack_475:
-    incbin "../../build/packs/EvtPack_475.lz"          ; lz11 -> 628 B
+    incbin "../../build/packs/EvtPack_475.lz"          ; lz11 -> 628 B, event script
 
 ; $FC:858A-$FC:87F9 (624 B), packed_lz, confirmed: lz11 -> 890 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC858A
 EvtPack_476:
-    incbin "../../build/packs/EvtPack_476.lz"          ; lz11 -> 890 B
+    incbin "../../build/packs/EvtPack_476.lz"          ; lz11 -> 890 B, event script
 
 ; $FC:87FA-$FC:8916 (285 B), packed_lz, confirmed: lz11 -> 544 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC87FA
 EvtPack_477:
-    incbin "../../build/packs/EvtPack_477.lz"          ; lz11 -> 544 B
+    incbin "../../build/packs/EvtPack_477.lz"          ; lz11 -> 544 B, event script
 
 ; $FC:8917-$FC:8A33 (285 B), packed_lz, confirmed: lz11 -> 545 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8917
 EvtPack_479:
-    incbin "../../build/packs/EvtPack_479.lz"          ; lz11 -> 545 B
+    incbin "../../build/packs/EvtPack_479.lz"          ; lz11 -> 545 B, event script
 
 ; $FC:8A34-$FC:8AC4 (145 B), packed_lz, confirmed: lz11 -> 400 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8A34
 EvtPack_480:
-    incbin "../../build/packs/EvtPack_480.lz"          ; lz11 -> 400 B
+    incbin "../../build/packs/EvtPack_480.lz"          ; lz11 -> 400 B, event script
 
 ; $FC:8AC5-$FC:8BF8 (308 B), packed_lz, confirmed: lz11 -> 675 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8AC5
 EvtPack_481:
-    incbin "../../build/packs/EvtPack_481.lz"          ; lz11 -> 675 B
+    incbin "../../build/packs/EvtPack_481.lz"          ; lz11 -> 675 B, event script
 
 ; $FC:8BF9-$FC:8C94 (156 B), packed_lz, confirmed: lz11 -> 495 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8BF9
 EvtPack_482:
-    incbin "../../build/packs/EvtPack_482.lz"          ; lz11 -> 495 B
+    incbin "../../build/packs/EvtPack_482.lz"          ; lz11 -> 495 B, event script
 
 ; $FC:8C95-$FC:8E61 (461 B), packed_lz, confirmed: lz11 -> 895 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8C95
 EvtPack_483:
-    incbin "../../build/packs/EvtPack_483.lz"          ; lz11 -> 895 B
+    incbin "../../build/packs/EvtPack_483.lz"          ; lz11 -> 895 B, event script
 
 ; $FC:8E62-$FC:8F8B (298 B), packed_lz, confirmed: lz11 -> 629 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8E62
 EvtPack_484:
-    incbin "../../build/packs/EvtPack_484.lz"          ; lz11 -> 629 B
+    incbin "../../build/packs/EvtPack_484.lz"          ; lz11 -> 629 B, event script
 
 ; $FC:8F8C-$FC:9002 (119 B), packed_lz, confirmed: lz11 -> 377 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC8F8C
 EvtPack_485:
-    incbin "../../build/packs/EvtPack_485.lz"          ; lz11 -> 377 B
+    incbin "../../build/packs/EvtPack_485.lz"          ; lz11 -> 377 B, event script
 
 ; $FC:9003-$FC:9052 (80 B), packed_lz, confirmed: lz11 -> 292 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9003
 EvtPack_486:
-    incbin "../../build/packs/EvtPack_486.lz"          ; lz11 -> 292 B
+    incbin "../../build/packs/EvtPack_486.lz"          ; lz11 -> 292 B, event script
 
 ; $FC:9053-$FC:9676 (1,572 B), packed_lz, confirmed: lz11 -> 3097 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9053
 EvtPack_490:
-    incbin "../../build/packs/EvtPack_490.lz"          ; lz11 -> 3097 B
+    incbin "../../build/packs/EvtPack_490.lz"          ; lz11 -> 3097 B, event script
 
 ; $FC:9677-$FC:98FB (645 B), packed_lz, confirmed: lz11 -> 1051 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9677
 EvtPack_491:
-    incbin "../../build/packs/EvtPack_491.lz"          ; lz11 -> 1051 B
+    incbin "../../build/packs/EvtPack_491.lz"          ; lz11 -> 1051 B, event script
 
 ; $FC:98FC-$FC:9ABD (450 B), packed_lz, confirmed: lz11 -> 953 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC98FC
 EvtPack_492:
-    incbin "../../build/packs/EvtPack_492.lz"          ; lz11 -> 953 B
+    incbin "../../build/packs/EvtPack_492.lz"          ; lz11 -> 953 B, event script
 
 ; $FC:9ABE-$FC:9C5C (415 B), packed_lz, confirmed: lz11 -> 855 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9ABE
 EvtPack_493:
-    incbin "../../build/packs/EvtPack_493.lz"          ; lz11 -> 855 B
+    incbin "../../build/packs/EvtPack_493.lz"          ; lz11 -> 855 B, event script
 
 ; $FC:9C5D-$FC:9D5B (255 B), packed_lz, confirmed: lz11 -> 639 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9C5D
 EvtPack_494:
-    incbin "../../build/packs/EvtPack_494.lz"          ; lz11 -> 639 B
+    incbin "../../build/packs/EvtPack_494.lz"          ; lz11 -> 639 B, event script
 
 ; $FC:9D5C-$FC:9EAE (339 B), packed_lz, confirmed: lz11 -> 625 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9D5C
 EvtPack_495:
-    incbin "../../build/packs/EvtPack_495.lz"          ; lz11 -> 625 B
+    incbin "../../build/packs/EvtPack_495.lz"          ; lz11 -> 625 B, event script
 
 ; $FC:9EAF-$FC:A018 (362 B), packed_lz, confirmed: lz11 -> 648 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FC9EAF
 EvtPack_496:
-    incbin "../../build/packs/EvtPack_496.lz"          ; lz11 -> 648 B
+    incbin "../../build/packs/EvtPack_496.lz"          ; lz11 -> 648 B, event script
 
 ; $FC:A019-$FC:A14F (311 B), packed_lz, confirmed: lz11 -> 691 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA019
 EvtPack_497:
-    incbin "../../build/packs/EvtPack_497.lz"          ; lz11 -> 691 B
+    incbin "../../build/packs/EvtPack_497.lz"          ; lz11 -> 691 B, event script
 
 ; $FC:A150-$FC:A27F (304 B), packed_lz, confirmed: lz11 -> 637 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA150
 EvtPack_498:
-    incbin "../../build/packs/EvtPack_498.lz"          ; lz11 -> 637 B
+    incbin "../../build/packs/EvtPack_498.lz"          ; lz11 -> 637 B, event script
 
 ; $FC:A280-$FC:A6E4 (1,125 B), packed_lz, confirmed: lz11 -> 1562 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA280
 EvtPack_499:
-    incbin "../../build/packs/EvtPack_499.lz"          ; lz11 -> 1562 B
+    incbin "../../build/packs/EvtPack_499.lz"          ; lz11 -> 1562 B, event script
 
 ; $FC:A6E5-$FC:A777 (147 B), packed_lz, confirmed: lz11 -> 402 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA6E5
 EvtPack_500:
-    incbin "../../build/packs/EvtPack_500.lz"          ; lz11 -> 402 B
+    incbin "../../build/packs/EvtPack_500.lz"          ; lz11 -> 402 B, event script
 
 ; $FC:A778-$FC:A818 (161 B), packed_lz, confirmed: lz11 -> 413 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA778
 EvtPack_501:
-    incbin "../../build/packs/EvtPack_501.lz"          ; lz11 -> 413 B
+    incbin "../../build/packs/EvtPack_501.lz"          ; lz11 -> 413 B, event script
 
 ; $FC:A819-$FC:A99B (387 B), packed_lz, confirmed: lz11 -> 833 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA819
 EvtPack_502:
-    incbin "../../build/packs/EvtPack_502.lz"          ; lz11 -> 833 B
+    incbin "../../build/packs/EvtPack_502.lz"          ; lz11 -> 833 B, event script
 
 ; $FC:A99C-$FC:ABB8 (541 B), packed_lz, confirmed: lz11 -> 1127 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCA99C
 EvtPack_504:
-    incbin "../../build/packs/EvtPack_504.lz"          ; lz11 -> 1127 B
+    incbin "../../build/packs/EvtPack_504.lz"          ; lz11 -> 1127 B, event script
 
 ; $FC:ABB9-$FC:AF9B (995 B), packed_lz, confirmed: lz11 -> 1836 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCABB9
 EvtPack_506:
-    incbin "../../build/packs/EvtPack_506.lz"          ; lz11 -> 1836 B
+    incbin "../../build/packs/EvtPack_506.lz"          ; lz11 -> 1836 B, event script
 
 ; $FC:AF9C-$FC:B1E8 (589 B), packed_lz, confirmed: lz11 -> 1248 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCAF9C
 EvtPack_507:
-    incbin "../../build/packs/EvtPack_507.lz"          ; lz11 -> 1248 B
+    incbin "../../build/packs/EvtPack_507.lz"          ; lz11 -> 1248 B, event script
 
 ; $FC:B1E9-$FC:B398 (432 B), packed_lz, confirmed: lz11 -> 913 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCB1E9
 EvtPack_508:
-    incbin "../../build/packs/EvtPack_508.lz"          ; lz11 -> 913 B
+    incbin "../../build/packs/EvtPack_508.lz"          ; lz11 -> 913 B, event script
 
 ; $FC:B399-$FC:B47F (231 B), packed_lz, confirmed: lz11 -> 485 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCB399
 EvtPack_509:
-    incbin "../../build/packs/EvtPack_509.lz"          ; lz11 -> 485 B
+    incbin "../../build/packs/EvtPack_509.lz"          ; lz11 -> 485 B, event script
 
 ; $FC:B480-$FC:B6EF (624 B), packed_lz, confirmed: lz11 -> 928 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCB480
 EvtPack_510:
-    incbin "../../build/packs/EvtPack_510.lz"          ; lz11 -> 928 B
+    incbin "../../build/packs/EvtPack_510.lz"          ; lz11 -> 928 B, event script
 
 ; $FC:B6F0-$FC:B9E7 (760 B), packed_lz, confirmed: lz11 -> 1452 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $FCB6F0
 EvtPack_512:
-    incbin "../../build/packs/EvtPack_512.lz"          ; lz11 -> 1452 B
+    incbin "../../build/packs/EvtPack_512.lz"          ; lz11 -> 1452 B, event script
 
 ; $FC:B9E8-$FC:B9FF (24 B), text, probable: bytes in the text encoding
 org $FCB9E8
