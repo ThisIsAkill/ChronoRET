@@ -1,9 +1,8 @@
 ROM         ?= roms/chrono_trigger.sfc
 BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
-MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate progress test-hooks test-tools duplicates duplicates-reloc xref clean check-rom setup tables-scan draft
+.PHONY: all build extract data-check diff verify lint gate progress test-hooks test-tools duplicates duplicates-reloc xref clean check-rom setup tables-scan draft
 
 all: build diff
 
@@ -14,12 +13,24 @@ check-rom:
 		exit 1; \
 	fi
 
+# The ROM from the source and the assets extracted from your own ROM
+# (tools/build_rom.py): extract (build/assets/, cached), pack the module
+# and the data packs (cached), then assemble asm/rom.asm onto blank $00 and
+# $FF images, which must agree (every byte written). Nothing is copied
+# from the original ROM.
 build: check-rom
 	@mkdir -p $(BUILD_DIR)
-	cp $(ROM) $(OUT_ROM)
-	python3 tools/c3pack.py build
-	asar --fix-checksum=off $(MAIN_ASM) $(OUT_ROM)
-	@echo "Built -> $(OUT_ROM)"
+	python3 tools/build_rom.py -o $(OUT_ROM)
+
+# The data layer's assets, from your ROM into build/assets/ (never
+# committed; tools/extract_data.py). `make build` runs it when needed.
+extract: check-rom
+	python3 tools/extract_data.py extract
+
+# The manifest and asm/data/ are what tools/extract_data.py generates from
+# symbols/data_survey.csv (the pointer tables' entries only with the ROM).
+data-check:
+	python3 tools/extract_data.py check
 
 diff: build
 	python3 tools/diff_rom.py $(ROM) $(OUT_ROM)
@@ -69,7 +80,8 @@ test-hooks:
 # held-out score), the lint's INDEX and SIZE rules, the SPC700 decoder and
 # the lint's SPC700 rules, the packer of the $C3 module (tools/c3pack.py), its
 # trace and the lint's module rules (tools/c3module.py, tools/lint_c3module.py),
-# and the data survey's coverage (tools/data_survey.py).
+# the data survey's coverage (tools/data_survey.py), and the data layer's
+# manifest, lint and isolation (tools/test_data_layer.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -81,6 +93,7 @@ test-tools:
 	python3 tools/test_c3pack.py
 	python3 tools/test_c3module.py
 	python3 tools/test_data_survey.py
+	python3 tools/test_data_layer.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]
@@ -91,7 +104,7 @@ draft: check-rom
 	python3 tools/draft.py "$$a" $(if $(value END),'$(value END)') $(DRAFT_ARGS) --check -o "$$out"
 
 # What a function needs before it reaches main.
-gate: diff verify lint
+gate: diff verify lint data-check
 
 clean:
 	rm -rf $(BUILD_DIR)
