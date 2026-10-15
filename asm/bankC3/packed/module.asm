@@ -335,7 +335,11 @@ C3Mod_WaitVblank:
 ; $F7 (where the high word's high byte will be), which also shifts the
 ; byte after it, $F8, left by one, and brings its bit 7 in as the carry
 ; of the next add: the product is one too big in its bits 8-23 when
-; $F8 bit 7 is set (the callers leave $F8 as it is).
+; $F8 bit 7 is set (the callers leave $F8 as it is). Second quirk: the
+; carry out of ADC $F5 (the cross-product sum plus the low product's
+; high byte) goes into the next ADC $F6, so it lands at bit 16 instead
+; of bit 24: when that sum overflows the product is $00FF0000 too
+; small (e.g. $24E1 x $FAFD gives $23292C5D, not $24282C5D).
 ; Callers note: C3Mod_MulSigned16 ($33F0) and $3591, $35A7, $35C9,
 ;   $35E8, C3Mod_Perspective ($4F4A), C3Mod_ScaleByVar0 ($56DE),
 ;   C3Mod_RockTask ($5BE7, $5C05, $5C22), C3Mod_SwingTask ($5CCD,
@@ -473,7 +477,10 @@ C3Mod_DivHighByte:
 ; ($F0-$F3: C3Math_A low word, C3Math_B high word) / the divisor ($F4-$F7:
 ; C3Math_Lo, C3Math_Hi), C3Math_R ($FC-$FF) = the remainder. The
 ; dividend words are shifted left 32 times on the way (what comes in
-; at their bottom is not used).
+; at their bottom is not used). Quirk: the remainder is shifted left
+; (ROL) before the trial subtract and its top bit is lost, so the
+; result is wrong for divisors of $80000000 or more (the only caller
+; passes a high word of 0).
 ; Callers note: C3Mod_RockTask ($5C44).
 ; Entry: M=0, X=0 (the 16-bit step count), DP = the page of C3Math_A..
 ;        (0 at the call); DB any; the dividend and the divisor (not 0) as
@@ -516,7 +523,9 @@ C3Mod_Div32:
 ; $7E:33D6 — C3Mod_MulSigned16 (55 bytes, $33D6–$340C)
 ; Signed 16 x 16-bit multiply: the operands are made positive in place,
 ; multiplied (C3Mod_Mul16) and the 32-bit product negated when their
-; signs differed.
+; signs differed. C3Mod_Mul16's two quirks carry over (the magnitudes'
+; product one too big in bits 8-23 with $F8 bit 7 set, or $00FF0000
+; too small when its middle sum overflows), before the negation.
 ; Callers note: C3Mod_ViewOffsetTask ($4458, $446B), C3Mod_SizeBike
 ;   ($4E61), C3Mod_SizeRival ($4ECB) and $9939, $9953, $9B0A and $9B1D
 ;   (code not matched yet).
@@ -5293,7 +5302,8 @@ C3Mod_BumpFromAbove:
 ; carry as the task is entered: 0, from C3Mod_TaskNext's CPX, unless
 ; it is the list's first task), C3_ViewNegSin = C3Mod_Cosine(x) =
 ; -sin(a) and C3_ViewSin its negation, C3_ViewNegCos = C3Mod_Sine(x) =
-; -cos(a) and C3_ViewCos its negation (with C = 0); then
+; -cos(a) and C3_ViewCos its negation (these hold for C = 0; with C =
+; 1, x is one step further); then
 ; C3Mod_ProjectBike and C3Mod_ProjectRival, C3_DivisorStart = the
 ; horizon (page $0A00's C3_ViewHorizon), and the two sizes: when
 ; C3_BikeScrY - C3_RivalScrY has bit 15 set (CMP / BMI: the bike higher
@@ -5348,7 +5358,8 @@ C3Mod_ProjectTask:
 ; Callers note: C3Mod_ProjectTask ($4D31).
 ; Entry: M=0, X=0 (C3_MulSigned's 16-bit LDX), DP=0 (the race words and
 ;        C3_MulA..), DB=$00 (C3_MulSigned's CPU registers).
-; Exit:  M=0, X=0; A = C3_BikeScrY; X = C3_ViewCos; Y unchanged; C =
+; Exit:  M=0, X=0; A = C3_BikeScrY; X = |C3_MulB| x the low byte of
+;        |C3_MulA| (the last C3_MulSigned's RDMPYL); Y unchanged; C =
 ;        the last ADC's carry out; C3_MulA.. changed.
 ; Calls: C3_MulSigned (JSL).
 C3Mod_ProjectBike:
@@ -5414,7 +5425,9 @@ C3Mod_ProjectBike:
 ; Entry: M=0, X=0, DP=0, DB=$00, as C3Mod_ProjectBike; C = its last
 ;        carry (C3Mod_ProjectTask calls it right after).
 ; Exit:  M=0, X=0; A = C3_RivalScrY (or C3_Unk1444, not 0); X =
-;        C3_ViewCos (or unchanged); Y unchanged; C3_MulA.. changed.
+;        |C3_MulB| x the low byte of |C3_MulA| (the last C3_MulSigned's
+;        RDMPYL; unchanged when nothing is done); Y unchanged;
+;        C3_MulA.. changed.
 ; Calls: C3_MulSigned (JSL).
 C3Mod_ProjectRival:
     LDA.w !C3_Unk1444
@@ -5821,8 +5834,10 @@ C3Mod_DrawTask:
 ; Callers note: C3Mod_DrawTask ($4F93; and it falls in at $4FAD).
 ; Entry: M=0, X=0, DP=0, DB=$00 (as C3Mod_DrawTask); C3_TmpFE = the
 ;        facing.
-; Exit:  M=0, X=0; A, X, Y as C3_SprListLarge leaves them (or A =
-;        C3_BikeHidden, X, Y as before); C3_TmpF0 = the index.
+; Exit:  M=0, X=0; A, X, Y as C3_SprListLarge leaves them, or with
+;        C3_BikeHidden set A = it, Y as before and X = the picture
+;        index (new-job path) or as on entry (state 1); C3_TmpF0 = the
+;        index on the new-job path only (state 1 leaves it).
 ; Calls: C3_SprListLarge (JSL).
 C3Mod_DrawBike:
     LDA.w !C3_BikeJob+!C3_JobState
@@ -5910,8 +5925,9 @@ C3Mod_DrawBike:
 ; Callers note: C3Mod_DrawTask ($4F96 JMP, $4FAA).
 ; Entry: M=0, X=0, DP=0, DB=$00, as C3Mod_DrawBike; C3_TmpFE = the
 ;        facing.
-; Exit:  M=0, X=0; A, X, Y as C3_SprListLarge leaves them (or A =
-;        C3_RivalHidden, X = the index, Y as before).
+; Exit:  M=0, X=0; A, X, Y as C3_SprListLarge leaves them, or with
+;        C3_RivalHidden set A = it, Y as before and X = the picture
+;        index (new-job path) or as on entry (state 1).
 ; Calls: C3_SprListLarge (JSL).
 C3Mod_DrawRival:
     LDA.w !C3_RivalJob+!C3_JobState
@@ -6046,7 +6062,9 @@ C3Mod_RivalMarker:
 ;   (BRA).
 ; Entry: M=0, X=0, DP=0, DB=$00.
 ; Exit:  M=0, X=0; A = C3_RacePhase or as C3_SprOneSmall leaves it; X =
-;        the record; Y = C3_OamPos (or unchanged).
+;        the record; Y = C3_OamPos (or unchanged). With the RTS written
+;        over .draw: A = C3_SprBaseY (C3Mod_MarkerY's), X = the record,
+;        Y unchanged.
 ; Calls: C3Mod_MarkerX, C3Mod_MarkerY, C3_SprOneSmall (JSL).
 C3Mod_BikeMarker:
     LDA.b !C3_BikeDist+1
@@ -6164,9 +6182,10 @@ C3Mod_DrawHud:
     JMP C3Mod_DrawNumber
 
 ; $7E:51B1 — C3Mod_RivalPics (32 bytes, $51B1–$51D0)
-; The rival's pictures for C3Mod_DrawRival: the address in bank $7F
-; (C3_Prog0MirrorC's 64-byte rows from $8A00 up) by the facing (8
-; words), then the second frame's (8 more).
+; The rival's pictures for C3Mod_DrawRival: the address in bank $7F of
+; a picture of 64-byte rows by the facing (8 words), then the second
+; frame's (8 more). $8A00-$ADFF point into C3_Prog0PicsB (pack 4's own
+; rows), $AE00 and up into C3_Prog0MirrorC (its mirrored rows).
 C3Mod_RivalPics:
     dw $8A00, $9C00, $A800, $C000, $AE00, $BA00, $A200, $9600
     dw $9000, $9C00, $A800, $C000, $B400, $BA00, $A200, $9600
@@ -6608,8 +6627,11 @@ C3Mod_Prog4:
 ; at $7F:FFFE (C3_TileListLeft, DB = $7F), DP = DP_PPU meanwhile.
 ; Callers note: C3Mod_Prog4 ($5424).
 ; Entry: M=1 (M=0 set here), X=0 (16-bit X and Y), DP any (set to
-;        DP_PPU, then to 0, not restored), DB any (set to $7F with PEA
-;        $007F / PLB; the last PLB takes the $00: DB = $00 at the exit).
+;        DP_PPU, then to 0, not restored), DB = a bank that maps the
+;        I/O registers ($00-$3F, $80-$BF: the WMADDL/WMADDH stores come
+;        before the PEA; $00 at C3Mod_Prog4's call), then $7F (PEA
+;        $007F / PLB; the last PLB takes the $00: DB = $00 at the
+;        exit).
 ; Exit:  M=1, X=0, DP=0, DB=$00; A = 0, X = the last tile's end offset,
 ;        Y = 0; C3_TileListLeft = 0; WMADD past the list.
 C3Mod_TileListToVram:
@@ -6814,8 +6836,9 @@ C3Mod_Prog4ZoomOut:
 ; Callers note: script opcode $F0 at $55EA (C3Mod_Prog4ScriptB); JSR
 ;   from $8F8B (code not matched yet).
 ; Entry: M=0, X any, DP any, DB = $7E (the stores are absolute: the
-;        code's bank for $582E; C3_RunScript's and $8F8B's PEA $007E /
-;        PLB give it).
+;        code's bank for $582E; from the script, C3Mod_ScriptTaskB's
+;        PHK / PLB, which C3_RunScript keeps; at $8F8B, its PEA $007E /
+;        PLB).
 ; Exit:  M=0; A = C3Mod_Prog4End; X, Y unchanged.
 C3Mod_Prog4ToEnd:
     LDA.w #!Op_BRA
@@ -6841,7 +6864,8 @@ C3Mod_Prog4ToZoomOut:
 ; (C3_PlaneCentreVarX/Y), BG1HOFS / BG1VOFS from vars 1 and 2
 ; (C3_PlaneScrollVarX/Y), each written low byte then high byte.
 ; Callers note: an NMI task added by script opcode $F8 at $5552
-;   (C3Mod_Prog4ScriptA) and $9DD6 (code not matched yet).
+;   (C3Mod_Prog4ScriptA); JMP from $9DD6 (M=1, at the end of the NMI-task
+;   code from $9DBC; code not matched yet).
 ; Entry: an NMI task (C3Mod_RunNmiTasks): M=1, X any, DP any (set to
 ;        $0A00 here, restored by C3Mod_RunNmiTasks), DB=$00 (absolute
 ;        registers).
@@ -7084,8 +7108,10 @@ C3Mod_InitStars:
 ; after a new place; the X and Y adds the carry out of the one before.
 ; Quirk: C3_StarDivisor is C3_Prog9's byte ($44) reused.
 ; Callers note: a task added by script opcode $FA at $5546
-;   (C3Mod_Prog4ScriptA) and $93E6, $99B2 (code and scripts not
-;   matched yet).
+;   (C3Mod_Prog4ScriptA) and $93E6 (script not matched yet); JMP from
+;   $99B2 (code not matched yet: the code from $999C first, when
+;   C3_OamPos - $100 has bit 15 set (CMP / BPL), calls $3870 and sets
+;   C3_OamPos = $100, C3_OamHiPtr = $0910).
 ; Entry: a task (C3Mod_RunTasks): M=0 (8-bit set here), X=0 (16-bit
 ;        index), DP=0 (C3_OamPos, C3_StarDivisor), DB=$00 (the star
 ;        tables, the OAM shadow, the divider and page $0B00's words are
@@ -7348,7 +7374,8 @@ C3Mod_Atan:
 
 ; $7E:58F8 — C3Mod_TanTable (128 bytes, $58F8–$5977)
 ; tan(k x 90 / 64 degrees) x 256 for k = 0-63 (k = 32: $FF, 45
-; degrees), for C3Mod_Atan's search.
+; degrees), for C3Mod_Atan's search, which starts at entry 1: entry 0
+; is never read.
 C3Mod_TanTable:
     dw $0000, $0006, $000C, $0012, $0019, $001F, $0025, $002C
     dw $0032, $0039, $0040, $0046, $004D, $0054, $005B, $0062
@@ -7643,8 +7670,9 @@ C3Mod_Prog2Script:
 ; Page $0A00's script from the end of the swing (C3Mod_SwingTask): 85
 ; frames later var 1 = -$100, C3Mod_SlideTask, C3Mod_RockTask
 ; removed; a frame later mode 2 (C3Mod_Prog2ToMode2); 184 frames
-; later var 1 + 2 a frame for 104 frames (BG1 scrolls left); then the
-; colour whitening (C3Mod_PalWhitenAnim) and C3Mod_SidePicTask; 120
+; later var 1 + 2 a frame for 104 frames (BG1 scrolls left); then a
+; white flash on colours $B0-$BA that fades out (C3Mod_PalWhitenAnim)
+; and C3Mod_SidePicTask; 120
 ; frames later C3Mod_WaveCountTask (the wave dies down); 120 frames
 ; later the colour fade (C3Mod_PalFadeAnim) and C3Mod_BottomPicTask;
 ; 720 frames later C3_Prog2Done = 1 (C3Mod_SkipTask does nothing more)
@@ -8159,8 +8187,8 @@ C3Mod_PalFadeAnim:
 ; As C3Mod_PalFadeAnim: FieldAnimB record 0 = .Unk0 $40 (kind 4,
 ; PalAnim_FadeWhite), colours $B0-$BA (.Unk1 = $B0, .Unk2 = 11), .Unk3
 ; = 2, .Unk4 = 0, every frame (.Unk5 = 1), red and green lightened
-; (.Unk6 = 3), level .Unk7 = $80, target .Unk8 = 0; DB = $7E at the
-; exit the same way.
+; (.Unk6 = 3), level .Unk7 = $80, target .Unk8 = 0 (a white flash
+; that fades out); DB = $7E at the exit the same way.
 ; Callers note: script opcode $F0 at $5B70 (C3Mod_Prog2Wave).
 ; Entry: M=0 (8-bit set here), X any, DP any, DB any.
 ; Exit:  M=0, DB = $7E; A's low byte 0; X, Y unchanged.
@@ -8225,8 +8253,8 @@ C3Mod_BottomPicTask:
 ;        PLB; the last PLB takes the $00: DB = $00 at the exit); Y =
 ;        the tile count (not 0); VMADD at the first character's word,
 ;        VMAIN = $80 (+ 1 after the high byte).
-; Exit:  M=1, X=0, DB=$00; A = the last pixel, X = $0200 + the count x
-;        32 (x 64 when patched), Y = 0.
+; Exit:  M=1, X=0, DB=$00; A = X (the TAX's word: low byte in A, high
+;        in B), X = $0200 + the count x 32 (x 64 when patched), Y = 0.
 ; Calls: C3Mod_Tile4ToM7 (or C3Mod_Tile8ToM7, patched).
 C3Mod_TilesToM7:
     PEA.w !Bank7F                       ; PLB takes the $7F; the $00 stays for the last PLB

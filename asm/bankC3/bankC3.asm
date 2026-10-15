@@ -1775,10 +1775,14 @@ C3_IrqAck:
 
 ; $C3:094C — C3_MulSigned (80 bytes, $094C–$099B)
 ; Signed multiply with the CPU multiplier: C3_MulA (16-bit) x C3_MulB
-; (8-bit) into C3_MulProduct (32-bit), all signed. Multiplies the
-; magnitudes (|MulB| x low byte, then x high byte, added at +1) and
-; negates the 32-bit result when the signs of MulA's high byte and
-; MulB differ.
+; (8-bit) into C3_MulProduct, signed. Multiplies the magnitudes (|MulB|
+; x low byte, then x high byte, added at +1) and negates the 32-bit
+; result when the signs of MulA's high byte and MulB differ.
+; Quirk: it is not a 32-bit product. The add at +1 is 16-bit (M=0), so
+; ADC C3_MulProduct+1 also adds the byte left at +2 ($F6, which nothing
+; clears: only +3 is zeroed), and the carry out of that byte is lost.
+; Only the low word ($F4-$F5) is exact; the module's eight sites read
+; only that word.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:4D5C, $7E:4D6F, $7E:4D87, $7E:4D9A, $7E:4DBD, $7E:4DCF, $7E:4DEA
 ;   and $7E:4DFC).
@@ -2497,7 +2501,8 @@ C3_NmiListAdd:
 ;   and $7E:5E37).
 ; Entry: M=0 (A stored to WMADDL/M as a word), X=0 (16-bit X/Y), DP =
 ;        the module's (C3_OamPos.. are direct page; 0 at $7E:3A78,
-;        $7E:5155 and the six program-2 tasks' $7E:5D0C-$7E:5E37), DB =
+;        $7E:5155 and the six program-2 sites $7E:5D0C-$7E:5E37, in four
+;        tasks), DB =
 ;        a bank that maps the I/O registers and low WRAM ($00-$3F or
 ;        $80-$BF: WMADDL/WMADDH/WMDATA and the OAM shadow are absolute;
 ;        with DB=$7E the port accesses would hit WRAM $7E:2180-$2183

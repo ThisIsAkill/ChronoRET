@@ -7411,9 +7411,10 @@ FieldFD_UploadTileAnims:
 
 ; $FD:E275 — PalAnim_StopAll (29 bytes, $E275–$E291)
 ; FdVec_FFEE's routine: sets .Unk0 of all 12 FieldAnimB records to 0
-; (kind 0: PalAnim_TickAll leaves them alone), so every palette
-; animation stops. Saves P and DB; DB=$00. The SEP #$20 is redundant:
-; the LDA #0 before it is already the 8-bit form.
+; (kind 0: PalAnim_TickAll still steps their .Unk4 counter but runs no
+; kind for them), so every palette animation stops. Saves P and DB;
+; DB=$00. The SEP #$20 is redundant: the LDA #0 before it is already
+; the 8-bit form.
 ; Callers note: FdVec_FFEE ($FD:FFEE) JMPs here (the unpacked $C3
 ;   module JSLs FdVec_FFEE; the JSL $FD:FFEE bytes at $C3:4D46 are a
 ;   literal inside BankC3_PackedModule, not code: see FdVec_FFEE).
