@@ -53,6 +53,8 @@ endmacro
 !C3_SprListSmall = $C30D0E              ; bankC3.asm: a list of small sprites (JSL)
 !FdVec_FFF7 = $FDFFF7                    ; bankFD.asm: JMP PalAnim_TickAll (JSL)
 !RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
+!BankC3_Entry000E = $C3000E              ; bankC3.asm: BRA/JMP to the wipe, WinFx_StepWipe (JSL)
+!C3_BuildCopyCode = $C309E9              ; bankC3.asm: writes the bitmap-to-tiles copy code (JSL)
 
 ; ------------------------------------------------------------
 ; RAM the module uses (DB = $00 and DP = 0 unless a header says
@@ -81,7 +83,8 @@ endmacro
 !C3_RowCount = $F0                       ; dp offset (the caller's DP): C3Mod_DoubleRows /
                                          ; C3Mod_SpaceRows count their 64 source rows here
 ; The math routines' operands and results, dp offsets in the caller's
-; direct page (0 at every call traced: $00F0-$00FF):
+; direct page (0, $00F0-$00FF, or a script page: $0A00 at
+; C3Mod_ViewOffsetTask's calls, the script's at C3Mod_BuildM7Tables'):
 !C3Math_A = $F0                          ; 16-bit: multiplicand / dividend (Div32: low word)
 !C3Math_B = $F2                          ; 16-bit: multiplier / divisor (Div32: dividend high word)
 !C3Math_Lo = $F4                         ; 16-bit: product low word / quotient (Div32: divisor low)
@@ -90,6 +93,91 @@ endmacro
                                          ; C3Mod_DivHighByte: the divisor - 1
 !C3Math_R = $FC                          ; 32-bit: C3Mod_Div32's remainder ($FC-$FF)
 !C3_SqrtRoot = $F0                       ; 16-bit: C3Mod_SquareRoot's result
+!C3_TmpF0 = $F0                          ; 16-bit dp scratch of the caller's page (C3Mod_PadDelayTask,
+                                         ; C3Mod_SteerTask, C3Mod_SkyNmiTask)
+!C3_TmpF2 = $F2                          ; ... a second word (C3Mod_SteerTask)
+!C3_RowsLeft = $F0                       ; dp (DP=0 at the calls): C3Mod_CopyTileBlock's row count
+!C3_PadPrev = $04                        ; 16-bit, dp (DP=0): last frame's pad (C3Mod_PadDelayTask)
+!C3_PadHeld = $06                        ; 16-bit, dp (DP=0): this frame's pad, C3_Pad as
+                                         ; C3Mod_PadDelayTask copies it (C3Mod_RaceTask zeroes it)
+!C3_Prog9 = $44                          ; 8-bit, dp (DP=0): 1 when C3Mod_Prog0 runs as program 9
+                                         ; (C3_EntryArg bits 0-3 not 0), else 0 (Init's clear)
+!C3_Unk004E = $4E                        ; 16-bit, dp: C3Mod_Prog0Vars sets $6000; C3Mod_RaceTask
+                                         ; moves it to $2000 (program 9) or $4000 by $80 a frame
+!C3_Unk0051 = $51                        ; 16-bit, dp: C3Mod_RaceTask compares it with C3_Unk0076
+!C3_Unk0055 = $55                        ; 16-bit, dp: C3Mod_Prog0Vars sets $4000
+!C3_Unk0059 = $59                        ; 16-bit, dp: C3Mod_Prog0Vars sets $4000
+!C3_Unk0063 = $63                        ; 16-bit, dp: C3Mod_RaceTask zeroes it (program 0)
+!C3_Unk0065 = $65                        ; 16-bit, dp: C3Mod_RaceTask zeroes it at a phase's end
+!C3_Unk0067 = $67                        ; 16-bit, dp: likewise
+!C3_Unk0069 = $69                        ; 16-bit, dp: counted down by C3Mod_CountDownTask
+!C3_Unk0073 = $73                        ; 16-bit, dp: C3Mod_Prog0Vars sets $2000; C3Mod_RaceTask
+                                         ; moves it to $6000 (program 9)
+!C3_Unk0076 = $76                        ; 16-bit, dp: see C3_Unk0051
+!C3_Unk007A = $7A                        ; 16-bit, dp: C3Mod_Prog0Vars sets $3000
+!C3_Unk007E = $7E                        ; 16-bit, dp: C3Mod_Prog0Vars sets $5000
+!C3_Unk0088 = $88                        ; 16-bit, dp: C3Mod_RaceTask sets 1 (program 0) and tests it
+!C3_Unk0098 = $98                        ; 16-bit, dp: C3Mod_RaceTask: $8000 in program 9, else 0
+!C3_Unk009A = $9A                        ; 8-bit, dp: C3Mod_Prog0Vars sets 3 (program 0)
+!C3_Unk009C = $9C                        ; 16-bit, dp: C3Mod_RaceTask tests it against $400
+!C3_Unk009D = $9D                        ; 16-bit (read absolute as $009D): C3Mod_SkyNmiTask's input
+!C3_Unk009E = $9E                        ; 16-bit, dp: C3Mod_RaceTask tests it against 8
+!C3_Unk00A0 = $A0                        ; 16-bit, dp: C3Mod_Prog0Vars sets 1
+!C3_Unk00A2 = $A2                        ; 16-bit, dp: C3Mod_Prog0Vars sets 1; C3Mod_RaceTask
+                                         ; clears it when it puts the map column back
+!C3_Unk00A8 = $A8                        ; 16-bit, dp: C3Mod_Prog0Vars sets $20
+!C3_Unk00AE = $AE                        ; 16-bit, dp: C3Mod_Prog0Vars clears it
+!C3_Unk00B0 = $B0                        ; 16-bit, dp: a phase number C3Mod_RaceTask tests (1) and steps
+!C3_Unk00B2 = $B2                        ; 8-bit count C3Mod_RaceTask moves to 0 (read as a word too)
+!C3_PadForward = $00B6                   ; 16-bit: C3Mod_ForwardPads' entry for the view's angle
+!C3_PadBack = $00B8                      ; 16-bit: C3Mod_BackPads' entry
+!C3_Unk00BA = $BA                        ; 8-bit, dp: C3Mod_Prog0Vars sets $80 (program 0)
+!C3_Unk00BE = $BE                        ; 16-bit, dp: set once C3Mod_RaceTask has seen the A button
+!C3_StaffTextPtr = $0382                 ; 16-bit: the staff text's address ($A651), 0 for none
+                                         ; (C3Mod_Prog0)
+!C3_StartCount = $0397                   ; 16-bit: C3Mod_Prog0's C3_EntryArg bit 6 runs, counted
+                                         ; (bit 0 picks C3Mod_Prog0WipeA or B)
+!C3_ExitTimer = $0399                    ; 16-bit: frames C3Mod_ExitCountTask waits
+!C3_SkyScrollX = $141C                   ; 16-bit: BG1's horizontal scroll above the horizon (sky)
+!C3_SkyScrollY = $141E                   ; 16-bit: its vertical scroll
+!C3_PlaneScrollX = $1420                 ; 16-bit: BG1's scroll below the horizon (the mode-7 plane)
+!C3_PlaneScrollY = $1422
+!C3_SkyScrollHdma = $1424                ; 4 bytes: C3_SkyScrollX/Y as C3Mod_ScrollHdma sends them
+!C3_PlaneScrollHdma = $1428              ; 4 bytes: C3_PlaneScrollX/Y, likewise
+!C3_PlaneCentreX = $142C                 ; 16-bit: M7X (C3Mod_ScrollNmiTask)
+!C3_PlaneCentreY = $142E                 ; 16-bit: M7Y
+!C3_Bg2ScrollX = $1430                   ; 16-bit: BG2HOFS
+!C3_Bg3ScrollX = $1434                   ; 16-bit: BG3HOFS
+!C3_Bg3ScrollY = $1436                   ; 16-bit: BG3VOFS
+!C3_Unk143E = $143E                      ; 16-bit: added to the sky's scroll by C3Mod_SkyNmiTask
+!C3_ViewOffsetX = $1440                  ; 16-bit: sin(angle) x distance / 256 (C3Mod_ViewOffsetTask)
+!C3_ViewOffsetY = $1442                  ; 16-bit: cos(angle) x distance / 256
+!C3_Unk1444 = $1444                      ; 16-bit: C3Mod_Prog0Vars clears it, C3Mod_RaceTask steps it
+!C3_Unk1446 = $1446                      ; 256 bytes ($1446-$1545): cleared by C3Mod_ClearUnk1446
+!C3_Unk1446Bytes = $0100                 ; its size
+!C3_MirrorEnd = $0200                    ; 16-bit, in the source's bank ($7F:0200 at C3Mod_Prog0):
+                                         ; C3Mod_MirrorRows' first byte, from Y
+!C3_MirrorLeft = $0202                   ; 8-bit, $7F:0202: C3Mod_Prog0's C3Mod_MirrorRows calls left
+!C3_M7Tables = $7EF000                   ; $7E:F000-$FFFF: the mode-7 line tables (C3_M7ABLines..)
+!C3_WipeTable = $7EE000                  ; the kernel wipe's line table and its two buffers
+                                         ; (WinFx_C3ETablePtr: $E000 and $E0E0)
+!C3_CopyCode = $7EB574                   ; where C3_BuildCopyCode's routine goes (GENERATED)
+!C3_MapColumnSave = $7EC995              ; 20 bytes: the mode-7 map column C3Mod_Prog0 saves
+!C3_Unk7F0062 = $7F0062                  ; 8-bit: C3Mod_ExitTask zeroes it (use not traced)
+; Page $0A00's script variables as the view tasks read them (dp offsets
+; in the page; C3Script_Vars + 2n is variable n):
+!C3_ViewScale = $00                      ; var 0: C3Mod_BuildM7Tables' scale (C3_M7Scale)
+!C3_ViewX = $02                          ; var 1: the plane's X ($000-$3FF)
+!C3_ViewDist = $04                       ; var 2: the distance (C3Mod_ViewOffsetTask)
+!C3_ViewAngle = $0A                      ; var 5: the angle (C3_M7Angle)
+!C3_ViewHorizon = $0C                    ; var 6: the horizon line
+!C3_ViewFirstDiv = $10                   ; var 8: C3Mod_BuildM7Tables' first divisor
+!C3_ViewSpeedX = $12                     ; var 9: added to C3_ViewX each frame
+!C3_ViewStepMode = $16                   ; var 11: nonzero: every other line copied (C3Mod_Prog0Setup)
+!C3_ViewCache = $30                      ; 5 words (loop counters 7-11): C3Mod_ViewTask's copies
+!C3_ViewLeanR = $3A                      ; 16-bit (loop counter 12): R held, 0-12 (C3Mod_LeanR)
+!C3_ViewLeanL = $3C                      ; 16-bit (loop counter 13): L held, 0-12
+!C3_ViewY = $04                          ; page $0B00's var 2: the plane's Y (C3Mod_TurnTask)
 
 ; ------------------------------------------------------------
 ; Constants
@@ -166,6 +254,132 @@ endmacro
 !C3_Div32Steps = 32                      ; C3Mod_Div32: one step per dividend bit
 !C3_NibbleStack = $0BFF                  ; C3Mod_UnpackNibbles: S before its first PLA (reads
                                          ; from $0C00 up)
+!C3_EntryLowNibble = $0F                 ; C3_EntryArg bits 0-3 (nonzero: program 9, for C3Mod_Prog0)
+!C3_EntryWipeStart = $40                 ; C3_EntryArg bit 6: C3Mod_Prog0 starts the wipe run
+                                         ; (C3Mod_Prog0WipeA/B, it ends by itself)
+!C3_SongCourse = $2C                     ; C3Mod_Prog0's song (C3Mod_PlaySong)
+!C3_PackPtrBytes = 3                     ; bytes per C3Rom_PackPtrs entry (X = 3 x the pack)
+!C3_Prog0PicsA = $0A00                   ; $7F:0A00: where C3Mod_Prog0 unpacks pack 2 (and
+                                         ; C3Scale_PrevEnd's start)
+!C3_Prog0PicsB = $8A00                   ; $7F:8A00: packs 3 and 4
+!C3_Prog0PicsMoved = $3800               ; $7F:3800: the MVN's destination
+!C3_Prog0PicsBytes = $2E00               ; ... its length
+!C3_TileRows = 8                         ; rows of an 8x8 block (C3Mod_CopyTileBlock, MirrorRows)
+!C3_TileRowBytes = 8                     ; bytes of a block's row
+!C3_MirrorBytes = 32                     ; bytes C3Mod_MirrorRows reverses per row (and zeros after)
+!C3_MirrorEnd32 = $0020                  ; C3_MirrorEnd values of C3Mod_Prog0
+!C3_MirrorEnd24 = $0018
+!C3_Prog0MirrorA = $5A00                 ; $7F: where C3Mod_Prog0's mirrored rows go
+!C3_Prog0MirrorB = $7800
+!C3_Prog0MirrorC = $AE00
+!C3_Prog0MirrorCalls = 12                ; C3Mod_MirrorRows calls for pack 4 (96 rows)
+!C3_M7TablesBytes = $1000                ; C3_M7Tables' size
+!C3_Prog0Clear = $0C00                   ; $7E:0C00-$1DFF, filled from MPYL by C3Mod_Prog0
+!C3_Prog0ClearBytes = $1200
+!C3_Prog0HdmaOn = $3F                    ; HDMA channels 0-5 (C3Mod_Prog0Hdma)
+!C3_Prog0HdmaNoWipe = $3E                ; ... without channel 0 (the wipe's WH0)
+!C3_Prog0Fade = $0808                    ; C3_FadeStep and C3_FadeTimer = 8 (one word)
+!C3_CopyCodeDest = $0C00                 ; C3_BuildCopyCode's X (stores from $0C00 up)
+!C3_CopyCodeSrc = $0200                  ; ... its Y (source base)
+!C3_Prog0Bg1Sc = $60                     ; BG1SC: map at VRAM word $6000, 32x32
+!C3_Prog0Bg2Sc = $64                     ; BG2SC: map at $6400
+!C3_Prog0Bg3Sc = $68                     ; BG3SC: map at $6800
+!C3_Prog0Tiles = $77                     ; BG12NBA / BG34NBA: tiles at VRAM word $7000
+!VMAIN_Inc128 = $02                      ; VMAIN: + 128 words after the low byte (a mode-7 map column)
+!BBAD_RDVRAML = $39                      ; B-bus address of RDVRAML ($2139)
+!C3_MapColumn = $0B00                    ; VRAM word: the top of the saved map column (row 22, x 0)
+!C3_MapColumnBytes = $0014               ; 20 bytes saved (19 written back)
+!C3_WipeHalf = $70                       ; 112 lines: half a wipe buffer
+!C3_SprTilesVram = $4000                 ; VRAM word of the sprite tiles (OBSEL C3_Obsel)
+!C3_SprTilesBytes = $1000                ; bytes C3Mod_Prog0LoadGfx clears there
+!C3_SprTilesHigh = $5000                 ; the sprites' second tile page
+!C3_Prog0BgTiles = $7000                 ; VRAM word: BG1-BG3 tiles (C3_Prog0Tiles)
+!C3_Prog0Bg1Map = $6000                  ; VRAM words of the three maps
+!C3_Prog0Bg2Map = $6400
+!C3_Prog0Bg3Map = $6800
+!C3_Prog0MapBytes = $0800                ; bytes sent of each map's pack
+!C3_Prog0Clear7F = $7F0300               ; $7F:0300-$09FF, filled from MPYL by C3Mod_Prog0LoadGfx
+!C3_Prog0Clear7FBytes = $0700
+!C3_WipeClearBytes = $40                 ; $7E:E100-$E13F zeroed by C3Mod_Prog0LoadGfx
+!C3_PickRunBit = $0002                   ; C3Mod_PickRun: a random byte's bit 1 (x 2 = the index)
+!C3_PlaneMask = $03FF                    ; C3_ViewX's range (the mode-7 plane's 1,024 pixels)
+!C3_PlaneCentreDX = $007F                ; M7X = the scroll + this (C3Mod_TurnTask)
+!C3_PlaneCentreDY = $00E0                ; M7Y = the scroll + this
+!C3_ExitFrames = $0020                   ; C3Mod_ExitTask: frames before the module leaves
+!C3_SfxWipe = $BA                        ; sound effect of the wipe (C3Mod_ExitTask, the scripts)
+!C3_SndSfxA = $18                        ; Spc_CmdSfx18: a sound effect on voices 7 and 6
+!C3_SfxArg1 = $80                        ; its Audio_CmdArg1 in the module
+!C3_DriftScale = $00A0                   ; C3Mod_DriftTask's rest: the scale,
+!C3_DriftHorizon = $0038                 ; the horizon
+!C3_DriftDist = $0090                    ; and the distance
+!C3_EighthTurn = $80                     ; an eighth of a turn (1,024 steps)
+!C3_PadTableMask = $000E                 ; the angle / 64 as an even index (8 entries)
+!C3_ViewScaleMax = $007F                 ; C3Mod_SteerTask: X raises the scale while below this
+!C3_ViewScaleMin = $0060                 ; ... A lowers it while it is at least this
+!C3_LeanMax = $000C                      ; C3Mod_LeanR / LeanL: the count's top
+!C3_SkyTopY = $0017                      ; C3_SkyScrollY = this - the horizon
+!C3_SkyBaseX = $0088                     ; C3Mod_SkyNmiTask's constant
+!C3_CountDownEvery = 4                   ; C3Mod_CountDownTask: one step every 4 frames
+!C3_BgMode1 = $01                        ; BGMODE: mode 1 (the sky)
+!C3_MathTop = $50                        ; CGADSUB: half colour math on the sprites (the bottom)
+!C3_MathSky = $42                        ; CGADSUB: half colour math on BG2 (the sky)
+!C3_MathFade = $91                       ; CGADSUB: subtract, on BG1 and the sprites (the fade)
+!C3_Prog9Unk53A0 = $D8                   ; what C3Mod_Prog0Vars writes over operands in program 9
+!C3_Prog9Unk53A4 = $E8
+!C3_Prog9Unk5395 = $06
+!C3_Prog9Unk53AE = $01
+!C3_Prog0Unk00BA = $80                   ; C3_Unk00BA in program 0
+!C3_Prog0Unk009A = $03                   ; C3_Unk009A in program 0
+!C3_Init0055 = $4000                     ; C3Mod_Prog0Vars' values
+!C3_Init007A = $3000
+!C3_Init007E = $5000
+!C3_Init004E = $6000
+!C3_Init0073 = $2000
+!C3_Init00A8 = $0020
+!C3_Race009E = $0008                     ; C3Mod_RaceTask's tests
+!C3_Race009C = $0400
+!C3_Race0098 = $8000
+!C3_Race004EProg9 = $2000                ; ... where it moves C3_Unk004E / C3_Unk0073
+!C3_Race0073Prog9 = $6000
+!C3_Race004EProg0 = $4000
+!C3_Race004EMask = $FFFE
+!C3_RaceMoveStep = $0080
+!C3_RaceMoveMask = $FF80
+!C3_Race0088Gap = $1000
+!C3_PadR = $0010                         ; JOY1 as a word (C3_Pad..): R
+!C3_PadL = $0020                         ; L
+!C3_PadX = $0040                         ; X
+!C3_PadA = $0080                         ; A
+!C3_PadRight = $0100                     ; Right
+!C3_PadLeft = $0200                      ; Left
+!C3_PadDown = $0400                      ; Down
+!C3_PadUp = $0800                        ; Up
+!Op_NOP = $EA                            ; 65816 opcodes written into code
+!Op_INX = $E8
+; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
+; variable ones take the variable n in bits 0-3, the loops the counter.
+!C3Op_Set = $00                          ; var n = word
+!C3Op_Add = $10                          ; var n += word
+!C3Op_CopyVar = $20                      ; var n = var (byte: 2 x m)
+!C3Op_AddVar = $30                       ; var n += var (byte: 2 x m)
+!C3Op_Loop = $80                         ; counter n, word limit, word target
+!C3Op_LoopYield = $90                    ; the same, then yield
+!C3Op_CallW = $F0                        ; word: module routine (C3Mod_CallW)
+!C3Op_Poke8 = $F1                        ; word address, byte
+!C3Op_Poke16 = $F2                       ; word address, word
+!C3Op_Call = $F3                         ; word: a script subroutine
+!C3Op_Return = $F4
+!C3Op_WaitApu = $F5                      ; byte: wait for APUIO2's low nibble
+!C3Op_Driver = $F6                       ; words: Audio_CmdId/Arg0, Arg1/Arg2
+!C3Op_NmiRemove = $F7                    ; word: C3_NmiTaskList
+!C3Op_NmiAdd = $F8
+!C3Op_TaskRemove = $F9                   ; word: C3_TaskList
+!C3Op_TaskAdd = $FA
+!C3Op_Ppu = $FB                          ; byte value, byte register - $2100
+!C3Op_Yield = $FC
+!C3Op_JumpYield = $FD                    ; word
+!C3Op_Jump = $FE                         ; word
+!C3Op_End = $FF                          ; sets C3_ExitFlag
 
 ; ------------------------------------------------------------
 ; The steps of the unrolled dividers (C3Mod_Div16, C3Mod_DivHighByte):
