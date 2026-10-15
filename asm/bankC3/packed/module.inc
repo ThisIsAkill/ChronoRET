@@ -60,8 +60,6 @@ endmacro
 ; RAM the module uses (DB = $00 and DP = 0 unless a header says
 ; otherwise; the kernel's names, C3_*, are in ram_engine.inc)
 ; ------------------------------------------------------------
-!C3_Unk0380 = $0380                      ; 8-bit: C3Mod_Init clears it (use not traced)
-!C3_Unk0381 = $0381                      ; 8-bit: C3Mod_Init clears it (use not traced)
 !C3_FadeStep = $038E                     ; 8-bit: frames per brightness step of the fade tasks
                                          ; (C3Mod_FadeInTask..); C3Mod_Init sets C3_FadeStepInit
 !C3_FadeTimer = $038F                    ; 8-bit: frames left to the next step (reloaded from
@@ -100,41 +98,63 @@ endmacro
 !C3_PadPrev = $04                        ; 16-bit, dp (DP=0): last frame's pad (C3Mod_PadDelayTask)
 !C3_PadHeld = $06                        ; 16-bit, dp (DP=0): this frame's pad, C3_Pad as
                                          ; C3Mod_PadDelayTask copies it (C3Mod_RaceTask zeroes it)
+!C3_RaceResult = $0380                   ; 8-bit: the race's result for the game: 1 won, 2 lost
+                                         ; (C3Mod_Init clears it; written as a word with C3_RacePrize)
+!C3_RacePrize = $0381                    ; 8-bit: the finish's score prizes (C3Mod_RaceFinish):
+                                         ; bits 0-2 a special number (1-4), bits 5-7 1300/1500/2000
+!C3_ResultWord = $0382                   ; 16-bit: C3Mod_Prog0 clears it; the score at the finish
+                                         ; (C3Mod_RaceFinish); the staff programs put the staff
+                                         ; text's address there ($86C2, $86D4)
+; The race (program 0), dp words with DP=0: the player's bike and the
+; rival. Distances are 32-bit (the high word counts laps: 8 ends the
+; race), the side is the position across the track (0-$7000, shown
+; up and down: the D-pad steers it), speeds are 8.8 (distance / 64 a
+; frame).
+!C3_BikeSpeed = $4A                      ; 16-bit: the bike's speed
+!C3_BikeAccel = $4C                      ; 16-bit: added to it each frame ($100, 0 at the cap)
+!C3_BikeSide = $4E                       ; 16-bit: the bike's side position
+!C3_BikeDist = $51                       ; 32-bit ($51-$54): the bike's distance
+!C3_BikeTopSpeed = $55                   ; 16-bit: its speed cap ...
+!C3_BikeSpeedCap = $57                   ; 16-bit: ... the cap this frame
+!C3_BikeTopBehind = $59                  ; 16-bit: ... the cap while it is behind the rival
+!C3_BikeHidden = $63                     ; 16-bit: set when the bike leads by $1000 or more
+                                         ; (C3Mod_RaceStepTask; tested at $5033)
+!C3_BikeSideUp = $65                     ; 16-bit: the bike's side speed up (C3_PadSidePlus)
+!C3_BikeSideDown = $67                   ; 16-bit: ... and down (C3_PadSideMinus)
+!C3_Score = $69                          ; 16-bit: the score x 2 (+2 a frame in the lead, -1 behind,
+                                         ; +20 / -10 by the bumps; shown / 2)
+!C3_RivalSpeed = $6F                     ; 16-bit: the rival's speed
+!C3_RivalAccel = $71                     ; 16-bit: its acceleration ($F8, 0 at the cap)
+!C3_RivalSide = $73                      ; 16-bit: its side position
+!C3_RivalDist = $76                      ; 32-bit ($76-$79): its distance
+!C3_RivalTopSpeed = $7A                  ; 16-bit: its speed cap ...
+!C3_RivalSpeedCap = $7C                  ; 16-bit: ... this frame
+!C3_RivalTopAhead = $7E                  ; 16-bit: ... while the bike is ahead
+!C3_RivalHidden = $88                    ; 16-bit: as C3_BikeHidden (tested at $50BF)
+!C3_RivalSideUp = $8A                    ; 16-bit: the rival's side speed up
+!C3_RivalSideDown = $8C                  ; 16-bit: ... and down
+!C3_RaceGap = $8E                        ; 16-bit, signed: (the bike's distance - the rival's) / 32
+!C3_RivalControl = $98                   ; 16-bit: bit 15 accelerate, bit 9 steer up, bit 8 down
+!C3_BoostsLeft = $9A                     ; 16-bit: boosts left (B button), 3 at the start
+!C3_PackDist = $9C                       ; 32-bit ($9C-$9F): the mean of the two distances
+!C3_BoostHeld = $A0                      ; 16-bit: B held (a boost wants a new press)
+!C3_ColumnCleared = $A2                  ; 16-bit: the mode-7 map column is cleared
+!C3_BumpNow = $A4                        ; 16-bit: the bikes' relation this frame (see
+                                         ; C3Mod_RaceStepTask)
+!C3_BumpSide = $A6                       ; 16-bit: its across part (scratch)
+!C3_BumpLast = $A8                       ; 16-bit: the last relation while apart
+!C3_BikeSteer = $AE                      ; 16-bit: 1 or 2 while the bike steers (0 not)
+!C3_RacePhase = $B0                      ; 16-bit: 0 racing, 1 finished (slowing down), 2 after
+!C3_FinishGap = $B2                      ; 8-bit: C3_RaceGap's low byte at the finish, counted to 0
+                                         ; by C3Mod_RaceTask (read as a word too)
+!C3_BoostTimer = $BA                     ; 16-bit: frames of the boost lamp left
+!C3_RaceFrames = $BC                     ; 16-bit: + 1 each frame of C3Mod_RaceStepTask
+!C3_QuitSeen = $BE                       ; 16-bit: set once C3Mod_RaceTask has seen the A button
+!C3_PadSideMinus = $00B6                 ; 16-bit: the D-pad button that steers the bike's side
+                                         ; down (C3Mod_SideMinusPads' entry for the view's angle)
+!C3_PadSidePlus = $00B8                  ; 16-bit: the one that steers it up (C3Mod_SidePlusPads)
 !C3_Prog9 = $44                          ; 8-bit, dp (DP=0): 1 when C3Mod_Prog0 runs as program 9
                                          ; (C3_EntryArg bits 0-3 not 0), else 0 (Init's clear)
-!C3_Unk004E = $4E                        ; 16-bit, dp: C3Mod_Prog0Vars sets $6000; C3Mod_RaceTask
-                                         ; moves it to $2000 (program 9) or $4000 by $80 a frame
-!C3_Unk0051 = $51                        ; 16-bit, dp: C3Mod_RaceTask compares it with C3_Unk0076
-!C3_Unk0055 = $55                        ; 16-bit, dp: C3Mod_Prog0Vars sets $4000
-!C3_Unk0059 = $59                        ; 16-bit, dp: C3Mod_Prog0Vars sets $4000
-!C3_Unk0063 = $63                        ; 16-bit, dp: C3Mod_RaceTask zeroes it (program 0)
-!C3_Unk0065 = $65                        ; 16-bit, dp: C3Mod_RaceTask zeroes it at a phase's end
-!C3_Unk0067 = $67                        ; 16-bit, dp: likewise
-!C3_Unk0069 = $69                        ; 16-bit, dp: counted down by C3Mod_CountDownTask
-!C3_Unk0073 = $73                        ; 16-bit, dp: C3Mod_Prog0Vars sets $2000; C3Mod_RaceTask
-                                         ; moves it to $6000 (program 9)
-!C3_Unk0076 = $76                        ; 16-bit, dp: see C3_Unk0051
-!C3_Unk007A = $7A                        ; 16-bit, dp: C3Mod_Prog0Vars sets $3000
-!C3_Unk007E = $7E                        ; 16-bit, dp: C3Mod_Prog0Vars sets $5000
-!C3_Unk0088 = $88                        ; 16-bit, dp: C3Mod_RaceTask sets 1 (program 0) and tests it
-!C3_Unk0098 = $98                        ; 16-bit, dp: C3Mod_RaceTask: $8000 in program 9, else 0
-!C3_Unk009A = $9A                        ; 8-bit, dp: C3Mod_Prog0Vars sets 3 (program 0)
-!C3_Unk009C = $9C                        ; 16-bit, dp: C3Mod_RaceTask tests it against $400
-!C3_Unk009D = $9D                        ; 16-bit (read absolute as $009D): C3Mod_SkyNmiTask's input
-!C3_Unk009E = $9E                        ; 16-bit, dp: C3Mod_RaceTask tests it against 8
-!C3_Unk00A0 = $A0                        ; 16-bit, dp: C3Mod_Prog0Vars sets 1
-!C3_Unk00A2 = $A2                        ; 16-bit, dp: C3Mod_Prog0Vars sets 1; C3Mod_RaceTask
-                                         ; clears it when it puts the map column back
-!C3_Unk00A8 = $A8                        ; 16-bit, dp: C3Mod_Prog0Vars sets $20
-!C3_Unk00AE = $AE                        ; 16-bit, dp: C3Mod_Prog0Vars clears it
-!C3_Unk00B0 = $B0                        ; 16-bit, dp: a phase number C3Mod_RaceTask tests (1) and steps
-!C3_Unk00B2 = $B2                        ; 8-bit count C3Mod_RaceTask moves to 0 (read as a word too)
-!C3_PadForward = $00B6                   ; 16-bit: C3Mod_ForwardPads' entry for the view's angle
-!C3_PadBack = $00B8                      ; 16-bit: C3Mod_BackPads' entry
-!C3_Unk00BA = $BA                        ; 8-bit, dp: C3Mod_Prog0Vars sets $80 (program 0)
-!C3_Unk00BE = $BE                        ; 16-bit, dp: set once C3Mod_RaceTask has seen the A button
-!C3_StaffTextPtr = $0382                 ; 16-bit: the staff text's address ($A651), 0 for none
-                                         ; (C3Mod_Prog0)
 !C3_StartCount = $0397                   ; 16-bit: C3Mod_Prog0's C3_EntryArg bit 6 runs, counted
                                          ; (bit 0 picks C3Mod_Prog0WipeA or B)
 !C3_ExitTimer = $0399                    ; 16-bit: frames C3Mod_ExitCountTask waits
@@ -328,24 +348,91 @@ endmacro
 !C3_Prog9Unk53A4 = $E8
 !C3_Prog9Unk5395 = $06
 !C3_Prog9Unk53AE = $01
-!C3_Prog0Unk00BA = $80                   ; C3_Unk00BA in program 0
-!C3_Prog0Unk009A = $03                   ; C3_Unk009A in program 0
-!C3_Init0055 = $4000                     ; C3Mod_Prog0Vars' values
-!C3_Init007A = $3000
-!C3_Init007E = $5000
-!C3_Init004E = $6000
-!C3_Init0073 = $2000
-!C3_Init00A8 = $0020
-!C3_Race009E = $0008                     ; C3Mod_RaceTask's tests
-!C3_Race009C = $0400
-!C3_Race0098 = $8000
-!C3_Race004EProg9 = $2000                ; ... where it moves C3_Unk004E / C3_Unk0073
-!C3_Race0073Prog9 = $6000
-!C3_Race004EProg0 = $4000
-!C3_Race004EMask = $FFFE
-!C3_RaceMoveStep = $0080
-!C3_RaceMoveMask = $FF80
-!C3_Race0088Gap = $1000
+!C3_BoostTimerStart = $80                ; C3_BoostTimer at the start (program 0)
+!C3_BoostsStart = 3                      ; C3_BoostsLeft at the start (program 0)
+!C3_BikeTopStart = $4000                 ; C3Mod_Prog0Vars' start values
+!C3_RivalTopStart = $3000
+!C3_RivalAheadStart = $5000
+!C3_BikeSideStart = $6000
+!C3_RivalSideStart = $2000
+!C3_BumpLastStart = $0020
+!C3_RaceLaps = $0008                     ; laps (the distances' high word) of a race
+!C3_ColumnBackFinish = $0400             ; C3Mod_RaceTask: the column is put back from lap 8 + this
+!C3_RivalGo = $8000                      ; C3_RivalControl: accelerate
+!C3_RivalSteerUp = $0200                 ; ... steer up (C3_RivalSideUp)
+!C3_RivalSteerDown = $0100               ; ... steer down
+!C3_FinishSideLow = $2000                ; C3Mod_RaceTask (program 9): where the sides go
+!C3_FinishSideHigh = $6000
+!C3_SideCentre = $4000                   ; the middle of the track (program 0's finish)
+!C3_SideEvenMask = $FFFE
+!C3_SideMoveStep = $0080                 ; the finish moves: $80 a frame
+!C3_SideMoveMask = $FF80
+!C3_HideLead = $1000                     ; the lead that sets C3_BikeHidden / C3_RivalHidden
+!C3_RaceWon = $0001                      ; C3_RaceResult (a word: C3_RacePrize = 0)
+!C3_RaceLost = $0002
+!C3_TopSpeedFinish = $7000               ; C3Mod_RaceFinish: the bike's caps (program 0)
+!C3_RivalTopFinish9 = $4000              ; ... the rival's (program 9)
+!C3_FinishVarB6 = $0FFF                  ; ... page $0B00's var 6
+!C3_FinishFade = $0505                   ; ... C3_FadeStep and C3_FadeTimer = 5
+!C3_ScriptVar6 = $0C                     ; a script page's var 6 (C3Script_Vars + 12)
+!C3_Score777 = 777                       ; C3Mod_RaceFinish: special scores (the score shown) ...
+!C3_Score123 = 123
+!C3_Score1234 = 1234
+!C3_Score1000 = 1000                     ; (and 2000, 3000)
+!C3_Score1300 = 1300                     ; ... and thresholds
+!C3_Score1500 = 1500
+!C3_RepDigitCount = 11                   ; C3Mod_RepDigits' entries
+!C3_PrizeRepDigits = $01                 ; C3_RacePrize values ...
+!C3_Prize777 = $02
+!C3_PrizeRun = $03
+!C3_PrizeThousands = $04
+!C3_Prize1300 = $20                      ; ... and bits
+!C3_Prize1500 = $40
+!C3_Prize2000 = $80
+!C3_SongWon = $1B                        ; C3_SongReq at the finish (the win song, probably)
+!C3_ColumnBackDist = $1000               ; C3Mod_RaceStepTask: lap 0 from here: the column back
+!C3_ColumnClearDist = $F200              ; ... lap 7 from here: the column cleared
+!C3_SpeedDrag = $0080                    ; taken off both speeds each frame
+!C3_BikeAccelOn = $0100                  ; C3_BikeAccel below the cap
+!C3_RivalAccelOn = $00F8                 ; C3_RivalAccel below the cap
+!C3_LampEvery = 8                        ; the boost lamp rotates every 8th frame
+!C3_BoostTiles = $7EE100                 ; 64 bytes: two sprite tiles, the boost lamp (sent to VRAM
+                                         ; word $5180 by C3Mod_LampUpload)
+!C3_BoostTilesBytes = $0040               ; its size
+!C3_LampLeftRows = $E111                 ; bank $7E (DB = $7E): the lamp's first tile, row 0's bit
+                                         ; plane 3 (+2: row 1's), rotated by C3Mod_RaceStepTask
+!C3_LampRightRows = $E131                ; ... the second tile's
+!C3_LampVram = $5180                     ; VRAM word C3Mod_LampUpload sends it to
+!C3_BoostFrames = $0080                  ; C3_BoostTimer for a boost
+!C3_BoostSpeed = $1700                   ; added to C3_BikeSpeed by a boost
+!C3_SpeedMax = $7FFF                     ; the most a boost gives
+!C3_ViewXBase = $0374                    ; C3_ViewX = C3_PackDist / 16 + this + 1
+!C3_SideNear = $0020                     ; the sides' high bytes within this: the rival steers away
+!C3_SideMiddle = $0040                   ; the middle of the sides' high bytes
+!C3_BikeSteerPlus = 1                    ; C3_BikeSteer values
+!C3_BikeSteerMinus = 2
+!C3_SidePush = $0028                     ; the bike's side speed + this while steering
+!C3_RivalSidePush = $0018                ; the rival's
+!C3_SideSpeedMax = $0210                 ; side speeds' top
+!C3_SideDecay = $0010                    ; taken off the side speeds each frame
+!C3_SideMax = $7000                      ; the side positions' top
+!C3_BikeLength = $0100                   ; the bump test's lengths (distance units)
+!C3_RivalLength = $00C0
+!C3_BumpAhead = $0200                    ; ... and margins
+!C3_BumpBehind = $0180
+!C3_BumpWidth = $1000                    ; ... the bikes' width (side units)
+!C3_BumpAheadOnly = $01                  ; C3_BumpNow / C3_BumpLast: the bike ahead
+!C3_BumpBehindOnly = $02                 ; ... behind
+!C3_BumpBelowOnly = $10                  ; ... below (side)
+!C3_BumpAboveOnly = $20                  ; ... above
+!C3_BumpScoreUp = 20                     ; C3_Score + this for a bump from behind
+!C3_BumpScoreDown = 10                   ; - this for a bump into the rival
+!C3_SfxBump = $98                        ; the bump's sound effect (Audio_CmdPlaySfx)
+!C3_StepMask = $01FF                     ; a speed / 64 as a distance step
+!C3_TmpF6 = $F6                          ; 32-bit (C3_TmpF6/F8) dp scratch of the bump routines
+!C3_TmpF8 = $F8
+!C3_PadB = $8000                         ; JOY1 as a word: B
+!Op_RTS = $60                            ; 65816 opcode RTS
 !C3_PadR = $0010                         ; JOY1 as a word (C3_Pad..): R
 !C3_PadL = $0020                         ; L
 !C3_PadX = $0040                         ; X

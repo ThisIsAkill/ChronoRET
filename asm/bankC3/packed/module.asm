@@ -104,7 +104,7 @@ C3Mod_ProgramTable:
 ; Sets the module up from whatever the field left:
 ;   - sets its variables: C3_FadeStep and C3_FadeTimer =
 ;     C3_FadeStepInit; the pause words, C3_NoSoftReset, C3_SongBusy,
-;     C3_Brightness, C3_HdmaEnable, C3_Unk0380/0381/0366 = 0;
+;     C3_Brightness, C3_HdmaEnable, C3_RaceResult/0381/0366 = 0;
 ;   - clears the direct page $0000-$00FF with DMA channel 7, reading
 ;     MPYL (M7A x M7B = $0404 x 0 = 0) the way ClearRAMDMA does;
 ;   - with C3_BootIrqOn in C3_EntryArg (entered from the field hook,
@@ -143,8 +143,8 @@ C3Mod_Init:
     LDA.b #!C3_FadeStepInit
     STA.w !C3_FadeStep
     STA.w !C3_FadeTimer
-    STZ.w !C3_Unk0380
-    STZ.w !C3_Unk0381
+    STZ.w !C3_RaceResult
+    STZ.w !C3_RacePrize
     STZ.w !C3_PauseAllowed
     STZ.w !C3_Paused
     STZ.w !C3_PauseHeld
@@ -1430,8 +1430,9 @@ C3Mod_AudioCommand:
 ; (C3Mod_SoundReset relies on that, sending runs of commands that
 ; change one byte each).
 ; Callers note: C3Mod_AudioCommand ($377A), C3Mod_SoundReset ($3187,
-;   $318F, $3197, $319F, $31AD JMP), C3Mod_ExitTask ($426D) and $4BC8,
-;   $63E5 and $8EB2 (code not matched yet).
+;   $318F, $3197, $319F, $31AD JMP), C3Mod_ExitTask ($426D),
+;   C3Mod_RaceStepTask ($4BC8) and $63E5 and $8EB2 (code not matched
+;   yet).
 ; Entry: M any (SEP #$20 here), X=0 (the 16-bit poll count), DP any,
 ;        DB=$00 (the ports and the block are absolute).
 ; Exit:  M=1, X=0; A = Audio_CmdId; X = polls left (nonzero), Y, DP
@@ -1816,7 +1817,8 @@ C3Mod_SetM7Scroll:
 ; The module's copy of C3_TaskListRemove: clears the first word of
 ; C3_TaskList equal to X, searching without a bound (a value not in the
 ; list is searched for past its end).
-; Callers note: $482E and $4879 (code not matched yet).
+; Callers note: C3Mod_RaceFinish ($482E) and C3Mod_RaceStepTask
+;   ($4879).
 ; Entry: M any (P saved; 16-bit set here), X=0, DP any, DB = $00 or $7E
 ;        (the list is absolute); X = the task's address.
 ; Exit:  P restored; A = the address, X = its offset in the list; Y
@@ -1862,8 +1864,9 @@ C3Mod_NmiTaskRemove:
 ; $7E:395E — C3Mod_TaskAdd (22 bytes, $395E–$3973)
 ; The module's copy of C3_TaskListAdd: X into the first free (zero)
 ; word of C3_TaskList, searched without a bound.
-; Callers note: C3Mod_RaceTask ($4687) and $4834, $489D, $5BAC, $5D54,
-;   $63EB, $6BDB and $6BE1 (code not matched yet).
+; Callers note: C3Mod_RaceTask ($4687), C3Mod_RaceFinish ($4834),
+;   C3Mod_RaceStepTask ($489D) and $5BAC, $5D54, $63EB, $6BDB and $6BE1
+;   (code not matched yet).
 ; Entry: M any (P saved; 16-bit set here), X=0 (pushed and pulled as a
 ;        word), DP any, DB = $00 or $7E; X = the task's address.
 ; Exit:  P restored; A = the address, X = its offset; Y unchanged.
@@ -1886,8 +1889,8 @@ C3Mod_TaskAdd:
 
 ; $7E:3974 — C3Mod_NmiTaskAdd (22 bytes, $3974–$3989)
 ; As C3Mod_TaskAdd, for C3_NmiTaskList.
-; Callers note: C3Mod_RaceTask ($46A1) and $4897, $48BD, $48D7, $8652
-;   and $9C69 (code not matched yet).
+; Callers note: C3Mod_RaceTask ($46A1), C3Mod_RaceStepTask ($4897,
+;   $48BD, $48D7) and $8652 and $9C69 (code not matched yet).
 ; Entry: M any (P saved), X=0, DP any, DB = $00 or $7E; X = the task's
 ;        address.
 ; Exit:  P restored; A = the address, X = its offset; Y unchanged.
@@ -1963,8 +1966,9 @@ C3Mod_TaskNext:                         ; header: see C3Mod_RunTasks
 ; Callers note: JMP from tasks (reached through C3_TaskList; the trace
 ;   follows them): C3Mod_FadeInTask ($3492), C3Mod_FadeOutTask ($34A8),
 ;   C3Mod_FadeOutStopTask ($34E0), C3Mod_FadeOutExitTask ($34F8),
-;   C3Mod_CountDownTask ($44F8), and $48A6, $5BBB, $5BCB, $5CB7,
-;   $5D47, $6ACA, $9A9F, $9B7B and $9EF9 (code not matched yet).
+;   C3Mod_CountDownTask ($44F8), C3Mod_RaceStepTask ($48A6), and $5BBB,
+;   $5BCB, $5CB7, $5D47, $6ACA, $9A9F, $9B7B and $9EF9 (code not matched
+;   yet).
 ; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
 ;        task found it (C3Mod_RunTasks' JSR return address on top: a JSR
 ;        here would push a second one and misalign the pulls); X=0
@@ -1987,8 +1991,9 @@ C3Mod_TaskEnd:
 ; next frame).
 ; Callers note: JMP from tasks (the trace follows them):
 ;   C3Mod_MusicFadeTask ($34BF, after LDX #C3Mod_FadeOutStopTask),
-;   C3Mod_ExitTask ($427F), C3Mod_WaitSongEndTask ($476E), and $485A,
-;   $63F1, $6A71, $6A94, $6BF6 and $98A9 (code not matched yet).
+;   C3Mod_ExitTask ($427F), C3Mod_WaitSongEndTask ($476E),
+;   C3Mod_RaceFinish ($485A), and $63F1, $6A71, $6A94, $6BF6 and $98A9
+;   (code not matched yet).
 ; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
 ;        task found it (C3Mod_RunTasks' JSR return address on top, as
 ;        for C3Mod_TaskEnd); X=0 (16-bit index: the address and the PLX
@@ -2369,7 +2374,7 @@ C3Mod_SprListMixed:
 ;     0-5; C3Mod_Prog0Vars;
 ;   - C3_EntryArg bit 6 clear: page $0A00 runs C3Mod_Prog0ScriptA and
 ;     $0B00 C3Mod_Prog0ScriptB, C3_HdmaEnable without channel 0 and
-;     C3_StaffTextPtr = 0; set: the kernel's wipe set up (WinFx_C3E*:
+;     C3_ResultWord = 0; set: the kernel's wipe set up (WinFx_C3E*:
 ;     table at $7E:E000, frame 0), wipe mode 2 written over
 ;     C3Mod_ExitTask's operand, the PPU windows (window 1 on BG1-BG4,
 ;     the sprites and the colour window, WH0 = 0, WH1 = $FF, WH2 = 0,
@@ -2517,7 +2522,7 @@ C3Mod_Prog0:
     LDA.b #!C3_Prog0HdmaNoWipe
     STA.w !C3_HdmaEnable
     REP #$20
-    STZ.w !C3_StaffTextPtr
+    STZ.w !C3_ResultWord
     BRA .run_script
 .wipe_start:
     LDA.w #!C3_Prog0Fade
@@ -3038,7 +3043,7 @@ C3Mod_Prog0RunB:
 ; count-down: sound effect $96 (C3_SndSfxA) three times 60 frames
 ; apart, then effect $97 (Audio_CmdPlaySfx); 20 frames later
 ; C3_PauseAllowed = 1 (poke), var 13 = 1, sound effect $44, the task
-; C3Mod_Unk485D added; then waits for good.
+; C3Mod_RaceStepTask added; then waits for good.
 C3Mod_Prog0ScriptB:
     db !C3Op_Set|2 : dw $0018
     db !C3Op_Set|0 : dw $00FF
@@ -3058,7 +3063,7 @@ C3Mod_Prog0ScriptB:
     db !C3Op_Poke8 : dw !C3_PauseAllowed : db 1
     db !C3Op_Set|13 : dw $0001
     db !C3Op_Driver : dw !C3_SndSfxA|($44<<8), $0080
-    db !C3Op_TaskAdd : dw C3Mod_Unk485D
+    db !C3Op_TaskAdd : dw C3Mod_RaceStepTask
 .l404A:
     db !C3Op_JumpYield : dw .l404A
 
@@ -3295,7 +3300,8 @@ C3Mod_Prog0Finish:
     db !C3Op_End
 
 ; $7E:4211 — C3Mod_Prog0Quit (60 bytes, $4211–$424C)
-; Page $0A00's script when the race is left (stored by code at $48A3):
+; Page $0A00's script when the race is lost (stored by
+; C3Mod_RaceStepTask at $48A3):
 ; stops sound effect groups 0 and 1 (C3_SndStopSfx), sets the tempo
 ; adjustment ($40, $80), waits 32 frames, adds C3Mod_RestoreColumnTask
 ; (an NMI task) and jumps to .fade: C3Mod_FadeOutTask, 128 frames,
@@ -3506,20 +3512,20 @@ C3Mod_ClearUnk1446:
     MVN $00,$00                         ; lint-ok: MVN operands are bank bytes (bank $00)
     RTS
 
-; $7E:4319 — C3Mod_ForwardPads (16 bytes, $4319–$4328)
-; The D-pad buttons (JOY1's high byte as a word) that point along the
-; view, by eighth of a turn of the angle (C3Mod_SteerTask's index:
-; (angle + $40) / 64, even): Up, Up+Right, Right, Down+Right, Down,
-; Down+Left, Left, Up+Left; C3Mod_SteerTask and C3Mod_Prog0Vars copy
-; the entry to C3_PadForward (probably the button that drives
-; forward; its reader is not matched yet).
-C3Mod_ForwardPads:
+; $7E:4319 — C3Mod_SideMinusPads (16 bytes, $4319–$4328)
+; The D-pad button (JOY1's high byte as a word) that steers the bike's
+; side down (C3_PadSideMinus, read by C3Mod_RaceStepTask), by eighth
+; of a turn of the view's angle (C3Mod_SteerTask's index: (angle +
+; $40) / 64, even), as the track turns on the screen: Up, Up+Right,
+; Right, Down+Right, Down, Down+Left, Left, Up+Left; C3Mod_SteerTask
+; and C3Mod_Prog0Vars copy the entry.
+C3Mod_SideMinusPads:
     dw !C3_PadUp, !C3_PadUp|!C3_PadRight, !C3_PadRight, !C3_PadDown|!C3_PadRight
     dw !C3_PadDown, !C3_PadDown|!C3_PadLeft, !C3_PadLeft, !C3_PadUp|!C3_PadLeft
 
-; $7E:4329 — C3Mod_BackPads (16 bytes, $4329–$4338)
-; The opposite directions, for C3_PadBack.
-C3Mod_BackPads:
+; $7E:4329 — C3Mod_SidePlusPads (16 bytes, $4329–$4338)
+; The opposite directions, for C3_PadSidePlus (the side up).
+C3Mod_SidePlusPads:
     dw !C3_PadDown, !C3_PadDown|!C3_PadLeft, !C3_PadLeft, !C3_PadUp|!C3_PadLeft
     dw !C3_PadUp, !C3_PadUp|!C3_PadRight, !C3_PadRight, !C3_PadDown|!C3_PadRight
 
@@ -3529,16 +3535,16 @@ C3Mod_BackPads:
 ;     the view: C3_ViewLeanR / C3_ViewLeanL count up while R / L is
 ;     held (to 12) and down otherwise (C3Mod_LeanR, C3Mod_LeanL), and
 ;     the angle moves by C3_ViewLeanR / 4 - C3_ViewLeanL / 4 a frame;
-;   - C3_PadForward / C3_PadBack = the C3Mod_ForwardPads /
-;     C3Mod_BackPads entry for the angle's eighth of a turn;
+;   - C3_PadSideMinus / C3_PadSidePlus = the C3Mod_SideMinusPads /
+;     C3Mod_SidePlusPads entry for the angle's eighth of a turn;
 ;   - on odd frames (C3_FrameCount bit 0), X held brings the view up
 ;     (distance, scale and horizon + 1, while the scale is below $7F),
 ;     else A held takes it down (- 1 each, while the scale is $60 or
 ;     more).
 ; Callers note: a task added by script opcode $FA at $3FA6
 ;   (C3Mod_Prog0RunA) and $4004 (C3Mod_Prog0RunB); removed by LDX
-;   #C3Mod_SteerTask / JSR C3Mod_TaskRemove at $482B and $4876 (code not
-;   matched yet).
+;   #C3Mod_SteerTask / JSR C3Mod_TaskRemove at $482B (C3Mod_RaceFinish)
+;   and $4876 (C3Mod_RaceStepTask).
 ; Entry: a task (C3Mod_RunTasks): M=0, X=0 (16-bit counters), DP any
 ;        (set to $0A00 here, restored by C3Mod_RunTasks), DB=$00
 ;        (C3_Prog9, C3_PadHeld and C3_FrameCount are read absolute).
@@ -3579,10 +3585,10 @@ C3Mod_SteerTask:
     LSR A
     AND.w #!C3_PadTableMask
     TAX
-    LDA.l C3Mod_ForwardPads,X
-    STA.w !C3_PadForward
-    LDA.l C3Mod_BackPads,X
-    STA.w !C3_PadBack
+    LDA.l C3Mod_SideMinusPads,X
+    STA.w !C3_PadSideMinus
+    LDA.l C3Mod_SidePlusPads,X
+    STA.w !C3_PadSidePlus
     LDA.w !C3_PadHeld
     BIT.w #!C3_PadX
     BEQ .not_up
@@ -3765,20 +3771,23 @@ C3Mod_ViewOffsetTask:
     RTS
 
 ; $7E:449C — C3Mod_SkyNmiTask (50 bytes, $449C–$44CD)
-; An NMI task: the sky's horizontal scroll from C3_Unk009D / 4 and
-; C3_ViewX / 2: C3_TmpF0 = -(C3_ViewX / 2 + C3_Unk009D / 4 + $88 + the
-; carries of the shifts), C3_SkyScrollX = it + C3_Unk143E,
+; An NMI task (once the race is lost): the sky's horizontal scroll from
+; the pack's distance (C3_PackDist's bytes 1-2 / 4: the distance /
+; 1024) and C3_ViewX / 2: C3_TmpF0 = -(C3_ViewX / 2 + the distance /
+; 1024 + $88 + the carries of the shifts), C3_SkyScrollX = it +
+; C3_Unk143E,
 ; C3_Bg2ScrollX = C3_SkyScrollX / 4 and C3_Bg3ScrollX = C3_SkyScrollX
 ; x 3/8 (/ 4 + / 8, plus the carry of the shift). Quirk: no CLC before
 ; the ADCs, so the bits the LSRs shift out are added in.
 ; Callers note: an NMI task added by LDX #C3Mod_SkyNmiTask / JSR
-;   C3Mod_NmiTaskAdd at $4894 (code not matched yet).
+;   C3Mod_NmiTaskAdd at $4894 (C3Mod_RaceStepTask, when the race is
+;   lost).
 ; Entry: an NMI task: M any (REP #$20 here), X any, DP=0 (C3_TmpF0),
 ;        DB=$00 (absolute RAM).
 ; Exit:  M=0; A = C3_Bg3ScrollX; X, Y unchanged; C3_TmpF0 changed.
 C3Mod_SkyNmiTask:
     REP #$20
-    LDA.w !C3_Unk009D
+    LDA.w !C3_PackDist+1
     LSR A
     LSR A
     STA.b !C3_TmpF0
@@ -3806,21 +3815,22 @@ C3Mod_SkyNmiTask:
 
 ; $7E:44CE — C3Mod_CountDownTask (48 bytes, $44CE–$44FD)
 ; A task: every fourth frame (C3_FrameCount bits 0-1 clear), takes
-; 2000, 200, 20 or 2 off C3_Unk0069 (the first that fits, tried from
+; 2000, 200, 20 or 2 off C3_Score (the first that fits, tried from
 ; the largest); when none fits (below 2) it ends itself
-; (C3Mod_TaskEnd), C3_Unk0069 left as it is.
+; (C3Mod_TaskEnd), C3_Score left as it is.
 ; Callers note: a task added by LDX #C3Mod_CountDownTask / JSR
-;   C3Mod_TaskAdd at $489A (code not matched yet).
+;   C3Mod_TaskAdd at $489A (C3Mod_RaceStepTask, when the race is
+;   lost).
 ; Entry: a task: M=0, X=0 (C3Mod_TaskEnd's), DP=0 (C3_FrameCount and
-;        C3_Unk0069 are direct page), DB any.
-; Exit:  RTS with A = C3_Unk0069 (after a step) or C3_FrameCount AND 3;
-;        at the end JMP C3Mod_TaskEnd with A = C3_Unk0069 - 2 (wrapped
+;        C3_Score are direct page), DB any.
+; Exit:  RTS with A = C3_Score (after a step) or C3_FrameCount AND 3;
+;        at the end JMP C3Mod_TaskEnd with A = C3_Score - 2 (wrapped
 ;        below 0).
 C3Mod_CountDownTask:
     LDA.b !C3_FrameCount
     AND.w #!C3_CountDownEvery-1
     BNE .wait
-    LDA.b !C3_Unk0069
+    LDA.b !C3_Score
     SEC
     SBC.w #!C3_Dec1000*2
     BCS .store
@@ -3838,7 +3848,7 @@ C3Mod_CountDownTask:
     BCS .store
     JMP C3Mod_TaskEnd
 .store:
-    STA.b !C3_Unk0069
+    STA.b !C3_Score
 .wait:
     RTS
 
@@ -3848,13 +3858,14 @@ C3Mod_CountDownTask:
 ; C3Mod_ModeHdma, C3Mod_MathHdma and C3Mod_ScrollHdma: half of it, and
 ; half plus the bit shifted out (so the two add up to the horizon: the
 ; sky's lines in BG mode 1, the plane below in mode 7), then goes on
-; at C3Mod_Unk5261. Quirk: a horizon of 0 or 1 gives a first count of
+; at C3Mod_LampUpload. Quirk: a horizon of 0 or 1 gives a first count of
 ; 0, which ends the tables there.
 ; Callers note: an NMI task added by script opcode $F8 at $3F3B
 ;   (C3Mod_Prog0ScriptA) and $4151 (C3Mod_Prog0Start).
-; Entry: an NMI task: M=1, X any, DP any, DB=$00 (C3_ViewHorizon is
-;        read absolute; the stores are long).
-; Exit:  as C3Mod_Unk5261 leaves them (JMP).
+; Entry: an NMI task: M=1, X=0 (C3Mod_LampUpload's 16-bit loads), DP
+;        any, DB=$00 (C3_ViewHorizon is read absolute; the stores are
+;        long).
+; Exit:  as C3Mod_LampUpload leaves them (JMP).
 C3Mod_HorizonNmiTask:
     LDA.w !C3_ScriptPageA+!C3_ViewHorizon
     LSR A
@@ -3865,7 +3876,7 @@ C3Mod_HorizonNmiTask:
     STA.l C3Mod_ModeHdma+3
     STA.l C3Mod_MathHdma+3
     STA.l C3Mod_ScrollHdma+3
-    JMP C3Mod_Unk5261
+    JMP C3Mod_LampUpload
 
 ; $7E:451F — C3Mod_ModeHdma (12 bytes, $451F–$452A)
 ; Indirect HDMA table for BGMODE (C3Mod_Prog0Hdma channel 5): the
@@ -3988,12 +3999,13 @@ C3Mod_Prog0Setup:
 ; Program 0's race variables (called by C3Mod_Prog0): program 9
 ; (C3_Prog9) writes $D8 over the operands at $53A0, $4F74 and $50DA,
 ; $E8 over $53A4, 6 over $5395 and 1 over $53AE (code not matched
-; yet); program 0 sets C3_Unk00BA = $80 and C3_Unk009A = 3. Then: the
-; words C3_Unk0055 = C3_Unk0059 = $4000, C3_Unk007A = $3000,
-; C3_Unk007E = $5000, C3_Unk00AE = 0, C3_Unk004E = $6000, C3_Unk0073 =
-; $2000, C3_Unk00A8 = $20, C3_Unk00A2 = C3_Unk00A0 = 1, C3_Unk1444 =
-; 0, C3_PadForward / C3_PadBack = the angle-0 entries (Up / Down), and
-; C3_Unk1446 cleared (JMP C3Mod_ClearUnk1446).
+; yet); program 0 sets C3_BoostTimer = $80 and C3_BoostsLeft = 3.
+; Then the words: C3_BikeTopSpeed = C3_BikeTopBehind = $4000,
+; C3_RivalTopSpeed = $3000, C3_RivalTopAhead = $5000, C3_BikeSteer =
+; 0, C3_BikeSide = $6000, C3_RivalSide = $2000, C3_BumpLast = $20,
+; C3_ColumnCleared = C3_BoostHeld = 1, C3_Unk1444 = 0,
+; C3_PadSideMinus / C3_PadSidePlus = the angle-0 entries (Up / Down),
+; and C3_Unk1446 cleared (JMP C3Mod_ClearUnk1446).
 ; Callers note: C3Mod_Prog0 ($3C51).
 ; Entry: M=1, X=0, DP=0, DB=$00 (absolute RAM; the code stores are
 ;        long).
@@ -4016,34 +4028,34 @@ C3Mod_Prog0Vars:
     STA.l C3Mod_Unk53AE
     BRA .both
 .prog0:
-    LDA.b #!C3_Prog0Unk00BA
-    STA.b !C3_Unk00BA
-    LDA.b #!C3_Prog0Unk009A
-    STA.b !C3_Unk009A
+    LDA.b #!C3_BoostTimerStart
+    STA.b !C3_BoostTimer
+    LDA.b #!C3_BoostsStart
+    STA.b !C3_BoostsLeft
 .both:
     REP #$20
-    LDA.w #!C3_Init0055
-    STA.b !C3_Unk0055
-    STA.b !C3_Unk0059
-    LDA.w #!C3_Init007A
-    STA.b !C3_Unk007A
-    LDA.w #!C3_Init007E
-    STA.b !C3_Unk007E
-    STZ.b !C3_Unk00AE
-    LDA.w #!C3_Init004E
-    STA.b !C3_Unk004E
-    LDA.w #!C3_Init0073
-    STA.b !C3_Unk0073
-    LDA.w #!C3_Init00A8
-    STA.b !C3_Unk00A8
+    LDA.w #!C3_BikeTopStart
+    STA.b !C3_BikeTopSpeed
+    STA.b !C3_BikeTopBehind
+    LDA.w #!C3_RivalTopStart
+    STA.b !C3_RivalTopSpeed
+    LDA.w #!C3_RivalAheadStart
+    STA.b !C3_RivalTopAhead
+    STZ.b !C3_BikeSteer
+    LDA.w #!C3_BikeSideStart
+    STA.b !C3_BikeSide
+    LDA.w #!C3_RivalSideStart
+    STA.b !C3_RivalSide
+    LDA.w #!C3_BumpLastStart
+    STA.b !C3_BumpLast
     LDA.w #1
-    STA.b !C3_Unk00A2
-    STA.b !C3_Unk00A0
+    STA.b !C3_ColumnCleared
+    STA.b !C3_BoostHeld
     STZ.w !C3_Unk1444
-    LDA.l C3Mod_ForwardPads
-    STA.w !C3_PadForward
-    LDA.l C3Mod_BackPads
-    STA.w !C3_PadBack
+    LDA.l C3Mod_SideMinusPads
+    STA.w !C3_PadSideMinus
+    LDA.l C3Mod_SidePlusPads
+    STA.w !C3_PadSidePlus
     JMP C3Mod_ClearUnk1446
 
 ; $7E:4643 — C3Mod_ClearColumnTask (52 bytes with C3Mod_RestoreColumnTask, $4643–$4676)
@@ -4056,11 +4068,11 @@ C3Mod_Prog0Vars:
 ; written back.
 ; Callers note: an NMI task added by script opcode $F8 at $3F3E
 ;   (C3Mod_Prog0ScriptA) and by LDX #C3Mod_ClearColumnTask / JSR
-;   C3Mod_NmiTaskAdd at $48D4 (code not matched yet).
+;   C3Mod_NmiTaskAdd at $48D4 (C3Mod_RaceStepTask).
 ;   C3Mod_RestoreColumnTask: added by script opcode $F8 at $4225
 ;   (C3Mod_Prog0Quit) and by LDX #C3Mod_RestoreColumnTask / JSR
-;   C3Mod_NmiTaskAdd at $469E (C3Mod_RaceTask) and $48BA (code not
-;   matched yet).
+;   C3Mod_NmiTaskAdd at $469E (C3Mod_RaceTask) and $48BA
+;   (C3Mod_RaceStepTask).
 ; Entry: an NMI task (C3Mod_RunNmiTasks): M=1, X=0 (the 16-bit register
 ;        pairs; C3Mod_NmiTaskEnd's PLX), DP and DB as it ran them (DB =
 ;        $00: absolute registers).
@@ -4090,66 +4102,70 @@ C3Mod_RestoreColumnTask:                ; header: see C3Mod_ClearColumnTask
     JMP C3Mod_NmiTaskEnd
 
 ; $7E:4677 — C3Mod_RaceTask (222 bytes, $4677–$4754)
-; A task (the first part of one; it goes on at C3Mod_Unk48FD):
-;   - the A button (C3_PadHeld bit 7) once (C3_Unk00BE set): adds
+; A task, after the finish (C3Mod_RaceFinish hands over to it); it
+; goes on at C3Mod_RaceStep:
+;   - the A button (C3_PadHeld bit 7) once (C3_QuitSeen set): adds
 ;     C3Mod_FadeOutExitTask (the module leaves after the fade);
-;   - while C3_Unk00A2 is set: when C3_Unk009E is 8 and C3_Unk009C is
-;     $400 or more, clears it and adds C3Mod_RestoreColumnTask (an NMI
-;     task: the map column put back);
+;   - while C3_ColumnCleared is set: once the pack (C3_PackDist) is in
+;     lap 8 at $400 or more, clears it and adds C3Mod_RestoreColumnTask
+;     (an NMI task: the map column put back);
 ;   - C3_PadHeld = 0;
-;   - unless C3_Unk00B0 is 1, nothing more here. With it: C3_Unk0098 =
-;     $8000 in program 9, else 0; program 9 (C3_EntryArg bits 0-3)
-;     moves C3_Unk004E to $2000 and C3_Unk0073 to $6000 by $80 a frame
-;     (rounded down to $80), not while C3_SongBusy (then straight to
-;     C3Mod_Unk48FD); program 0 clears C3_Unk0063, sets C3_Unk0088 = 1
-;     once C3_Unk0051 - C3_Unk0076 is $1000 or more (BMI) and, unless
-;     C3_SongBusy, moves C3_Unk004E to $4000 the same way;
-;   - C3_Unk00B2 (a byte) one step towards 0; once the word
-;     C3_Unk00B2 is 0, C3_Unk0088 is set and C3_Unk004E (bit 0 aside)
-;     is $4000: C3_Unk0065 = C3_Unk0067 = 0 and C3_Unk00B0 and
-;     C3_Unk1444 + 1.
+;   - unless C3_RacePhase is 1, nothing more here. With it:
+;     C3_RivalControl = $8000 (the rival keeps going) in program 9,
+;     else 0; program 9 (C3_EntryArg bits 0-3) moves C3_BikeSide to
+;     $2000 and C3_RivalSide to $6000 (.bike_target / .rival_target,
+;     swapped by C3Mod_RaceFinish when the bike was above) by $80 a
+;     frame (rounded down to $80), not while C3_SongBusy (then
+;     straight to C3Mod_RaceStep); program 0 clears C3_BikeHidden,
+;     sets C3_RivalHidden = 1 once the low words' C3_BikeDist -
+;     C3_RivalDist is $1000 or more (BMI) and, unless C3_SongBusy,
+;     moves C3_BikeSide to $4000 the same way;
+;   - C3_FinishGap (a byte) one step towards 0; once the word
+;     C3_FinishGap is 0, C3_RivalHidden is set and C3_BikeSide (bit 0
+;     aside) is $4000: C3_BikeSideUp = C3_BikeSideDown = 0 and
+;     C3_RacePhase and C3_Unk1444 + 1.
 ; The SBC and ADC of the moves have no SEC / CLC: the CMP before each
 ; leaves the carry right (set when above, clear when below).
 ; Callers note: a task by replacement: LDX #C3Mod_RaceTask / JMP
-;   C3Mod_TaskReplace at $4857 (code not matched yet).
-; Entry: a task: M=0, X=0, DP=0 (the C3_Unk00xx words), DB=$00
+;   C3Mod_TaskReplace at $4857 (C3Mod_RaceFinish).
+; Entry: a task: M=0, X=0, DP=0 (the race words), DB=$00
 ;        (C3_EntryArg, C3_SongBusy and C3_Unk1444 are absolute).
-; Exit:  JMP C3Mod_Unk48FD with M=0, X=0.
-; Calls: C3Mod_TaskAdd, C3Mod_NmiTaskAdd, C3Mod_Unk48FD (JMP).
+; Exit:  JMP C3Mod_RaceStep with M=0, X=0.
+; Calls: C3Mod_TaskAdd, C3Mod_NmiTaskAdd, C3Mod_RaceStep (JMP).
 C3Mod_RaceTask:
-    LDA.b !C3_Unk00BE
+    LDA.b !C3_QuitSeen
     BNE .no_quit
     LDA.b !C3_PadHeld
     BIT.w #!C3_PadA
     BEQ .no_quit
-    INC.b !C3_Unk00BE
+    INC.b !C3_QuitSeen
     LDX.w #C3Mod_FadeOutExitTask
     JSR C3Mod_TaskAdd
 .no_quit:
-    LDA.b !C3_Unk00A2
+    LDA.b !C3_ColumnCleared
     BEQ .pad_used
-    LDA.b !C3_Unk009E
-    CMP.w #!C3_Race009E
+    LDA.b !C3_PackDist+2
+    CMP.w #!C3_RaceLaps
     BNE .pad_used
-    LDA.b !C3_Unk009C                   ; C = 1 from the CMP
-    SBC.w #!C3_Race009C
+    LDA.b !C3_PackDist                   ; C = 1 from the CMP
+    SBC.w #!C3_ColumnBackFinish
     BCC .pad_used
-    STZ.b !C3_Unk00A2
+    STZ.b !C3_ColumnCleared
     LDX.w #C3Mod_RestoreColumnTask
     JSR C3Mod_NmiTaskAdd
 .pad_used:
     STZ.b !C3_PadHeld
-    LDA.b !C3_Unk00B0
+    LDA.b !C3_RacePhase
     CMP.w #1
     BEQ .phase1
 .to_next:
-    JMP C3Mod_Unk48FD
+    JMP C3Mod_RaceStep
 .phase1:
-    STZ.b !C3_Unk0098
+    STZ.b !C3_RivalControl
     LDA.b !C3_Prog9
     BEQ .prog
-    LDA.w #!C3_Race0098
-    STA.b !C3_Unk0098
+    LDA.w #!C3_RivalGo
+    STA.b !C3_RivalControl
 .prog:
     LDA.w !C3_EntryArg
     AND.w #!C3_EntryLowNibble
@@ -4157,57 +4173,59 @@ C3Mod_RaceTask:
     LDA.w !C3_SongBusy
     AND.w #!Eng_LowByteMask
     BNE .to_next
-    LDA.b !C3_Unk004E
-    CMP.w #!C3_Race004EProg9
+    LDA.b !C3_BikeSide
+.bike_target:
+    CMP.w #!C3_FinishSideLow             ; written by C3Mod_RaceFinish
     BEQ .move_0073
     BMI .up_004E
-    SBC.w #!C3_RaceMoveStep
+    SBC.w #!C3_SideMoveStep
     BRA .round_004E
 .up_004E:
-    ADC.w #!C3_RaceMoveStep
+    ADC.w #!C3_SideMoveStep
 .round_004E:
-    AND.w #!C3_RaceMoveMask
-    STA.b !C3_Unk004E
+    AND.w #!C3_SideMoveMask
+    STA.b !C3_BikeSide
 .move_0073:
-    LDA.b !C3_Unk0073
-    CMP.w #!C3_Race0073Prog9
+    LDA.b !C3_RivalSide
+.rival_target:
+    CMP.w #!C3_FinishSideHigh            ; written by C3Mod_RaceFinish
     BEQ .moved
     BMI .up_0073
-    SBC.w #!C3_RaceMoveStep
+    SBC.w #!C3_SideMoveStep
     BRA .round_0073
 .up_0073:
-    ADC.w #!C3_RaceMoveStep
+    ADC.w #!C3_SideMoveStep
 .round_0073:
-    AND.w #!C3_RaceMoveMask
-    STA.b !C3_Unk0073
+    AND.w #!C3_SideMoveMask
+    STA.b !C3_RivalSide
 .moved:
     BRA .count_00B2
 .prog0:
-    STZ.b !C3_Unk0063
-    LDA.b !C3_Unk0051                   ; C = 1 from the CMP #1
-    SBC.b !C3_Unk0076
-    CMP.w #!C3_Race0088Gap
+    STZ.b !C3_BikeHidden
+    LDA.b !C3_BikeDist                   ; C = 1 from the CMP #1
+    SBC.b !C3_RivalDist
+    CMP.w #!C3_HideLead
     BMI .song
     LDA.w #1
-    STA.b !C3_Unk0088
+    STA.b !C3_RivalHidden
 .song:
     LDA.w !C3_SongBusy
     AND.w #!Eng_LowByteMask
     BNE .done
-    LDA.b !C3_Unk004E
-    CMP.w #!C3_Race004EProg0
+    LDA.b !C3_BikeSide
+    CMP.w #!C3_SideCentre
     BEQ .count_00B2
     BMI .up_004E_prog0
-    SBC.w #!C3_RaceMoveStep
+    SBC.w #!C3_SideMoveStep
     BRA .round_004E_prog0
 .up_004E_prog0:
-    ADC.w #!C3_RaceMoveStep
+    ADC.w #!C3_SideMoveStep
 .round_004E_prog0:
-    AND.w #!C3_RaceMoveMask
-    STA.b !C3_Unk004E
+    AND.w #!C3_SideMoveMask
+    STA.b !C3_BikeSide
 .count_00B2:
     SEP #$20
-    LDA.b !C3_Unk00B2
+    LDA.b !C3_FinishGap
     BEQ .test_end
     BPL .down_00B2
     INC A
@@ -4215,23 +4233,23 @@ C3Mod_RaceTask:
 .down_00B2:
     DEC A
 .store_00B2:
-    STA.b !C3_Unk00B2
+    STA.b !C3_FinishGap
 .test_end:
     REP #$20
-    LDA.b !C3_Unk00B2
+    LDA.b !C3_FinishGap
     BNE .done
-    LDA.b !C3_Unk0088
+    LDA.b !C3_RivalHidden
     BEQ .done
-    LDA.b !C3_Unk004E
-    AND.w #!C3_Race004EMask
-    CMP.w #!C3_Race004EProg0
+    LDA.b !C3_BikeSide
+    AND.w #!C3_SideEvenMask
+    CMP.w #!C3_SideCentre
     BNE .done
-    STZ.b !C3_Unk0065
-    STZ.b !C3_Unk0067
-    INC.b !C3_Unk00B0
+    STZ.b !C3_BikeSideUp
+    STZ.b !C3_BikeSideDown
+    INC.b !C3_RacePhase
     INC.w !C3_Unk1444
 .done:
-    JMP C3Mod_Unk48FD
+    JMP C3Mod_RaceStep
 
 ; $7E:4755 — C3Mod_WaitSongEndTask (29 bytes, $4755–$4771)
 ; A task: unless C3_SongBusy, once APUIO3's low nibble is not 0 (the
@@ -4239,7 +4257,7 @@ C3Mod_RaceTask:
 ; traced): C3_FrameCount's low byte = 0, page $0A00 runs
 ; C3Mod_Prog0Finish and this task hands over to C3Mod_DriftTask.
 ; Callers note: a task added by LDX #C3Mod_WaitSongEndTask / JSR
-;   C3Mod_TaskAdd at $4831 (code not matched yet).
+;   C3Mod_TaskAdd at $4831 (C3Mod_RaceFinish).
 ; Entry: a task: M any (8-bit set here), X=0 (the 16-bit pointer
 ;        store), DP=0 (C3_FrameCount), DB=$00 (absolute).
 ; Exit:  RTS with M=1, A = C3_SongBusy or the nibble (0); else JMP
@@ -4259,17 +4277,944 @@ C3Mod_WaitSongEndTask:
 .wait:
     RTS
 
-; $7E:4772 — C3Mod_Unk4772 (22 bytes, $4772–$4787)
+; $7E:4772 — C3Mod_RepDigits (22 bytes, $4772–$4787)
 ; Eleven words, the numbers with repeated digits 111-666, 888, 999,
-; 1111, 2222 and 3333 (no 777); read by
-; the CMP $4770,X loop at $47F2 (X = $16 down to 2; code not matched
-; yet).
-C3Mod_Unk4772:
+; 1111, 2222 and 3333 (no 777, which has a prize of its own): the
+; scores of C3Mod_RaceFinish's prize 1, read by its CMP loop at $47F2
+; (C3Mod_RepDigits - 2 + X, X = $16 down to 2).
+C3Mod_RepDigits:
     dw 111, 222, 333, 444, 555, 666, 888, 999, 1111, 2222, 3333
 
 %C3ModOrg($7E4788)
-C3Mod_Rest4788:
-    %C3ModRomBytes($7E4788, $7EA651)
+; ============================================================
+; The race: the finish, the step of the two bikes, the bumps
+; ($4788–$4D0C)
+; ============================================================
+
+; $7E:4788 — C3Mod_RaceFinish (213 bytes, $4788–$485C)
+; The player's bike has done its 8 laps (C3Mod_RaceStepTask's JMP):
+;   - C3_RaceResult = 1 (won), C3_FinishGap = C3_RaceGap's low byte;
+;     the top speeds raised to $7000 (the bike's, program 0) or set to
+;     $4000 (the rival's, program 9); page $0B00's var 6 = $FFF;
+;     C3_FadeStep = C3_FadeTimer = 5;
+;   - C3_ResultWord = C3_Score / 2 (the score shown) and C3_RacePrize:
+;     2 for 777, 3 for 123 or 1234, 4 for 1000, 2000 or 3000, 1 for a
+;     number of C3Mod_RepDigits (111-666, 888, 999, 1111, 2222, 3333),
+;     else left as it is; then bits 5, 6 and 7 set for a score of 1300,
+;     1500 and 2000 or more (signed compares); C3_SongReq = the
+;     victory song (C3_SongWon);
+;   - C3Mod_SteerTask removed, C3Mod_WaitSongEndTask added;
+;     C3_ColumnCleared + 1, C3_RacePhase + 1 (to 1), C3_PauseAllowed =
+;     0, the bike's side speeds 0; when the bike is not below the
+;     rival on the side axis (C3_BikeSide >= C3_RivalSide, BMI), the
+;     targets of C3Mod_RaceTask's program-9 moves are swapped ($6000
+;     over its .bike_target's operand, $2000 over .rival_target's);
+;   - hands the task over to C3Mod_RaceTask (C3Mod_TaskReplace).
+; Callers note: JMP from C3Mod_RaceStepTask ($4866).
+; Entry: JMP from a task (C3Mod_RaceStepTask's level: C3Mod_TaskReplace
+;        needs the task's stack): M=0, X=0, DP=0, DB=$00.
+; Exit:  JMP C3Mod_TaskReplace with X = C3Mod_RaceTask, M=0.
+; Calls: C3Mod_TaskRemove, C3Mod_TaskAdd.
+C3Mod_RaceFinish:
+    LDA.w #!C3_RaceWon
+    STA.w !C3_RaceResult                ; and C3_RacePrize = 0
+    LDA.b !C3_RaceGap
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_FinishGap
+    LDA.w !C3_EntryArg
+    AND.w #!C3_EntryLowNibble
+    BNE .prog9
+    LDA.w #!C3_TopSpeedFinish
+    STA.b !C3_BikeTopSpeed
+    STA.b !C3_BikeTopBehind
+    BRA .vars
+.prog9:
+    LDA.w #!C3_RivalTopFinish9
+    STA.b !C3_RivalTopSpeed
+    LDA.w #!C3_RivalTopFinish9
+    STA.b !C3_RivalTopAhead
+.vars:
+    LDA.w #!C3_FinishVarB6
+    STA.w !C3_ScriptPageB+!C3_ScriptVar6
+    LDA.w #!C3_FinishFade
+    STA.w !C3_FadeStep                  ; and C3_FadeTimer
+    LDA.b !C3_Score
+    LSR A
+    STA.w !C3_ResultWord
+    CMP.w #!C3_Score777
+    BNE .not_777
+    LDA.w #!C3_Prize777
+    BRA .prize
+.not_777:
+    CMP.w #!C3_Score123
+    BEQ .run
+    CMP.w #!C3_Score1234
+    BNE .not_run
+.run:
+    LDA.w #!C3_PrizeRun
+    BRA .prize
+.not_run:
+    CMP.w #!C3_Score1000
+    BEQ .thousands
+    CMP.w #!C3_Score1000*2
+    BEQ .thousands
+    CMP.w #!C3_Score1000*3
+    BNE .rep_digits
+.thousands:
+    LDA.w #!C3_PrizeThousands
+    BRA .prize
+.rep_digits:
+    LDX.w #!C3_RepDigitCount*2
+.next_rep:
+    CMP.l C3Mod_RepDigits-2,X
+    BEQ .rep_found
+    DEX
+    DEX
+    BNE .next_rep
+    BRA .song
+.rep_found:
+    LDA.w #!C3_PrizeRepDigits
+.prize:
+    SEP #$20
+    STA.w !C3_RacePrize
+.song:
+    SEP #$20
+    LDA.b #!C3_SongWon
+    STA.w !C3_SongReq
+    TDC                                 ; A = 0 (DP = 0)
+    LDX.w !C3_ResultWord
+    CPX.w #!C3_Score1300
+    BMI .high_bits
+    LDA.b #!C3_Prize1300
+    CPX.w #!C3_Score1500
+    BMI .high_bits
+    ORA.b #!C3_Prize1500
+    CPX.w #!C3_Score1000*2
+    BMI .high_bits
+    ORA.b #!C3_Prize2000
+.high_bits:
+    TSB.w !C3_RacePrize
+    REP #$20
+    LDX.w #C3Mod_SteerTask
+    JSR C3Mod_TaskRemove
+    LDX.w #C3Mod_WaitSongEndTask
+    JSR C3Mod_TaskAdd
+    INC.b !C3_ColumnCleared
+    INC.w !C3_RacePhase
+    STZ.w !C3_PauseAllowed
+    STZ.b !C3_BikeSideUp
+    STZ.b !C3_BikeSideDown
+    LDA.b !C3_BikeSide
+    CMP.b !C3_RivalSide
+    BMI .keep_targets
+    LDA.w #!C3_FinishSideHigh
+    STA.l C3Mod_RaceTask_bike_target+1
+    LDA.w #!C3_FinishSideLow
+    STA.l C3Mod_RaceTask_rival_target+1
+.keep_targets:
+    LDX.w #C3Mod_RaceTask
+    JMP C3Mod_TaskReplace
+
+; $7E:485D — C3Mod_RaceStepTask (994 bytes with C3Mod_RaceStep, $485D–$4C3E)
+; A task, from the end of the count-down (C3Mod_Prog0ScriptB): one
+; frame of the race. C3_RaceFrames + 1; when the bike's laps (C3_BikeDist's
+; high word) reach 8, JMP C3Mod_RaceFinish; when the rival's do, the
+; race is lost: C3_RaceResult = 2, C3Mod_SteerTask removed, an RTS
+; (Op_RTS) written over $510D (the end of the bikes' shadow
+; drawing, C3Mod_Unk50F1/C3Mod_Unk5100: no more shadows), the view's
+; X speed = the two speeds' sum / 2048, C3Mod_SkyNmiTask (NMI) and
+; C3Mod_CountDownTask (the score counted down) added, page $0A00 on
+; C3Mod_Prog0Quit, and the task ends (C3Mod_TaskEnd). Else:
+;   - C3_ColumnCleared: the map column is put back
+;     (C3Mod_RestoreColumnTask) once the pack (C3_PackDist) is in lap
+;     0 at $1000 or more, and cleared (C3Mod_ClearColumnTask) once it
+;     is in lap 7 at $F200 or more;
+;   - C3_BikeHidden = C3_RivalHidden = 1 when the bike is ahead by
+;     $1000 or more (the difference's high word not negative and its
+;     low word $1000 or more, signed: a lead of a whole lap with a
+;     small low word does not count), else 0;
+; then C3Mod_RaceStep ($48FD, also C3Mod_RaceTask's tail):
+;   - both speeds - $80 (to at least 0), then + the accelerations
+;     (the rival's only while C3_RivalControl bit 15 is set); the
+;     accelerations reset to $100 (bike) and $F8 (rival), or 0 when the
+;     speed is above the speed cap;
+;   - racing (C3_RacePhase 0): the boost. While C3_BoostTimer runs it
+;     counts down, and every 8th frame (while boosts are left) the
+;     lamp's rows rotate (C3_LampLeftRows / C3_LampRightRows, bit
+;     plane 3 of rows 0 and 1 of its two tiles: SEC / ROR through both,
+;     a row of lit pixels filling in); else B (C3_PadHeld bit 15), pressed anew (C3_BoostHeld),
+;     uses a boost when one is left: C3_BoostsLeft - 1, C3_BoostTimer =
+;     $80, the lamp rows cleared, the bike's speed + $1700 (+ the carry
+;     of the CMP before; $7FFF at most);
+;   - the speed caps: the bike's C3_BikeTopSpeed, or C3_BikeTopBehind
+;     when C3_RaceGap is negative; the rival's C3_RivalTopSpeed, or
+;     C3_RivalTopAhead when it is not;
+;   - C3_PackDist = the two distances' mean (32-bit); the view's X =
+;     (its low word / 16 + $375) AND $3FF;
+;   - racing: C3_RivalControl = $8000 (accelerate) and, with the bike
+;     ahead (C3_RaceGap > 0), C3_Score + 2 and, within $20 on the side
+;     axis (the high bytes), the rival steers away from the bike's
+;     half (down when the bike is at $40 or more, else up); else
+;     C3_Score - 1 and the rival steers towards the bike (down when the
+;     bike is below it, else up);
+;   - C3_BikeSteer: 1 while C3_PadSidePlus is held (C3_BikeSideUp +
+;     $28, to $210 at most), 2 while C3_PadSideMinus is
+;     (C3_BikeSideDown + $28); both decay by $10 a frame (to 0); the
+;     rival's C3_RivalSideUp / Down + $18 by C3_RivalControl bits 9 /
+;     8, the same decay;
+;   - C3_RaceGap = (the bike's distance - the rival's) / 32 (the low
+;     words of the 32-bit values shifted right 5; no SEC, the carry is
+;     the last bit shifted out of the bike's);
+;   - racing, the bumps: C3_BumpNow = the bikes' relation along the
+;     track (low digit: 0 overlapping, 1 the bike ahead, 2 behind) and
+;     across ($10: the bike $1000 or more below, $20 above); while
+;     they are apart it goes to C3_BumpLast; when they overlap both
+;     ways, C3_BumpLast says how they came together: 1 the rival ran
+;     into the bike from behind (C3Mod_BumpFromBehind, C3_Score + 20),
+;     2 the bike into the rival (C3Mod_BumpFromAhead, C3_Score - 10),
+;     $10 / $20 from the side (C3Mod_BumpFromBelow / FromAbove), or a
+;     mix of them (both); then sound effect $98 (Audio_CmdPlaySfx,
+;     C3Mod_AudioSend) unless C3_SongBusy;
+;   - racing, after any bump sound: the engine sound: C3_SndSfxPitch
+;     with the bike's speed's high byte, written to APUIO1 and APUIO0
+;     straight (no echo wait, unlike C3Mod_AudioSend), unless
+;     C3_SongBusy;
+;   - the bikes move: each distance + its speed / 64 (bits 0-8), each
+;     side + its up speed (to $7000 at most) - its down speed (to 0).
+; The ADCs and SBCs that follow a CMP, BIT or the shifts take the carry
+; as left (no CLC / SEC), as noted at each.
+; Sub-entry: C3Mod_RaceStep ($48FD).
+; Callers note: a task added by script opcode $FA at $4047
+;   (C3Mod_Prog0ScriptB). C3Mod_RaceStep: JMP from C3Mod_RaceTask
+;   ($46AD, $4752).
+; Entry: a task (C3Mod_RunTasks): M=0, X=0, DP=0 (the race words), DB =
+;        $00 (C3_RaceResult, the script pages' words and the APU ports
+;        are absolute).
+; Exit:  RTS with M=0, X=0, DP=0, DB=$00; A = C3_RivalSide; X changed;
+;        Y unchanged; C3_TmpF0/F2 changed (and the bump routines'
+;        C3_TmpF6/F8); or JMP C3Mod_RaceFinish / C3Mod_TaskEnd (see
+;        above).
+; Calls: C3Mod_RaceFinish (JMP), C3Mod_TaskRemove, C3Mod_NmiTaskAdd,
+;   C3Mod_TaskAdd, C3Mod_TaskEnd (JMP), the bump routines,
+;   C3Mod_AudioSend.
+C3Mod_RaceStepTask:
+    INC.b !C3_RaceFrames
+    LDA.b !C3_BikeDist+2
+    CMP.w #!C3_RaceLaps
+    BNE .rival_done
+    JMP C3Mod_RaceFinish
+.rival_done:
+    LDA.b !C3_RivalDist+2
+    CMP.w #!C3_RaceLaps
+    BNE .column
+    LDA.w #!C3_RaceLost
+    STA.w !C3_RaceResult
+    LDX.w #C3Mod_SteerTask
+    JSR C3Mod_TaskRemove
+    SEP #$20
+    LDA.b #!Op_RTS
+    STA.l C3Mod_Unk510D
+    REP #$20
+    LDA.b !C3_BikeSpeed                 ; C = 1 from the CMP
+    ADC.b !C3_RivalSpeed
+    XBA
+    AND.w #!Eng_LowByteMask
+    LSR A
+    LSR A
+    LSR A
+    STA.w !C3_ScriptPageA+!C3_ViewSpeedX
+    LDX.w #C3Mod_SkyNmiTask
+    JSR C3Mod_NmiTaskAdd
+    LDX.w #C3Mod_CountDownTask
+    JSR C3Mod_TaskAdd
+    LDA.w #C3Mod_Prog0Quit
+    STA.w !C3_ScriptPageA+!C3Script_Ptr
+    JMP C3Mod_TaskEnd
+.column:
+    LDA.b !C3_PackDist+2
+    BNE .not_lap0
+    LDA.b !C3_PackDist
+    CMP.w #!C3_ColumnBackDist
+    BMI .not_lap0
+    LDA.b !C3_ColumnCleared
+    BEQ .not_lap0
+    STZ.b !C3_ColumnCleared
+    LDX.w #C3Mod_RestoreColumnTask
+    JSR C3Mod_NmiTaskAdd
+.not_lap0:
+    LDA.b !C3_PackDist+2
+    CMP.w #!C3_RaceLaps-1
+    BNE .lead
+    LDA.b !C3_PackDist                  ; C = 1 from the CMP
+    SBC.w #!C3_ColumnClearDist
+    BCC .lead
+    LDA.b !C3_ColumnCleared
+    BNE .lead
+    INC.b !C3_ColumnCleared
+    LDX.w #C3Mod_ClearColumnTask
+    JSR C3Mod_NmiTaskAdd
+.lead:
+    STZ.b !C3_RivalHidden
+    STZ.b !C3_BikeHidden
+    LDA.b !C3_BikeDist
+    SEC
+    SBC.b !C3_RivalDist
+    STA.b !C3_TmpF0
+    LDA.b !C3_BikeDist+2
+    SBC.b !C3_RivalDist+2
+    STA.b !C3_TmpF2
+    LDA.b !C3_TmpF2
+    CMP.w #0
+    BMI C3Mod_RaceStep
+    LDA.b !C3_TmpF0
+    CMP.w #!C3_HideLead
+    BMI C3Mod_RaceStep
+    INC.b !C3_BikeHidden
+    INC.b !C3_RivalHidden
+C3Mod_RaceStep:                         ; header: see C3Mod_RaceStepTask
+    LDA.b !C3_BikeSpeed
+    SEC
+    SBC.w #!C3_SpeedDrag
+    BPL .bike_drag
+    TDC                                 ; A = 0 (DP = 0)
+.bike_drag:
+    STA.b !C3_BikeSpeed
+    LDA.b !C3_RivalSpeed
+    SEC
+    SBC.w #!C3_SpeedDrag
+    BPL .rival_drag
+    TDC
+.rival_drag:
+    STA.b !C3_RivalSpeed
+    LDA.b !C3_BikeSpeed
+    CLC
+    ADC.b !C3_BikeAccel
+    STA.b !C3_BikeSpeed
+    LDA.b !C3_RivalControl
+    BIT.w #!C3_RivalGo
+    BEQ .accels
+    LDA.b !C3_RivalSpeed
+    CLC
+    ADC.b !C3_RivalAccel
+    STA.b !C3_RivalSpeed
+.accels:
+    LDA.w #!C3_BikeAccelOn
+    STA.b !C3_BikeAccel
+    LDA.w #!C3_RivalAccelOn
+    STA.b !C3_RivalAccel
+    LDA.b !C3_BikeSpeedCap
+    CMP.b !C3_BikeSpeed
+    BPL .bike_capped
+    STZ.b !C3_BikeAccel
+.bike_capped:
+    LDA.b !C3_RivalSpeedCap
+    CMP.b !C3_RivalSpeed
+    BPL .rival_capped
+    STZ.b !C3_RivalAccel
+.rival_capped:
+    LDA.b !C3_RacePhase
+    BNE .caps
+    LDA.b !C3_BoostTimer
+    BEQ .boost_button
+    LDA.b !C3_BoostsLeft
+    BEQ .boost_count
+    LDA.b !C3_BoostTimer
+    AND.w #!C3_LampEvery-1
+    BNE .boost_count
+    SEP #$20
+    PEA.w !Bank7E                       ; PLB takes the $7E; the second PLB the $00
+    PLB
+    LDA.w !C3_LampLeftRows
+    SEC
+    ROR A
+    STA.w !C3_LampLeftRows
+    STA.w !C3_LampLeftRows+2
+    LDA.w !C3_LampRightRows
+    ROR A
+    STA.w !C3_LampRightRows
+    STA.w !C3_LampRightRows+2
+    PLB
+    REP #$20
+.boost_count:
+    DEC.b !C3_BoostTimer
+    BRA .caps
+.boost_button:
+    LDA.b !C3_PadHeld
+    BIT.w #!C3_PadB
+    BEQ .boost_released
+    LDA.b !C3_BoostHeld
+    BNE .caps
+    INC.b !C3_BoostHeld
+    LDA.b !C3_BoostsLeft
+    BEQ .caps
+    DEC A
+    STA.b !C3_BoostsLeft
+    LDA.w #!C3_BoostFrames
+    STA.b !C3_BoostTimer
+    SEP #$20
+    PEA.w !Bank7E
+    PLB
+    STZ.w !C3_LampLeftRows
+    STZ.w !C3_LampLeftRows+2
+    STZ.w !C3_LampRightRows
+    STZ.w !C3_LampRightRows+2
+    PLB
+    REP #$20
+    LDA.b !C3_BikeSpeed                 ; C from the CMP of the rival's cap
+    ADC.w #!C3_BoostSpeed
+    BPL .boosted
+    LDA.w #!C3_SpeedMax
+.boosted:
+    STA.b !C3_BikeSpeed
+    BRA .caps
+.boost_released:
+    STZ.b !C3_BoostHeld
+.caps:
+    LDA.b !C3_BikeTopSpeed
+    STA.b !C3_BikeSpeedCap
+    LDA.b !C3_RivalTopSpeed
+    STA.b !C3_RivalSpeedCap
+    LDA.b !C3_RaceGap
+    BMI .bike_behind
+    LDA.b !C3_RivalTopAhead
+    STA.b !C3_RivalSpeedCap
+    BRA .pack
+.bike_behind:
+    LDA.b !C3_BikeTopBehind
+    STA.b !C3_BikeSpeedCap
+.pack:
+    LDA.b !C3_BikeDist
+    CLC
+    ADC.b !C3_RivalDist
+    STA.b !C3_PackDist
+    LDA.b !C3_BikeDist+2
+    ADC.b !C3_RivalDist+2
+    LSR A
+    STA.b !C3_PackDist+2
+    LDA.b !C3_PackDist
+    ROR A
+    STA.b !C3_PackDist
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    SEC
+    ADC.w #!C3_ViewXBase
+    AND.w #!C3_PlaneMask
+    STA.w !C3_ScriptPageA+!C3_ViewX
+    STZ.b !C3_RivalControl
+    LDA.b !C3_RacePhase
+    BNE .bike_steer
+    LDA.w #!C3_RivalGo
+    STA.b !C3_RivalControl
+    LDA.b !C3_RaceGap
+    BEQ .bike_not_ahead
+    BMI .bike_not_ahead
+    INC.b !C3_Score
+    INC.b !C3_Score
+    LDA.b !C3_BikeSide+1
+    SEC
+    SBC.b !C3_RivalSide+1
+    BPL .side_gap
+    LDA.b !C3_RivalSide+1
+    SEC
+    SBC.b !C3_BikeSide+1
+.side_gap:
+    CMP.w #!C3_SideNear
+    BPL .bike_steer
+    LDA.b !C3_BikeSide+1
+    CMP.w #!C3_SideMiddle
+    BMI .steer_up
+.steer_down:
+    LDA.w #!C3_RivalSteerDown
+    BRA .rival_steer
+.bike_not_ahead:
+    DEC.b !C3_Score
+    LDA.b !C3_BikeSide
+    CMP.b !C3_RivalSide
+    BMI .steer_down
+.steer_up:
+    LDA.w #!C3_RivalSteerUp
+.rival_steer:
+    TSB.b !C3_RivalControl
+.bike_steer:
+    STZ.b !C3_BikeSteer
+    LDA.b !C3_PadHeld
+    BIT.b !C3_PadSidePlus
+    BEQ .side_up_decay
+    LDA.w #!C3_BikeSteerPlus
+    STA.b !C3_BikeSteer
+    LDA.b !C3_BikeSideUp                ; C as left (no CLC)
+    ADC.w #!C3_SidePush
+    CMP.w #!C3_SideSpeedMax
+    BMI .side_up_store
+    LDA.w #!C3_SideSpeedMax
+.side_up_store:
+    STA.b !C3_BikeSideUp
+.side_up_decay:
+    LDA.b !C3_BikeSideUp                ; C as left (no SEC)
+    SBC.w #!C3_SideDecay
+    BPL .side_up_kept
+    LDA.w #0
+.side_up_kept:
+    STA.b !C3_BikeSideUp
+    LDA.b !C3_PadHeld
+    BIT.b !C3_PadSideMinus
+    BEQ .side_down_decay
+    LDA.w #!C3_BikeSteerMinus
+    STA.b !C3_BikeSteer
+    LDA.b !C3_BikeSideDown
+    ADC.w #!C3_SidePush
+    CMP.w #!C3_SideSpeedMax
+    BMI .side_down_store
+    LDA.w #!C3_SideSpeedMax
+.side_down_store:
+    STA.b !C3_BikeSideDown
+.side_down_decay:
+    LDA.b !C3_BikeSideDown
+    SBC.w #!C3_SideDecay
+    BPL .side_down_kept
+    LDA.w #0
+.side_down_kept:
+    STA.b !C3_BikeSideDown
+    LDA.b !C3_RivalControl
+    BIT.w #!C3_RivalSteerUp
+    BEQ .rival_up_decay
+    LDA.b !C3_RivalSideUp
+    ADC.w #!C3_RivalSidePush
+    CMP.w #!C3_SideSpeedMax
+    BMI .rival_up_store
+    LDA.w #!C3_SideSpeedMax
+.rival_up_store:
+    STA.b !C3_RivalSideUp
+.rival_up_decay:
+    LDA.b !C3_RivalSideUp
+    SBC.w #!C3_SideDecay
+    BPL .rival_up_kept
+    LDA.w #0
+.rival_up_kept:
+    STA.b !C3_RivalSideUp
+    LDA.b !C3_RivalControl
+    BIT.w #!C3_RivalSteerDown
+    BEQ .rival_down_decay
+    LDA.b !C3_RivalSideDown
+    ADC.w #!C3_RivalSidePush
+    CMP.w #!C3_SideSpeedMax
+    BMI .rival_down_store
+    LDA.w #!C3_SideSpeedMax
+.rival_down_store:
+    STA.b !C3_RivalSideDown
+.rival_down_decay:
+    LDA.b !C3_RivalSideDown
+    SBC.w #!C3_SideDecay
+    BPL .rival_down_kept
+    LDA.w #0
+.rival_down_kept:
+    STA.b !C3_RivalSideDown
+    LDA.b !C3_RivalDist+2               ; the gap: both distances / 32
+    STA.b !C3_TmpF0
+    LDA.b !C3_RivalDist
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    STA.b !C3_TmpF2
+    LDA.b !C3_BikeDist+2
+    STA.b !C3_TmpF0
+    LDA.b !C3_BikeDist
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    LSR.b !C3_TmpF0
+    ROR A
+    SBC.b !C3_TmpF2                     ; C = the bit the last ROR shifted out
+    STA.b !C3_RaceGap
+    LDA.b !C3_RacePhase
+    BEQ .bumps
+    JMP .move
+.bumps:
+    STZ.b !C3_BumpNow
+    LDA.w #!C3_BikeLength               ; C as left
+    ADC.b !C3_BikeDist
+    STA.b !C3_TmpF0
+    LDA.w #!C3_RivalLength
+    ADC.b !C3_RivalDist
+    STA.b !C3_TmpF2
+    ADC.w #!C3_BumpAhead
+    CMP.b !C3_TmpF0
+    BMI .bike_ahead
+    LDA.b !C3_TmpF2
+    SBC.w #!C3_BumpBehind
+    CMP.b !C3_TmpF0
+    BMI .side
+    INC.b !C3_BumpNow
+.bike_ahead:
+    INC.b !C3_BumpNow
+.side:
+    STZ.b !C3_BumpSide
+    LDA.b !C3_RivalSide
+    SEC
+    SBC.w #!C3_BumpWidth
+    CMP.b !C3_BikeSide
+    BPL .bike_below
+    LDA.b !C3_RivalSide                 ; C as left by the CMP
+    ADC.w #!C3_BumpWidth
+    CMP.b !C3_BikeSide
+    BEQ .relation
+    BPL .relation
+    INC.b !C3_BumpSide
+.bike_below:
+    INC.b !C3_BumpSide
+.relation:
+    LDA.b !C3_BumpSide
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.b !C3_BumpNow
+    STA.b !C3_BumpNow
+    BEQ .bump
+    LDA.b !C3_BumpNow
+    STA.b !C3_BumpLast
+    JMP .engine
+.bump:
+    LDA.b !C3_BumpLast
+    CMP.w #!C3_BumpAheadOnly
+    BNE .not_1
+    JSR C3Mod_BumpFromBehind
+    LDA.b !C3_Score
+    CLC
+    ADC.w #!C3_BumpScoreUp
+    STA.b !C3_Score
+    BRA .bump_sound
+.not_1:
+    CMP.w #!C3_BumpBehindOnly
+    BNE .not_2
+    JSR C3Mod_BumpFromAhead
+    LDA.b !C3_Score
+    SEC
+    SBC.w #!C3_BumpScoreDown
+    STA.b !C3_Score
+    BRA .bump_sound
+.not_2:
+    CMP.w #!C3_BumpBelowOnly
+    BNE .not_10
+    JSR C3Mod_BumpFromBelow
+    BRA .bump_sound
+.not_10:
+    CMP.w #!C3_BumpBelowOnly|!C3_BumpAheadOnly
+    BNE .not_11
+    JSR C3Mod_BumpFromBehind
+    JSR C3Mod_BumpFromBelow
+    BRA .bump_sound
+.not_11:
+    CMP.w #!C3_BumpBelowOnly|!C3_BumpBehindOnly
+    BNE .not_12
+    JSR C3Mod_BumpFromBelow
+    JSR C3Mod_BumpFromAhead
+    BRA .bump_sound
+.not_12:
+    CMP.w #!C3_BumpAboveOnly
+    BNE .not_20
+    JSR C3Mod_BumpFromAbove
+    BRA .bump_sound
+.not_20:
+    CMP.w #!C3_BumpAboveOnly|!C3_BumpAheadOnly
+    BNE .not_21
+    JSR C3Mod_BumpFromBehind
+    JSR C3Mod_BumpFromAbove
+    BRA .bump_sound
+.not_21:
+    CMP.w #!C3_BumpAboveOnly|!C3_BumpBehindOnly
+    BNE .bump_sound
+    JSR C3Mod_BumpFromAbove
+    JSR C3Mod_BumpFromAhead
+.bump_sound:
+    SEP #$20
+    LDA.w !C3_SongBusy
+    BNE .engine
+    LDA.b #!C3_SfxArg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!C3_SfxBump
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_CmdPlaySfx
+    STA.w !Audio_CmdId
+    JSR C3Mod_AudioSend
+.engine:
+    SEP #$20
+    LDA.w !C3_SongBusy
+    BNE .engine_done
+    LDA.b !C3_BikeSpeed+1
+    STA.w APUIO1
+    LDA.b #!C3_SndSfxPitch
+    STA.w APUIO0
+.engine_done:
+    REP #$20
+.move:
+    LDA.b !C3_BikeSpeed
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    AND.w #!C3_StepMask
+    CLC
+    ADC.b !C3_BikeDist
+    STA.b !C3_BikeDist
+    LDA.b !C3_BikeDist+2
+    ADC.w #0
+    STA.b !C3_BikeDist+2
+    LDA.b !C3_RivalSpeed
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    AND.w #!C3_StepMask
+    CLC
+    ADC.b !C3_RivalDist
+    STA.b !C3_RivalDist
+    LDA.b !C3_RivalDist+2
+    ADC.w #0
+    STA.b !C3_RivalDist+2
+    LDA.b !C3_BikeSide
+    CLC
+    ADC.b !C3_BikeSideUp
+    CMP.w #!C3_SideMax
+    BMI .bike_side_max
+    LDA.w #!C3_SideMax
+.bike_side_max:
+    STA.b !C3_BikeSide
+    LDA.b !C3_BikeSide
+    SEC
+    SBC.b !C3_BikeSideDown
+    BPL .bike_side_min
+    TDC                                 ; A = 0 (DP = 0)
+.bike_side_min:
+    STA.b !C3_BikeSide
+    LDA.b !C3_RivalSide
+    CLC
+    ADC.b !C3_RivalSideUp
+    CMP.w #!C3_SideMax
+    BMI .rival_side_max
+    LDA.w #!C3_SideMax
+.rival_side_max:
+    STA.b !C3_RivalSide
+    LDA.b !C3_RivalSide
+    SEC
+    SBC.b !C3_RivalSideDown
+    BPL .rival_side_min
+    TDC
+.rival_side_min:
+    STA.b !C3_RivalSide
+    RTS
+
+; $7E:4C3F — C3Mod_BumpFromBehind (69 bytes, $4C3F–$4C83)
+; A bump along the track with the bike ahead: the overlap ((the
+; rival's distance + $C0) - (the bike's - $100), 32-bit, in
+; C3_TmpF6/F8) is added to the bike's distance (with the carry of the
+; subtraction), and the
+; speeds are swapped (C3Mod_BumpFromAhead's .swap_speeds). Quirk: the
+; rival's distance loses the overlap's high word C3_TmpF8 from both of
+; its words (SBC C3_TmpF8 twice), not the overlap; with the overlap
+; below $10000, the high word is 0 and the rival stays (bar the
+; borrows).
+; Callers note: C3Mod_RaceStepTask ($4B4D, $4B7B, $4B9F).
+; Entry: M=0, X=0 (the swap's 16-bit LDX/STX), DP=0 (the race words,
+;        C3_TmpF0..F8), DB any.
+; Exit:  M=0; A = the rival's old speed, X = the bike's old speed; Y
+;        unchanged; C3_TmpF0..F8 changed.
+C3Mod_BumpFromBehind:
+    LDA.b !C3_BikeDist
+    SEC
+    SBC.w #!C3_BikeLength
+    STA.b !C3_TmpF0
+    LDA.b !C3_BikeDist+2
+    SBC.w #0
+    STA.b !C3_TmpF2
+    LDA.b !C3_RivalDist
+    CLC
+    ADC.w #!C3_RivalLength
+    STA.b !C3_TmpF6
+    LDA.b !C3_RivalDist+2
+    ADC.w #0
+    STA.b !C3_TmpF8
+    LDA.b !C3_TmpF6
+    SEC
+    SBC.b !C3_TmpF0
+    STA.b !C3_TmpF6
+    LDA.b !C3_TmpF8
+    SBC.b !C3_TmpF2
+    STA.b !C3_TmpF8
+    LDA.b !C3_BikeDist                  ; C from the SBC
+    ADC.b !C3_TmpF6
+    STA.b !C3_BikeDist
+    LDA.b !C3_BikeDist+2
+    ADC.b !C3_TmpF8
+    STA.b !C3_BikeDist+2
+    LDA.b !C3_RivalDist
+    SBC.b !C3_TmpF8
+    STA.b !C3_RivalDist
+    LDA.b !C3_RivalDist+2
+    SBC.b !C3_TmpF8
+    STA.b !C3_RivalDist+2
+    BRA C3Mod_BumpFromAhead_swap_speeds
+
+; $7E:4C84 — C3Mod_BumpFromAhead (76 bytes, $4C84–$4CCF)
+; The same with the rival ahead: the overlap ((the bike's distance +
+; $100) - (the rival's - $C0)) is added to the rival's distance, and the
+; bike's loses the overlap's high word from both words (the same
+; quirk); then .swap_speeds: the bike's and the rival's speeds are
+; swapped (also C3Mod_BumpFromBehind's end).
+; Callers note: C3Mod_RaceStepTask ($4B5F, $4B8B, $4BAF).
+;   .swap_speeds: C3Mod_BumpFromBehind (BRA).
+; Entry: M=0, X=0, DP=0, DB any.
+; Exit:  M=0; A = the bike's new speed (the rival's old one), X = the
+;        rival's new speed; Y unchanged; C3_TmpF0..F8 changed.
+C3Mod_BumpFromAhead:
+    LDA.b !C3_RivalDist
+    SEC
+    SBC.w #!C3_RivalLength
+    STA.b !C3_TmpF0
+    LDA.b !C3_RivalDist+2
+    SBC.w #0
+    STA.b !C3_TmpF2
+    LDA.b !C3_BikeDist
+    CLC
+    ADC.w #!C3_BikeLength
+    STA.b !C3_TmpF6
+    LDA.b !C3_BikeDist+2
+    ADC.w #0
+    STA.b !C3_TmpF8
+    LDA.b !C3_TmpF6
+    SEC
+    SBC.b !C3_TmpF0
+    STA.b !C3_TmpF6
+    LDA.b !C3_TmpF8
+    SBC.b !C3_TmpF2
+    STA.b !C3_TmpF8
+    LDA.b !C3_RivalDist
+    ADC.b !C3_TmpF6
+    STA.b !C3_RivalDist
+    LDA.b !C3_RivalDist+2
+    ADC.b !C3_TmpF8
+    STA.b !C3_RivalDist+2
+    LDA.b !C3_BikeDist
+    SBC.b !C3_TmpF8
+    STA.b !C3_BikeDist
+    LDA.b !C3_BikeDist+2
+    SBC.b !C3_TmpF8
+    STA.b !C3_BikeDist+2
+.swap_speeds:
+    LDX.b !C3_BikeSpeed
+    LDA.b !C3_RivalSpeed
+    STA.b !C3_BikeSpeed
+    STX.b !C3_RivalSpeed
+    RTS
+
+; $7E:4CD0 — C3Mod_BumpFromBelow (23 bytes, $4CD0–$4CE6)
+; A bump across the track with the bike below the rival: the overlap
+; C3_TmpF0 = the bike's side + $1000 - the rival's (with the carries
+; as left) is taken off the bike's side and added to the rival's, then
+; .swap_sides (C3Mod_BumpFromAbove's) swaps their side speeds (up with
+; up, down with down).
+; Callers note: C3Mod_RaceStepTask ($4B71, $4B7E, $4B88).
+; Entry: M=0, X=0, DP=0, DB any.
+; Exit:  as C3Mod_BumpFromAbove's .swap_sides.
+C3Mod_BumpFromBelow:
+    LDA.b !C3_BikeSide                  ; C as left
+    ADC.w #!C3_BumpWidth
+    SBC.b !C3_RivalSide
+    STA.b !C3_TmpF0
+    LDA.b !C3_BikeSide
+    SBC.b !C3_TmpF0
+    STA.b !C3_BikeSide
+    LDA.b !C3_RivalSide
+    ADC.b !C3_TmpF0
+    STA.b !C3_RivalSide
+    BRA C3Mod_BumpFromAbove_swap_sides
+
+; $7E:4CE7 — C3Mod_BumpFromAbove (38 bytes, $4CE7–$4D0C)
+; The same with the bike above: C3_TmpF0 = the rival's side + $1000 -
+; the bike's, added to the bike's side and taken off the rival's; then
+; .swap_sides: C3_BikeSideDown with C3_RivalSideDown and C3_BikeSideUp
+; with C3_RivalSideUp (also C3Mod_BumpFromBelow's end).
+; Callers note: C3Mod_RaceStepTask ($4B95, $4BA2, $4BAC).
+;   .swap_sides: C3Mod_BumpFromBelow (BRA).
+; Entry: M=0, X=0, DP=0, DB any.
+; Exit:  M=0; A = C3_RivalSideUp's old value (the bike's new one), X =
+;        C3_BikeSideUp's old value; Y unchanged; C3_TmpF0 changed.
+C3Mod_BumpFromAbove:
+    LDA.b !C3_RivalSide                 ; C as left
+    ADC.w #!C3_BumpWidth
+    SBC.b !C3_BikeSide
+    STA.b !C3_TmpF0
+    LDA.b !C3_BikeSide
+    ADC.b !C3_TmpF0
+    STA.b !C3_BikeSide
+    LDA.b !C3_RivalSide
+    SBC.b !C3_TmpF0
+    STA.b !C3_RivalSide
+.swap_sides:
+    LDX.b !C3_BikeSideDown
+    LDA.b !C3_RivalSideDown
+    STA.b !C3_BikeSideDown
+    STX.b !C3_RivalSideDown
+    LDX.b !C3_BikeSideUp
+    LDA.b !C3_RivalSideUp
+    STA.b !C3_BikeSideUp
+    STX.b !C3_RivalSideUp
+    RTS
+
+%C3ModOrg($7E4D0D)
+C3Mod_Rest4D0D:
+    %C3ModRomBytes($7E4D0D, $7E5261)
+
+%C3ModOrg($7E5261)
+; $7E:5261 — C3Mod_LampUpload (42 bytes, $5261–$528A)
+; Sends the boost lamp's two sprite tiles (C3_BoostTiles, 64 bytes) to
+; VRAM word $5180 (the sprites' second tile page, tiles $18-$19 there)
+; by DMA channel 7, two registers (VMDATAL/H), VMAIN = $80; the tail of
+; C3Mod_HorizonNmiTask, so once a frame in the NMI.
+; Callers note: JMP from C3Mod_HorizonNmiTask ($451C).
+; Entry: M=1, X=0 (the 16-bit register pairs), DP any, DB=$00 (absolute
+;        registers).
+; Exit:  M=1, X=0; A = VMAIN_IncAfterHigh (= MDMAEN_Ch7, both $80), X =
+;        the tiles' address; Y unchanged; VMADD past the tiles.
+C3Mod_LampUpload:
+    LDX.w #!C3_LampVram
+    STX.w VMADDL
+    LDX.w #!C3_BoostTilesBytes
+    STX.w DAS7L
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.w #!C3_BoostTiles&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C3_BoostTiles)
+    STA.w A1B7
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STA.w MDMAEN                        ; the same $80: channel 7
+    RTS
+
+%C3ModOrg($7E528B)
+C3Mod_Rest528B:
+    %C3ModRomBytes($7E528B, $7EA651)
 
 ; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
 ; The staff credits the module shows, in two texts to the module's end:

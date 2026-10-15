@@ -36,18 +36,12 @@ C3Mod_Unk4F54:
 C3Mod_Unk4D0D:
 %C3ModOrg($7E5221)
 C3Mod_Unk5221:
-%C3ModOrg($7E485D)
-C3Mod_Unk485D:
 %C3ModOrg($7E89ED)
 C3Mod_Unk89ED:
 %C3ModOrg($7E8752)
 C3Mod_Unk8752:
 %C3ModOrg($7E51D1)
 C3Mod_Unk51D1:
-%C3ModOrg($7E48FD)
-C3Mod_Unk48FD:
-%C3ModOrg($7E5261)
-C3Mod_Unk5261:
 %C3ModOrg($7E53A0)
 C3Mod_Unk53A0:
 %C3ModOrg($7E4F74)
@@ -60,3 +54,5 @@ C3Mod_Unk53A4:
 C3Mod_Unk5395:
 %C3ModOrg($7E53AE)
 C3Mod_Unk53AE:
+%C3ModOrg($7E510D)
+C3Mod_Unk510D:
