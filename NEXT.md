@@ -1510,9 +1510,16 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     renamed from `Spc_Unk0892`/`08CD`/`100E`, `!Spc_UnkD2` -> `!Spc_SongCond`), `Spc_WriteDsp`,
     `Spc_ClearPorts01` and `Spc_PollCommand` (callers and callee names).
 
-    For the next edit of these approved headers (review round 170 nits not yet applied):
-    `Spc_CmdFadeSong`: $83 marks only $30 (voices 5-4) in !Spc_UnkD0 although its group is tracks
-    8-13. (The others were applied by the third batch.)
+    For the next edit of these approved headers (review nits not yet applied): `Spc_CmdFadeSong`:
+    $83 marks only $30 (voices 5-4) in !Spc_UnkD0 although its group is tracks 8-13 (round 170).
+    Round 173: `Spc_TrackEffects`: the vibrato offset uses the high byte of phase x 2 (the ASL/ROL
+    of the phase word), not the phase's high byte x 2 / 256; `Spc_AnimateBuiltin`: skipped while
+    !Spc_Flags87 bit 4 pauses Spc_MainLoop, and at the last step only byte 1's high nibble ($70)
+    is flipped; `Spc_CmdTimer`: 125 us is timer 0's tick, not a pass; `Spc_MainLoop`: "the tempo
+    step" (Spc_StepTracks) steps all the tracks; `Spc_StepTracks`: a voice is cleared from
+    !Spc_Unk24 (25) even when an effect holds it (only the key-off is skipped);
+    `Spc_StepSongFades`: the "probably" can go, the sequence commands at `$1722`-`$1826` set those
+    fades; `Spc_TrackSlides`: a pitch slide with 0 steps runs as 256 (the count wraps).
 
     **Third batch (branch match-c7-spc700-3, 1,954 bytes):** the track pass, `$0377`-`$07A2`,
     `$07AF`-`$0891` and `$0903`-`$0B95`: `Spc_StepTracks` (the tempo, each track's next note and

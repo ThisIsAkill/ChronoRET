@@ -894,12 +894,13 @@ Spc_TrackLookAhead:                     ; header: see Spc_TrackStep
     ret
 
 ; $06BD — Spc_NotePitch (99 bytes, $06BD–$071F; ROM $C7:2982–$29E4)
-; The pitch of note A for track X: octave = A / 12, the semitone's word
-; from Spc_PitchTable; scaled by the sample's tuning (!Spc_TrackTuning:
-; its low byte plus the fine tune in !Spc_TrackF3A0's low byte, and its
-; high byte as a second factor when nonzero), then shifted left or right
-; by the octave's distance from 4. The exact scale was not checked
-; against the DSP's pitch units.
+; The pitch of note A for track X: octave = A / 12, P = the semitone's
+; word from Spc_PitchTable. With t = (!Spc_TrackTuning's low byte + the
+; fine tune, !Spc_TrackF3A0's low byte) & $FF, Q = P x t / 256; when the
+; tuning's high byte h is nonzero, (Q's high byte x h) / 256 is added to
+; Q (under 0.4%). The result is P + Q = P x (256 + t) / 256 for t below
+; $80, Q alone = P x t / 256 from $80 up (BBS on t's bit 7). Then it is
+; shifted left or right by the octave's distance from 4.
 ; Callers note: CALL from Spc_TrackStep ($0557) and Spc_TrackLookAhead
 ;   ($0657).
 ; Entry: P=0; A = the note; !Spc_CurTrack = X = the track
@@ -1036,10 +1037,15 @@ Spc_ReadSeqByte:                        ; header: see Spc_RunSeqCommand
 ; Finds track X's next note byte without moving its pointer: from
 ; !Spc_TrackPtr (copied to !Spc_Ptr93, with !Spc_TempBA = the track's
 ; !Spc_TrackUnk27), skips commands: one with a second handler
-; (Spc_SeqCmdTable2) runs it (it reads at !Spc_Ptr93) and comes back to
-; Spc_PeekNoteFrom (its address is pushed first); the others are skipped
-; with their operands (Spc_SeqOperandCounts). Returns the first byte below
-; $C4, or $EB (!Spc_SeqEndTrack: the end, which counts as a rest).
+; (Spc_SeqCmdTable2) runs it and comes back to Spc_PeekNoteFrom (its
+; address is pushed first); where a second handler reads operands it
+; steps !Spc_Ptr93 past them itself. The others are skipped with their
+; operands (Spc_SeqOperandCounts). Returns the first byte below $C4, or
+; $EB (!Spc_SeqEndTrack: the end, which counts as a rest).
+; Quirk of the original: $1B86, the second handler of $DC and $E4-$E7,
+; only clears the voice from !Spc_Unk5C/60 (5D/61) and does not step
+; !Spc_Ptr93; $DC has one operand, so that operand is read as the next
+; byte (DC 21 1C gives $21).
 ; Callers note: CALL from Spc_TrackLookAhead ($0601). Spc_PeekNoteFrom:
 ;   the return address pushed at $0786/$0789.
 ; Entry: P=0; X = the track
@@ -1274,8 +1280,8 @@ Spc_TrackSlides:
 ; the last entry is overwritten), clears the port 0/1 latches and echoes
 ; the id. Spc_RunQueue runs the entries.
 ; Callers note: CALL from Spc_MainLoop ($031C, $0340, $035C) and
-;   unmatched code ($03E0 in Spc_StepTracks's track loop, $1308 in
-;   Spc_Unk12F9's wait).
+;   Spc_StepTracks ($03E0) and unmatched code ($1308, in Spc_Unk12F9's
+;   wait).
 ; Entry: P=0; X any (kept): the track being stepped, except at the
 ;        $1308 call, where it holds the address of the count Spc_Unk12F9
 ;        waits on
@@ -1516,9 +1522,14 @@ Spc_TrackTremolo:                       ; header: see Spc_TrackEffects
 ;   - volume (in !Spc_UnkD0): the pan byte is !Spc_PanCentre with
 ;     !Spc_Flags87 bit 0 (mono), else the inverse of pan + pan LFO
 ;     (!Spc_TrackF280, !Spc_TrackF4C0 high bytes, through Spc_Unk12DE);
-;     the volume is !Spc_TrackF240's high byte, raised by the tremolo
-;     phase below $80 (+ volume x phase x 2 / 256, capped at $7F on an
-;     overflow), x !Spc_GroupVolume / 256, and for a song track 0 when
+;     the volume is !Spc_TrackF240's high byte, moved by a nonzero tremolo
+;     phase p (!Spc_TrackTremPhase high byte): below $80 it becomes
+;     volume + volume x 2p / 256; from $80 up volume x (2p - 256) / 256
+;     (the BCS after the MUL still sees the ASL's carry): volume x (1 +
+;     signed p / 128) in all. Quirk of the original: the sum is capped at
+;     $7F only when the add carries with bit 7 set (sum >= $180); sums of
+;     $80-$FF and $100-$17F keep their low byte. Then x !Spc_GroupVolume
+;     / 256, and for a song track 0 when
 ;     muted (!Spc_Mute), else x !Spc_TrackF220 x !Spc_Unk4D / 65536
 ;     (!Spc_Unk4D: the song command's Arg1, a song volume probably). Left
 ;     = volume x pan / 256, right = volume x (pan ^ $FF) / 256 (with mono:
@@ -1680,15 +1691,18 @@ Spc_WritePitch:                         ; header: see Spc_WriteVoice
     ret
 
 ; $0ADE — Spc_LfoRate (126 bytes, $0ADE–$0B5B; ROM $C7:2DA3–$2E20)
-; The next step of a vibrato or tremolo, from the depth byte in
-; !Spc_TempA5 (below $80, $80-$BF, $C0 up: three shapes), the step in
-; !Spc_Quotient, the base rate in !Spc_Temp9B/9C (a quarter of it is
-; used) and the stage in A (0 starts a turn): returns the new step in YA
-; and the next stage in !Spc_Temp9D. The shapes were not traced further
-; (rising, falling and a turn, probably).
+; The next step of a vibrato or tremolo at a turn of its counter. Every
+; call negates the step (!Spc_Quotient): the LFO turns. While the stage
+; (A) is nonzero it counts down (the new stage in !Spc_Temp9D) and the
+; step's size grows by a quarter of the base rate (!Spc_Temp9B/9C), on
+; the turns that make the step positive for a depth byte (!Spc_TempA5)
+; below $80, on those that make it negative for $80-$BF, and on every
+; turn from $C0 up (keeping the turn's sign: the old step's sign in
+; !Spc_TempB7 bit 7 picks it). Stage 0: only the negation, no more growth.
 ; Callers note: CALL from Spc_TrackEffects ($097E, $09DE).
-; Entry: P=0; A = the stage (0-7), !Spc_TempA5, !Spc_Quotient,
-;        !Spc_Temp9B/9C as above
+; Entry: P=0; A = the stage (0-7); !Spc_TempA5 = the depth byte;
+;        !Spc_Quotient = the step; !Spc_Temp9B/9C = the base rate;
+;        !Spc_TempB7 = the old step's high byte (read for $C0 up)
 ; Exit:  YA = the step; !Spc_Temp9D = the stage; X unchanged
 Spc_LfoRate:
     mov.b !Spc_Temp9D,#$00
