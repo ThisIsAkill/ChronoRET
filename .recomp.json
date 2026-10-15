@@ -1,0 +1,20 @@
+{
+  "game": "Chrono Trigger",
+  "system": "SNES",
+  "type": "decomp",
+  "project": "ChronoRET",
+  "status": "in-progress",
+  "toolchain": ["asar"],
+  "original": [
+    { "region": "USA", "revision": "1.0", "serial": "SNS-ACTE-USA", "sha1": "de5822f4f2f7a55acb8926d4c0eaa63d5d989312" }
+  ],
+  "approach": "Matching decompilation into readable 65816 and SPC700 assembly (asar) that rebuilds the original byte for byte; every routine is independently reviewed.",
+  "notes": "All reachable 65816 code is matched, readable and independently verified. The SPC700 sound driver is being matched now; the code inside the compressed $C3 module is next. Progress and devlog are on the Kajar wiki.",
+  "help": ["Reviewing routine headers", "Naming unknown RAM and data", "SPC700 sound driver"],
+  "tags": ["matching", "65816", "spc700", "asar"],
+  "maintainers": [{ "name": "Akill", "link": "https://github.com/ThisIsAkill" }],
+  "links": [
+    { "label": "Kajar wiki", "url": "https://thisisakill.github.io/Kajar-site/" },
+    { "label": "Progress", "url": "https://thisisakill.github.io/Kajar-site/PROGRESS/" }
+  ]
+}
