@@ -645,14 +645,22 @@ WinFx_StepWipe:
 ; $C3:02DD — C3_RandomByte (42 bytes, $02DD–$0306)
 ; Returns a new pseudo-random byte in A and keeps it in C3_RandSeed: A
 ; (with C rotated in) plus C3_RandSeed, stored; then X's low byte, the
-; seed, C3_FrameCount, the H counter's low byte (OPHCT; the counters are
-; latched by the CMP that reads SLHV, and that CMP's carry, A against
-; the open-bus value SLHV returns, goes into this ADC), minus the V
-; counter's low byte (first OPVCT read), the seed again, C3_ScratchF0,
-; C3_ScratchF2 (EOR), C3_ScratchF4, and minus the V counter's high byte
-; (second OPVCT read: bit 0 = V bit 8, the rest open bus) are added or
-; subtracted in, each with the carry of the step before, and the result
-; stored back.
+; seed, C3_FrameCount, the H counter (OPHCT; the counters are latched
+; by the CMP that reads SLHV, and that CMP's carry, A against the
+; open-bus value SLHV returns, goes into this ADC), minus the V counter
+; (OPVCT), the seed again, C3_ScratchF0, C3_ScratchF2 (EOR),
+; C3_ScratchF4, and minus the V counter again are added or subtracted
+; in, each with the carry of the step before, and the result stored
+; back. Which byte each counter read gives is not fixed: OPHCT and
+; OPVCT each return the low byte or bit 8 (with open bus in bits 1-7)
+; by a flip-flop that every read toggles and only a STAT78 read clears,
+; and nothing on this path reads STAT78 (the module's one read, at
+; $7E:9AB3, is elsewhere). At M=1 OPHCT is read once a call, so it
+; alternates from call to call (bit 8 and open bus every other call),
+; and OPVCT twice, keeping the phase it had (low then high from a clear
+; flip-flop); at M=0 the word reads also take the next register
+; (OPHCT's read takes OPVCT, OPVCT's STAT77), so H is read once and V
+; three times a call, and both alternate.
 ; Callers (1 JSL site): WinFx_StepWipe ($C3:024A).
 ; Callers note: the unpacked module also JSLs here, from
 ;   C3Mod_KernelRandom ($7E:3443), whose twelve JSR sites

@@ -339,8 +339,10 @@ C3Mod_WaitVblank:
 ;   $35E8, $4F4A, $56DE, $5BE7, $5C05, $5C22, $5CCD, $5CF0, $6025, $99CB
 ;   and $99EB (code not matched yet).
 ; Entry: M=0 (16-bit A for the product reads), X=0 (X and Y are pushed
-;        and pulled as words), DP = the page of C3Math_A.. (0 at every
-;        call), DB any (saved); C3Math_A, C3Math_B = the operands.
+;        and pulled as words), DP = the page of C3Math_A.. (the
+;        script's page at C3Mod_BuildM7Tables' calls $3591-$35E8, the
+;        caller's own at C3Mod_MulSigned16's; the others' not traced),
+;        DB any (saved); C3Math_A, C3Math_B = the operands.
 ; Exit:  P, X, Y, DB restored; A = the product's high word; C3Math_Lo
 ;        and C3Math_Hi = the product; $F8 shifted left (see above).
 %C3ModOrg($7E31BF)
@@ -657,8 +659,9 @@ C3Mod_TableRandom:
 ;   matched yet).
 ; Entry: M=0, X=0 (16-bit index), DP any, DB any (the read is long); A
 ;        = the angle (only bits 0-9 count).
-; Exit:  A = the signed value; X = the angle AND C3_AngleMask; Y
-;        unchanged.
+; Exit:  A = the signed value; X = the angle AND C3_AngleMask entered
+;        at C3Mod_Sine, (the angle + C3_QuarterTurn) AND C3_AngleMask
+;        entered at C3Mod_Cosine; Y unchanged.
 C3Mod_Cosine:
     CLC
     ADC.w #!C3_QuarterTurn
@@ -714,7 +717,8 @@ C3Mod_FadeInTask:
 ;   #C3Mod_FadeOutTask / JSR $395E at $63E8 (code and scripts not
 ;   matched yet).
 ; Entry: a task: M=0 (8-bit set here), X=0, DP any, DB = $00.
-; Exit:  RTS with M=1; at the end JMP C3Mod_TaskEnd.
+; Exit:  RTS with M=1; A = C3_FadeStep after a step, else as on entry;
+;        at the end JMP C3Mod_TaskEnd.
 C3Mod_FadeOutTask:
     SEP #$20
     DEC.w !C3_FadeTimer
@@ -843,9 +847,11 @@ C3Mod_FillBytes:
 ; Unpacks Y bytes of 4-bit pixels from $0C00 up into one byte per pixel
 ; at $7F:0200 (C3_BitmapSrc, through WMDATA): the low nibble first, then
 ; the high. It reads the bytes with PLA, the stack pointed at
-; C3_NibbleStack ($0BFF) and saved in C3_StackSave meanwhile, so no
-; interrupt must come (the module calls it with the screen off,
-; probably).
+; C3_NibbleStack ($0BFF) and saved in C3_StackSave meanwhile. An
+; interrupt then pushes onto the bytes already read (and, near the
+; start, into page $0B below $0C00, the second script page), which does
+; little harm unless its handler's stack reaches further (the module
+; calls it with the screen off, probably).
 ; Callers note: $53E1 (code not matched yet).
 ; Entry: M=1 (set here), X=0, DP any (saved; DP_PPU inside), DB = $00
 ;        (C3_StackSave is absolute); Y = the byte count (not 0).
