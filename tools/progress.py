@@ -9,6 +9,8 @@ the review log, and writes:
   symbols/functions.csv         one row per function: where, how big, kind, status
   symbols/spc700_functions.csv  the same for the SPC700 sound driver (asm/spc700/),
                                 by ARAM and ROM address
+  symbols/c3module_functions.csv  the same for the packed $C3 module
+                                (asm/bankC3/packed/), by its WRAM address
   symbols/progress.json         totals, per bank, per 4 KB address-map slice, and the
                                 SPC700 driver's figure apart (key "spc700")
   symbols/progress_history.csv  one row per working day (--update-history)
@@ -22,9 +24,18 @@ emitted_bytes too (they are spc700.emitted_bytes). Its
 statuses work the same way: the lint's SPC700 rules (tools/lint_spc700.py)
 and the same review log, keyed by routine name and source_hash.
 
-functions.csv, spc700_functions.csv and progress.json are not tracked: every tool that reads them
-regenerates them when they are stale (tools/generated.py), and the docs
-carry no generated numbers. Run `--update` to have them on disk (the wiki
+The packed $C3 module is counted apart the same way (key "c3module"): its
+routines are rows of c3module_functions.csv, matched where the module's
+source writes the bytes itself (not incbin'd from the ROM's module,
+tools/c3pack.py) and they equal the ROM's unpacked module; its code bytes
+are those tools/c3module.py's trace reaches together with the matched code;
+the packed block's emitted bytes are left out of the 65816 figures; its
+statuses come from the lint's module rules (tools/lint_c3module.py) and
+the review log.
+
+functions.csv, spc700_functions.csv, c3module_functions.csv and progress.json
+are not tracked: every tool that reads them regenerates them when they are
+stale (tools/generated.py), and the docs carry no generated numbers. Run `--update` to have them on disk (the wiki
 sync reads them from here). Never type a count or percentage by hand.
 
 A function's kind is `data` when its source body (label through last
@@ -65,6 +76,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asm_source  # noqa: E402
+import c3module  # noqa: E402
+import c3pack  # noqa: E402
+import isolated  # noqa: E402
 import generated  # noqa: E402
 import lint_readability  # noqa: E402
 import review_log  # noqa: E402
@@ -77,6 +91,8 @@ SYMBOLS = Path('symbols')
 FUNCTIONS_CSV = generated.FUNCTIONS_CSV
 SPC700_CSV = generated.SPC700_CSV
 SPC700_SOURCE = Path('asm/spc700/driver.asm')
+C3MODULE_CSV = generated.C3MODULE_CSV
+C3MODULE_SOURCE = Path('asm/bankC3/packed/module.asm')
 PROGRESS_JSON = generated.PROGRESS_JSON
 HISTORY_CSV = SYMBOLS / 'progress_history.csv'
 # Docs that once carried generated blocks; --check keeps them out.
@@ -171,7 +187,7 @@ def header_note(lines: list[str], i: int, name: str) -> str:
         elif not line:
             if block:
                 break
-        elif not (line.lower().startswith('org') or line.startswith('!')):
+        elif not (line.lower().startswith('org') or line.startswith(('!', '%C3ModOrg'))):
             break
         j -= 1
     text = []
@@ -296,6 +312,37 @@ def spc700_functions(emitted: set[int], aram: dict[str, int]) -> list[dict]:
     return rows
 
 
+def c3module_functions(source_bytes: set[int], labels: dict[str, int]) -> list[dict]:
+    """Rows for the packed $C3 module's labels (asm/bankC3/packed/module.asm),
+    as analyse() makes them for the 65816 code: from each label, the bytes
+    its source writes itself (not incbin'd from the ROM's module) that equal
+    the ROM's unpacked module, up to the next label."""
+    if not C3MODULE_SOURCE.exists():
+        return []
+    original = c3pack.ROM_MODULE.read_bytes()
+    built = c3pack.MODULE_BIN.read_bytes()
+    good = {i for i in source_bytes if built[i] == original[i]}
+    base = c3pack.MODULE_BASE
+    source = {r.name: r for r in asm_source.file_regions(C3MODULE_SOURCE)}
+    starts = sorted((a - base, n) for n, a in labels.items()
+                    if n in source and 0 <= a - base < c3pack.MODULE_SIZE)
+    rows = []
+    for idx, (start, name) in enumerate(starts):
+        if start not in good:
+            continue
+        nxt = starts[idx + 1][0] if idx + 1 < len(starts) else c3pack.MODULE_SIZE
+        end = start
+        while end < nxt and end in good:
+            end += 1
+        r = source[name]
+        rows.append({
+            'address': f'$7E:{(base + start) & 0xFFFF:04X}', 'end': f'$7E:{(base + end - 1) & 0xFFFF:04X}',
+            'size': end - start, 'name': name, 'kind': r.kind, 'status': 'matched',
+            'source_hash': r.source_hash, 'notes': header_note(r.lines, r.label, name), 'file': r.file,
+        })
+    return rows
+
+
 def analyse() -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         emitted, addrs, aram = build_facts(Path(tmp))
@@ -307,6 +354,21 @@ def analyse() -> dict:
     spc_block = set(range(spc700.DRIVER_ROM, first + size))
     spc_emitted = len(emitted & spc_block)
     emitted = emitted - spc_block
+    # The packed $C3 module is counted apart too (under "c3module"): its
+    # packed bytes, BankC3_PackedModule, are built from the unpacked source
+    # in asm/bankC3/packed/ (tools/c3pack.py).
+    # (verify.assemble_onto gives the incbin a placeholder: the packed bytes
+    # count when tools/c3pack.py's build of them is the ROM's.)
+    pack_block = set(range(c3pack.MODULE_ROM, c3pack.MODULE_ROM + c3pack.MODULE_PACKED_SIZE))
+    emitted = emitted - pack_block
+    rom = ROM_PATH.read_bytes()
+    built = c3pack.MODULE_LZ.read_bytes()
+    pack_emitted = len(built) if built == rom[c3pack.MODULE_ROM:c3pack.MODULE_ROM + len(built)] else 0
+    try:
+        mod_source = set(c3pack.source_bytes())
+    except c3pack.PackError as e:
+        raise SystemExit(f'progress: {e}') from None
+    c3_rows = c3module_functions(mod_source, c3pack.module_labels())
 
     starts = sorted((off, name) for name, off in addrs.items() if name in source)
     functions = []
@@ -325,10 +387,11 @@ def analyse() -> dict:
         })
 
     # The layout is known now; the lint's caller checks read it from here.
-    with generated.generating([dict(f) for f in functions], [dict(f) for f in spc_rows]):
+    with generated.generating([dict(f) for f in functions], [dict(f) for f in spc_rows],
+                              [dict(f) for f in c3_rows]):
         lint = lint_readability.blocking(lint_readability.by_function(lint_readability.collect()))
     reviews = read_reviews()
-    for f in spc_rows:
+    for f in spc_rows + c3_rows:
         if f'{f["file"]}:{f["name"]}' not in lint:
             f['status'] = 'readable'
             review = reviews.get(f['name'])
@@ -399,7 +462,22 @@ def analyse() -> dict:
                        'code_bytes': sum(hi - lo + 1 for lo, hi in spc700.CODE_RANGES),
                        'data_bytes': sum(hi - lo + 1 for lo, hi in spc700.DATA_RANGES),
                        'totals': level_totals(spc_rows)},
-            'spc700_functions': spc_rows}
+            'spc700_functions': spc_rows,
+            'file_check': isolated.run_mode(),
+            'c3module': {'emitted_bytes': pack_emitted, 'unpacked_bytes': c3pack.MODULE_SIZE,
+                         'source_bytes': len(mod_source), **c3module_code(c3_rows),
+                         'totals': level_totals(c3_rows)},
+            'c3module_functions': c3_rows}
+
+
+def c3module_code(rows) -> dict:
+    """The module's code bytes: what tools/c3module.py's trace reaches, with
+    the matched code rows (code the trace has not reached yet included)."""
+    insns, _ = c3module.trace(c3module.module_bytes())
+    traced = {a - c3module.BASE for a in c3module.code_bytes(insns)}
+    matched = {int(r['address'][4:], 16) - c3module.BASE + k for r in rows if r['kind'] == 'code'
+               for k in range(r['size'])}
+    return {'code_bytes': len(traced | matched), 'traced_code_bytes': len(traced)}
 
 
 # ── Outputs ──────────────────────────────────────────────────────────────────
@@ -428,12 +506,27 @@ def render_spc700_csv(result) -> str:
     return buf.getvalue()
 
 
+C3MODULE_COLS = ['address', 'end', 'size', 'name', 'kind', 'status', 'source_hash', 'notes']
+
+
+def render_c3module_csv(result) -> str:
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=C3MODULE_COLS, lineterminator='\n')
+    w.writeheader()
+    w.writerows(result['c3module_functions'])
+    return buf.getvalue()
+
+
 def render_progress_json(result) -> str:
     # "spc700" (added beside schema 3's keys; nothing else changed): the
     # driver's code and data bytes and its totals per level, apart from the
-    # 65816 figures.
-    data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'surveyed_code_bytes', 'totals',
-                                   'banks', 'slices', 'spc700')}
+    # 65816 figures. "file_check": "strace" when every isolated assembly
+    # behind the figures had tools/isolated.py's file-open check, "none"
+    # when one ran without it (unchecked figures). "c3module" likewise for the packed $C3 module: its
+    # packed bytes emitted, its unpacked bytes and those from source, its
+    # code bytes (traced and matched) and its totals per level.
+    data = {k: result[k] for k in ('file_check', 'emitted_bytes', 'code_bytes', 'surveyed_code_bytes',
+                                   'totals', 'banks', 'slices', 'spc700', 'c3module')}
     return json.dumps({'schema': SCHEMA, **data}, indent=2) + '\n'
 
 
@@ -488,11 +581,25 @@ def render_spc700_line(result) -> str:
             f'{t["verified"]["functions"]} are verified by independent review.')
 
 
+def render_c3module_line(result) -> str:
+    s = result['c3module']
+    t, code = s['totals'], s['code_bytes']
+    return (f'packed $C3 module (counted apart): {t["matched"]["code_bytes"]:,} of {code:,} code bytes '
+            f'matched byte-exact ({pct(t["matched"]["code_bytes"], code)}, {t["matched"]["functions"]} '
+            f'routines, plus {t["matched"]["data_bytes"]:,} bytes of data); '
+            f'{t["readable"]["functions"]} of those meet the readability standard and '
+            f'{t["verified"]["functions"]} are verified by independent review. Its code bytes are '
+            f'those its trace reaches (tools/c3module.py) and the matched code, so far; '
+            f'{s["source_bytes"]:,} of its {s["unpacked_bytes"]:,} unpacked bytes are from source, '
+            f'packed back to the {s["emitted_bytes"]:,} bytes in ROM.')
+
+
 def write_generated(result) -> None:
-    """Write symbols/functions.csv, spc700_functions.csv and progress.json
+    """Write symbols/functions.csv, spc700_functions.csv, c3module_functions.csv and progress.json
     (tools/generated.py)."""
     generated.write_outputs({FUNCTIONS_CSV: render_functions_csv(result),
                              SPC700_CSV: render_spc700_csv(result),
+                             C3MODULE_CSV: render_c3module_csv(result),
                              PROGRESS_JSON: render_progress_json(result)})
 
 
@@ -574,6 +681,10 @@ def main() -> int:
     print()
     print(render_status_line(result))
     print(render_spc700_line(result))
+    print(render_c3module_line(result))
+    if result['file_check'] != 'strace':
+        print('UNCHECKED: these figures were made without the strace file-open check '
+              '(progress.json "file_check": "none"); CI makes them with it.')
     return 0
 
 

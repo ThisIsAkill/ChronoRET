@@ -3069,3 +3069,22 @@ WinFx_QuadExit:                         ; header: see WinFx_QuadEdge
 org $C310C0
 BankC3_EndMarker:
     db "CODE END C3"
+
+; ============================================================
+; The packed module ($C3:1313–$C3:7A2B)
+; ============================================================
+
+; $C3:1313 — BankC3_PackedModule (26,393 bytes, $1313–$7A2B)
+; The bank $C3 module (65816 code and its data, the jet-bike race
+; program), packed in Decomp_ToWram's format (12-bit mode), which
+; C3_BootModule unpacks to C3Mod_Code ($7E:3000-$7E:B57E, $857F bytes)
+; and jumps to. Pointed to by C3Rom_PackPtrs entry 1 ($FE:0003). Its
+; source is the unpacked module, asm/bankC3/packed/module.asm, which
+; tools/c3pack.py assembles and packs with the original packer's rules
+; (Okumura's LZSS, its docstring has the details) to
+; build/c3pack/module.lz, the exact bytes in ROM. $C3:1200-$C3:1312
+; before it is another pack (C3Rom_PackPtrs entry 0; $400 bytes
+; unpacked; user not traced), kept as ROM bytes.
+org $C31313
+BankC3_PackedModule:
+    incbin "../../build/c3pack/module.lz"

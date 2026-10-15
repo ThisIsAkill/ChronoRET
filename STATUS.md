@@ -106,6 +106,13 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-15 (packed $C3 module): the module is matched in unpacked form
+  (`asm/bankC3/packed/module.asm`), assembled apart and packed back by `tools/c3pack.py`, whose
+  packer (Okumura's LZSS, zeroed ring buffer) rebuilds all 60 packs of C3Rom_PackPtrs in the
+  format byte for byte. Counted apart like the SPC700 driver (`symbols/c3module_functions.csv`,
+  `tools/lint_c3module.py`, a separate progress figure whose code bytes are the module's trace
+  plus the matched code); STYLE.md gains a "The packed $C3 module" section. Decided by the
+  session lead under the owner's standing mandate; pending the owner's review.
 - 2026-10-14 (SPC700): STYLE.md gains an "SPC700 (the sound driver)" section: the same
   readability rules for `asm/spc700/`, the Entry line stating P instead of DP and DB, `DSP:` and
   `Ports:` header lines, titles with ARAM and ROM ranges, and hand-written callers checked

@@ -1,0 +1,8 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:3063,C3Mod_Init,2026-10-09,rev178a,approved,f20eb74dce39,"r177 fix ok: PPU writes cover $2100-$2133 except $2104/$2116-$2119/$2122; DMA sizes, exits, callers $3000/$3023 checked. nit: Return is also SoundReset's BNE target ($317C)"
+$7E:37F3,C3Mod_CallW,2026-10-09,rev178a,approved,3663cdfccf6b,"r177 fix ok: X=0 required (A2 00 00); JSL site $C3:0C58 in C3_RunScript opcode 0 (M=0,X=0,DB=$7E) verified by bytes; $7E:00F0 mirrors $00:00F0; no JSL/JML in module"
+$7E:398A,C3Mod_RunTasks,2026-10-09,rev178a,approved,0ef5dc59a1ee,"r177 fix ok (X, JMP); JSL at $C3:0938 after the C3_TaskList->C3_TaskRun MVN; save/restore, exit A/X and TaskNext fall-ins checked. nit: 'puts the address in X there' reads ambiguously"
+$7E:39A7,C3Mod_TaskEnd,2026-10-09,rev178a,approved,fa8cf602d643,"r177 fix ok: JMP entry, X=0 for the 2-byte PLX, pull order vs RunTasks pushes; all 14 JMP $39A7 patterns in module.bin match the note exactly"
+$7E:39B1,C3Mod_TaskReplace,2026-10-09,rev178a,approved,1adff194b1fa,"REP/TXA then pulls and 16-bit STA to C3_TaskList,X; A = new address; the 9 JMP $39B1 patterns match module.bin, $34BC bytes A2 C2 34 4C B1 39 confirm LDX #$34C2"
+$7E:39DE,C3Mod_NmiTaskEnd,2026-10-09,rev178a,approved,c97cd36ed3d6,"Pulls match RunNmiTasks' pushes (saved P has M=0), STZ C3_NmiTaskList,X, BRA NmiTaskNext; the 9 JMP $39DE patterns match module.bin exactly"
+$7E:39E8,C3Mod_NmiTaskReplace,2026-10-09,rev178a,approved,edd21d4c5563,"BRA bytes 80 AA -> $399F (TaskNext) quirk verified, incl. TaskRun copy made after NMI tasks in C3_ModuleFrame; no JMP $39E8 pattern in module.bin; exit state checked"

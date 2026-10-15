@@ -12,6 +12,8 @@ REQUIRED = {
 }
 
 OPTIONAL = {
+    "strace": "recommended (Linux): verify.py checks which files asar opens (tools/isolated.py); "
+              "without it that check is skipped with a warning — apt-get install strace",
     "bsnes": "cycle-accurate emulator for tracing — yay -S bsnes-hd-git",
     "mesen-s": "alternative debugger-focused emulator",
 }

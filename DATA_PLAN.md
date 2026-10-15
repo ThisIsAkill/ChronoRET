@@ -4,15 +4,17 @@ How the rest of the ROM, everything the 65816 and SPC700 source does not emit ye
 described in source, so that one day the build no longer copies bytes from the original ROM.
 The measured map is `symbols/data_survey.csv` (one row per region); `python3 tools/data_survey.py`
 checks that it covers exactly the bytes `tools/verify.py` does not count as emitted, and prints
-the totals below. Survey of 2026-10-15, from `main` at 280,042 emitted bytes.
+the totals below. Survey of 2026-10-15, from `main` at 306,435 emitted bytes (280,042 assembled,
+plus the packed `$C3` module, 26,393 bytes, which `tools/c3pack.py` packs from source since PR #113
+and verify counts apart).
 
 ## What is left
 
-3,914,262 bytes (93.32% of the 4,194,304-byte ROM) in 2,228 rows. Shares are of the whole ROM.
+3,887,869 bytes (92.69% of the 4,194,304-byte ROM) in 2,227 rows. Shares are of the whole ROM.
 
 | kind | bytes | share | rows | confirmed / probable / unknown |
 |---|---:|---:|---:|---|
-| packed_lz | 2,376,040 | 56.65% | 1,523 | 2,373,031 / 3,009 / 0 |
+| packed_lz | 2,349,647 | 56.02% | 1,522 | 2,346,638 / 3,009 / 0 |
 | graphics (raw tiles) | 336,619 | 8.03% | 28 | 328,331 / 8,288 / 0 |
 | sprite_layout | 253,952 | 6.05% | 5 | 253,952 / 0 / 0 |
 | text | 208,485 | 4.97% | 48 | 206,683 / 1,802 / 0 |
@@ -29,7 +31,7 @@ the totals below. Survey of 2026-10-15, from `main` at 280,042 emitted bytes.
 | map (exit and treasure records) | 6,694 | 0.16% | 2 | 6,694 / 0 / 0 |
 | spc_data | 82 | 0.00% | 3 | 82 / 0 / 0 |
 
-Confidence over all 3,914,262 bytes: confirmed 3,880,800 (99.15%), probable 26,075 (0.67%),
+Confidence over all 3,887,869 bytes: confirmed 3,854,407 (99.14%), probable 26,075 (0.67%),
 unknown 7,387 (0.19%). "Confirmed" means a matched routine, or a pointer table a matched routine
 reads, reaches the region and the code fixes its format; where only the start is reached, the
 row's notes say the end is inferred (it runs to the next known region). The table and padding
@@ -38,10 +40,10 @@ per-kind work below still has to settle.
 
 ### The packed bytes, by content
 
-Every `packed_lz` row is one Decomp_ToWram stream (`$C3:0002`), and every one of the 1,523
-repacks byte-exact with the packer of `tools/c3pack.py` (branch `match-c3-packed`):
-`python3 tools/data_survey.py --packs` with that file present checks all of them (about 20 s).
-960 use 11-bit offsets, 563 12-bit. Unpacked they hold 4,043,199 bytes.
+Every `packed_lz` row is one Decomp_ToWram stream (`$C3:0002`), and every one of the 1,522
+repacks byte-exact with the packer of `tools/c3pack.py`:
+`python3 tools/data_survey.py --packs` checks all of them (about 20 s).
+960 use 11-bit offsets, 562 12-bit. Unpacked they hold 4,009,024 bytes.
 
 | content (pointer table) | packed | unpacked | packs |
 |---|---:|---:|---:|
@@ -53,7 +55,6 @@ repacks byte-exact with the packer of `tools/c3pack.py` (branch `match-c3-packed
 | scene BG graphics (`C2SceneRom_BgPacks`) | 104,984 | 137,616 | 37 |
 | data of the `$C3` module (`C3Rom_PackPtrs`) | 89,860 | 186,928 | 57 |
 | scene sprite graphics (`C2SceneRom_ObjPacks`) | 30,592 | 65,536 | 14 |
-| the `$C3` module itself (65816 code and data) | 26,393 | 34,175 | 1 |
 | scene BG maps, metatiles, BG3 maps, palettes, lists, `$7000`/`$7200` data | 51,857 | 166,270 | 57 |
 | scene dial pixels and palette (`C2Scene_DialPacks`, `$C2:7220`) | 4,302 | 12,352 | 3 |
 | scene scripts (`C2SceneRom_ScriptPacks`) | 17,112 | 27,757 | 8 |
@@ -101,7 +102,7 @@ step ends the same way: the bytes come from source and assets instead of the ROM
 risk. A few rows of stale bytes (`unknown`) sit beside the fill and stay raw blobs.
 Difficulty trivial; with step 1 below.
 
-**Packed streams** (2.38 MB, 57%). Store the unpacked contents and pack at build time; the
+**Packed streams** (2.35 MB, 56%). Store the unpacked contents and pack at build time; the
 packer exists and is exact for every stream (Okumura's LZSS with the original's changes, the
 two-segment framing and the per-stream mode, all in `tools/c3pack.py`). What the round trip has
 to record: the mode of each stream (11 or 12 bit); the placement (streams sit back to back,
@@ -110,8 +111,8 @@ become `dl Label` entries, except the entries that point at stale or non-pack by
 102-110, 231-235, 320-322; LocGfx_PackPtrs 204-218; LocGfx_Meta3Ptrs 19-22; Map_PropsPtrs 201)
 and the tables with duplicate entries, which must keep their exact values. The 17 empty packs
 are 3 bytes each. Build time: packing all 4 MB in Python takes about 20 s, so the build should
-cache the packed output (as c3pack's module build does). Difficulty low; 1-2 sessions once
-`match-c3-packed` is merged. Readable formats for the unpacked contents are separate, later work
+cache the packed output (as c3pack's module build does). Difficulty low; 1-2 sessions (the
+packer and a packed build path exist since PR #113). Readable formats for the unpacked contents are separate, later work
 (graphics to PNG, maps, event and scene script disassembly, below).
 
 **Raw graphics** (337 KB) and **font** (9 KB). Mostly 4bpp sprite tiles (the seven characters'
@@ -189,16 +190,16 @@ own labels; 1 session to re-check each with an emulator trace.
    ROM region. A build with no ROM at all would need the assets in the repository, which
    conflicts with the README's legal section. This is the owner's decision; the plan below
    assumes extraction.
-1. **Merge `match-c3-packed`** (the packer and the packed-module build path). Prerequisite for
-   everything packed.
+1. **Done in PR #113**: the packer and the packed-module build path (`tools/c3pack.py`), the
+   prerequisite for everything packed. Its build step is the model for step 3.
 2. **Extraction and placement framework** (1-2 sessions): `tools/extract_data.py` writes one
    asset per CSV row; a generated `asm/data/*.asm` per bank places each row (`incbin` of its
    asset, fill directives, labels at row starts). Verify then counts every byte as emitted.
    This is the step that ends the ROM copy for the structure; content is still binary.
 3. **Packed streams from unpacked assets** (1-2 sessions): pack at build time with a cache;
-   pointer tables as labels. Biggest share (57%) and the packer is done.
+   pointer tables as labels. Biggest share (56%) and the packer is done.
 4. **Blobs that need no decoder** (1 session): padding, BRR samples, song and effect blocks,
-   raw graphics, sprite layout, unknown rows. With 2 and 3 this covers about 90% of the
+   raw graphics, sprite layout, unknown rows. With 2 and 3 this covers about 85% of the
    remaining bytes.
 5. **Text** (2-4 sessions): the encoder and the dictionary question; the pointer tables.
 6. **Tables and palettes** (3-5 sessions), in bank order; settles the inferred table ends.
@@ -234,8 +235,10 @@ stop copying bytes. Uncertainties, largest first:
 None found beyond what is already known:
 
 - The packed `$C3` module (`$C3:1313`-`$7A2B`, 26,393 bytes, 34,175 unpacked to `$7E:3000`) is
-  65816 code and data. It is known, counted apart in `symbols/code_survey.csv`, and its source
-  is on branch `match-c3-packed`.
+  65816 code and data. It is known, counted apart in `symbols/code_survey.csv`, and since PR #113
+  it is packed from its source (`asm/bankC3/packed/`), so it is not a row of the data survey; of
+  its 34,175 unpacked bytes, 763 are matched source and the rest are still the ROM's (incbin'd
+  inside the module source), which is code-matching work, not data work.
 - Evidence for the rest: every unemitted row, and every stream unpacked, was scanned for `JSL`
   and `JML` to the entry address of a matched routine. Only the module has more than one (60 in
   its unpacked bytes, 18 in its packed literals); seven other places have one each (five in

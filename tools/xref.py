@@ -73,6 +73,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disasm import _OPCODES  # noqa: E402
+import c3pack  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
@@ -187,6 +188,7 @@ class Xref:
     def _assemble(rom_path: Path):
         """asar's symbol file: labels and the address of every source line."""
         labels, boundaries, where = {}, {}, {}
+        c3pack.ensure_built()           # the packed $C3 module, incbin'd by bankC3.asm
         with tempfile.TemporaryDirectory() as tmp:
             rom_copy, sym = Path(tmp) / 'x.sfc', Path(tmp) / 'x.sym'
             shutil.copy(rom_path, rom_copy)

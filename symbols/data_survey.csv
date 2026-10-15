@@ -1,6 +1,6 @@
-# Every ROM byte the source does not emit (tools/verify.py's "bytes emitted by source"), one
-# row per region, gap-free and non-overlapping; no row crosses a bank. Checked by
-# `python3 tools/data_survey.py` (coverage against a fresh assembly; --packs re-reads every
+# Every ROM byte the source does not emit (tools/verify.py's "bytes emitted by source"; the
+# packed $C3 module, which verify counts apart, is emitted), one row per region, gap-free and
+# non-overlapping; no row crosses a bank. Checked by `python3 tools/data_survey.py` (coverage against a fresh assembly; --packs re-reads every
 # packed_lz row from the ROM). Method, totals and the plan: DATA_PLAN.md.
 # Addresses are HiROM ($C0+n:xxxx = file offset n*$10000 + xxxx); end is inclusive.
 # kind: the content. packed_lz rows are Decomp_ToWram streams (format "lzNN -> unpacked size:
@@ -14,7 +14,6 @@
 start,end,size,bank,kind,format,readers,confidence,notes
 $C3:10CB,$C3:11FF,309,$C3,padding,309 x $00,,confirmed,uniform fill; nothing points into it
 $C3:1200,$C3:1312,275,$C3,packed_lz,"lz12 -> 1024 B: data for the $C3 module (graphics, tile maps, tables; PR #106)","C3_BootModule (entry 1); the unpacked $C3 module (others, PR #106)",confirmed,via C3Rom_PackPtrs[0]; repacks byte-exact (c3pack)
-$C3:1313,$C3:7A2B,26393,$C3,packed_lz,lz12 -> 34175 B: the $C3 module: 65816 code and data (unpacked to $7E:3000; C3_BootModule),"C3_BootModule (entry 1); the unpacked $C3 module (others, PR #106)",confirmed,"via C3Rom_PackPtrs[1]; matched in unpacked form on branch match-c3-packed (asm/bankC3/packed/), not on main yet; repacks byte-exact (c3pack)"
 $C3:7A2C,$C3:7FFF,1492,$C3,padding,1492 x $00,,confirmed,uniform fill; nothing points into it
 $C3:8000,$C3:8B6B,2924,$C3,packed_lz,lz11 -> 3648 B: scene dial data: mode-7 tile pixels or palette (C2Scene_DialLoad),C2Scene_DialUnpack (bank from C2Scene_DialLoad),confirmed,via C2Scene_DialPacks[0]; repacks byte-exact (c3pack)
 $C3:8B6C,$C3:97D6,3179,$C3,packed_lz,lz12 -> 5557 B: scene script (C2Scene bytecode),C2Scene_LoadScript,confirmed,via C2SceneRom_ScriptPacks[0]; repacks byte-exact (c3pack)

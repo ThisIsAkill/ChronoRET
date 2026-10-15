@@ -1843,14 +1843,16 @@ if !ram_engine_inc == 0
 !C3_NmiTaskList = $0940                  ; 8 words: module tasks run in the forced blank of each
                                          ; frame (C3Mod_RunNmiTasks)
 !C3_TaskRun = $0950                      ; 16 words: the copy C3Mod_RunTasks runs
-!C3Mod_AudioCommand = $7E377A            ; in the unpacked module (stub name): sends Audio_CmdId..
-                                         ; Arg2 to APUIO0-3 and waits for the echo
-!C3Mod_CallW = $7E37F3                   ; in the unpacked module (stub name): LDX #0 / JSR ($00F0,X)
-                                         ; / RTL: calls the module code at C3_ScratchF0
-!C3Mod_RunTasks = $7E398A                ; in the unpacked module (stub name): JSRs each nonzero
-                                         ; word of C3_TaskRun, saving DB, X, P and DP around each
-!C3Mod_RunNmiTasks = $7E39BE             ; in the unpacked module (stub name): the same for
-                                         ; C3_NmiTaskList, with DP=0 and M=1
+; The module routines the kernel calls (asm/bankC3/packed/module.asm, assembled
+; apart: tools/lint_c3module.py's KERNEL rule checks each address against the label)
+!C3Mod_AudioCommand = $7E377A            ; C3Mod_AudioCommand: sends Audio_CmdId..Arg2 to APUIO0-3
+                                         ; and waits for the echo (JSL wrapper)
+!C3Mod_CallW = $7E37F3                   ; C3Mod_CallW: LDX #0 / JSR ($00F0,X) / RTL: calls the
+                                         ; module code at C3_ScratchF0
+!C3Mod_RunTasks = $7E398A                ; C3Mod_RunTasks: JSRs each nonzero word of C3_TaskRun,
+                                         ; saving DB, X, P and DP around each
+!C3Mod_RunNmiTasks = $7E39BE             ; C3Mod_RunNmiTasks: the same for C3_NmiTaskList, with
+                                         ; M=1 and A = DP
 ; Direct-page bytes of the module services (DP = the caller's; offsets):
 !C3Scale_Groups = $1F                    ; C3_ScaleBitmap: 16-pixel groups per row
 !C3Scale_SrcBase = $23                   ; 16-bit: the source bitmap (64-byte rows)

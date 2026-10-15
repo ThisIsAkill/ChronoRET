@@ -5,8 +5,9 @@ source does not emit, and print its totals.
 
 The CSV (one row per region; DATA_PLAN.md has the method and the plan) must
 cover exactly the bytes `tools/verify.py` does not count as "emitted by
-source": no gap, no overlap, no row across a bank boundary, each row's size
-equal to its extent. This tool checks that against a fresh verify-style
+source" (the packed $C3 module, which verify counts apart, counts as
+emitted): no gap, no overlap, no row across a bank boundary, each row's
+size equal to its extent. This tool checks that against a fresh verify-style
 assembly (the source on all-$00 and all-$FF bases), so the CSV goes stale,
 and the check fails, as soon as matching data in source shrinks the
 unemitted set; rows inside newly emitted bytes must then be removed or cut.
@@ -116,9 +117,14 @@ def unemitted_ranges() -> list[tuple[int, int]]:
     with tempfile.TemporaryDirectory() as tmp:
         lo = verify.assemble_onto(0x00, Path(tmp))
         hi = verify.assemble_onto(0xFF, Path(tmp))
+    # The packed $C3 module is a placeholder in these assemblies; verify.py
+    # counts it as emitted on its own (c3pack packs it from source), so it is
+    # not data to survey either.
+    import c3pack
+    packed = range(c3pack.MODULE_ROM, c3pack.MODULE_ROM + c3pack.MODULE_PACKED_SIZE)
     out, start = [], None
     for i in range(ROM_SIZE):
-        free = lo[i] != hi[i]
+        free = lo[i] != hi[i] and i not in packed
         if free and start is None:
             start = i
         elif not free and start is not None:

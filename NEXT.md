@@ -918,12 +918,37 @@ describing it in source, with totals, order of work and estimates, is [DATA_PLAN
    services of the packed module: `C3_ScaleBitmap`, `C3_ModuleNmi`/`C3_ModuleFrame`, the script
    interpreter `C3_RunScript` and its task lists, the sprite builders, `C3_BuildCopyCode`,
    `C3_ReadPad`, `C3_MulSigned`, `C3_FindDivisor`, the staff text, the "CODE END C3" marker).
-   The rest of the bank stays ROM bytes: the packs at `$C3:1200` and `$C3:1313`
-   (`BankC3_PackedModule`, the jet-bike race module, unpacked to `$7E:3000`-`$B57E`) and the
-   scene data after them. Next: the module itself needs a packer that rebuilds the exact packed
-   bytes (or matching it as data) before its code can be matched; the module routines the kernel
-   calls by address are stubs (`!C3Mod_AudioCommand`, `!C3Mod_CallW`, `!C3Mod_RunTasks`,
-   `!C3Mod_RunNmiTasks` in ram_engine.inc). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   The pack at `$C3:1200` and the scene data after the module stay ROM bytes. The module,
+   `BankC3_PackedModule` (`$C3:1313`-`$7A2B`, the jet-bike race program, unpacked to
+   `$7E:3000`-`$B57E`), is built from source: `asm/bankC3/packed/module.asm` is the unpacked
+   module, assembled on its own at base `$7E:3000` by `tools/c3pack.py build` (run by `make
+   build` and by every tool that assembles `asm/main.asm`), packed with the original packer's
+   rules (Okumura's LZSS with a zeroed ring buffer; the tool's docstring has them, and it rebuilds
+   all 60 packs of C3Rom_PackPtrs in the format byte for byte) to `build/c3pack/module.lz`, which
+   bankC3.asm incbins. What the source does not cover yet is incbin'd from the ROM's module
+   (`%C3ModRomBytes`, from `build/c3pack/rom_module.bin`), as unmatched bytes stay ROM bytes
+   elsewhere; it is counted apart like the SPC700 driver (`tools/progress.py`'s "packed $C3
+   module" line, rows in `symbols/c3module_functions.csv`, rules in `tools/lint_c3module.py`;
+   the module's code bytes are what `tools/c3module.py`'s trace reaches plus the matched code).
+   Matched so far (first batch, to review): the start and setup `$3000`-`$31BE`
+   (`C3Mod_Start`, `C3Mod_ProgramTable`, `C3Mod_Init` with `C3Mod_Return`, `C3Mod_SoundReset`,
+   `C3Mod_WaitVblank`), the sound port and row copies `$377A`-`$37F9` (`C3Mod_AudioCommand`,
+   `C3Mod_AudioSend`, `C3Mod_DoubleRows`, `C3Mod_SpaceRows`, `C3Mod_CallW`),
+   `C3Mod_HideSprites` (`$3843`), `C3Mod_UploadPalette` (`$388B`) and the task runners
+   `$398A`-`$39F4` (`C3Mod_RunTasks` with `C3Mod_TaskNext`, `C3Mod_TaskEnd`,
+   `C3Mod_TaskReplace`, `C3Mod_RunNmiTasks` with `C3Mod_NmiTaskNext`, `C3Mod_NmiTaskEnd`,
+   `C3Mod_NmiTaskReplace`; quirk: the last one branches back into the frame-task loop). The
+   kernel's `!C3Mod_*` defines now name matched routines (the lint's KERNEL rule checks them).
+   Next: the rest of the module, `C3Mod_Rest*` blocks; the trace (6.8 KB of code from the
+   entries and the program table) misses code reached through the task lists and
+   C3_ScratchF0, so add entries to `tools/c3module.py` as they are found (the programs at
+   `C3Mod_Prog*` set tasks up: their `LDA #addr` / `STA C3_TaskList,X` stores give the task
+   entries; `$31BF` (a multiply/divide pair), `$3870` and `$37FA` are code no trace reaches
+   yet; `JMP` byte patterns to C3Mod_TaskEnd/TaskReplace/NmiTaskEnd and `JSR`/`JSL` patterns
+   to C3Mod_AudioSend ($426D, $4BC8, $63E5), C3Mod_DoubleRows ($87B3), C3Mod_SpaceRows
+   ($8A8D) and C3Mod_UploadPalette ($8AC7, $8C97) point at more of it: once traced, the CALLERS
+   rule will want them named). Trace anomalies: `JSR $B574` at `$82A5` runs into the staff texts
+   ($A651-$B57E, `DATA_RANGES`; the path from `$8280` looks mis-decoded). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
    and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
    the module reads them. Re-review needed (verified headers edited by this batch):
