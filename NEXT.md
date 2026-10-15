@@ -3,6 +3,10 @@
 The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 "Definition of done").
 
+Data: everything the source does not emit yet (93% of the ROM, almost all of it data) is
+mapped in `symbols/data_survey.csv` (checked by `tools/data_survey.py`); the plan for
+describing it in source, with totals, order of work and estimates, is [DATA_PLAN.md](DATA_PLAN.md).
+
 ## Matching
 
 0. Quick wins from `tools/find_duplicates.py`. The byte-identical copies (`Battle_Mul8CC`,
