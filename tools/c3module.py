@@ -142,6 +142,16 @@ TASK_TABLES = [
     (0x7EDC, 6, 'LDX #$7EDC / LDA #$B / LDY #C3_TaskList / MVN at $7EEB: six tasks'),
 ]
 SCRIPT_TABLES = []
+# Instructions overwritten with a BRA from a table of BRA words: (site,
+# table, entries, evidence); each BRA's target is traced (M=0, X=0: the
+# loop around the site runs with both 16-bit).
+PATCHED_BRANCHES = [
+    (0x3634, 0x3689, 4, 'the INX / NOP at $3634 in C3Mod_BuildM7Tables\'s loop is replaced by a '
+                        'word of the table $3689 (BRA +6, +$22, +$2C, +$36): $368D by LDA.l / '
+                        'STA.l $7E3634 at $7A0C, $368F at $45C5; the first two words have no reader '
+                        'found. Other writers put INX / INX, DEX / DEX ($8066, $8051) or NOP / INX '
+                        '($45D1) there'),
+]
 SCRIPT_REDIRECTS = {
     0x3F59: ([0x3F6A, 0x3FAC], False, 'LDA $3F66,X (X = 0 or 2: the table $3F68, $3FAA) / STA $20'),
     0x996F: ([0x9417], True, 'LDA #$9415 / STA $20 when $006A is nonzero, else the script goes on'),
@@ -437,6 +447,14 @@ def discover(mem: bytes) -> Discovery:
                 v = mem[table + 2 * k - BASE] | mem[table + 2 * k + 1 - BASE] << 8
                 if v not in entries:
                     entries[v] = (False, False, f'task: entry {k} of the table at ${table:04X} ({why})')
+        for site, table, count, why in PATCHED_BRANCHES:
+            for k in range(count):
+                op, off = mem[table + 2 * k - BASE], mem[table + 2 * k + 1 - BASE]
+                if op == 0x80:                      # BRA
+                    v = site + 2 + (off ^ 0x80) - 0x80
+                    if v not in entries:
+                        entries[v] = (False, False, f'patched branch: entry {k} of the table at '
+                                                    f'${table:04X} written over ${site:04X} ({why})')
         for table, count, why in SCRIPT_TABLES:
             for k in range(count):
                 v = mem[table + 2 * k - BASE] | mem[table + 2 * k + 1 - BASE] << 8

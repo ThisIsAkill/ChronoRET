@@ -45,7 +45,12 @@ endmacro
 !C3_ModuleFrame = $C308D0                ; bankC3.asm: one frame of the module (JSL)
 !ReentryVectors = $C00000                ; bankC0.asm: entry [0], the warm restart into GameLoop_Main
 !C3_RandomByte = $C302DD                 ; bankC3.asm: the kernel's random byte (JSL)
+!Decomp_ToWram = $C30557                 ; bankC3.asm: the unpacker (JSL)
+!C3_CopyFEto7E = $C3099C                 ; bankC3.asm: MVN from bank $FE to $7E (JSL)
+!C3_CopyFEto7F = $C309A0                 ; bankC3.asm: the same to $7F (JSL)
+!C3_RunScript = $C30AFF                  ; bankC3.asm: the script interpreter (JSL)
 !Audio_DriverCommand = $C70004           ; bankC7.asm: sends the Audio_Cmd* block (JSL)
+!FdVec_FFF7 = $FDFFF7                    ; bankFD.asm: JMP PalAnim_TickAll (JSL)
 !RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
 
 ; ------------------------------------------------------------
@@ -59,6 +64,15 @@ endmacro
 !C3_FadeTimer = $038F                    ; 8-bit: frames left to the next step (reloaded from
                                          ; C3_FadeStep)
 !C3_RandIndex = $039B                    ; 8-bit: C3Mod_TableRandom's index into RandomTable
+!C3_OamRotate = $10                      ; 8-bit, dp: OAMADDL with priority rotation (the sprite
+                                         ; given the first priority, probably); C3Mod_OamUploadTask
+!C3_PaletteWork = $7E2000                ; 512 bytes: the palette the module builds, copied to
+                                         ; C3_PaletteBuf by C3Mod_CommitPalette
+!C3_DmaMode = $00F0                      ; C3Mod_DmaFromArgs / DmaUnpacked: DMAP7 (absolute)
+!C3_DmaBbad = $00F2                      ; ... BBAD7
+!C3_DmaAddr = $00F4                      ; ... 16-bit A-bus address (DmaFromArgs)
+!C3_DmaBank = $00F6                      ; ... A-bus bank
+!C3_DmaCount = $00F8                     ; ... 16-bit byte count
 !C3_StackSave = $00FE                    ; 16-bit: S while C3Mod_UnpackNibbles reads with PLA
 !C3_Unk0366 = $0366                      ; 8-bit: C3Mod_Init clears it (use not traced)
 !C3_PaletteBuf = $7E2200                 ; 512 bytes: the 256 CGRAM colours C3Mod_UploadPalette sends
@@ -111,6 +125,30 @@ endmacro
 !C3_AngleMask = $03FF                    ; C3Mod_Sine: 1024 steps per turn
 !C3_QuarterTurn = $0100                  ; ... a quarter turn (C3Mod_Cosine adds it)
 !C3_HalfTurn = $0200                     ; ... half a turn
+!Op_BRA = $80                            ; 65816 opcode BRA (C3Mod_BuildM7Tables writes BRAs into itself)
+!C3_NoCall = $0000                       ; a JSR operand written at run time (the assembled $0000 is
+                                         ; never called)
+!C3_M7ABLines = $F100                    ; $7E:F100: per line, M7A and M7B (4 bytes), 224 lines; the
+                                         ; indirect HDMA tables C3Mod_M7HdmaAB.. point into it
+!C3_M7CDLines = $F488                    ; $7E:F488: per line, M7C and M7D (4 bytes)
+!C3_M7HalfBytes = $01C0                  ; 112 lines x 4 bytes: the second half of a table
+!C3_HdmaRepeat112 = $F0                  ; HDMA line count: repeat ($80) for 112 lines
+!C3_M7EndDefault = $0380                 ; C3Mod_BuildM7Tables' end offset as assembled (224 x 4);
+                                         ; the setup routines write theirs over it
+!C3_M7Angle = $0A                        ; dp (the script's page: variable 5): the plane's angle,
+                                         ; 1,024 steps per turn
+!C3_M7Scale = $00                        ; dp (variable 0): the scale (its low byte)
+!C3_DmaChannelBytes = $10                ; one DMA channel's registers ($43n0-$43nF)
+!C3_HdmaRecordBytes = 5                  ; C3Mod_SetupHdma: DMAP, BBAD, address, bank
+!C3_HdmaListEnd = $00FF                  ; ... a record starting with $FF ends the list
+!C3_ScriptPageA = $0A00                  ; the direct page of the first script (C3Script_*)
+!C3_ScriptPageB = $0B00                  ; ... and of the second
+!C3_HdmaPairs = $70                      ; C3Mod_HdmaAlternate: 112 pairs of lines
+!C3_HdmaOneLine = $01                    ; ... each entry one line
+!C3_OamBytes = $0220                     ; all of OAM: Oam_LowTable and Oam_HighTable
+!C3_OamPriorityRotate = $80              ; OAMADDH bit 7: priority rotation
+!C3_OamSlotMask = $03                    ; sprites in a high-table byte so far (offset / 4, mod 4)
+!C3_OamSlotsPerByte = 4                  ; sprites per Oam_HighTable byte
 !C3_NibbleMask = $0F                     ; a byte's low nibble (one 4-bit pixel)
 !C3_Div32Steps = 32                      ; C3Mod_Div32: one step per dividend bit
 !C3_NibbleStack = $0BFF                  ; C3Mod_UnpackNibbles: S before its first PLA (reads
