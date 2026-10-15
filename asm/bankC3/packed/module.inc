@@ -44,6 +44,9 @@ endmacro
 ; ------------------------------------------------------------
 !C3_ModuleFrame = $C308D0                ; bankC3.asm: one frame of the module (JSL)
 !ReentryVectors = $C00000                ; bankC0.asm: entry [0], the warm restart into GameLoop_Main
+!C3_RandomByte = $C302DD                 ; bankC3.asm: the kernel's random byte (JSL)
+!Audio_DriverCommand = $C70004           ; bankC7.asm: sends the Audio_Cmd* block (JSL)
+!RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
 
 ; ------------------------------------------------------------
 ; RAM the module uses (DB = $00 and DP = 0 unless a header says
@@ -51,20 +54,34 @@ endmacro
 ; ------------------------------------------------------------
 !C3_Unk0380 = $0380                      ; 8-bit: C3Mod_Init clears it (use not traced)
 !C3_Unk0381 = $0381                      ; 8-bit: C3Mod_Init clears it (use not traced)
-!C3_Unk038E = $038E                      ; 8-bit: C3Mod_Init sets it to C3_Unk038EInit (use not traced)
-!C3_Unk038F = $038F                      ; 8-bit: likewise
+!C3_FadeStep = $038E                     ; 8-bit: frames per brightness step of the fade tasks
+                                         ; (C3Mod_FadeInTask..); C3Mod_Init sets C3_FadeStepInit
+!C3_FadeTimer = $038F                    ; 8-bit: frames left to the next step (reloaded from
+                                         ; C3_FadeStep)
+!C3_RandIndex = $039B                    ; 8-bit: C3Mod_TableRandom's index into RandomTable
+!C3_StackSave = $00FE                    ; 16-bit: S while C3Mod_UnpackNibbles reads with PLA
 !C3_Unk0366 = $0366                      ; 8-bit: C3Mod_Init clears it (use not traced)
 !C3_PaletteBuf = $7E2200                 ; 512 bytes: the 256 CGRAM colours C3Mod_UploadPalette sends
 !C3_RowCount = $F0                       ; dp offset (the caller's DP): C3Mod_DoubleRows /
                                          ; C3Mod_SpaceRows count their 64 source rows here
+; The math routines' operands and results, dp offsets in the caller's
+; direct page (0 at every call traced: $00F0-$00FF):
+!C3Math_A = $F0                          ; 16-bit: multiplicand / dividend (Div32: low word)
+!C3Math_B = $F2                          ; 16-bit: multiplier / divisor (Div32: dividend high word)
+!C3Math_Lo = $F4                         ; 16-bit: product low word / quotient (Div32: divisor low)
+!C3Math_Hi = $F6                         ; 16-bit: product high word (Div32: divisor high)
+!C3Math_Q = $F8                          ; 32-bit: C3Mod_Div32's quotient ($F8-$FB);
+                                         ; C3Mod_DivHighByte: the divisor - 1
+!C3Math_R = $FC                          ; 32-bit: C3Mod_Div32's remainder ($FC-$FF)
+!C3_SqrtRoot = $F0                       ; 16-bit: C3Mod_SquareRoot's result
 
 ; ------------------------------------------------------------
 ; Constants
 ; ------------------------------------------------------------
 !C3_ProgramMask = $1F                    ; C3_EntryArg bits 0-4: the program (C3Mod_ProgramTable;
                                          ; it has 16 entries, so values $10-$1F would read code)
-!C3_Unk038EInit = $04                    ; what C3Mod_Init stores in C3_Unk038E/038F (also the
-                                         ; M7A value of its DMA fill, any value but 0 would do)
+!C3_FadeStepInit = $04                   ; what C3Mod_Init stores in C3_FadeStep/FadeTimer (also
+                                         ; the M7A value of its DMA fill, any value but 0 would do)
 !C3_ClearFromTasks = $14E0               ; bytes C3Mod_Init clears from C3_TaskList ($0920-$1DFF)
 !C3_ClearFromOamHigh = $1500             ; bytes it clears from Oam_HighTable ($0900-$1DFF)
 !C3_DirectPageBytes = $0100              ; the direct page $0000-$00FF, cleared first
@@ -88,3 +105,52 @@ endmacro
 !C3_SndStopSfx = $F2                     ; Spc_CmdStopSfx: stop one effect group (Arg0 bit 0)
 !C3_SndFadeSong = $81                    ; Spc_CmdFadeSong: the song's volume to Arg1 over Arg0 steps
 !C3_SndFullVolume = $FF00                ; Audio_CmdArg0/Arg1 as a word: 0 steps, volume $FF
+!C3_SndFadeOut = $0040                   ; Audio_CmdArg0/Arg1 as a word: $40 steps to volume 0
+!C3_SndStopAll = $F0                     ; Spc_CmdStopAll: stop the song and the effects
+!C3_BrightnessFull = $0F                 ; C3_Brightness at the end of a fade in
+!C3_AngleMask = $03FF                    ; C3Mod_Sine: 1024 steps per turn
+!C3_QuarterTurn = $0100                  ; ... a quarter turn (C3Mod_Cosine adds it)
+!C3_HalfTurn = $0200                     ; ... half a turn
+!C3_NibbleMask = $0F                     ; a byte's low nibble (one 4-bit pixel)
+!C3_Div32Steps = 32                      ; C3Mod_Div32: one step per dividend bit
+!C3_NibbleStack = $0BFF                  ; C3Mod_UnpackNibbles: S before its first PLA (reads
+                                         ; from $0C00 up)
+
+; ------------------------------------------------------------
+; The steps of the unrolled dividers (C3Mod_Div16, C3Mod_DivHighByte):
+; each shifts the next dividend bit into the remainder in A, takes the
+; divisor off when it fits (the carry is the quotient bit) and shifts
+; that bit into C3Math_Lo.
+; ------------------------------------------------------------
+macro C3ModDivStep()                    ; C3Mod_Div16: SEC, then the divisor
+    ROL.b !C3Math_A
+    ROL A
+    SEC
+    SBC.b !C3Math_B
+    BCS ?fits
+    ADC.b !C3Math_B
+    CLC
+?fits:
+    ROL.b !C3Math_Lo
+endmacro
+
+macro C3ModDivHighStep()                ; C3Mod_DivHighByte's first 8: no SEC, divisor - 1
+    ROL.b !C3Math_A
+    ROL A
+    SBC.b !C3Math_Q
+    BCS ?fits
+    ADC.b !C3Math_B
+    CLC
+?fits:
+    ROL.b !C3Math_Lo
+endmacro
+
+macro C3ModDivZeroStep()                ; its last 8: a zero bit (ASL) in place of the dividend's
+    ASL A
+    SBC.b !C3Math_Q
+    BCS ?fits
+    ADC.b !C3Math_B
+    CLC
+?fits:
+    ROL.b !C3Math_Lo
+endmacro

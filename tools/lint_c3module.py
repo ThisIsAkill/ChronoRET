@@ -197,8 +197,8 @@ def module_sites():
     import c3pack
     if not c3pack.ROM_PATH.exists():
         return None
-    insns, _ = c3module.trace(c3module.module_bytes())
-    return c3module.call_sites(insns)
+    d = c3module.discover(c3module.module_bytes())
+    return c3module.call_sites(d.insns, d.patched)
 
 
 def rom_labels():
