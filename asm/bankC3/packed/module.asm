@@ -7102,24 +7102,32 @@ C3Mod_InitStars:
 ;     the tile - $68 has bit 7 set (CMP #$68 / BMI at .colour: tiles
 ;     $60-$67), else $02 (C3Mod_Prog4ToEnd writes a BRA +0 over the BMI:
 ;     $02 always).
-; The carries: the first depth add takes the carry as the task is
-; entered (0 from C3Mod_TaskNext's CPX unless it is the list's first
-; task), each next star the CPY's (0, Y below $200); the + $80 the
+; The carries: the first depth add takes the carry as the routine is
+; entered: as a task, 0 from C3Mod_TaskNext's CPX unless it is the
+; list's first task; by the JMP at $99B2, 1 on both paths there (the
+; CMP #$0100's carry when C3_OamPos is $100 or more and BPL is taken,
+; else $3870's exit through CPX #4 / BEQ, with nothing after it that
+; changes C). Each next star takes the CPY's (0, Y below $200); the + $80 the
 ; CMP's (the sum >= $7F, unsigned) or the ADC's, or C3Mod_KernelRandom's
 ; after a new place; the X and Y adds the carry out of the one before.
-; Quirk: C3_StarDivisor is C3_Prog9's byte ($44) reused.
+; Quirk: C3_StarDivisor is C3_Prog9's byte ($44) reused. Quirk: depth
+; $7F with C = 1 wraps d to $00 (a kept sum of $FF: the CMP's carry is
+; 1), so the divider divides by zero (quotient $FFFF).
 ; Callers note: a task added by script opcode $FA at $5546
 ;   (C3Mod_Prog4ScriptA) and $93E6 (script not matched yet); JMP from
 ;   $99B2 (code not matched yet: the code from $999C first, when
 ;   C3_OamPos - $100 has bit 15 set (CMP / BPL), calls $3870 and sets
 ;   C3_OamPos = $100, C3_OamHiPtr = $0910).
-; Entry: a task (C3Mod_RunTasks): M=0 (8-bit set here), X=0 (16-bit
-;        index), DP=0 (C3_OamPos, C3_StarDivisor), DB=$00 (the star
+; Entry: a task (C3Mod_RunTasks), or the JMP at $99B2 (M=0, C=1; the
+;        tail of the task at $999C, so the same DP and DB): M=0 (8-bit
+;        set here), X=0 (16-bit index), DP=0 (C3_OamPos,
+;        C3_StarDivisor), DB=$00 (the star
 ;        tables, the OAM shadow, the divider and page $0B00's words are
 ;        absolute).
 ; Exit:  M=1, X=0; A = the last star's OAM Y; Y = $200 (C3_StarBytes:
 ;        the loop ends on Y = $200 exactly, BEQ; C3_OamPos is a multiple
-;        of 4); X unchanged; C3_RandSeed changed.
+;        of 4); X unchanged; C3_RandSeed changed only when a star is
+;        re-placed (C3Mod_KernelRandom).
 ; Calls: C3Mod_KernelRandom.
 C3Mod_StarsTask:
     SEP #$20
