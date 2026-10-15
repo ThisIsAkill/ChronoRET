@@ -22,7 +22,7 @@ BattleRom_ActSubscripts:
 ; Read by BattleCF_StepFxColourCycle.
 org $CE0100
 BattleRom_FxCycleColours:
-    incbin "../../build/records/BattleRom_FxCycleColours.bin"          ; records: palette 320 x 2 B
+    incbin "../../build/assets/palette/BattleRom_FxCycleColours.bin"
 
 ; $CE:0380-$CE:8293 (32,532 B), battle_script, confirmed: PC attack and tech action scripts
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
@@ -41,7 +41,7 @@ BattleScript_CE8294:
 ; Read by BattleAct_LoadAttack, BattleAct_LoadKind3, BattleAct_LoadTech, BattleAct_StepObjAnim.
 org $CE8870
 Table_CE8870:
-    incbin "../../build/records/Table_CE8870.bin"          ; records: table 4846 x 4 B
+    incbin "../../build/assets/table/Table_CE8870.bin"
 
 ; $CE:D428-$CE:DC19 (2,034 B), battle_script, confirmed: subscripts (opcode $1E)
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
@@ -87,7 +87,7 @@ org $CEEFFA
 BattleRom_FxRecByte0:
     incbin "../../build/records/BattleRom_FxRecByte0.bin"          ; records: table 2 x 1 B
 
-; $CE:EFFC-$CE:EFFD (2 B), unknown, unknown: 2 B after BattleRom_FxRecByte0 (not read as its
+; $CE:EFFC-$CE:EFFD (2 B), unknown, unknown: 2 B after BattleRom_FxRecByte0 (past its reader's 2
 ; records)
 org $CEEFFC
 Unknown_CEEFFC:
@@ -115,7 +115,7 @@ BattleRom_FxBitMask:
 ; Read by BattleCD_BuildFxTilemap.
 org $CEF046
 BattleRom_FxColumnOfs:
-    incbin "../../build/records/BattleRom_FxColumnOfs.bin"          ; records: table 32 x 1 B
+    incbin "../../build/assets/table/BattleRom_FxColumnOfs.bin"
 
 ; $CE:F0E6-$CE:F0ED (8 B), table, confirmed: 8 B per kind 0-3, 16 apart (interleaved with the
 ; next table)
@@ -188,7 +188,7 @@ BattleRom_FxBobSteps:
 ; Read by BattleCE_UnkEE6E.
 org $CEF24E
 BattleRom_HdmaSetOfs:
-    incbin "../../build/records/BattleRom_HdmaSetOfs.bin"          ; records: table 32 x 2 B
+    incbin "../../build/assets/table/BattleRom_HdmaSetOfs.bin"
 
 ; $CE:F28E-$CE:F48D (512 B), table, confirmed: 2 B per angle 0-255: (x, y) on the screen edge
 ; Read by BattleCD_FxOpHalfPlane.

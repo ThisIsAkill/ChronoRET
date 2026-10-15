@@ -392,7 +392,7 @@ Padding_C6FC51:
 ; Read by C2Scene_GetHeaderPtr.
 org $C6FD00
 C2SceneRom_HeaderTable:
-    incbin "../../build/records/C2SceneRom_HeaderTable.bin"          ; records: table 120 x 2 B
+    incbin "../../build/assets/table/C2SceneRom_HeaderTable.bin"
 
 ; $C6:FDF0-$C6:FE1F (48 B), table, confirmed: 16 x 3 B long pointers to sprite graphics packs
 ; Read by C2Scene_LoadExtraObjPack, C2Scene_LoadObjGfx, C2Scene_LoadPartyGfx,

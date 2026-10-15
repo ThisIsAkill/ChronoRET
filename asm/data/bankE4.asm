@@ -330,18 +330,12 @@ Padding_E4F522:
     fillbyte $00
     fill 222
 
-; $E4:F600-$E4:FFD7 (2,520 B), table, confirmed: 10 B per enemy sprite record
+; $E4:F600-$E4:FFDF (2,528 B), table, confirmed: 10 B per enemy sprite record
 ; Read by Evt_Op83_InitEnemySprite, Battle_InitScene.
 ; Also BattleRom_EnemySpr (a struct or label of the code source).
 org $E4F600
 RomE4_EnemySprRec:
-    incbin "../../build/records/RomE4_EnemySprRec.bin"          ; records: table 252 x 10 B
-
-; $E4:FFD8-$E4:FFDF (8 B), unknown, unknown: 8 B after RomE4_EnemySprRec (not read as its
-; records)
-org $E4FFD8
-Unknown_E4FFD8:
-    incbin "../../build/assets/unknown/Unknown_E4FFD8.bin"
+    incbin "../../build/assets/table/RomE4_EnemySprRec.bin"
 
 ; $E4:FFE0-$E4:FFED (14 B), table, confirmed: 7 u16: low words of the bank-$E4 table pointers
 ; Read by Field_InitLoadState, Menu_SprLoad.

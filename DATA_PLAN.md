@@ -10,7 +10,7 @@ and verify counts apart).
 
 ## What is left
 
-3,887,869 bytes (92.69% of the 4,194,304-byte ROM) in 2,249 rows. Shares are of the whole ROM.
+3,887,869 bytes (92.69% of the 4,194,304-byte ROM) in 2,245 rows. Shares are of the whole ROM.
 
 | kind | bytes | share | rows | confirmed / probable / unknown |
 |---|---:|---:|---:|---|
@@ -19,23 +19,23 @@ and verify counts apart).
 | sprite_layout | 253,952 | 6.05% | 5 | 253,952 / 0 / 0 |
 | text | 206,826 | 4.93% | 49 | 205,047 / 1,779 / 0 |
 | brr_sample | 203,202 | 4.84% | 66 | 203,202 / 0 / 0 |
-| table | 177,511 | 4.23% | 298 | 174,855 / 2,134 / 522 |
+| table | 177,278 | 4.23% | 298 | 174,622 / 2,134 / 522 |
 | music_sequence | 107,721 | 2.57% | 87 | 104,092 / 3,629 / 0 |
 | battle_script | 102,763 | 2.45% | 12 | 102,763 / 0 / 0 |
 | padding | 65,391 | 1.56% | 78 | 62,206 / 3,185 / 0 |
-| palette | 32,028 | 0.76% | 46 | 24,778 / 7,250 / 0 |
+| palette | 32,062 | 0.76% | 46 | 24,812 / 7,250 / 0 |
 | tilemap | 19,717 | 0.47% | 10 | 19,717 / 0 / 0 |
 | font | 9,216 | 0.22% | 2 | 9,216 / 0 / 0 |
 | event_script (scene animation table) | 7,946 | 0.19% | 1 | 7,946 / 0 / 0 |
-| unknown | 8,490 | 0.20% | 47 | 0 / 0 / 8,490 |
+| unknown | 8,689 | 0.21% | 43 | 0 / 0 / 8,689 |
 | map (exit and treasure records) | 6,694 | 0.16% | 2 | 6,694 / 0 / 0 |
 | spc_data | 82 | 0.00% | 3 | 82 / 0 / 0 |
 
-Confidence over all 3,887,869 bytes: confirmed 3,849,583 (99.02%), probable 29,274 (0.75%),
-unknown 9,012 (0.23%). "Confirmed" means a matched routine, or a pointer table a matched routine
-reads, reaches the region and the code fixes its format. Of the confirmed bytes, 478,649
-(12.4%) are in rows whose start is reached but whose end is inferred (it runs to the next known
-region; the row's notes say so). In the tables that share is 41% (72,947 of 177,511 bytes). How
+Confidence over all 3,887,869 bytes: confirmed 3,849,384 (99.01%), probable 29,274 (0.75%),
+unknown 9,211 (0.24%). "Confirmed" means a matched routine, or a pointer table a matched routine
+reads, reaches the region and the code fixes its format. Of the confirmed bytes, 475,287
+(12.3%) are in rows whose start is reached but whose end is inferred (it runs to the next known
+region; the row's notes say so). In the tables that share is 40% (70,041 of 177,278 bytes). How
 far each named table really runs is the main thing the per-kind work below still has to settle.
 
 ### The packed bytes, by content
@@ -95,7 +95,7 @@ repacks byte-exact with the packer of `tools/c3pack.py`:
    confirmed only where the reader's index range ends before it (else probable); where a reader's
    index range covers such bytes (offset tables with $FFFF entries, `BattleRom_Kind3Act`,
    `BattleRom_InitTiles2bpp`) they stay in the table.
-6. The rest is listed one row each, with what is known (`unknown`, 47 rows).
+6. The rest is listed one row each, with what is known (`unknown`, 43 rows).
 
 ## Per kind: what a byte-exact round trip needs
 
@@ -210,10 +210,10 @@ kind and address). `symbols/data_assets.csv` is its manifest. Pieces:
 |---|---:|---|
 | fill | 65,391 | the 78 padding rows, `fill` of the value in the survey (source) |
 | table | 5,044 | 20 pointer tables of labels (source; below) |
-| extracted | 1,152,754 | 410 blobs (402 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
+| extracted | 1,244,557 | 482 blobs (474 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
 | packed | 2,349,626 | 1,515 streams packed at build time from their unpacked assets |
 | text | 202,895 | 45 rows in 31 text units, encoded at build time from readable text (step 5, below) |
-| records | 112,159 | 189 rows: 144 tables (81,667 B) and 45 palettes (30,492 B), encoded at build time from readable records (step 6, below) |
+| records | 20,356 | 113 rows: 85 tables (19,668 B) and 28 palettes (688 B), encoded at build time from readable records (step 6, below) |
 
 `tools/verify.py` reports these six apart from the code figures, which do not change; with
 the code's 306,435 bytes they account for all 4,194,304. The tables written as labels are the
@@ -296,44 +296,54 @@ tool holds the character map, the tag names and which survey rows form which uni
 
 ## Tables and palettes (step 6, first part)
 
-On the `data-tables-6` branch. `tools/records.py` holds layouts only (no value): for each row it
-structures, the fields and, where the reader fixes it, the record count. A row becomes a
-`records` piece: `extract` writes `build/assets/records/<label>.tsv` (a header of the layout's
-columns, one line per record, checked to encode back), the build encodes it to
-`build/records/<label>.bin`, `asm/data/` incbins it through the manifest (the same FILEREAD rule
-and tests as packs and text), and `tools/verify.py` counts it as "records", never as source.
+On the `data-tables-6` branch. `tools/records.py` holds layouts only (no value). A row is a
+`records` piece only when its reader proves both the layout and the record count; every other
+table and palette stays an extracted blob, however regular it looks. `extract` writes
+`build/assets/records/<label>.tsv` (a header of the layout's columns, one line per record,
+checked to encode back), the build encodes it to `build/records/<label>.bin`, `asm/data/`
+incbins it through the manifest (the same FILEREAD rule and tests as packs and text), and
+`tools/verify.py` counts it as "records", never as source.
 
-- **Layouts.** 16 rows are the records of a ROM struct of `asm/include/`, read from the struct
-  itself (`BattleRom_TechRec`, `BattleRom_EnemyReward`, the seven `BattleRom_*Act` action
-  record tables, `BattleRom_PcAttackScript`, `BattleRom_ActObjRec`'s records at `$CE:8870`,
-  `BattleRom_ActObjInit`, `BattleRom_FrameLayout`, `BattleRom_CursorSprite`,
-  `BattleRom_FxOverlaySpr`, `BattleRom_EnemySpr`, `LocRom`): 41,927 bytes. 128 more table rows
+- **Layouts.** Six rows are the records of a ROM struct of `asm/include/`, read from the struct
+  itself, each with the count its reader's index bound gives: `BattleRom_EnemyReward` (255: a
+  byte id, `$FF` skipped), `BattleRom_FrameLayout` (6: layouts 0-4 and the alternate row order
+  5), `BattleRom_CursorSprite` (4: the loop ends at `BattleOam_CursorBytes`),
+  `BattleRom_PcAttackScript` (1), `BattleRom_Kind3Act` (68: ids `$BC`-`$FF`) and `LocRom` (512: a
+  9-bit location id): 9,550 bytes. A struct field wider than a byte is a word only where its
+  reader reads it so (`FrameLayout.RowOffset` is 6 words, read 16-bit by
+  Battle_DrawBattlerFrame); otherwise it stays one unsplit column of bytes. 79 more table rows
   are arrays or small records whose element width (and, for some, fields) the survey's format
-  takes from the reader ("2 B per tech id: target mode, flags"); one line each in
-  `records.ARRAYS`. Words named as an address or offset in a bank are pointers, written as the
-  label of the piece they point at when they point at one's start. Unnamed struct bytes are
-  `Unk_XX` (their offset).
-- **Palettes.** 45 of the 46 palette rows, as BGR555 colours: R, G, B (0-31) and bit 15 per
-  colour, in the sets their format states (`LocPal_Rom`'s 88 rows of 105 colours, the battle
-  colour sets of 3, 4, 7 and 12 colours, the window palettes). Their use is in each row's
-  readers and format (location, battle, menu). `$E4:2A00` (offsets, then palettes) is left.
-- **Extent corrections** (22 rows split; the bytes past the reader's extent are rows of their
-  own, `unknown`): where the format gives a count (`BattleRom_ActFrameBase` 32 frames,
-  `BattleRom_FrameExtraCount` and `BattleRom_FrameDmaSizeB` 5 layouts, `BattleRom_PcPathAlways`
-  7 characters, `MenuRom_ComboNeeds` and `MenuRom_ComboMembers` 5 combos, `BattleRom_FxRecByte0`
-  2 cases), where a menu or battle palette copy has a fixed length (`MenuRom_PalB`,
-  `MenuRom_HealNumberPal`, `MenuRom_Icon0RedrawPal`, `MenuRom_Icon1PalA`, `MenuRom_Icon2PalB`,
-  `MenuRom_LoadPalB`, `BattleRom_UnkColours38F2`), and where a row was not a whole number of
-  records (`BattleRom_TechRec`, `BattleRom_TechUserSets`, `BattleRom_FxCycleList`,
-  `BattleRom_ItemCursorCell`, `BattleRom_SpecialPals`, `BattleRom_ActObjInit`,
-  `RomE4_EnemySprRec`, `MenuRom_SlotIconPals`; their ends stay marked inferred). Rows given an
-  exact count by their reader no longer say "end inferred".
-- **Left:** 133 table rows (90,798 B) stay extracted: the `Menu_RunDrawList` lists in `$FF`
-  (a byte code), records whose fields the reader does not name yet (equipment, enemy stats,
-  effect and action records in `$CC`, `$CE:F58E`'s HDMA sets, `$D1` effect records), the
-  `$E4` animation lists, the palette-step records in `$CD`, and the multi-byte rows the
-  survey's format leaves open; their ends, and those of the whole-record rows above, still need
-  their readers' index ranges.
+  takes from the reader, with the reader's index domain as the count: character ids 0-6, the 3
+  PC slots, the 11 battler slots (`Battle_NumSlots`), stated ranges ("action frames 0-31"),
+  and index bounds (`BattleRom_EnemyMoveInterval` 32, `BattleRom_PcKoFrame` 28,
+  `BattleRom_EnemyTechTarget` 256, `BattleRom_FrameExtraCount` and `BattleRom_LayoutFrameBytes`
+  8: `Battler_FrameLayout` is `Flags AND 7`). One line each in `records.ARRAYS`, with the
+  reader. Words named as an address in a bank are written as the label of the piece they point
+  at when they point at one's start.
+- **Palettes.** 28 rows whose reader copies a fixed number of colours, as BGR555 colours: R, G,
+  B (0-31) and bit 15 per colour. `MenuRom_ObjPal` (`$FF:9DF0`) holds 13 colours; its reader's
+  32-byte copy also takes the 3 colours of `MenuRom_MainPalC` after it (the rows overlap in
+  that read, noted in the survey).
+- **Extent corrections** (18 rows split; the bytes past the reader's reach are rows of their
+  own, `unknown`): `BattleRom_CursorSprite` (40 B), `BattleRom_EnemyMoveInterval` (48 B),
+  `BattleRom_PcKoFrame` (162 B), `BattleRom_EnemyTechTarget` (2 B), `BattleRom_EnemyReward` (7
+  B), `BattleRom_FrameExtraCount` (1 B), `BattleRom_ActFrameBase` (32 B),
+  `BattleRom_PcPathAlways` (1 B), `MenuRom_ComboNeeds` (1 B), `MenuRom_ComboMembers` (79 B),
+  `BattleRom_FxRecByte0` (2 B), and seven palettes whose copy has a fixed length
+  (`MenuRom_PalB`, `MenuRom_HealNumberPal`, `MenuRom_Icon0RedrawPal`, `MenuRom_Icon1PalA`,
+  `MenuRom_Icon2PalB`, `MenuRom_LoadPalB`, `BattleRom_UnkColours38F2`). These rows no longer say
+  "end inferred".
+- **Left as blobs** (their reader's index bound is not proven, or the row is not whole
+  records of it): the other struct tables (`BattleRom_TechRec`, the action record tables in
+  `$CD`, `BattleRom_FxOverlaySpr`, `BattleRom_ActObjRec`'s and `BattleRom_ActObjInit`'s records,
+  `BattleRom_EnemySpr`), arrays indexed by tech, item, enemy or action ids from data,
+  `BattleRom_FrameBytes`, `BattleRom_FrameDmaSizeA`/`B` and `BattleRom_LayoutSprBytes` (their
+  index `Flags AND 7` reaches 8 entries, past the rows), `BattleRom_Div5`, the
+  `Menu_RunDrawList` lists, the `$E4` animation lists, the palette-step records in `$CD`,
+  `LocPal_Rom` (its 88 rows come from the largest `LocRom.Palette` value, not from the
+  reader), and 18 palette rows without a fixed copy length. 192 table rows (152,564 B, with the
+  8 tails of the pointer tables of labels) and 18
+  palette rows (31,374 B) are still extracted.
 
 ## Order of work
 
@@ -384,7 +394,7 @@ stop the copying of bytes. Uncertainties, largest first:
   its operands, or code that jumps into data, can stretch the estimate.
 - **The text encoder.** If the original dictionary rule cannot be recovered, explicit references
   make the source text harder to edit (it still round-trips).
-- **Table ends.** 41% of the table bytes (72,947 of 177,511) run to the next named table only
+- **Table ends.** 40% of the table bytes (70,041 of 177,278) run to the next named table only
   by inference; each has to be settled from its reader (step 6 settled the ones below).
 - **Sprite frames and the character tile blocks**: format and ends not decoded yet.
 - **Probable and unknown rows** (33 KB): these are stale data or a reader the survey missed; a
@@ -426,7 +436,8 @@ None found beyond what is already known:
 - 12 packs (3,009 bytes) that repack byte-exact but that no pointer reaches (`$E0:332C`,
   `$E0:FD93`, `$F8:AB72`, `$F8:AD83`, eight in `$FA:FB33`-`$FF09`): reached through data the
   survey did not follow (no word or long pointer to them is in ROM or source), or unused.
-- 47 unknown rows (8,490 bytes), each described in its notes (seven of them are the non-text
-  bytes split off the text rows in step 5, 22 the bytes split off tables and palettes in step 6): stale bytes beside unused pointer
+- 43 unknown rows (8,689 bytes), each described in its notes (seven of them are the non-text
+  bytes split off the text rows in step 5, 18 the bytes past their readers' reach split off
+  tables and palettes in step 6): stale bytes beside unused pointer
   entries, four single bytes of the same value right after a run of packs, and small gaps.
 - The internal layout of the sprite frame records and of `$E4:0000`-`$1FFF`.

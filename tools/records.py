@@ -12,26 +12,30 @@ each such row as a `records` piece: extract writes build/assets/records/
 asm/data/ incbins that, and tools/verify.py counts it apart, never as
 emitted by source.
 
-Where the layouts come from (no field is invented):
+A row is structured only when its reader proves both the layout and the
+record count; every other table or palette stays an extracted blob. No
+field is invented:
 
-  structs    a ROM struct of asm/include/ (STRUCTS: the struct whose records
-             fill the row); its fields are read from the struct itself: a
-             1-byte field is u8, a 2-byte field u16, a longer one a byte per
-             column (Name0, Name1, ...), an unnamed `skip` Unk_XX (its offset).
+  structs    a ROM struct of asm/include/ (STRUCTS: the struct and the count
+             its reader's index bound gives); its fields are read from the
+             struct itself: a 1-byte field is u8; a wider one is u16 (or
+             words) only where FIELD_TYPES names the reader that reads it so,
+             else one unsplit column of its bytes (bytesN); an unnamed `skip`
+             is Unk_XX (Unk_XX_YY when wider).
   arrays     the survey row's format, which states the element width the
-             reader uses ("1 B per ...", "2 B per ...", "N u16 ...") and, for
-             some, the fields of a small record ("2 B per tech id: target
-             mode, flags"); ARRAYS below, one line each, with the reader.
-             Where the format names a word as an address or offset in a bank
-             the field is a pointer (ptr16): it is written as the label of the
-             data piece it points at when it points at one's start.
-  palettes   every `palette` row: SNES BGR555 words, written as 5-bit R, G,
-             B and bit 15 (kept for an exact round trip). A palette row's
-             record is a colour, or the colour set its format states.
+             reader uses ("1 B per ...", "2 B per ...") and, for some, the
+             fields of a small record; ARRAYS below, one line each with the
+             reader and its index bound (a stated domain: character ids 0-6,
+             PC slots, the 11 battler slots, ...). Words the format names as
+             an address or offset in a bank are pointers (ptr16): written as
+             the label of the data piece they point at when they point at
+             one's start.
+  palettes   palette rows whose reader copies a fixed number of colours
+             (PALETTES): SNES BGR555 words, written as 5-bit R, G, B and bit
+             15 (kept for an exact round trip).
 
-A row's size must be a whole number of records (and, where a count is given,
-exactly that many): the bytes past the reader's extent are survey rows of
-their own (DATA_PLAN.md lists the corrections).
+A row's size must be exactly its count of records: the bytes past the
+reader's extent are survey rows of their own (DATA_PLAN.md lists them).
 
 The readable form, one tab-separated file per piece:
 
@@ -39,7 +43,8 @@ The readable form, one tab-separated file per piece:
   Index  Field1  Field2 ...           the header: the layout's columns
   0      $1F     $0200   ...          one line per record: u8/u16/u24 as $hex,
                                       s8 as signed decimal, R/G/B as decimal
-                                      0-31, ptr16 as a label or $hex
+                                      0-31, ptr16 as a label or $hex, bytesN
+                                      as N hex bytes in ROM order (`01 02`)
 
     python3 tools/records.py check      extract every records piece from the
                                         ROM and encode it back: byte-exact?
@@ -63,6 +68,25 @@ class RecordsError(Exception):
 WIDTHS = {'u8': 1, 's8': 1, 'u16': 2, 'u24': 3, 'ptr16': 2, 'colour': 2}
 
 
+def width(t: str) -> int:
+    """Bytes of a field type ('bytesN': N bytes the reader does not split)."""
+    kind = t.split(':')[0]
+    return int(kind[5:]) if kind.startswith('bytes') else WIDTHS[kind]
+
+
+# The element type of a struct field wider than a byte, where its reader
+# shows it (else the field stays one unsplit `bytesN` column: its width is
+# not known, so it is not split into bytes or words). A u16 field of more
+# than 2 bytes becomes Name0, Name1, ... words.
+FIELD_TYPES = {
+    ('BattleRom_FrameLayout', 'RowOffset'): 'u16',   # Battle_DrawBattlerFrame: REP #$21, ADC [RowPtr], INC x2
+    ('BattleRom_EnemyReward', 'Unk0'): 'u16',        # BattleFD reward sum: REP #$20, LDA .Unk0,X
+    ('BattleRom_EnemyReward', 'Gold'): 'u16',        # the same, LDA .Gold,X
+    ('LocRom', 'MapProps'): 'u16',                   # LocLoad_UnkA33B: 16-bit entry number
+    ('LocRom', 'Events'): 'u16',                     # LocLoad_Unk56D4: 16-bit entry number
+}
+
+
 def _struct_fields(name: str) -> list[tuple[str, str]]:
     """The fields of ROM struct `name` (asm/include/*.inc) as columns."""
     for path in sorted(INCLUDE.glob('*.inc')):
@@ -76,37 +100,35 @@ def _struct_fields(name: str) -> list[tuple[str, str]]:
                     m = re.match(r'^\s*(?:\.([A-Za-z_][A-Za-z0-9_]*):)?\s*skip\s+(\d+)\b', body)
                     if not m:
                         continue
-                    field, n = m.group(1) or f'Unk_{off:02X}', int(m.group(2))
+                    n = int(m.group(2))
+                    field = m.group(1) or (f'Unk_{off:02X}' if n == 1 else f'Unk_{off:02X}_{off + n - 1:02X}')
+                    t = FIELD_TYPES.get((name, m.group(1)))
                     if n == 1:
                         out.append((field, 'u8'))
-                    elif n == 2:
+                    elif t == 'u16' and n == 2:
                         out.append((field, 'u16'))
+                    elif t == 'u16' and n % 2 == 0:
+                        out += [(f'{field}{k}', 'u16') for k in range(n // 2)]
                     else:
-                        out += [(f'{field}{k}', 'u8') for k in range(n)]
+                        out.append((field, f'bytes{n}'))
                     off += n
                 raise RecordsError(f'struct {name}: no endstruct')
     raise RecordsError(f'no struct {name} in asm/include/')
 
 
-# Row start -> the ROM struct whose records fill it (the struct's address is
-# the row's, or the row holds the records a base-address struct indexes).
+# A row is structured only when its reader proves both the layout and the
+# record count (DATA_PLAN.md, step 6): every entry below names the reader
+# and how it bounds the index. Rows whose bound no reader proves stay
+# extracted blobs, however regular they look.
+
+# Row start -> (the ROM struct whose records fill it, record count).
 STRUCTS = {
-    '$CC:1BEB': 'BattleRom_TechRec',
-    '$CC:5E00': 'BattleRom_EnemyReward',
-    '$CC:F3B6': 'BattleRom_FrameLayout',
-    '$CC:F604': 'BattleRom_CursorSprite',
-    '$CC:F6D4': 'BattleRom_FxOverlaySpr',
-    '$CD:4000': 'BattleRom_PcAttackScript',
-    '$CD:4015': 'BattleRom_PcAttackAct',
-    '$CD:45A6': 'BattleRom_PcTechAct',
-    '$CD:4926': 'BattleRom_EnemyAttackAct',
-    '$CD:4F26': 'BattleRom_EnemyAttack2Act',
-    '$CD:5526': 'BattleRom_EnemyTechAct',
-    '$CD:5C26': 'BattleRom_Kind3Act',
-    '$CE:8870': 'BattleRom_ActObjRec',        # the records BattleRom_ActObjRec ($CE:0000 base) indexes
-    '$D1:50A2': 'BattleRom_ActObjInit',
-    '$E4:F600': 'BattleRom_EnemySpr',
-    '$F6:0000': 'LocRom',
+    '$CC:5E00': ('BattleRom_EnemyReward', 255),   # BattleFD reward sum: id = a byte of Battler_UnkAF0A, $FF (Battle_EntryNone) skipped
+    '$CC:F3B6': ('BattleRom_FrameLayout', 6),     # Battle_DrawBattlerFrame: layouts 0-4 (Battler_FrameLayout) and 5 (Battle_FrameLayoutTallAlt)
+    '$CC:F604': ('BattleRom_CursorSprite', 4),    # BattleMenu_DrawCursorSprites: X by 4 to CPX #BattleOam_CursorBytes ($10)
+    '$CD:4000': ('BattleRom_PcAttackScript', 1),  # one header (its fields are read at fixed offsets)
+    '$CD:5C26': ('BattleRom_Kind3Act', 68),       # BattleAct kind 3: index Battle_ActId - $BC, ids $BC-$FF
+    '$F6:0000': ('LocRom', 512),                  # LocLoad_Unk092B: Loc_Id low byte x 14, + $E00 for bit 8 (9-bit id)
 }
 
 
@@ -119,168 +141,122 @@ def _rep(n: int, *fields: tuple[str, str]) -> list[tuple[str, str]]:
     return [(f'{name}{k}', t) for k in range(n) for name, t in fields]
 
 
-# Row start -> (fields of one record, record count or None for the whole
-# row). From the survey's format of each row (the reader's element width,
-# and the fields where it names them); the comment names the reader.
-ARRAYS: dict[str, tuple[list[tuple[str, str]], int | None]] = {
-    '$C6:F560': (_f('Divisor', t='u16'), 32),                 # C2Scene zoom (M7A/M7B)
-    '$C6:F5A0': (_f('Divisor', t='u16'), 32),                 # C2Scene zoom (M7C/M7D)
-    '$C6:FD00': (_f('Header', t='ptr16:C6'), None),           # C2SceneRom_HeaderTable
-    '$C7:0E11': (_rep(16, ('Sample', 'u16')), 83),            # AudioRom_SongSamples
-    '$C7:241D': (_f('Echo', t='u16'), 83),                    # AudioRom_SongEcho
-    '$CC:1ACB': (_f('TargetMode', 'Flags'), None),            # BattleRom_TechInfo
-    '$CC:1BB5': (_f('TargetMode'), None),                     # BattleRom_ItemTargetMode
-    '$CC:249F': (_f('Char0', 'Char1', 'Char2'), None),        # BattleRom_TechUserSets
-    '$CC:253B': (_f('MpCost'), None),                         # BattleRom_TechMpCost
-    '$CC:2583': (_f('AttackNum'), None),                      # BattleRom_PcAttackNum
-    '$CC:258A': (_rep(4, ('Level', 'u8'), ('Gain', 'u8')), 7),    # BattleRom_HpGrowth
-    '$CC:25C2': (_rep(4, ('Level', 'u8'), ('Gain', 'u8')), 7),    # BattleRom_MpGrowth
-    '$CC:2632': (_f('Exp', t='u16'), None),                   # BattleRom_ExpToLevel
-    '$CC:26FA': (_rep(8, ('Tp', 'u16')), 7),                  # BattleRom_TechTpCost
-    '$CC:276A': (_f('FirstTech', 'TechCount'), 7),            # BattleRom_CharTechs
-    '$CC:2953': (_f('Bit0', 'Bit1', 'Bit2'), 5),              # MenuRom_ComboNeeds
-    '$CC:2963': (_f('Members'), None),                        # MenuRom_TechByteMembers
-    '$CC:2983': (_f('Members'), 5),                           # MenuRom_ComboMembers
-    '$CC:29D7': (_f('Boost', t='u16'), None),                 # MenuRom_ItemBoosts
-    '$CC:2AB0': (_f('AreaRec', t='ptr16:CC'), None),          # BattleRom_AreaRecPtr
-    '$CC:2BDC': (_f('Nibbles'), None),                        # BattleRom_TechWaitNib
-    '$CC:2C6D': (_f('Items', t='ptr16:CC'), None),            # MenuRom_ShopLists
-    '$CC:2D69': (_f('Value', t='u16'), None),                 # MenuRom_Char5Attack
-    '$CC:86C9': (_f('TargetMode', 'Area'), None),             # BattleRom_EnemyTechTarget
-    '$CC:F395': (_f('Offset', t='u16'), None),                # BattleRom_TechEntryBase
-    '$CC:F39B': (_f('Offset', t='u16'), None),                # BattleRom_TechRowMapOffset
-    '$CC:F3A1': (_f('Offset'), None),                         # BattleRom_TechEntryOffset
-    '$CC:F40A': (_f('Bytes', t='u16'), 5),                    # BattleRom_FrameBytes
-    '$CC:F414': (_f('FromDir'), None),                        # BattleRom_PathFromDir
-    '$CC:F434': (_f('Facing'), None),                         # BattleRom_PathFacing
-    '$CC:F494': (_f('DX', t='s8'), None),                     # BattleRom_PathStepDX
-    '$CC:F4FC': (_f('Extra', t='s8'), 5),                     # BattleRom_FrameExtraCount
-    '$CC:F505': (_f('Bytes'), 5),                             # BattleRom_LayoutSprBytes
-    '$CC:F544': (_f('Interval'), None),                       # BattleRom_EnemyMoveInterval
-    '$CC:F594': (_f('DY', t='s8'), None),                     # BattleRom_PathStepDY
-    '$CC:F5FD': (_f('Frames'), 7),                            # BattleRom_FxOverlayPeriod
-    '$CC:F63C': (_f('Flag'), 7),                              # BattleRom_PcPathAlways
-    '$CC:F754': (_f('Offset', t='u16'), None),                # BattleRom_FxCycleList
-    '$CC:F7C0': (_f('Offset', t='u16'), 32),                  # BattleRom_ActFrameBase
-    '$CC:F820': (_f('Pixels'), 9),                            # BattleRom_Times16
-    '$CC:F829': (_f('Offset'), 6),                            # BattleRom_HitSetOffset
-    '$CC:F846': (_f('Offset'), 7),                            # BattleRom_CharTimes6
-    '$CC:F84D': (_f('Address', t='u16'), None),               # BattleRom_SprTileListPtr
-    '$CC:F8ED': (_f('Offset', t='u16'), None),                # BattleRom_StatsOffset
-    '$CC:F903': (_f('Tile'), 10),                             # BattleRom_DigitTiles
-    '$CC:F90D': (_f('Tile'), 10),                             # BattleRom_DigitTilesB
-    '$CC:F917': (_f('Offset', t='u16'), None),                # BattleRom_SlotTimes16
-    '$CC:F939': (_f('Offset'), 8),                            # BattleRom_EnemyRecOfs
-    '$CC:F941': (_f('Address', t='u16'), None),               # BattleRom_FrameDestBase
-    '$CC:F957': (_f('Source', t='u16'), 4),                   # BattleRom_GfxStepSrcA
+# Row start -> (fields of one record, record count). The element width and,
+# where the format names them, the fields come from the survey row's format
+# (taken from the reader); the count is the reader's index range: an index
+# domain the format states ("per character id 0-6", "per PC slot", "per
+# battler slot", Battle_NumSlots = 11), or the bound of the index the
+# comment names.
+SLOTS = 11          # Battle_NumSlots: battler slots 0-10
+PC_SLOTS = 3        # Battle_NumPcSlots
+ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
+    '$C6:F560': (_f('Divisor', t='u16'), 32),                 # C2Scene zoom (M7A/M7B), 32 steps
+    '$C6:F5A0': (_f('Divisor', t='u16'), 32),                 # C2Scene zoom (M7C/M7D), 32 steps
+    '$C7:0E11': (_rep(16, ('Sample', 'u16')), 83),            # AudioRom_SongSamples: 83 songs
+    '$C7:241D': (_f('Echo', t='u16'), 83),                    # AudioRom_SongEcho: 83 songs
+    '$CC:2583': (_f('AttackNum'), 7),                         # BattleRom_PcAttackNum: character ids 0-6
+    '$CC:258A': (_rep(4, ('Level', 'u8'), ('Gain', 'u8')), 7),    # BattleRom_HpGrowth: character ids 0-6
+    '$CC:25C2': (_rep(4, ('Level', 'u8'), ('Gain', 'u8')), 7),    # BattleRom_MpGrowth: character ids 0-6
+    '$CC:26FA': (_rep(8, ('Tp', 'u16')), 7),                  # BattleRom_TechTpCost: character ids 0-6
+    '$CC:276A': (_f('FirstTech', 'TechCount'), 7),            # BattleRom_CharTechs: character ids 0-6
+    '$CC:2953': (_f('Bit0', 'Bit1', 'Bit2'), 5),              # MenuRom_ComboNeeds: combos 0-4
+    '$CC:2983': (_f('Members'), 5),                           # MenuRom_ComboMembers: combos 0-4
+    '$CC:86C9': (_f('TargetMode', 'Area'), 256),              # BattleRom_EnemyTechTarget: X = 8-bit Battle_UnkB18C x 2
+    '$CC:F395': (_f('Offset', t='u16'), PC_SLOTS),            # BattleRom_TechEntryBase: per PC slot
+    '$CC:F4FC': (_f('Extra', t='s8'), 8),                     # BattleRom_FrameExtraCount: Battler_FrameLayout = Flags AND 7
+    '$CC:F544': (_f('Interval'), 32),                         # BattleRom_EnemyMoveInterval: (delay / 2) * 4 + speed / 2, at most 31
+    '$CC:F5FD': (_f('Frames'), 7),                            # BattleRom_FxOverlayPeriod: overlay blocks 1-7
+    '$CC:F63C': (_f('Flag'), 7),                              # BattleRom_PcPathAlways: character ids 0-6
+    '$CC:F7C0': (_f('Offset', t='u16'), 32),                  # BattleRom_ActFrameBase: action frames 0-31
+    '$CC:F820': (_f('Pixels'), 9),                            # BattleRom_Times16: n 0-8
+    '$CC:F829': (_f('Offset'), 6),                            # BattleRom_HitSetOffset: record sets 0-5
+    '$CC:F846': (_f('Offset'), 7),                            # BattleRom_CharTimes6: character ids 0-6
+    '$CC:F8ED': (_f('Offset', t='u16'), SLOTS),               # BattleRom_StatsOffset: per battler slot
+    '$CC:F903': (_f('Tile'), 10),                             # BattleRom_DigitTiles: digits 0-9
+    '$CC:F90D': (_f('Tile'), 10),                             # BattleRom_DigitTilesB: digits 0-9
+    '$CC:F917': (_f('Offset', t='u16'), SLOTS),               # BattleRom_SlotTimes16: per battler slot
+    '$CC:F939': (_f('Offset'), 8),                            # BattleRom_EnemyRecOfs: enemies 0-7
+    '$CC:F941': (_f('Address', t='u16'), SLOTS),              # BattleRom_FrameDestBase: per battler slot
+    '$CC:F957': (_f('Source', t='u16'), 4),                   # BattleRom_GfxStepSrcA: graphics steps 0-3
     '$CC:F95F': (_f('Source', t='u16'), 4),                   # BattleRom_GfxStepSrcB
     '$CC:F967': (_f('Vram', t='u16'), 4),                     # BattleRom_GfxStepVramA
     '$CC:F96F': (_f('Vram', t='u16'), 4),                     # BattleRom_GfxStepVramB
     '$CC:F977': (_f('Bytes', t='u16'), 4),                    # BattleRom_GfxStepSizeA
     '$CC:F97F': (_f('Bytes', t='u16'), 4),                    # BattleRom_GfxStepSizeB
-    '$CC:F987': (_f('Source', t='u16'), None),                # BattleRom_FrameDmaSrcA
-    '$CC:F99D': (_f('Source', t='u16'), None),                # BattleRom_FrameDmaSrcB
-    '$CC:F9B3': (_f('Vram', t='u16'), None),                  # BattleRom_FrameDmaVramA
-    '$CC:F9C9': (_f('Vram', t='u16'), None),                  # BattleRom_FrameDmaVramB
-    '$CC:F9DF': (_f('Bytes', t='u16'), 5),                    # BattleRom_FrameDmaSizeA
-    '$CC:F9E9': (_f('Bytes', t='u16'), 5),                    # BattleRom_FrameDmaSizeB
-    '$CC:FA23': (_f('Offset', t='u16'), 3),                   # BattleRom_NameAttrL1
-    '$CC:FA29': (_f('Offset', t='u16'), 3),                   # BattleRom_NameAttrL02
-    '$CC:FA2F': (_f('Offset', t='u16'), 3),                   # BattleRom_HpCellL0
-    '$CC:FA35': (_f('Offset', t='u16'), 3),                   # BattleRom_HpCellL1
-    '$CC:FA3B': (_f('Offset', t='u16'), 3),                   # BattleRom_HpCellL2
-    '$CC:FADD': (_f('Offset', t='u16'), None),                # BattleRom_MenuCursorCell
-    '$CC:FAE3': (_f('Offset', t='u16'), None),                # BattleRom_TechCursorCell
-    '$CC:FAE9': (_f('Offset', t='u16'), None),                # BattleRom_ItemCursorCell
-    '$CC:FAF0': (_f('Offset'), None),                         # BattleRom_CmdOffset
-    '$CC:FAF3': (_f('Tile', 'Attr'), 44),                     # BattleRom_SprRecInit
-    '$CC:FB6F': (_f('Square'), 16),                           # BattleRom_Squares
-    '$CC:FB7F': (_f('WeightA', 'WeightB'), 7),                # BattleRom_ActLerpWeights
-    '$CC:FB91': (_f('Kind'), None),                           # BattleRom_EnemyAnimKind
-    '$CC:FBAB': (_f('Mover'), None),                          # BattleRom_EnemyMover
-    '$CC:FBC8': (_f('SlotA', 'SlotB'), 3),                    # BattleRom_PcPartners
-    '$CC:FBCE': (_f('Value'), None),                          # BattleRom_Div5
-    '$CC:FC1E': (_f('Offset', t='u16'), 7),                   # BattleRom_CharRecOffset
-    '$CD:64B0': (_f('ObjRec', t='ptr16:CE'), None),           # BattleRom_PcAttackObjs
-    '$CD:656E': (_f('ObjRec', t='ptr16:CE'), None),           # BattleRom_TechObjs
-    '$CD:666E': (_f('ObjRec', t='ptr16:CE'), None),           # BattleRom_EnemyActObjs
-    '$CD:686E': (_f('PalStep', t='ptr16:CD'), 95),            # BattleRom_PcAttackPals
-    '$CD:692C': (_f('PalStep', t='ptr16:CD'), None),          # BattleRom_PcTechPals
-    '$CD:6A2C': (_f('PalStep', t='ptr16:CD'), 256),           # BattleRom_EnemyActPals
-    '$CD:6C2C': (_f('PalStep', t='ptr16:CD'), 96),            # BattleRom_Kind3Pals
-    '$CD:6CEC': (_f('Colours'), None),                        # BattleRom_WeaponColourIdx
-    '$CD:6D4C': (_f('Sound'), None),                          # BattleRom_PcAttackSfxA
-    '$CD:6DAC': (_f('Sound'), None),                          # BattleRom_PcAttackSfxB
-    '$CE:0000': (_f('Subscript', t='ptr16:CE'), 128),         # BattleRom_ActSubscripts
-    '$CE:EFEA': (_f('Step'), 8),                              # BattleRom_DissolvePhaseStep
-    '$CE:EFF2': (_f('Vram', t='u16'), 4),                     # BattleRom_FxTileVram
-    '$CE:EFFA': (_f('Byte0'), 2),                             # BattleRom_FxRecByte0
-    '$CE:F03E': (_f('Mask'), 8),                              # BattleRom_FxBitMask
-    '$CE:F046': (_f('Offset'), None),                         # BattleRom_FxColumnOfs
-    '$CE:F146': (_f('Value', t='u16'), 8),                    # BattleRom_Op80PairB
-    '$CE:F156': (_f('Bytes', t='u16'), None),                 # BattleRom_LayoutFrameBytes
-    '$CE:F166': (_f('Address', t='u16'), None),               # BattleRom_SlotFrameBuf
-    '$CE:F17C': (_f('Vram', t='u16'), None),                  # BattleRom_SlotFrameVram
-    '$CE:F1C2': (_f('Mask', t='u16'), 8),                     # BattleRom_DissolveMask
-    '$CE:F24E': (_f('Offset', t='u16'), None),                # BattleRom_HdmaSetOfs
-    '$CE:F28E': (_f('X', 'Y'), 256),                          # BattleRom_HalfPlaneEdge
-    '$CE:F48E': (_f('Sine'), 256),                            # BattleRom_AbsSine
-    '$CF:8000': (_rep(64, ('Tile', 'u16')), None),            # BattleRom_FxTileLists
-    '$CF:A000': (_rep(32, ('Tile', 'u16')), None),            # BattleRom_FxGfxLists
-    '$CF:E000': (_f('Colours', t='u16'), None),               # BattleRom_FxGfxColours
-    '$D1:5E10': (_f('Lift', t='s8'), None),                   # BattleRom_HitNumBounce
-    '$D1:5E49': (_f('Lift', t='s8'), None),                   # BattleRom_HitNumBounceAlt
-    '$D1:5F42': (_f('Frame'), None),                          # BattleRom_PcKoFrame
-    '$E1:DE80': (_f('Flag'), None),                           # BattleRom_UnkE1DE80
-    '$E4:2600': (_f('Offset', t='u16'), 256),                 # BattleRom_SprAnimFrames
-    '$E4:2800': (_f('Offset', t='u16'), 256),                 # BattleRom_SprAnimDurs
-    '$E4:FFE0': (_f('Low', t='u16'), 7),                      # RomE4_PtrInit
-    '$E5:0000': (_f('Offset', t='u16'), 513),                 # ExitRom_LocOfs
-    '$F5:F000': (_f('Offset', t='u16'), 513),                 # TreasureRom_LocOfs
-    '$F6:1C00': (_rep(8, ('Pack', 'u8')), 64),                # LocGfx_Lists
-    '$FD:A849': (_f('Address', t='u16'), 3),                  # BattleRom_CmdPtr
-    '$FD:A89D': (_f('FirstTech'), 8),                         # BattleRom_CharFirstTech
-    '$FF:C9AC': (_rep(10, ('Char', 'u8')), 8),                # MenuRom_NameChars
-    '$FF:CE70': (_f('Tile'), 8),                              # MenuRom_PortraitTiles
-    '$FF:CE78': (_f('Colours', t='ptr16:FF'), 8),             # MenuRom_PortraitPals
-    '$FF:CE88': (_f('Tile', t='u16'), None),                  # MenuRom_CharIconTiles
-    '$FF:CE92': (_f('Colours', t='ptr16:FF'), None),          # MenuRom_CharIconPals
-    '$FF:CF0E': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesA
-    '$FF:CF18': (_f('RecSize'), 5),                           # MenuRom_ItemRecSizesA
-    '$FF:CF1D': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesB
-    '$FF:CF27': (_f('RecSize'), None),                        # MenuRom_ItemRecSizesB
-    '$FF:D554': (_f('Tile', t='u16'), 7),                     # MenuRom_ButtonLetters
-    '$FF:D562': (_f('Tile', t='u16'), 12),                    # MenuRom_CfgIcons
+    '$CC:F987': (_f('Source', t='u16'), SLOTS),               # BattleRom_FrameDmaSrcA: per battler slot
+    '$CC:F99D': (_f('Source', t='u16'), SLOTS),               # BattleRom_FrameDmaSrcB
+    '$CC:F9B3': (_f('Vram', t='u16'), SLOTS),                 # BattleRom_FrameDmaVramA
+    '$CC:F9C9': (_f('Vram', t='u16'), SLOTS),                 # BattleRom_FrameDmaVramB
+    '$CC:FA23': (_f('Offset', t='u16'), PC_SLOTS),            # BattleRom_NameAttrL1: per PC slot
+    '$CC:FA29': (_f('Offset', t='u16'), PC_SLOTS),            # BattleRom_NameAttrL02
+    '$CC:FA2F': (_f('Offset', t='u16'), PC_SLOTS),            # BattleRom_HpCellL0
+    '$CC:FA35': (_f('Offset', t='u16'), PC_SLOTS),            # BattleRom_HpCellL1
+    '$CC:FA3B': (_f('Offset', t='u16'), PC_SLOTS),            # BattleRom_HpCellL2
+    '$CC:FAF3': (_f('Tile', 'Attr'), 44),                     # BattleRom_SprRecInit: Battle_SprRec records 0-43
+    '$CC:FB6F': (_f('Square'), 16),                           # BattleRom_Squares: n 0-15
+    '$CC:FB7F': (_f('WeightA', 'WeightB'), 7),                # BattleRom_ActLerpWeights: 7 pairs
+    '$CC:FBC8': (_f('SlotA', 'SlotB'), PC_SLOTS),             # BattleRom_PcPartners: per PC slot
+    '$CC:FC1E': (_f('Offset', t='u16'), 7),                   # BattleRom_CharRecOffset: character ids 0-6
+    '$CD:686E': (_f('PalStep', t='ptr16:CD'), 95),            # BattleRom_PcAttackPals: 95 palette indexes
+    '$CD:6A2C': (_f('PalStep', t='ptr16:CD'), 256),           # BattleRom_EnemyActPals: 256 palette indexes
+    '$CD:6C2C': (_f('PalStep', t='ptr16:CD'), 96),            # BattleRom_Kind3Pals: 96 palette indexes
+    '$CE:0000': (_f('Subscript', t='ptr16:CE'), 128),         # BattleRom_ActSubscripts: 128 subscripts
+    '$CE:EFEA': (_f('Step'), 8),                              # BattleRom_DissolvePhaseStep: patterns 0-7
+    '$CE:EFF2': (_f('Vram', t='u16'), 4),                     # BattleRom_FxTileVram: tile sets 0-3
+    '$CE:EFFA': (_f('Byte0'), 2),                             # BattleRom_FxRecByte0: colour-math cases 0/1
+    '$CE:F03E': (_f('Mask'), 8),                              # BattleRom_FxBitMask: bits 0-7
+    '$CE:F146': (_f('Value', t='u16'), 8),                    # BattleRom_Op80PairB: values 0-7
+    '$CE:F156': (_f('Bytes', t='u16'), 8),                    # BattleRom_LayoutFrameBytes: Battler_FrameLayout = Flags AND 7
+    '$CE:F166': (_f('Address', t='u16'), SLOTS),              # BattleRom_SlotFrameBuf: per battler slot
+    '$CE:F17C': (_f('Vram', t='u16'), SLOTS),                 # BattleRom_SlotFrameVram: per battler slot
+    '$CE:F1C2': (_f('Mask', t='u16'), 8),                     # BattleRom_DissolveMask: pixel columns 0-7
+    '$CE:F28E': (_f('X', 'Y'), 256),                          # BattleRom_HalfPlaneEdge: angles 0-255
+    '$CE:F48E': (_f('Sine'), 256),                            # BattleRom_AbsSine: angles 0-255
+    '$D1:5F42': (_f('Frame'), 28),                            # BattleRom_PcKoFrame: Pc_CharId (0-6) x 4 + Battler_Facing (0-3)
+    '$E4:2600': (_f('Offset', t='u16'), 256),                 # BattleRom_SprAnimFrames: 256 animations
+    '$E4:2800': (_f('Offset', t='u16'), 256),                 # BattleRom_SprAnimDurs: 256 animations
+    '$E4:FFE0': (_f('Low', t='u16'), 7),                      # RomE4_PtrInit: 7 table pointers
+    '$E5:0000': (_f('Offset', t='u16'), 513),                 # ExitRom_LocOfs: 512 locations and the end
+    '$F5:F000': (_f('Offset', t='u16'), 513),                 # TreasureRom_LocOfs: 512 locations and the end
+    '$F6:1C00': (_rep(8, ('Pack', 'u8')), 64),                # LocGfx_Lists: 64 tilesets
+    '$FD:A849': (_f('Address', t='u16'), PC_SLOTS),           # BattleRom_CmdPtr: per PC slot
+    '$FD:A89D': (_f('FirstTech'), 8),                         # BattleRom_CharFirstTech: character ids 0-6 and the end byte
+    '$FF:C9AC': (_rep(10, ('Char', 'u8')), 8),                # MenuRom_NameChars: 8 rows of 10
+    '$FF:CE70': (_f('Tile'), 8),                              # MenuRom_PortraitTiles: 8 portraits
+    '$FF:CE78': (_f('Colours', t='ptr16:FF'), 8),             # MenuRom_PortraitPals: 8 portraits
+    '$FF:CF0E': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesA: item categories 0-4
+    '$FF:CF18': (_f('RecSize'), 5),                           # MenuRom_ItemRecSizesA: item categories 0-4
+    '$FF:CF1D': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesB: item categories 0-4
+    '$FF:D554': (_f('Tile', t='u16'), 7),                     # MenuRom_ButtonLetters: Pad_Pressed bits 7-1
+    '$FF:D562': (_f('Tile', t='u16'), 12),                    # MenuRom_CfgIcons: entries 0-11
 }
 
-# Palette rows whose colours come in sets (the format's record); others are
-# lists of single colours. Row start -> (colours per record, count or None).
-PALETTE_SETS = {
-    '$D1:4100': (3, None),          # 6 B per colour set (BattleAct_OpLoadPalEntry)
-    '$D1:4400': (7, None),          # 14 B per colour set
-    '$D1:4B00': (3, None),          # BattleRom_WeaponColours: 6 B per record
-    '$D1:4D90': (12, None),         # BattleRom_SpecialPals: 24 B per entry
-    '$D1:6000': (4, None),          # BattleRom_FxColours: 8 B per colour set
-    '$F6:24C0': (105, 88),          # LocPal_Rom: 88 x $D2 B
-    '$FF:B210': (8, None),          # FieldRom_PalRow0Sets: sets 16 B apart
-    '$FF:CC84': (16, None),         # MenuRom_SlotIconPals: 16 colours per character
+# Palette rows: row start -> (colours per record, record count). Only rows
+# whose reader copies a fixed number of colours (the format's "N colours ->
+# $AA-$BB" or a stated count); the rest stay blobs.
+PALETTES: dict[str, tuple[int, int]] = {
+    '$C6:F540': (1, 16), '$C6:F5E0': (1, 16), '$C6:F600': (1, 16),
+    '$C6:F620': (1, 16),        # C2Scene_LoadVram copies 33 B: one byte past the row
+    '$D0:FD00': (1, 48),        # BattleFx_LoadBgRows2To4: 48 colours
+    '$D1:38F2': (1, 3), '$D1:38FA': (1, 3),      # Battle_InitSceneGfx: 6 B each
+    '$D1:4D80': (1, 8),         # Battle_HitNumColoursA and B: 16 B
+    '$D1:5980': (1, 62),        # BattleCF_FrameUpdate: steps 0-$3D
+    '$FF:9C68': (1, 4), '$FF:9C70': (1, 4), '$FF:9C78': (1, 4),
+    '$FF:9DF0': (1, 13),        # the reader copies 16 colours: these 13 and MenuRom_MainPalC's 3 after them
+    '$FF:9E0A': (1, 3),
+    '$FF:CB9C': (1, 4), '$FF:CBAC': (1, 4), '$FF:CBB4': (1, 4), '$FF:CBBC': (1, 4),
+    '$FF:CBC4': (1, 8), '$FF:CBE4': (1, 24), '$FF:CC14': (1, 8), '$FF:CC34': (1, 8),
+    '$FF:CC64': (1, 8), '$FF:CC74': (1, 8), '$FF:CDF4': (1, 8), '$FF:CE04': (1, 8),
+    '$FF:CE30': (1, 16), '$FF:CE9A': (1, 16),
 }
-# Palette rows whose reader copies a fixed number of colours (the format's
-# "N colours -> $AA-$BB"): the row holds exactly those.
-PALETTE_COUNTS = {
-    '$FF:9C78': 4, '$FF:CB9C': 4, '$FF:CBC4': 8, '$FF:CC34': 8, '$FF:CE04': 8,
-    '$FF:CE30': 16, '$D1:38F2': 3,
-}
-# Palette rows not structured (their colours and other words are not split yet).
-PALETTE_SKIP = {'$E4:2A00'}
 
 
 class Layout:
-    def __init__(self, fields: list[tuple[str, str]], count: int | None, source: str):
+    def __init__(self, fields: list[tuple[str, str]], count: int, source: str):
         self.fields = fields
         self.count = count
         self.source = source
-        self.size = sum(WIDTHS[t.split(':')[0]] for _, t in fields)
+        self.size = sum(width(t) for _, t in fields)
 
     def columns(self) -> list[str]:
         out = []
@@ -292,13 +268,14 @@ class Layout:
 def layout_for(start: str, kind: str) -> Layout | None:
     """The layout of the survey row at `start` (of `kind`), or None when it
     is not structured."""
-    if start in STRUCTS:
-        return Layout(_struct_fields(STRUCTS[start]), None, f'struct {STRUCTS[start]} (asm/include/)')
-    if start in ARRAYS:
+    if kind == 'table' and start in STRUCTS:
+        name, count = STRUCTS[start]
+        return Layout(_struct_fields(name), count, f'struct {name} (asm/include/)')
+    if kind == 'table' and start in ARRAYS:
         fields, count = ARRAYS[start]
         return Layout(fields, count, 'the survey row\'s format (the reader\'s element width)')
-    if kind == 'palette' and start not in PALETTE_SKIP:
-        per, count = PALETTE_SETS.get(start, (1, PALETTE_COUNTS.get(start)))
+    if kind == 'palette' and start in PALETTES:
+        per, count = PALETTES[start]
         fields = [('Colour', 'colour')] if per == 1 else [(f'C{k}', 'colour') for k in range(per)]
         return Layout(fields, count, 'BGR555 colours')
     return None
@@ -324,6 +301,8 @@ def _value(data: bytes, t: str, labels: dict[int, str], bank: int) -> list[str]:
         return [str(v & 31), str(v >> 5 & 31), str(v >> 10 & 31), str(v >> 15)]
     if kind == 's8':
         return [str(v - 256 if v >= 128 else v)]
+    if kind.startswith('bytes'):
+        return [' '.join(f'{b:02X}' for b in data)]
     if kind == 'ptr16':
         target = (int(arg, 16) - 0xC0) << 16 | v
         if target in labels:
@@ -345,7 +324,7 @@ def decode(data: bytes, layout: Layout, label: str, where: str, labels: dict[int
     for k in range(n):
         rec, o, cols = data[k * layout.size:(k + 1) * layout.size], 0, [str(k)]
         for _, t in layout.fields:
-            w = WIDTHS[t.split(':')[0]]
+            w = width(t)
             cols += _value(rec[o:o + w], t, labels, 0)
             o += w
         out.append('\t'.join(cols))
@@ -378,7 +357,18 @@ def encode(text: str, layout: Layout, label: str, addresses: dict[str, int] | No
         i = 0
         for name, t in layout.fields:
             kind, _, arg = t.partition(':')
-            w = WIDTHS[kind]
+            w = width(t)
+            if kind.startswith('bytes'):
+                c = cols[i]
+                i += 1
+                try:
+                    raw = bytes(int(x, 16) for x in c.split())
+                except ValueError:
+                    raise RecordsError(f'{where}: {name}: {c!r} is not {w} hex bytes') from None
+                if len(raw) != w:
+                    raise RecordsError(f'{where}: {name}: {c!r} is not {w} hex bytes')
+                out += raw
+                continue
             if kind == 'colour':
                 r, g, b, hi = (_number(c, f'{where} {name}') for c in cols[i:i + 4])
                 if not all(0 <= c < 32 for c in (r, g, b)) or hi not in (0, 1):

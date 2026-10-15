@@ -144,12 +144,12 @@ $C6:F000,$C6:F355,854,$C6,text,strings of C2SceneRom_LabelStrings (TextWin forma
 $C6:F356,$C6:F3FF,170,$C6,padding,170 x $00,,probable,uniform fill after the last map label; the table's other 16 entries are $0000
 $C6:F400,$C6:F4FF,256,$C6,text,u16 string pointers (bank $C6) for TextWin_StrTable,"C2Scene_LabelWait, C2Scene_MapViewLabel",confirmed,named C2SceneRom_LabelStrings; extent to the next named table (end inferred)
 $C6:F500,$C6:F53F,64,$C6,graphics,two 4bpp tiles: sprite tiles 0 and 2 of the map view,C2Scene_MapView,confirmed,named C2SceneRom_MapMarkerTiles; extent to the next named table (end inferred)
-$C6:F540,$C6:F55F,32,$C6,palette,16 colours (BGR555): sprite palette 0 of the map view,C2Scene_MapView,confirmed,named C2SceneRom_MapViewObjPal; extent to the next named table (end inferred)
+$C6:F540,$C6:F55F,32,$C6,palette,16 colours (BGR555): sprite palette 0 of the map view,C2Scene_MapView,confirmed,named C2SceneRom_MapViewObjPal; extent: the reader's 16 records (tools/records.py)
 $C6:F560,$C6:F59F,64,$C6,table,32 u16 divisors for M7A/M7B (zoom steps),"C2Scene_MapZoomIn, C2Scene_MapZoomOut",confirmed,named C2SceneRom_ZoomDivA; extent: the reader's 32 records (tools/records.py)
 $C6:F5A0,$C6:F5DF,64,$C6,table,32 u16 divisors for M7C/M7D (zoom steps),"C2Scene_MapZoomIn, C2Scene_MapZoomOut",confirmed,named C2SceneRom_ZoomDivB; extent: the reader's 32 records (tools/records.py)
-$C6:F5E0,$C6:F5FF,32,$C6,palette,16 colours (BGR555) object A fades to,"C2Scene_ObjAScrArrive, C2Scene_ObjAScrLeave",confirmed,named C2SceneRom_ObjAPalA; extent to the next named table (end inferred)
-$C6:F600,$C6:F61F,32,$C6,palette,16 colours (BGR555) for palette 0,C2Scene_ObjAScrLeave,confirmed,named C2SceneRom_ObjAPalB; extent to the next named table (end inferred)
-$C6:F620,$C6:F63F,32,$C6,palette,16 colours (BGR555) for colours $F0-$FF (33 B copied: one byte past the row),"C2Scene_LoadVram, C2Scene_ObjAScrArrive, C2Scene_ObjAScrLeave",confirmed,"named C2SceneRom_LastPalRow; extent to the next named table (end inferred); C2Scene_LoadVram copies 33 B, one byte into the next row"
+$C6:F5E0,$C6:F5FF,32,$C6,palette,16 colours (BGR555) object A fades to,"C2Scene_ObjAScrArrive, C2Scene_ObjAScrLeave",confirmed,named C2SceneRom_ObjAPalA; extent: the reader's 16 records (tools/records.py)
+$C6:F600,$C6:F61F,32,$C6,palette,16 colours (BGR555) for palette 0,C2Scene_ObjAScrLeave,confirmed,named C2SceneRom_ObjAPalB; extent: the reader's 16 records (tools/records.py)
+$C6:F620,$C6:F63F,32,$C6,palette,16 colours (BGR555) for colours $F0-$FF (33 B copied: one byte past the row),"C2Scene_LoadVram, C2Scene_ObjAScrArrive, C2Scene_ObjAScrLeave",confirmed,"named C2SceneRom_LastPalRow; extent: the reader's 16 records (tools/records.py); C2Scene_LoadVram copies 33 B, one byte into the next row"
 $C6:F640,$C6:F6BF,128,$C6,table,16 x 8 B: X and Y velocity words with fractions,C2Scene_RandomVelocity,confirmed,C2SceneRom_RandVelocities; index = random AND C2Scene_RandVelMask (16 entries)
 $C6:F6C0,$C6:F6FF,64,$C6,padding,64 x $00,,confirmed,uniform fill; nothing points into it
 $C6:F700,$C6:FAFF,1024,$C6,graphics,"$400 B: two 4-bit pixels per byte, high first (mode-7 dial pixels)",C2Scene_DialUnpackNibbles,confirmed,"C2SceneRom_DialNibbles; extent $400 B from its define, then the C2Scene_DialPacks entry 1 pack at $C6:FB00"
@@ -336,14 +336,12 @@ $CC:0B5E,$CC:15C3,2662,$CC,text,"11-byte item names (icon glyph, then name glyph
 $CC:15C4,$CC:1ACA,1287,$CC,text,11-byte tech names,"Menu_TechDrawName, TextWin_ExtTechName",confirmed,"named MenuRom_TechNames, TextWinRom_TechNames; extent to the next named table (end inferred)"
 $CC:1ACB,$CC:1BB4,234,$CC,table,"2 B per tech id: target mode, flags","BattleSys_UnkC1DD, BattleSys_UnkC96A, BattleSys_UnkCA1A, BattleSys_UnkCCCB, Menu_Mode03H3",confirmed,"named BattleRom_TechInfo, MenuRom_TechTargets; extent to the next named table (end inferred)"
 $CC:1BB5,$CC:1BEA,54,$CC,table,1 B per item id - $BC: target mode,"BattleFD_AddItemEntry, BattleFD_UnkB655, BattleSys_UnkC1DD, Menu_UseItem",confirmed,named BattleRom_ItemTargetMode; extent to the next named table (end inferred)
-$CC:1BEB,$CC:213E,1364,$CC,table,tech records (BattleRom_TechRec struct),"BattleSys_LearnComboTechs, BattleSys_LoadTechUsers, BattleSys_RunTechParts, BattleSys_TechMpCost1, BattleSys_TechMpCost2, BattleSys_TechMpCost3, BattleSys_TryNextTech",confirmed,named BattleRom_TechRec; extent: its 124 whole 11-byte records (tools/records.py; end inferred)
-$CC:213F,$CC:213F,1,$CC,unknown,1 B after BattleRom_TechRec (not read as its records),,unknown,split off BattleRom_TechRec in step 6: its 124 whole 11-byte records end before it (tools/records.py); no reader found
+$CC:1BEB,$CC:213F,1365,$CC,table,tech records (BattleRom_TechRec struct),"BattleSys_LearnComboTechs, BattleSys_LoadTechUsers, BattleSys_RunTechParts, BattleSys_TechMpCost1, BattleSys_TechMpCost2, BattleSys_TechMpCost3, BattleSys_TryNextTech",confirmed,named BattleRom_TechRec; extent to the next named table (end inferred)
 $CC:2140,$CC:249E,863,$CC,table,"12 B per tech id: effect record (restore multiplier, HP/MP bits, ...)",Menu_Mode03H3,confirmed,named MenuRom_TechData; extent to the next named table (end inferred)
-$CC:249F,$CC:24B0,18,$CC,table,3 B per set: character ids of a tech's users,"BattleSys_LoadTechUsers, BattleSys_RunTechParts",confirmed,named BattleRom_TechUserSets; extent: its 6 whole 3-byte records (tools/records.py; end inferred)
-$CC:24B1,$CC:24B2,2,$CC,unknown,2 B after BattleRom_TechUserSets (not read as its records),,unknown,split off BattleRom_TechUserSets in step 6: its 6 whole 3-byte records end before it (tools/records.py); no reader found
+$CC:249F,$CC:24B2,20,$CC,table,3 B per set: character ids of a tech's users,"BattleSys_LoadTechUsers, BattleSys_RunTechParts",confirmed,named BattleRom_TechUserSets; extent to the next named table (end inferred)
 $CC:24B3,$CC:253A,136,$CC,table,3 B per tech-menu record 0-14,BankFF_UnkF813,confirmed,named MenuRom_TechMenuRec; extent to the next named table (end inferred)
 $CC:253B,$CC:2582,72,$CC,table,1 B per tech part: MP cost,"BattleSys_TechMpCost1, BattleSys_TechMpCost2, BattleSys_TechMpCost3, Menu_TechMpCost",confirmed,"named BattleRom_TechMpCost, MenuRom_TechCosts; extent to the next named table (end inferred)"
-$CC:2583,$CC:2589,7,$CC,table,1 B per character id: attack number,BattleSys_RunPcAttack,confirmed,named BattleRom_PcAttackNum; extent to the next named table (end inferred)
+$CC:2583,$CC:2589,7,$CC,table,1 B per character id: attack number,BattleSys_RunPcAttack,confirmed,named BattleRom_PcAttackNum; extent: the reader's 7 records (tools/records.py)
 $CC:258A,$CC:25C1,56,$CC,table,"8 B per character id: HP growth (level, gain) pairs",BattleSys_GrowHpMp,confirmed,named BattleRom_HpGrowth; extent: the reader's 7 records (tools/records.py)
 $CC:25C2,$CC:25F9,56,$CC,table,8 B per character id: MP growth pairs,BattleSys_GrowHpMp,confirmed,named BattleRom_MpGrowth; extent: the reader's 7 records (tools/records.py)
 $CC:25FA,$CC:2631,56,$CC,table,7 B per character id: stat growth per level,BattleSys_LevelUpStep,confirmed,named BattleRom_StatGrowth; extent to the next named table (end inferred)
@@ -354,11 +352,11 @@ $CC:2778,$CC:28DA,355,$CC,table,"5 B per combo record, $FF-ended: member bits, f
 $CC:28DB,$CC:2934,90,$CC,table,6 B per record 0-14: three byte pairs (tile bytes),BankFF_UnkF813,confirmed,named MenuRom_TechMenuTiles; extent to the next named table (end inferred)
 $CC:2935,$CC:2952,30,$CC,table,"tile bytes, one per set bit of MenuRom_TechLineBits",BankFF_UnkF813,confirmed,named MenuRom_TechLineTiles; extent to the next named table (end inferred)
 $CC:2953,$CC:2961,15,$CC,table,3 B per combo 0-4: tech bit numbers,BankFF_UnkF958,confirmed,named MenuRom_ComboNeeds; extent: the reader's 5 records (tools/records.py)
-$CC:2962,$CC:2962,1,$CC,unknown,1 B after MenuRom_ComboNeeds (not read as its records),,unknown,split off MenuRom_ComboNeeds in step 6: the reader's 5 records end before it (tools/records.py); no reader found
+$CC:2962,$CC:2962,1,$CC,unknown,1 B after MenuRom_ComboNeeds (past its reader's 5 records),,unknown,split off MenuRom_ComboNeeds in step 6: its reader reaches 5 records (tools/records.py); no reader found for these bytes
 $CC:2963,$CC:2978,22,$CC,table,1 B per Menu_TechBits byte: character bits needed,"BankFF_UnkF813, Menu_TechListBytes, Menu_TechPartners",confirmed,named MenuRom_TechByteMembers; extent to the next named table (end inferred)
 $CC:2979,$CC:2982,10,$CC,table,1 B per record 0-14: bit masks,BankFF_UnkF813,confirmed,named MenuRom_TechLineBits; extent to the next named table (end inferred)
 $CC:2983,$CC:2987,5,$CC,table,1 B per combo 0-4: characters needed in the party,BankFF_UnkF958,confirmed,named MenuRom_ComboMembers; extent: the reader's 5 records (tools/records.py)
-$CC:2988,$CC:29D6,79,$CC,unknown,79 B after MenuRom_ComboMembers (not read as its records),,unknown,split off MenuRom_ComboMembers in step 6: the reader's 5 records end before it (tools/records.py); no reader found
+$CC:2988,$CC:29D6,79,$CC,unknown,79 B after MenuRom_ComboMembers (past its reader's 5 records),,unknown,split off MenuRom_ComboMembers in step 6: its reader reaches 5 records (tools/records.py); no reader found for these bytes
 $CC:29D7,$CC:2A04,46,$CC,table,"u16 per item info value: stat bits, amount",Menu_AddItemBoosts,confirmed,named MenuRom_ItemBoosts; extent to the next named table (end inferred)
 $CC:2A05,$CC:2AAF,171,$CC,table,"3 B per record: stat-block offset, bits to set, third byte","BattleFD_UnkB555, BattleSys_RunUnkB2CCHandler",confirmed,named BattleRom_UnkCC2A05; extent to the next named table (end inferred)
 $CC:2AB0,$CC:2BDB,300,$CC,table,"u16 per area number: bank-$CC address of an area record (count, then 3 B entries)",BattleSys_UnkC1DD,confirmed,named BattleRom_AreaRecPtr; extent to the next named table (end inferred)
@@ -374,12 +372,14 @@ $CC:3AFB,$CC:3B0C,18,$CC,unknown,18 bytes between the pointer table and its stri
 $CC:3B0D,$CC:43AE,2210,$CC,text,TextWin strings of BattleRom_TechInfoStrings,"BattleCD_ShowTechInfo, Menu_TechTextSetup",confirmed,the strings the table at $CC:3A09 points at; extent to the next named table (end inferred)
 $CC:43AF,$CC:46FF,849,$CC,padding,849 x $FF,,probable,fill after the region before it ($CC:3A09): the reader's extent is not settled: these bytes may still be read
 $CC:4700,$CC:5DFF,5888,$CC,table,23 B per enemy id: stat record,BattleFD_UnkB438,confirmed,named BattleRom_EnemyStats; extent to the next named table (end inferred)
-$CC:5E00,$CC:64FF,1792,$CC,table,7 B per enemy id: reward record (BattleRom_EnemyReward struct),BattleFD_AddEnemyRewards,confirmed,named BattleRom_EnemyReward; extent to the next named table (end inferred)
+$CC:5E00,$CC:64F8,1785,$CC,table,7 B per enemy id: reward record (BattleRom_EnemyReward struct),BattleFD_AddEnemyRewards,confirmed,named BattleRom_EnemyReward; extent: the reader's 255 records (tools/records.py)
+$CC:64F9,$CC:64FF,7,$CC,unknown,7 B after BattleRom_EnemyReward (past its reader's 255 records),,unknown,split off BattleRom_EnemyReward in step 6: its reader reaches 255 records (tools/records.py); no reader found for these bytes
 $CC:6500,$CC:6FC8,2761,$CC,text,11-byte enemy names (251),"Battle_InitScene, TextWin_ExtEnemyName",confirmed,"named BattleRom_EnemyNames, TextWinRom_EnemyNames; extent: 251 whole names (tools/text.py)"
 $CC:6FC9,$CC:6FCA,2,$CC,unknown,2 bytes after the last whole enemy name,,unknown,not a whole 11-byte name; reader unknown
 $CC:6FCB,$CC:7AC8,2814,$CC,table,11 B per !Battle_UnkB18C: action records (TechRec layout from 2 B earlier),"BattleFD_LoadUnkB18E, BattleSys_UnkD7C4",confirmed,named BattleRom_UnkCC6FCB; extent to the next named table (end inferred)
 $CC:7AC9,$CC:86C8,3072,$CC,table,12 B per part number: effect records,BattleSys_UnkD7C4,confirmed,named BattleRom_EnemyEffectRecA; extent to the next named table (end inferred)
-$CC:86C9,$CC:88CA,514,$CC,table,"2 B per !Battle_UnkB18C: target mode, area number",BattleSys_UnkC1DD,confirmed,named BattleRom_EnemyTechTarget; extent to the next named table (end inferred)
+$CC:86C9,$CC:88C8,512,$CC,table,"2 B per !Battle_UnkB18C: target mode, area number",BattleSys_UnkC1DD,confirmed,named BattleRom_EnemyTechTarget; extent: the reader's 256 records (tools/records.py)
+$CC:88C9,$CC:88CA,2,$CC,unknown,2 B after BattleRom_EnemyTechTarget (past its reader's 256 records),,unknown,split off BattleRom_EnemyTechTarget in step 6: its reader reaches 256 records (tools/records.py); no reader found for these bytes
 $CC:88CB,$CC:89C5,251,$CC,table,11 B per !Battle_UnkB18C: action records,"BattleFD_LoadUnkB18E2, BattleSys_UnkD8D1",confirmed,named BattleRom_UnkCC88CB; extent to the next named table (end inferred)
 $CC:89C6,$CC:8B07,322,$CC,table,12 B per part number: effect records,BattleSys_UnkD8D1,confirmed,named BattleRom_EnemyEffectRecB; extent to the next named table (end inferred)
 $CC:8B08,$CC:CBC8,16577,$CC,battle_script,u16 per enemy id: bank-$CC address of its behaviour script; then the scripts,"BattleAi_FindReactPart, BattleAi_RunMainPart",confirmed,named BattleRom_AiScriptPtrs; extent to the next named table (end inferred)
@@ -389,11 +389,11 @@ $CC:CD90,$CC:DDC5,4150,$CC,text,TextWin strings of BattleRom_ScriptMsgStrings,Ba
 $CC:DDC6,$CC:DFFF,570,$CC,unknown,"570 bytes, not TextWin text",,unknown,reader unknown; after the last string of the table before it (tools/text.py); not text
 $CC:F383,$CC:F38B,9,$CC,table,small byte values,,unknown,between the end of the code ($F382) and BattleRom_TechListBase; no reader found
 $CC:F38C,$CC:F394,9,$CC,table,1 B per PC slot: first line in the tech lists,"BattleMenu_BuildTechAvailFlags, BattleMenu_RenderTechListRows, BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow, Battle_InitScene",confirmed,named BattleRom_TechListBase; extent to the next named table (end inferred)
-$CC:F395,$CC:F39A,6,$CC,table,2 B per PC slot: offset of its Tech_MenuEntry block,"BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow, Battle_InitScene",confirmed,named BattleRom_TechEntryBase; extent to the next named table (end inferred)
+$CC:F395,$CC:F39A,6,$CC,table,2 B per PC slot: offset of its Tech_MenuEntry block,"BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow, Battle_InitScene",confirmed,named BattleRom_TechEntryBase; extent: the reader's 3 records (tools/records.py)
 $CC:F39B,$CC:F3A0,6,$CC,table,2 B per visible tech row: offset of the row in the tech window map,BattleMenu_UpdateTechMpAvail,confirmed,named BattleRom_TechRowMapOffset; extent to the next named table (end inferred)
 $CC:F3A1,$CC:F3B5,21,$CC,table,1 B per menu-entry index: index * 7,"BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow",confirmed,named BattleRom_TechEntryOffset; extent to the next named table (end inferred)
-$CC:F3B6,$CC:F409,84,$CC,table,"14 B per frame layout 0-5: tile row offsets, height (BattleRom_FrameLayout struct)",Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameLayout; extent to the next named table (end inferred)
-$CC:F40A,$CC:F413,10,$CC,table,2 B per frame layout 0-4: bytes per frame record,Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameBytes; extent: the reader's 5 records (tools/records.py)
+$CC:F3B6,$CC:F409,84,$CC,table,"14 B per frame layout 0-5: tile row offsets, height (BattleRom_FrameLayout struct)",Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameLayout; extent: the reader's 6 records (tools/records.py)
+$CC:F40A,$CC:F413,10,$CC,table,2 B per frame layout 0-4: bytes per frame record,Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameBytes; extent to the next named table (end inferred)
 $CC:F414,$CC:F433,32,$CC,table,1 B per path step kind: the !Battler_PathFromDir it leaves,BattleAct_PathToPoint,confirmed,named BattleRom_PathFromDir; extent to the next named table (end inferred)
 $CC:F434,$CC:F453,32,$CC,table,1 B per path step kind: !Battler_Facing for it (the direction: 0-3),BattleAct_PathToPoint,confirmed,named BattleRom_PathFacing; extent to the next named table (end inferred)
 $CC:F454,$CC:F473,32,$CC,table,"8 B per direction: cell index steps +0 two cells ahead, +1/+2 the two diagonals",BattleAct_PathToPoint,confirmed,named BattleRom_PathAhead; extent to the next named table (end inferred)
@@ -402,28 +402,29 @@ $CC:F494,$CC:F4BB,40,$CC,table,1 B per path step kind * 8 + frame: signed x adde
 $CC:F4BC,$CC:F4C3,8,$CC,table,8 B: move speeds,BattleAct_OpSetSpeed,confirmed,named BattleRom_ActMoveSpeed; extent to the next named table (end inferred)
 $CC:F4C4,$CC:F4CB,8,$CC,table,4 B: OAM high-table X-bit masks,Battle_InitScene,confirmed,named BattleRom_Unk8E2DPattern; extent to the next named table (end inferred)
 $CC:F4CC,$CC:F4FB,48,$CC,table,4 B: OAM high-table X-bit clear masks (with the bytes up to the next table),Battle_InitScene,confirmed,named BattleRom_Unk8C2DPattern; extent to the next named table (end inferred)
-$CC:F4FC,$CC:F500,5,$CC,table,1 B per frame layout 0-4: signed bytes after the frame's tilemap (cells / 2),Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameExtraCount; extent: the reader's 5 records (tools/records.py)
-$CC:F501,$CC:F504,4,$CC,unknown,4 B after BattleRom_FrameExtraCount (not read as its records),,unknown,split off BattleRom_FrameExtraCount in step 6: the reader's 5 records end before it (tools/records.py); no reader found
-$CC:F505,$CC:F509,5,$CC,table,1 B per frame layout 0-4: sprite byte counts,Battle_InitScene,confirmed,named BattleRom_LayoutSprBytes; extent: the reader's 5 records (tools/records.py)
+$CC:F4FC,$CC:F503,8,$CC,table,1 B per frame layout 0-4: signed bytes after the frame's tilemap (cells / 2),Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameExtraCount; extent: the reader's 8 records (tools/records.py)
+$CC:F504,$CC:F504,1,$CC,unknown,1 B after BattleRom_FrameExtraCount (past its reader's 8 records),,unknown,split off BattleRom_FrameExtraCount in step 6: its reader reaches 8 records (tools/records.py); no reader found for these bytes
+$CC:F505,$CC:F509,5,$CC,table,1 B per frame layout 0-4: sprite byte counts,Battle_InitScene,confirmed,named BattleRom_LayoutSprBytes; extent to the next named table (end inferred)
 $CC:F50A,$CC:F543,58,$CC,table,bytes read at frame layout * 2: sprites per frame (the bytes between: no reader found),"BattleCF_DrawBattler, BattleCF_DrawPosHistRecord",confirmed,named BattleRom_LayoutSprites; extent to the next named table (end inferred)
-$CC:F544,$CC:F593,80,$CC,table,1 B per (move delay / 2) * 4 + move speed / 2: an enemy's !Enemy_MoveInterval,Battle_InitScene,confirmed,named BattleRom_EnemyMoveInterval; extent to the next named table (end inferred)
+$CC:F544,$CC:F563,32,$CC,table,1 B per (move delay / 2) * 4 + move speed / 2: an enemy's !Enemy_MoveInterval,Battle_InitScene,confirmed,named BattleRom_EnemyMoveInterval; extent: the reader's 32 records (tools/records.py)
+$CC:F564,$CC:F593,48,$CC,unknown,48 B after BattleRom_EnemyMoveInterval (past its reader's 32 records),,unknown,split off BattleRom_EnemyMoveInterval in step 6: its reader reaches 32 records (tools/records.py); no reader found for these bytes
 $CC:F594,$CC:F5BB,40,$CC,table,the same for y,BattleCF_StepPathWalks,confirmed,named BattleRom_PathStepDY; extent to the next named table (end inferred)
 $CC:F5BC,$CC:F5C3,8,$CC,table,8 B: move delays,BattleAct_OpSetSpeed,confirmed,named BattleRom_ActMoveDelay; extent to the next named table (end inferred)
 $CC:F5C4,$CC:F5FC,57,$CC,table,4 B per leading-zero count 0-3: digit sprite x offsets,BattleAct_OpShowHitNumbers,confirmed,named BattleRom_HitNumDigitX; extent to the next named table (end inferred)
 $CC:F5FD,$CC:F603,7,$CC,table,1 B per overlay block 1-7 (entry n-1): frames per overlay frame,"Battle_FxOverlay1, Battle_FxOverlay2Tint, Battle_FxOverlay3, Battle_FxOverlay4, Battle_FxOverlay5, Battle_FxOverlay6, Battle_FxOverlay7",confirmed,named BattleRom_FxOverlayPeriod; extent: the reader's 7 records (tools/records.py)
-$CC:F604,$CC:F63B,56,$CC,table,4 sprites x 4 B: command cursor (BattleRom_CursorSprite struct),BattleMenu_DrawCursorSprites,confirmed,named BattleRom_CursorSprite; extent to the next named table (end inferred)
+$CC:F604,$CC:F613,16,$CC,table,4 sprites x 4 B: command cursor (BattleRom_CursorSprite struct),BattleMenu_DrawCursorSprites,confirmed,named BattleRom_CursorSprite; extent: the reader's 4 records (tools/records.py)
+$CC:F614,$CC:F63B,40,$CC,unknown,40 B after BattleRom_CursorSprite (past its reader's 4 records),,unknown,split off BattleRom_CursorSprite in step 6: its reader reaches 4 records (tools/records.py); no reader found for these bytes
 $CC:F63C,$CC:F642,7,$CC,table,1 B per character id 0-6: path-search flag,BattleAct_CheckReach,confirmed,named BattleRom_PcPathAlways; extent: the reader's 7 records (tools/records.py)
-$CC:F643,$CC:F643,1,$CC,unknown,1 B after BattleRom_PcPathAlways (not read as its records),,unknown,split off BattleRom_PcPathAlways in step 6: the reader's 7 records end before it (tools/records.py); no reader found
+$CC:F643,$CC:F643,1,$CC,unknown,1 B after BattleRom_PcPathAlways (past its reader's 7 records),,unknown,split off BattleRom_PcPathAlways in step 6: its reader reaches 7 records (tools/records.py); no reader found for these bytes
 $CC:F644,$CC:F67B,56,$CC,table,16 B: one cell-map row template,Battle_InitScene,confirmed,named BattleRom_CellMapRow; extent to the next named table (end inferred)
 $CC:F67C,$CC:F693,24,$CC,table,2 B per battler slot: slot * $100 (offset in !Battler_PathMaps),BattleAct_PathToPoint,confirmed,named BattleRom_SlotTimes256; extent to the next named table (end inferred)
 $CC:F694,$CC:F6D3,64,$CC,table,48 B: cell-map edge rows,Battle_InitScene,confirmed,named BattleRom_CellMapEdge; extent to the next named table (end inferred)
 $CC:F6D4,$CC:F753,128,$CC,table,overlay sprite records (BattleRom_FxOverlaySpr struct),BattleCF_DrawFxOverlay,confirmed,named BattleRom_FxOverlaySpr; extent to the next named table (end inferred)
-$CC:F754,$CC:F779,38,$CC,table,2 B per !Battler_FxWanted value: offset of its colour list,BattleCF_StepFxColourCycle,confirmed,named BattleRom_FxCycleList; extent: its 19 whole 2-byte records (tools/records.py; end inferred)
-$CC:F77A,$CC:F77A,1,$CC,unknown,1 B after BattleRom_FxCycleList (not read as its records),,unknown,split off BattleRom_FxCycleList in step 6: its 19 whole 2-byte records end before it (tools/records.py); no reader found
+$CC:F754,$CC:F77A,39,$CC,table,2 B per !Battler_FxWanted value: offset of its colour list,BattleCF_StepFxColourCycle,confirmed,named BattleRom_FxCycleList; extent to the next named table (end inferred)
 $CC:F77B,$CC:F77E,4,$CC,palette,4 B: written into live palette bytes 6-9 by Battle_FxOverlay2Tint (inferred: two colours),Battle_FxOverlay2Tint,confirmed,named BattleRom_FxTintColours; extent to the next named table (end inferred)
 $CC:F77F,$CC:F7BF,65,$CC,table,"4 B records, ended by a negative status byte (BattleRom_StatusAnim struct)",Battle_PickStatusAnim,confirmed,named BattleRom_StatusAnim; extent to the next named table (end inferred)
 $CC:F7C0,$CC:F7FF,64,$CC,table,"2 B per action frame 0-31: frame * $C0, its block in BattleActSprite","BattleAct_UnpackFrames, BattleCF_DrawActObj",confirmed,named BattleRom_ActFrameBase; extent: the reader's 32 records (tools/records.py)
-$CC:F800,$CC:F81F,32,$CC,unknown,32 B after BattleRom_ActFrameBase (not read as its records),,unknown,split off BattleRom_ActFrameBase in step 6: the reader's 32 records end before it (tools/records.py); no reader found
+$CC:F800,$CC:F81F,32,$CC,unknown,32 B after BattleRom_ActFrameBase (past its reader's 32 records),,unknown,split off BattleRom_ActFrameBase in step 6: its reader reaches 32 records (tools/records.py); no reader found for these bytes
 $CC:F820,$CC:F828,9,$CC,table,1 B per n 0-8: n * 16 (sprite column/row to pixels),BattleAct_UnpackFrames,confirmed,named BattleRom_Times16; extent: the reader's 9 records (tools/records.py)
 $CC:F829,$CC:F82E,6,$CC,table,1 B per record set 0-5: offset of the set,BattleAct_OpShowHitNumbers,confirmed,named BattleRom_HitSetOffset; extent: the reader's 6 records (tools/records.py)
 $CC:F82F,$CC:F836,8,$CC,table,"1 B per enemy: enemy * 8, its block in !Enemy_AnimTicks/Frames",Battle_TickEnemyGroup,confirmed,named BattleRom_EnemyListOffset; extent to the next named table (end inferred)
@@ -431,26 +432,25 @@ $CC:F837,$CC:F83E,8,$CC,table,1 B per PC slot: offset in !Pc_NameTiles,"BattleUI
 $CC:F83F,$CC:F845,7,$CC,table,1 B per PC slot: slot * 5,"BattleAct_LoadAttack, Battle_InitScene",confirmed,named BattleRom_SlotTimes5; extent to the next named table (end inferred)
 $CC:F846,$CC:F84C,7,$CC,table,"1 B per character id 0-6: id * 6, its !Pc_CharNames offset",Battle_InitScene,confirmed,named BattleRom_CharTimes6; extent: the reader's 7 records (tools/records.py)
 $CC:F84D,$CC:F8EC,160,$CC,table,2 B per sprite index: address of the battler's sprite records,"BattleCF_BuildSprites, BattleCF_DrawPosHistRecord",confirmed,named BattleRom_SprTileListPtr; extent to the next named table (end inferred)
-$CC:F8ED,$CC:F902,22,$CC,table,"2 B per battler slot: slot * $80, offset of its BattlerStats record","BattleFx_SetPtrA2FromTable, BattleMenu_UpdateCursorOverlay, BattlePos_FarthestEnemy, BattlePos_FarthestPc, BattlePos_NearestEnemy, BattlePos_NearestPc, BattleUI_DrawPcNamePanel, BattleUI_UpdateNextPcPanel, Battle_PickStatusAnim",confirmed,named BattleRom_StatsOffset; extent to the next named table (end inferred)
+$CC:F8ED,$CC:F902,22,$CC,table,"2 B per battler slot: slot * $80, offset of its BattlerStats record","BattleFx_SetPtrA2FromTable, BattleMenu_UpdateCursorOverlay, BattlePos_FarthestEnemy, BattlePos_FarthestPc, BattlePos_NearestEnemy, BattlePos_NearestPc, BattleUI_DrawPcNamePanel, BattleUI_UpdateNextPcPanel, Battle_PickStatusAnim",confirmed,named BattleRom_StatsOffset; extent: the reader's 11 records (tools/records.py)
 $CC:F903,$CC:F90C,10,$CC,table,10 B: tile for digits 0-9 ($73-$7C),"BattleMsg_FormatNumberDigits, BattleMsg_FormatTwoDigits",confirmed,named BattleRom_DigitTiles; extent: the reader's 10 records (tools/records.py)
 $CC:F90D,$CC:F916,10,$CC,table,"10 B: a second set of digit tiles 0-9 ($90-$99), read by BattleMsg_FormatNumber4Digits",BattleMsg_FormatNumber4Digits,confirmed,named BattleRom_DigitTilesB; extent: the reader's 10 records (tools/records.py)
-$CC:F917,$CC:F92C,22,$CC,table,"2 B per battler slot: slot * $10, offset of its !Battler_FrameExtra block",Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_SlotTimes16; extent to the next named table (end inferred)
+$CC:F917,$CC:F92C,22,$CC,table,"2 B per battler slot: slot * $10, offset of its !Battler_FrameExtra block",Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_SlotTimes16; extent: the reader's 11 records (tools/records.py)
 $CC:F92D,$CC:F938,12,$CC,table,"1 B per battler slot: slot * 3, offset into the 3-byte pointer arrays",Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_SlotTimes3; extent to the next named table (end inferred)
 $CC:F939,$CC:F940,8,$CC,table,"1 B per enemy 0-7: enemy * 12, its FieldBtlObj offset",Battle_InitScene,confirmed,named BattleRom_EnemyRecOfs; extent: the reader's 8 records (tools/records.py)
-$CC:F941,$CC:F956,22,$CC,table,2 B per battler slot: bank-$7E address of its decoded frame tiles,Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameDestBase; extent to the next named table (end inferred)
+$CC:F941,$CC:F956,22,$CC,table,2 B per battler slot: bank-$7E address of its decoded frame tiles,Battle_DrawBattlerFrameAnyLayout,confirmed,named BattleRom_FrameDestBase; extent: the reader's 11 records (tools/records.py)
 $CC:F957,$CC:F95E,8,$CC,table,2 B per graphics step 0-3: bank-$7E source of the first block,BattleCF_VblankUploads,confirmed,named BattleRom_GfxStepSrcA; extent: the reader's 4 records (tools/records.py)
 $CC:F95F,$CC:F966,8,$CC,table,2 B per step: source of the second block,BattleCF_VblankUploads,confirmed,named BattleRom_GfxStepSrcB; extent: the reader's 4 records (tools/records.py)
 $CC:F967,$CC:F96E,8,$CC,table,2 B per step: VRAM word address of the first block,BattleCF_VblankUploads,confirmed,named BattleRom_GfxStepVramA; extent: the reader's 4 records (tools/records.py)
 $CC:F96F,$CC:F976,8,$CC,table,2 B per step: VRAM word address of the second block,BattleCF_VblankUploads,confirmed,named BattleRom_GfxStepVramB; extent: the reader's 4 records (tools/records.py)
 $CC:F977,$CC:F97E,8,$CC,table,2 B per step: bytes in the first block,BattleCF_VblankUploads,confirmed,named BattleRom_GfxStepSizeA; extent: the reader's 4 records (tools/records.py)
 $CC:F97F,$CC:F986,8,$CC,table,2 B per step: bytes in the second block; 0 = none (step 3),BattleCF_VblankUploads,confirmed,named BattleRom_GfxStepSizeB; extent: the reader's 4 records (tools/records.py)
-$CC:F987,$CC:F99C,22,$CC,table,2 B per battler slot: DMA source A,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSrcA; extent to the next named table (end inferred)
-$CC:F99D,$CC:F9B2,22,$CC,table,2 B per battler slot: DMA source B,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSrcB; extent to the next named table (end inferred)
-$CC:F9B3,$CC:F9C8,22,$CC,table,2 B per battler slot: VRAM address A,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaVramA; extent to the next named table (end inferred)
-$CC:F9C9,$CC:F9DE,22,$CC,table,2 B per battler slot: VRAM address B,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaVramB; extent to the next named table (end inferred)
-$CC:F9DF,$CC:F9E8,10,$CC,table,2 B per frame layout 0-4: !Battler_FrameDmaSizeA,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSizeA; extent: the reader's 5 records (tools/records.py)
-$CC:F9E9,$CC:F9F2,10,$CC,table,2 B per frame layout 0-4: !Battler_FrameDmaSizeB,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSizeB; extent: the reader's 5 records (tools/records.py)
-$CC:F9F3,$CC:F9FA,8,$CC,unknown,8 B after BattleRom_FrameDmaSizeB (not read as its records),,unknown,split off BattleRom_FrameDmaSizeB in step 6: the reader's 5 records end before it (tools/records.py); no reader found
+$CC:F987,$CC:F99C,22,$CC,table,2 B per battler slot: DMA source A,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSrcA; extent: the reader's 11 records (tools/records.py)
+$CC:F99D,$CC:F9B2,22,$CC,table,2 B per battler slot: DMA source B,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSrcB; extent: the reader's 11 records (tools/records.py)
+$CC:F9B3,$CC:F9C8,22,$CC,table,2 B per battler slot: VRAM address A,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaVramA; extent: the reader's 11 records (tools/records.py)
+$CC:F9C9,$CC:F9DE,22,$CC,table,2 B per battler slot: VRAM address B,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaVramB; extent: the reader's 11 records (tools/records.py)
+$CC:F9DF,$CC:F9E8,10,$CC,table,2 B per frame layout 0-4: !Battler_FrameDmaSizeA,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSizeA; extent to the next named table (end inferred)
+$CC:F9E9,$CC:F9FA,18,$CC,table,2 B per frame layout 0-4: !Battler_FrameDmaSizeB,Battle_InitSceneGfx,confirmed,named BattleRom_FrameDmaSizeB; extent to the next named table (end inferred)
 $CC:F9FB,$CC:FA22,40,$CC,table,1 B per PC slot: its bit in Item_BattleList.PcMask,BattleMenu_RenderItemRow,confirmed,named BattleRom_PcBit; extent to the next named table (end inferred)
 $CC:FA23,$CC:FA28,6,$CC,table,"2 B per PC slot: map offset of the PC's name block's first attribute byte, layout 1",BattleUI_HighlightPcName,confirmed,named BattleRom_NameAttrL1; extent: the reader's 3 records (tools/records.py)
 $CC:FA29,$CC:FA2E,6,$CC,table,2 B per PC slot: same for layouts 0 and 2 (BattleUI_HighlightPcName),BattleUI_HighlightPcName,confirmed,named BattleRom_NameAttrL02; extent: the reader's 3 records (tools/records.py)
@@ -462,8 +462,7 @@ $CC:FA6B,$CC:FA94,42,$CC,tilemap,42 B: 6x7 command-list tiles (Attack / Combo / 
 $CC:FA95,$CC:FADC,72,$CC,tilemap,"54 B: 6x9 tiles of the tech window's right part (label ""MP"")",BattleMenu_UpdateTechWindow,confirmed,named BattleRom_TechBorder; extent to the next named table (end inferred); the reader takes 54 B; the last 18 B of the row have no reader found
 $CC:FADD,$CC:FAE2,6,$CC,table,2 B per command row: map offset of the command cursor,BattleUI_ClearActivePanelColumn,confirmed,named BattleRom_MenuCursorCell; extent to the next named table (end inferred)
 $CC:FAE3,$CC:FAE8,6,$CC,table,2 B per tech row: map offset of the tech cursor,BattleMenu_DrawTechCursorRow,confirmed,named BattleRom_TechCursorCell; extent to the next named table (end inferred)
-$CC:FAE9,$CC:FAEE,6,$CC,table,2 B per item row: map offset of the item cursor,BattleMenu_UpdateCursorOverlay,confirmed,named BattleRom_ItemCursorCell; extent: its 3 whole 2-byte records (tools/records.py; end inferred)
-$CC:FAEF,$CC:FAEF,1,$CC,unknown,1 B after BattleRom_ItemCursorCell (not read as its records),,unknown,split off BattleRom_ItemCursorCell in step 6: its 3 whole 2-byte records end before it (tools/records.py); no reader found
+$CC:FAE9,$CC:FAEF,7,$CC,table,2 B per item row: map offset of the item cursor,BattleMenu_UpdateCursorOverlay,confirmed,named BattleRom_ItemCursorCell; extent to the next named table (end inferred)
 $CC:FAF0,$CC:FAF2,3,$CC,table,1 B per battler slot: offset of its BattleCmd record (PCs 0/7/14),"BattleMenu_CommitAction, BattleMenu_ConsumePartnerSlot, BattleMenu_EnqueueReadyBattler",confirmed,named BattleRom_CmdOffset; extent to the next named table (end inferred)
 $CC:FAF3,$CC:FB4A,88,$CC,table,2 B per !Battle_SprRec record 0-43: its tile and attribute,Battle_InitSceneGfx,confirmed,named BattleRom_SprRecInit; extent: the reader's 44 records (tools/records.py)
 $CC:FB4B,$CC:FB6E,36,$CC,table,2 x 18 B: the double- and triple-tech header lines (tile bytes),BattleMenu_RenderTechRow,confirmed,named BattleRom_TechFixedText; extent to the next named table (end inferred)
@@ -478,7 +477,7 @@ $CC:FBCE,$CC:FC1D,80,$CC,table,1 B per n: n / 5 (checked for the first 32 bytes)
 $CC:FC1E,$CC:FC2B,14,$CC,table,2 B per character id 0-6: record offset,BattleCF_ExitBattle,confirmed,BattleRom_CharRecOffset; 7 entries (!Battle_LastCharRecOfs)
 $CC:FC2C,$CC:FC4E,35,$CC,table,small byte values and a word table like the one before,,probable,"after BattleRom_CharRecOffset, before the $FF fill; no reader found"
 $CC:FC4F,$CC:FFFF,945,$CC,padding,945 x $FF,,confirmed,uniform fill; nothing points into it
-$CD:4000,$CD:4014,21,$CD,table,21 B: PC attack script header (BattleRom_PcAttackScript struct),BattleAct_LoadAttack,confirmed,named BattleRom_PcAttackScript; extent to the next named table (end inferred)
+$CD:4000,$CD:4014,21,$CD,table,21 B: PC attack script header (BattleRom_PcAttackScript struct),BattleAct_LoadAttack,confirmed,named BattleRom_PcAttackScript; extent: the reader's 1 records (tools/records.py)
 $CD:4015,$CD:451E,1290,$CD,table,"15 B per PC attack record: far, near and alternate (gfx A, gfx B, frames, palette, object)",BattleAct_LoadAttack,confirmed,named BattleRom_PcAttackAct; extent to the next named table (end inferred)
 $CD:451F,$CD:45A5,135,$CD,padding,135 x $00,,probable,fill after the region before it ($CD:4015): the reader's extent is not settled: these bytes may still be read
 $CD:45A6,$CD:4925,896,$CD,table,PC tech action records (BattleRom_PcTechAct struct),BattleAct_LoadTech,confirmed,named BattleRom_PcTechAct; extent to the next named table (end inferred)
@@ -519,7 +518,7 @@ $CE:EFE0,$CE:EFE9,10,$CE,table,10 B record (bytes 1-9 read),BattleCD_EnemyDissol
 $CE:EFEA,$CE:EFF1,8,$CE,table,1 B per pattern 0-7: added to !Battle_DissolvePhase per step,BattleCD_DissolveStep,confirmed,named BattleRom_DissolvePhaseStep; extent: the reader's 8 records (tools/records.py)
 $CE:EFF2,$CE:EFF9,8,$CE,table,2 B per tile set 0-3: VRAM word address,BattleCD_LoadLayerFx,confirmed,named BattleRom_FxTileVram; extent: the reader's 4 records (tools/records.py)
 $CE:EFFA,$CE:EFFB,2,$CE,table,1 B per colour-math case 0/1: !Battle_PalAnimRec10's byte 0,BattleCD_FxRecSetup,confirmed,named BattleRom_FxRecByte0; extent: the reader's 2 records (tools/records.py)
-$CE:EFFC,$CE:EFFD,2,$CE,unknown,2 B after BattleRom_FxRecByte0 (not read as its records),,unknown,split off BattleRom_FxRecByte0 in step 6: the reader's 2 records end before it (tools/records.py); no reader found
+$CE:EFFC,$CE:EFFD,2,$CE,unknown,2 B after BattleRom_FxRecByte0 (past its reader's 2 records),,unknown,split off BattleRom_FxRecByte0 in step 6: its reader reaches 2 records (tools/records.py); no reader found for these bytes
 $CE:EFFE,$CE:F005,8,$CE,table,the same for BattleCD_LoadFxPalB,BattleCD_LoadFxPalB,confirmed,named BattleRom_FxRecB; extent to the next named table (end inferred)
 $CE:F006,$CE:F03D,56,$CE,table,16 B per colour-math case (+$20 for the alternate),BattleCD_LoadFxPalA,confirmed,named BattleRom_FxRecA; extent to the next named table (end inferred)
 $CE:F03E,$CE:F045,8,$CE,table,1 B per bit 0-7: 1 << bit,BattleCD_BuildFxTilemap,confirmed,named BattleRom_FxBitMask; extent: the reader's 8 records (tools/records.py)
@@ -528,9 +527,9 @@ $CE:F0E6,$CE:F0ED,8,$CE,table,"8 B per kind 0-3, 16 apart (interleaved with the 
 $CE:F0EE,$CE:F125,56,$CE,table,"8 B per kind 0-3, 16 apart",BattleFx_Op80Kind0,confirmed,named BattleRom_Op80RegsB; extent to the next named table (end inferred)
 $CE:F126,$CE:F145,32,$CE,table,4 B per value 0-7: two byte pairs (BattleFx_Op80Kind0),BattleFx_Op80Kind0,confirmed,named BattleRom_Op80PairA; extent to the next named table (end inferred)
 $CE:F146,$CE:F155,16,$CE,table,2 B per value 0-7 (BattleFx_Op80Kind0),BattleFx_Op80Kind0,confirmed,named BattleRom_Op80PairB; extent: the reader's 8 records (tools/records.py)
-$CE:F156,$CE:F165,16,$CE,table,2 B per frame layout: bytes of a decoded frame,BattleCD_EnemyDissolveFx,confirmed,named BattleRom_LayoutFrameBytes; extent to the next named table (end inferred)
-$CE:F166,$CE:F17B,22,$CE,table,2 B per battler slot: bank-$7E address of its decoded frame,"BattleCD_DissolveStep, BattleCD_EnemyDissolveFx",confirmed,named BattleRom_SlotFrameBuf; extent to the next named table (end inferred)
-$CE:F17C,$CE:F191,22,$CE,table,2 B per battler slot: the VRAM address its frame goes to,BattleCD_EnemyDissolveFx,confirmed,named BattleRom_SlotFrameVram; extent to the next named table (end inferred)
+$CE:F156,$CE:F165,16,$CE,table,2 B per frame layout: bytes of a decoded frame,BattleCD_EnemyDissolveFx,confirmed,named BattleRom_LayoutFrameBytes; extent: the reader's 8 records (tools/records.py)
+$CE:F166,$CE:F17B,22,$CE,table,2 B per battler slot: bank-$7E address of its decoded frame,"BattleCD_DissolveStep, BattleCD_EnemyDissolveFx",confirmed,named BattleRom_SlotFrameBuf; extent: the reader's 11 records (tools/records.py)
+$CE:F17C,$CE:F191,22,$CE,table,2 B per battler slot: the VRAM address its frame goes to,BattleCD_EnemyDissolveFx,confirmed,named BattleRom_SlotFrameVram; extent: the reader's 11 records (tools/records.py)
 $CE:F192,$CE:F1C1,48,$CE,table,"8 B per frame layout: two (byte offset, tile count) word pairs",BattleCD_DissolveStep,confirmed,named BattleRom_DissolveRanges; extent to the next named table (end inferred)
 $CE:F1C2,$CE:F1D1,16,$CE,table,2 B per pixel column 0-7: both bytes with that column's bit clear,BattleCD_DissolveStep,confirmed,named BattleRom_DissolveMask; extent: the reader's 8 records (tools/records.py)
 $CE:F1D2,$CE:F24D,124,$CE,table,"256 B of signed bob steps (the read runs over the next rows, to $CE:F2D1)","BattleCD_FxMiscBobAdd, BattleCD_FxMiscBobSub",confirmed,named BattleRom_FxBobSteps; extent to the next named table (end inferred); the 256-byte table runs over the next rows (to $CE:F2D1); the row ends at the next named table
@@ -691,8 +690,8 @@ $D1:371E,$D1:3720,3,$D1,packed_lz,lz12 -> 0 B: empty pack,BattleAct_LoadCommon,c
 $D1:3721,$D1:38F0,464,$D1,padding,464 x $00,,confirmed,uniform fill; nothing points into it
 $D1:38F1,$D1:38F1,1,$D1,unknown,1 byte,,unknown,the byte before BattleRom_UnkColours38F2; no reader found
 $D1:38F2,$D1:38F7,6,$D1,palette,6 B (3 colours) -> !Battle_PaletteLive + $5A,Battle_InitSceneGfx,confirmed,named BattleRom_UnkColours38F2; extent: the reader's 3 records (tools/records.py)
-$D1:38F8,$D1:38F9,2,$D1,unknown,2 B after BattleRom_UnkColours38F2 (not read as its records),,unknown,split off BattleRom_UnkColours38F2 in step 6: the reader's 3 records end before it (tools/records.py); no reader found
-$D1:38FA,$D1:38FF,6,$D1,palette,6 B (3 colours) -> !Battle_PaletteLive + $7A,Battle_InitSceneGfx,confirmed,named BattleRom_UnkColours38FA; extent to the next named table (end inferred)
+$D1:38F8,$D1:38F9,2,$D1,unknown,2 B after BattleRom_UnkColours38F2 (past its reader's 3 records),,unknown,split off BattleRom_UnkColours38F2 in step 6: its reader reaches 3 records (tools/records.py); no reader found for these bytes
+$D1:38FA,$D1:38FF,6,$D1,palette,6 B (3 colours) -> !Battle_PaletteLive + $7A,Battle_InitSceneGfx,confirmed,named BattleRom_UnkColours38FA; extent: the reader's 3 records (tools/records.py)
 $D1:3900,$D1:40FF,2048,$D1,graphics,64 x 32 B 4bpp tiles,Battle_InitSceneGfx,confirmed,named BattleRom_InitTiles4bpp; extent to the next named table (end inferred)
 $D1:4100,$D1:4345,582,$D1,palette,6 B per colour set (3 colours),"BattleAct_OpLoadPalEntry, BattleAct_StepPalettes",confirmed,named BattleRom_PalSets6; extent to the next named table (end inferred)
 $D1:4346,$D1:43FF,186,$D1,padding,186 x $00,,probable,fill after the region before it ($D1:4100): the reader's extent is not settled: these bytes may still be read
@@ -701,13 +700,11 @@ $D1:49B0,$D1:4AFF,336,$D1,padding,336 x $00,,probable,fill after the region befo
 $D1:4B00,$D1:4BBF,192,$D1,palette,6 B (3 colours) per record: copied into the PC's sprite palette at set-up,Battle_InitScene,confirmed,named BattleRom_WeaponColours; extent to the next named table (end inferred)
 $D1:4BC0,$D1:4C7F,192,$D1,padding,192 x $00,,probable,fill after the region before it ($D1:4B00): the reader's extent is not settled: these bytes may still be read
 $D1:4C80,$D1:4D7F,256,$D1,graphics,"16 x 16 B 2bpp tiles, widened to 4bpp",Battle_InitSceneGfx,confirmed,BattleRom_InitTiles2bpp: Battle_InitSceneGfx copies $10 tiles of 16 B
-$D1:4D80,$D1:4D8F,16,$D1,palette,16 B: !Battle_HitNumColoursA and B,Battle_InitSceneGfx,confirmed,named BattleRom_HitNumColours; extent to the next named table (end inferred)
-$D1:4D90,$D1:508F,768,$D1,palette,24 B (12 colours) per entry: opcode $69's palette,BattleAct_SpecialPaletteBody,confirmed,named BattleRom_SpecialPals; extent: its 32 whole 24-byte records (tools/records.py; end inferred)
-$D1:5090,$D1:50A1,18,$D1,unknown,18 B after BattleRom_SpecialPals (not read as its records),,unknown,split off BattleRom_SpecialPals in step 6: its 32 whole 24-byte records end before it (tools/records.py); no reader found
-$D1:50A2,$D1:57FD,1884,$D1,table,action object init records (BattleRom_ActObjInit struct),BattleAct_LoadCommon,confirmed,named BattleRom_ActObjInit; extent: its 314 whole 6-byte records (tools/records.py; end inferred)
-$D1:57FE,$D1:57FF,2,$D1,unknown,2 B after BattleRom_ActObjInit (not read as its records),,unknown,split off BattleRom_ActObjInit in step 6: its 314 whole 6-byte records end before it (tools/records.py); no reader found
+$D1:4D80,$D1:4D8F,16,$D1,palette,16 B: !Battle_HitNumColoursA and B,Battle_InitSceneGfx,confirmed,named BattleRom_HitNumColours; extent: the reader's 8 records (tools/records.py)
+$D1:4D90,$D1:50A1,786,$D1,palette,24 B (12 colours) per entry: opcode $69's palette,BattleAct_SpecialPaletteBody,confirmed,named BattleRom_SpecialPals; extent to the next named table (end inferred)
+$D1:50A2,$D1:57FF,1886,$D1,table,action object init records (BattleRom_ActObjInit struct),BattleAct_LoadCommon,confirmed,named BattleRom_ActObjInit; extent to the next named table (end inferred)
 $D1:5800,$D1:597F,384,$D1,tilemap,$180 B: command window tilemap,"BattleMenu_LoadCommandWindowMap, Battle_InitScene",confirmed,named BattleRom_CommandWindowMap; extent to the next named table (end inferred)
-$D1:5980,$D1:59FB,124,$D1,palette,2 B per step 0-$3D: cursor glow colour,BattleCF_FrameUpdate,confirmed,named BattleRom_CursorGlow; extent to the next named table (end inferred)
+$D1:5980,$D1:59FB,124,$D1,palette,2 B per step 0-$3D: cursor glow colour,BattleCF_FrameUpdate,confirmed,named BattleRom_CursorGlow; extent: the reader's 62 records (tools/records.py)
 $D1:59FC,$D1:5A4F,84,$D1,tilemap,"84 B: one 7x6 command-window frame, 2 B (tile, attribute) per cell",BattleMenu_DrawCommandWindowFrame,confirmed,named BattleRom_CommandWindowFrame; extent to the next named table (end inferred)
 $D1:5A50,$D1:5BCF,384,$D1,tilemap,$180 B: tech window frame tilemap,BattleMenu_DrawTechCursorRow,confirmed,named BattleRom_TechBoxMap; extent to the next named table (end inferred)
 $D1:5BD0,$D1:5D4F,384,$D1,tilemap,$180 B: item window frame tilemap,"BattleMenu_OpenItemList, BattleMenu_TargetSelectInput",confirmed,named BattleRom_ItemBoxMap; extent to the next named table (end inferred)
@@ -717,7 +714,8 @@ $D1:5E49,$D1:5E81,57,$D1,table,1 B per step: alternate hit-number bounce,BattleC
 $D1:5E82,$D1:5EC1,64,$D1,graphics,"$40 B: stage 1, to VRAM !Battle_InitTilesCVram",Battle_InitUploadStep,confirmed,named BattleRom_InitTilesC; extent to the next named table (end inferred)
 $D1:5EC2,$D1:5F01,64,$D1,graphics,"$40 B: stage 1, to VRAM !Battle_InitTilesBVram",Battle_InitUploadStep,confirmed,named BattleRom_InitTilesB; extent to the next named table (end inferred)
 $D1:5F02,$D1:5F41,64,$D1,graphics,"$40 B: stage 2, sent twice (VRAM !Battle_InitTilesDVram and !Battle_InitTilesEVram)",Battle_InitUploadStep,confirmed,named BattleRom_InitTilesD; extent to the next named table (end inferred)
-$D1:5F42,$D1:5FFF,190,$D1,table,1 B per character * 4 + facing: KO frame id,BattleSys_RunAction,confirmed,named BattleRom_PcKoFrame; extent to the next named table (end inferred)
+$D1:5F42,$D1:5F5D,28,$D1,table,1 B per character * 4 + facing: KO frame id,BattleSys_RunAction,confirmed,named BattleRom_PcKoFrame; extent: the reader's 28 records (tools/records.py)
+$D1:5F5E,$D1:5FFF,162,$D1,unknown,162 B after BattleRom_PcKoFrame (past its reader's 28 records),,unknown,split off BattleRom_PcKoFrame in step 6: its reader reaches 28 records (tools/records.py); no reader found for these bytes
 $D1:6000,$D1:623F,576,$D1,palette,8 B per colour set; bytes 2-7 (colours 1-3) are copied,BattleCD_LoadLayerFx_colours,confirmed,named BattleRom_FxColours; extent to the next named table (end inferred)
 $D1:6240,$D1:646B,556,$D1,table,4 B per layer effect: script ids,BattleCD_LoadLayerFx,confirmed,named BattleRom_FxScripts; extent to the next named table (end inferred)
 $D1:646C,$D1:A232,15815,$D1,battle_script,u16 per channel script: address in bank $D1; then the scripts,BattleCD_StartFxChannel,confirmed,named BattleRom_FxScriptPtrs; extent to the next named table (end inferred)
@@ -1096,8 +1094,7 @@ $E4:3000,$E4:A7FF,30720,$E4,table,animation frame-id lists ($FF-ended),"Obj_Anim
 $E4:A800,$E4:EFFF,18432,$E4,table,animation duration lists,"Obj_AnimTickAndQueue, Battle anim tick (BattleRom_SprAnimDurs targets)",confirmed,targets of $E4:2800 ($A800-$CC57); the bytes after the last list up to $F000 not separated
 $E4:F000,$E4:F521,1314,$E4,table,5 B per sprite record (SprRec_Bytes),Evt_LoadSpriteRec,confirmed,named RomE4_SprRec; extent to the next named table (end inferred)
 $E4:F522,$E4:F5FF,222,$E4,padding,222 x $00,,probable,fill after the region before it ($E4:F000): the reader's extent is not settled: these bytes may still be read
-$E4:F600,$E4:FFD7,2520,$E4,table,10 B per enemy sprite record,"Evt_Op83_InitEnemySprite, Battle_InitScene",confirmed,"named RomE4_EnemySprRec, BattleRom_EnemySpr; extent: its 252 whole 10-byte records (tools/records.py; end inferred)"
-$E4:FFD8,$E4:FFDF,8,$E4,unknown,8 B after RomE4_EnemySprRec (not read as its records),,unknown,split off RomE4_EnemySprRec in step 6: its 252 whole 10-byte records end before it (tools/records.py); no reader found
+$E4:F600,$E4:FFDF,2528,$E4,table,10 B per enemy sprite record,"Evt_Op83_InitEnemySprite, Battle_InitScene",confirmed,"named RomE4_EnemySprRec, BattleRom_EnemySpr; extent to the next named table (end inferred)"
 $E4:FFE0,$E4:FFED,14,$E4,table,7 u16: low words of the bank-$E4 table pointers,"Field_InitLoadState, Menu_SprLoad",confirmed,"RomE4_PtrInit / MenuRom_E4GfxPtrs ($2000, $2300, $2600, $2800, $2A00, $3000, $A800)"
 $E4:FFEE,$E4:FFFF,18,$E4,padding,18 x $00,,confirmed,uniform fill; nothing points into it
 $E5:0000,$E5:0401,1026,$E5,table,513 u16: ExitRom offset per location (+ end),Map_LoadExitTiles,confirmed,ExitRom_LocOfs
@@ -2137,13 +2134,13 @@ $FF:8C60,$FF:8E5F,512,$FF,graphics,"$1000 B of tiles sent to VRAM (the read runs
 $FF:8E60,$FF:925F,1024,$FF,graphics,"$E00 B of 2bpp tiles (the read runs over the next rows, to $FF:9C5F)",Menu_LoadGraphics,confirmed,"named MenuRom_Font2bpp; extent to the next named table (end inferred); Menu_LoadGraphics reads $E00 B from here, through $FF:9C5F: over the next rows"
 $FF:9260,$FF:938F,304,$FF,graphics,64 B sent to VRAM $57E0 (then bytes no reader of its own reads),Field_UploadUnk57E0,confirmed,named FieldRom_Unk9260; extent to the next named table (end inferred); its own reader takes 64 B; the rest of the row is read only as part of the $FF:8C60 and $FF:8E60 blocks
 $FF:9390,$FF:9C67,2264,$FF,graphics,10 x 16 B 2bpp tiles (then bytes no reader of its own reads),BankFF_WidenTiles,confirmed,named MenuRom_ShadowTiles; extent to the next named table (end inferred); its own reader takes 160 B; the bytes up to $FF:9C5F are read as part of the $FF:8C60 and $FF:8E60 blocks; the last 8 B of the row have no reader found
-$FF:9C68,$FF:9C6F,8,$FF,palette,4 colours,"Battle_InitScene, Menu_LoadGraphics",confirmed,"named BattleRom_ColoursA, MenuRom_PalA; extent to the next named table (end inferred)"
-$FF:9C70,$FF:9C77,8,$FF,palette,8 B (MenuRom_Mode01Pal): to !Battle_PaletteSavedLo + $18,"Battle_InitScene, Menu_Icon2Preview, Menu_Icon3Preview, Menu_Mode01Init, Menu_ShopInit",confirmed,"named BattleRom_ColoursB, MenuRom_Icon2PalA, MenuRom_Mode01Pal; extent to the next named table (end inferred)"
+$FF:9C68,$FF:9C6F,8,$FF,palette,4 colours,"Battle_InitScene, Menu_LoadGraphics",confirmed,"named BattleRom_ColoursA, MenuRom_PalA; extent: the reader's 4 records (tools/records.py)"
+$FF:9C70,$FF:9C77,8,$FF,palette,8 B (MenuRom_Mode01Pal): to !Battle_PaletteSavedLo + $18,"Battle_InitScene, Menu_Icon2Preview, Menu_Icon3Preview, Menu_Mode01Init, Menu_ShopInit",confirmed,"named BattleRom_ColoursB, MenuRom_Icon2PalA, MenuRom_Mode01Pal; extent: the reader's 4 records (tools/records.py)"
 $FF:9C78,$FF:9C7F,8,$FF,palette,4 colours -> 16-19,Menu_LoadGraphics,confirmed,named MenuRom_PalB; extent: the reader's 4 records (tools/records.py)
-$FF:9C80,$FF:9CEF,112,$FF,unknown,112 B after MenuRom_PalB (not read as its records),,unknown,split off MenuRom_PalB in step 6: the reader's 4 records end before it (tools/records.py); no reader found
+$FF:9C80,$FF:9CEF,112,$FF,unknown,112 B after MenuRom_PalB (past its reader's 4 records),,unknown,split off MenuRom_PalB in step 6: its reader reaches 4 records (tools/records.py); no reader found for these bytes
 $FF:9CF0,$FF:9DEF,256,$FF,graphics,four 64-B pieces (FieldRom_Unk9CF0); stage 2 sends the first two,"Battle_InitUploadObjTiles, Battle_InitUploadObjTilesDead, Field_UploadUnk0000, Menu_LoadGraphics",confirmed,"named BattleRom_ObjTilePieces, FieldRom_Unk9CF0, MenuRom_ObjTiles; extent to the next named table (end inferred)"
-$FF:9DF0,$FF:9E09,26,$FF,palette,16 colours -> $80-$8F (the first sprite palette),"Menu_LoadGraphics, Menu_MainMenuLoop",confirmed,named MenuRom_ObjPal; extent to the next named table (end inferred)
-$FF:9E0A,$FF:9E0F,6,$FF,palette,6 B (MenuRom_MainPalC): to !Battle_PaletteSavedLo + $13A,"Battle_InitScene, Menu_MainIconSprites",confirmed,"named BattleRom_ColoursC, MenuRom_MainPalC; extent to the next named table (end inferred)"
+$FF:9DF0,$FF:9E09,26,$FF,palette,16 colours -> $80-$8F (the first sprite palette),"Menu_LoadGraphics, Menu_MainMenuLoop",confirmed,named MenuRom_ObjPal; extent: the reader's 13 records (tools/records.py); the reader's 32-byte copy takes these 13 colours and the 3 of MenuRom_MainPalC after them
+$FF:9E0A,$FF:9E0F,6,$FF,palette,6 B (MenuRom_MainPalC): to !Battle_PaletteSavedLo + $13A,"Battle_InitScene, Menu_MainIconSprites",confirmed,"named BattleRom_ColoursC, MenuRom_MainPalC; extent: the reader's 3 records (tools/records.py)"
 $FF:9E10,$FF:B20F,5120,$FF,graphics,8 window styles of $280 B (4bpp tiles),"Menu_LoadGraphics, Menu_LoadWindowGfx",confirmed,named MenuRom_WindowGfx; extent to the next named table (end inferred)
 $FF:B210,$FF:B30F,256,$FF,palette,colour sets 16 B apart (window palettes),"Pal_LoadUnkRow0, Menu_LoadWindowPal",confirmed,"named FieldRom_PalRow0Sets, MenuRom_WindowPals; extent to the next named table (end inferred)"
 $FF:B310,$FF:BD17,2568,$FF,text,"u16 per item id: address of its 9-byte string, then the strings",Menu_DrawInvEntry,confirmed,named MenuRom_ItemTextPtrs; extent to the next named table (end inferred)
@@ -2213,31 +2210,30 @@ $FF:C9AC,$FF:C9FB,80,$FF,table,"80 B: the name grid's characters, 10 a row","Men
 $FF:C9FC,$FF:CAFB,256,$FF,graphics,$100 B: 16 2bpp tiles,Menu_LoadGraphics,confirmed,named MenuRom_Font2bppB; extent to the next named table (end inferred)
 $FF:CAFC,$FF:CB9B,160,$FF,graphics,10 x 16 B: 2bpp tiles BankFF_BuildTileSets starts from,BankFF_BuildTileSets,confirmed,named MenuRom_GlyphRows; extent to the next named table (end inferred)
 $FF:CB9C,$FF:CBA3,8,$FF,palette,4 colours -> $84-$87 for the HP / MP numbers,Menu_UseHealOn,confirmed,named MenuRom_HealNumberPal; extent: the reader's 4 records (tools/records.py)
-$FF:CBA4,$FF:CBAB,8,$FF,unknown,8 B after MenuRom_HealNumberPal (not read as its records),,unknown,split off MenuRom_HealNumberPal in step 6: the reader's 4 records end before it (tools/records.py); no reader found
-$FF:CBAC,$FF:CBB3,8,$FF,palette,4 colours -> $24-$27,"Menu_ApplyStatItem, Menu_Icon0Preview, Menu_ShopInit",confirmed,named MenuRom_Icon0Pal; extent to the next named table (end inferred)
-$FF:CBB4,$FF:CBBB,8,$FF,palette,4 colours -> $20-$23,"Menu_Icon1Preview, Menu_Icon2Preview, Menu_Icon3Preview, Menu_UnkC9E5",confirmed,named MenuRom_Icon1PalB; extent to the next named table (end inferred)
-$FF:CBBC,$FF:CBC3,8,$FF,palette,4 colours -> 20-23,Menu_LoadGraphics,confirmed,named MenuRom_PalC; extent to the next named table (end inferred)
+$FF:CBA4,$FF:CBAB,8,$FF,unknown,8 B after MenuRom_HealNumberPal (past its reader's 4 records),,unknown,split off MenuRom_HealNumberPal in step 6: its reader reaches 4 records (tools/records.py); no reader found for these bytes
+$FF:CBAC,$FF:CBB3,8,$FF,palette,4 colours -> $24-$27,"Menu_ApplyStatItem, Menu_Icon0Preview, Menu_ShopInit",confirmed,named MenuRom_Icon0Pal; extent: the reader's 4 records (tools/records.py)
+$FF:CBB4,$FF:CBBB,8,$FF,palette,4 colours -> $20-$23,"Menu_Icon1Preview, Menu_Icon2Preview, Menu_Icon3Preview, Menu_UnkC9E5",confirmed,named MenuRom_Icon1PalB; extent: the reader's 4 records (tools/records.py)
+$FF:CBBC,$FF:CBC3,8,$FF,palette,4 colours -> 20-23,Menu_LoadGraphics,confirmed,named MenuRom_PalC; extent: the reader's 4 records (tools/records.py)
 $FF:CBC4,$FF:CBD3,16,$FF,palette,8 colours -> $70-$77,"Menu_Icon0Redraw, Menu_LoadGraphics",confirmed,"named MenuRom_Icon0RedrawPal, MenuRom_PalD; extent: the reader's 8 records (tools/records.py)"
-$FF:CBD4,$FF:CBE3,16,$FF,unknown,16 B after MenuRom_Icon0RedrawPal (not read as its records),,unknown,split off MenuRom_Icon0RedrawPal in step 6: the reader's 8 records end before it (tools/records.py); no reader found
-$FF:CBE4,$FF:CC13,48,$FF,palette,24 colours -> $50-$67,Menu_Icon3Preview,confirmed,named MenuRom_Icon3Pal; extent to the next named table (end inferred)
-$FF:CC14,$FF:CC23,16,$FF,palette,8 colours -> $80-$87,Menu_MainMenuIcons,confirmed,named MenuRom_MainPalA; extent to the next named table (end inferred)
+$FF:CBD4,$FF:CBE3,16,$FF,unknown,16 B after MenuRom_Icon0RedrawPal (past its reader's 8 records),,unknown,split off MenuRom_Icon0RedrawPal in step 6: its reader reaches 8 records (tools/records.py); no reader found for these bytes
+$FF:CBE4,$FF:CC13,48,$FF,palette,24 colours -> $50-$67,Menu_Icon3Preview,confirmed,named MenuRom_Icon3Pal; extent: the reader's 24 records (tools/records.py)
+$FF:CC14,$FF:CC23,16,$FF,palette,8 colours -> $80-$87,Menu_MainMenuIcons,confirmed,named MenuRom_MainPalA; extent: the reader's 8 records (tools/records.py)
 $FF:CC24,$FF:CC33,16,$FF,palette,8 colours per icon -> $88-$8F,Menu_MainMenuIcons,confirmed,named MenuRom_MainPalB; extent to the next named table (end inferred)
 $FF:CC34,$FF:CC43,16,$FF,palette,8 colours -> $50-$57,Menu_Icon1Preview,confirmed,named MenuRom_Icon1PalA; extent: the reader's 8 records (tools/records.py)
-$FF:CC44,$FF:CC63,32,$FF,unknown,32 B after MenuRom_Icon1PalA (not read as its records),,unknown,split off MenuRom_Icon1PalA in step 6: the reader's 8 records end before it (tools/records.py); no reader found
-$FF:CC64,$FF:CC73,16,$FF,palette,8 colours -> $60-$67,Menu_UnkC9E5,confirmed,named MenuRom_XchgPal; extent to the next named table (end inferred)
-$FF:CC74,$FF:CC83,16,$FF,palette,8 colours -> $20-$27,"Menu_LoadInit, Menu_UnkD065",confirmed,named MenuRom_LoadPalA; extent to the next named table (end inferred)
-$FF:CC84,$FF:CDE3,352,$FF,palette,16 colours per character for its slot icon,Menu_SlotMemberIcon,confirmed,named MenuRom_SlotIconPals; extent: its 11 whole 32-byte records (tools/records.py; end inferred)
-$FF:CDE4,$FF:CDF3,16,$FF,unknown,16 B after MenuRom_SlotIconPals (not read as its records),,unknown,split off MenuRom_SlotIconPals in step 6: its 11 whole 32-byte records end before it (tools/records.py); no reader found
-$FF:CDF4,$FF:CE03,16,$FF,palette,8 colours -> $40-$47 (the 16 bytes before MenuRom_Icon2PalB),Menu_Icon2Preview,confirmed,named MenuRom_Icon2PalC; extent to the next named table (end inferred)
+$FF:CC44,$FF:CC63,32,$FF,unknown,32 B after MenuRom_Icon1PalA (past its reader's 8 records),,unknown,split off MenuRom_Icon1PalA in step 6: its reader reaches 8 records (tools/records.py); no reader found for these bytes
+$FF:CC64,$FF:CC73,16,$FF,palette,8 colours -> $60-$67,Menu_UnkC9E5,confirmed,named MenuRom_XchgPal; extent: the reader's 8 records (tools/records.py)
+$FF:CC74,$FF:CC83,16,$FF,palette,8 colours -> $20-$27,"Menu_LoadInit, Menu_UnkD065",confirmed,named MenuRom_LoadPalA; extent: the reader's 8 records (tools/records.py)
+$FF:CC84,$FF:CDF3,368,$FF,palette,16 colours per character for its slot icon,Menu_SlotMemberIcon,confirmed,named MenuRom_SlotIconPals; extent to the next named table (end inferred)
+$FF:CDF4,$FF:CE03,16,$FF,palette,8 colours -> $40-$47 (the 16 bytes before MenuRom_Icon2PalB),Menu_Icon2Preview,confirmed,named MenuRom_Icon2PalC; extent: the reader's 8 records (tools/records.py)
 $FF:CE04,$FF:CE13,16,$FF,palette,8 colours -> $50-$57,Menu_Icon2Preview,confirmed,named MenuRom_Icon2PalB; extent: the reader's 8 records (tools/records.py)
-$FF:CE14,$FF:CE2F,28,$FF,unknown,28 B after MenuRom_Icon2PalB (not read as its records),,unknown,split off MenuRom_Icon2PalB in step 6: the reader's 8 records end before it (tools/records.py); no reader found
+$FF:CE14,$FF:CE2F,28,$FF,unknown,28 B after MenuRom_Icon2PalB (past its reader's 8 records),,unknown,split off MenuRom_Icon2PalB in step 6: its reader reaches 8 records (tools/records.py); no reader found for these bytes
 $FF:CE30,$FF:CE4F,32,$FF,palette,16 colours -> $70-$7F,Menu_LoadInit,confirmed,named MenuRom_LoadPalB; extent: the reader's 16 records (tools/records.py)
-$FF:CE50,$FF:CE6F,32,$FF,unknown,32 B after MenuRom_LoadPalB (not read as its records),,unknown,split off MenuRom_LoadPalB in step 6: the reader's 16 records end before it (tools/records.py); no reader found
+$FF:CE50,$FF:CE6F,32,$FF,unknown,32 B after MenuRom_LoadPalB (past its reader's 16 records),,unknown,split off MenuRom_LoadPalB in step 6: its reader reaches 16 records (tools/records.py); no reader found for these bytes
 $FF:CE70,$FF:CE77,8,$FF,table,8 B: first tile per portrait,Menu_DrawPortrait,confirmed,named MenuRom_PortraitTiles; extent: the reader's 8 records (tools/records.py)
 $FF:CE78,$FF:CE87,16,$FF,table,8 u16: bank-$FF address of 16 colours per portrait,Menu_DrawPortrait,confirmed,named MenuRom_PortraitPals; extent: the reader's 8 records (tools/records.py)
 $FF:CE88,$FF:CE91,10,$FF,table,u16 per icon: first tile word,Menu_DrawCharIcon,confirmed,named MenuRom_CharIconTiles; extent to the next named table (end inferred)
 $FF:CE92,$FF:CE99,8,$FF,table,u16 per icon: bank-$FF address of 16 colours,Menu_DrawCharIcon,confirmed,named MenuRom_CharIconPals; extent to the next named table (end inferred)
-$FF:CE9A,$FF:CEB9,32,$FF,palette,16 colours -> $40-$4F,Menu_NameChoiceInit,confirmed,named MenuRom_NameChoicePal; extent to the next named table (end inferred)
+$FF:CE9A,$FF:CEB9,32,$FF,palette,16 colours -> $40-$4F,Menu_NameChoiceInit,confirmed,named MenuRom_NameChoicePal; extent: the reader's 16 records (tools/records.py)
 $FF:CEBA,$FF:CF0D,84,$FF,table,per frame the numbers' lift in lines; negative: the end,Menu_HealBounce,confirmed,named MenuRom_HealBounce; extent to the next named table (end inferred)
 $FF:CF0E,$FF:CF17,10,$FF,table,"5 words: per item category, the address (bank $CC) of a table",Menu_ItemDataPtrA,confirmed,named MenuRom_ItemTablesA; extent: the reader's 5 records (tools/records.py)
 $FF:CF18,$FF:CF1C,5,$FF,table,5 bytes: its record size (Menu_ItemDataPtrA),Menu_ItemDataPtrA,confirmed,named MenuRom_ItemRecSizesA; extent: the reader's 5 records (tools/records.py)

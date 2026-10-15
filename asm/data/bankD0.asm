@@ -84,13 +84,13 @@ Padding_D0F98F:
 ; Read by BattleFx_LoadBgSet.
 org $D0FA00
 BattleRom_BgSetPalettes:
-    incbin "../../build/records/BattleRom_BgSetPalettes.bin"          ; records: palette 241 x 2 B
+    incbin "../../build/assets/palette/BattleRom_BgSetPalettes.bin"
 
 ; $D0:FBE2-$D0:FCFF (286 B), palette, confirmed: 9 sets of 14 colours, $20 apart
 ; Read by BattleFx_FindGradStart, BattleFx_HpGradientTick.
 org $D0FBE2
 BattleRom_GradColours:
-    incbin "../../build/records/BattleRom_GradColours.bin"          ; records: palette 143 x 2 B
+    incbin "../../build/assets/palette/BattleRom_GradColours.bin"
 
 ; $D0:FD00-$D0:FD5F (96 B), palette, confirmed: 48 colours (BGR555)
 ; Read by BattleFx_LoadBgRows2To4.

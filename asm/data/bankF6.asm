@@ -627,14 +627,14 @@ LocGfx_PackPtrs:
 ; Read by LocLoad_Unk7084.
 org $F624C0
 LocPal_Rom:
-    incbin "../../build/records/LocPal_Rom.bin"          ; records: palette 88 x 210 B
+    incbin "../../build/assets/palette/LocPal_Rom.bin"
 
 ; $F6:6CF0-$F6:7B7F (3,728 B), palette, probable: BGR555 colours (every word has bit 15 clear)
 ; Read by PalAnim_CopyListFrame, PalAnim_CopyRomFrame (kinds 1 and 8, offsets from
 ; FieldRom_AnimListB).
 org $F66CF0
 Palette_F66CF0:
-    incbin "../../build/records/Palette_F66CF0.bin"          ; records: palette 1864 x 2 B
+    incbin "../../build/assets/palette/Palette_F66CF0.bin"
 
 ; $F6:7B80-$F6:7FFF (1,152 B), padding, confirmed: 1152 x $00
 org $F67B80
