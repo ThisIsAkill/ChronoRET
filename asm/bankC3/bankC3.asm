@@ -736,7 +736,8 @@ C3_RandomByte:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:520D, $7E:82A0 and $7E:897F), with M=0 and DB=$7F (PEA/PLB).
 ; Entry: M=0, X=0 (16-bit throughout), DP = the module's (the
-;        C3Scale_* direct-page bytes; its value at the call sites is not
+;        C3Scale_* direct-page bytes; 0 at $7E:520D, C3Mod_ScaleJob,
+;        run from C3Mod_Start's idle loop; the other two sites' not
 ;        traced), DB = the bank of the source and the output ($7F at
 ;        all three sites: STA abs,Y and MVN $7F,$7F).
 ; Exit:  M=0, X=0, DB as on entry (the MVNs set it to $7F, the bank it
@@ -1783,8 +1784,8 @@ C3_IrqAck:
 ;   and $7E:4DFC).
 ; Entry: M any (P saved; SEP #$20 here), X=0 (the 16-bit LDX of the
 ;        first partial product), DP = 0 (C3_MulA.. are direct page;
-;        probably the module's DP-0 scratch, its value at the call
-;        sites not traced), DB = a bank with the CPU registers
+;        0 at all eight module sites: C3Mod_ProjectBike and
+;        C3Mod_ProjectRival, under a task), DB = a bank with the CPU registers
 ;        ($00-$3F, $80-$BF; WRMPYA.. are absolute).
 ; Exit:  P restored; A changed; X = |MulB| x the low byte of |MulA|; Y
 ;        unchanged; C3_MulProduct written.
@@ -2495,13 +2496,14 @@ C3_NmiListAdd:
 ;   $7E:3A78, $7E:5155, $7E:5D0C, $7E:5D1B, $7E:5D2D, $7E:5D9A, $7E:5E2B
 ;   and $7E:5E37).
 ; Entry: M=0 (A stored to WMADDL/M as a word), X=0 (16-bit X/Y), DP =
-;        the module's (C3_OamPos.. are direct page; probably 0, not
-;        traced), DB = a bank that maps the I/O registers and low WRAM
-;        ($00-$3F or $80-$BF: WMADDL/WMADDH/WMDATA and the OAM shadow
-;        are absolute; with DB=$7E the port accesses would hit WRAM
-;        $7E:2180-$2183 instead). The site at $7E:3A78 has DB=$00 (PEA
-;        $007E, PLB, PLB); the other sites' DB is not traced. A = the
-;        list's address.
+;        the module's (C3_OamPos.. are direct page; 0 at $7E:3A78 and
+;        $7E:5155, the others not traced), DB = a bank that maps the
+;        I/O registers and low WRAM ($00-$3F or $80-$BF:
+;        WMADDL/WMADDH/WMDATA and the OAM shadow are absolute; with
+;        DB=$7E the port accesses would hit WRAM $7E:2180-$2183
+;        instead). The site at $7E:3A78 has DB=$00 (PEA $007E, PLB,
+;        PLB) and $7E:5155 (C3Mod_DrawHud, under a task) too; the other
+;        sites' DB is not traced. A = the list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListSmall:
@@ -2557,10 +2559,12 @@ C3_SprListSmall:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
 ;   $7E:88B4 and $7E:9A07).
-; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (probably 0),
-;        DB = a bank that maps the I/O registers and low WRAM ($00-$3F
-;        or $80-$BF: WMADDL/H, WMDATA and the OAM shadow are absolute;
-;        the module sites' DB is not traced); A = the list's address.
+; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (0 at
+;        $7E:5042, $7E:50CE and $7E:514E, the others not traced), DB =
+;        a bank that maps the I/O registers and low WRAM ($00-$3F or
+;        $80-$BF: WMADDL/H, WMDATA and the OAM shadow are absolute;
+;        $00 at those three, under a task; the other sites' not
+;        traced); A = the list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:
@@ -2621,7 +2625,9 @@ C3_SprListLarge:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5111, $7E:5137 and $7E:6629).
 ; Entry: M=0 (the tile and attribute are moved as a word), X=0, DP =
-;        the module's (probably 0), DB = $00 or $7E; X = the record.
+;        the module's (0 at $7E:5111 and $7E:5137, under a task;
+;        $7E:6629's not traced), DB = $00 or $7E ($00 at those two); X
+;        = the record.
 ; Exit:  P restored; A changed; Y = the new C3_OamPos; X unchanged.
 C3_SprOneSmall:
     PHP

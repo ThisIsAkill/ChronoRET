@@ -55,6 +55,11 @@ endmacro
 !RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
 !BankC3_Entry000E = $C3000E              ; bankC3.asm: BRA/JMP to the wipe, WinFx_StepWipe (JSL)
 !C3_BuildCopyCode = $C309E9              ; bankC3.asm: writes the bitmap-to-tiles copy code (JSL)
+!C3_MulSigned = $C3094C                  ; bankC3.asm: 16 x 8-bit signed multiply (JSL)
+!C3_FindDivisor = $C30E29                ; bankC3.asm: counts a divisor up (JSL)
+!C3_SprListLarge = $C30D5E              ; bankC3.asm: a list of large sprites (JSL)
+!C3_SprOneSmall = $C30DBC                ; bankC3.asm: one small sprite (JSL)
+!C3_ScaleBitmap = $C30307                ; bankC3.asm: scales a bitmap (JSL)
 
 ; ------------------------------------------------------------
 ; RAM the module uses (DB = $00 and DP = 0 unless a header says
@@ -154,6 +159,41 @@ endmacro
                                          ; down (C3Mod_SideMinusPads' entry for the view's angle)
 !C3_PadSidePlus = $00B8                  ; 16-bit: the one that steers it up (C3Mod_SidePlusPads)
 !C3_Prog9 = $44                          ; 8-bit, dp (DP=0): 1 when C3Mod_Prog0 runs as program 9
+; The race on the screen (dp words with DP=0 unless noted):
+!C3_BikeScrX = $46                       ; 16-bit: the bike's projected X, then its sprite's left
+                                         ; (C3Mod_ProjectBike, C3Mod_SizeBike)
+!C3_BikeScrY = $48                       ; 16-bit: its projected Y, then its sprite's top
+!C3_BikeWidth = $5B                      ; 16-bit: its sprite's width (C3Mod_SizeBike)
+!C3_BikeHeight = $5D                     ; 16-bit: ... height
+!C3_BikeRight = $5F                      ; 16-bit: ... right edge
+!C3_BikeBottom = $61                     ; 16-bit: ... bottom
+!C3_RivalScrX = $6B                      ; 16-bit: as C3_BikeScrX for the rival
+!C3_RivalScrY = $6D
+!C3_RivalWidth = $80
+!C3_RivalHeight = $82
+!C3_RivalRight = $84
+!C3_RivalBottom = $86
+!C3_ViewNegCos = $90                     ; 16-bit: -cos of the view's angle (C3Mod_ProjectTask)
+!C3_ViewNegSin = $92                     ; 16-bit: -sin
+!C3_ViewCos = $94                        ; 16-bit: cos
+!C3_ViewSin = $96                        ; 16-bit: sin
+!C3_BikeTilesReady = $AA                 ; 16-bit: the bike's new tiles are to be sent (C3Mod_TilesNmiTask)
+!C3_RivalTilesReady = $AC                ; 16-bit: ... the rival's
+!C3_DivisorStart = $B4                   ; 16-bit: where C3Mod_Perspective's divisor search starts
+!C3_TilesPending = $39                   ; 16-bit: set while tiles at $0C00 wait to be sent
+!C3_TmpFC = $FC                          ; 16-bit dp scratch (C3Mod_SizeBike)
+!C3_TmpFE = $FE                          ; 16-bit dp scratch (C3Mod_Perspective; the facing in
+                                         ; C3Mod_DrawTask)
+!C3_BikeDepth = $0B00                    ; 16-bit (page $0B00's var 0): the bike's depth, the
+                                         ; divider's quotient (C3Mod_SizeBike)
+!C3_RivalDepth = $0B0C                   ; 16-bit (page $0B00's var 6): the rival's
+!C3_BikeJob = $1400                      ; 14 bytes: the bike's picture job (C3Scale_Groups.. with
+                                         ; the state word at +2)
+!C3_RivalJob = $140E                     ; 14 bytes: the rival's
+!C3_ViewFacing = $18                     ; page $0A00's var 12: added to the bikes' facing (the
+                                         ; opening scripts set 1, -1, 0)
+!C3_AnimFrame = $14                      ; page $0A00's var 10: the bikes' animation count
+!C3_RaceGo = $1A                         ; page $0B00's var 13: set after the count-down
                                          ; (C3_EntryArg bits 0-3 not 0), else 0 (Init's clear)
 !C3_StartCount = $0397                   ; 16-bit: C3Mod_Prog0's C3_EntryArg bit 6 runs, counted
                                          ; (bit 0 picks C3Mod_Prog0WipeA or B)
@@ -173,8 +213,10 @@ endmacro
 !C3_ViewOffsetX = $1440                  ; 16-bit: -sin(angle) x distance / 256 (C3Mod_ViewOffsetTask)
 !C3_ViewOffsetY = $1442                  ; 16-bit: -cos(angle) x distance / 256
 !C3_Unk1444 = $1444                      ; 16-bit: C3Mod_Prog0Vars clears it, C3Mod_RaceTask steps it
-!C3_Unk1446 = $1446                      ; 256 bytes ($1446-$1545): cleared by C3Mod_ClearUnk1446
-!C3_Unk1446Bytes = $0100                 ; its size
+!C3_DivisorCache = $1446                 ; 256 bytes ($1446-$1545): C3Mod_Perspective's divisors + 1
+                                         ; by its bound's low byte (0: none yet); cleared by
+                                         ; C3Mod_ClearDivisorCache
+!C3_DivisorCacheBytes = $0100                 ; its size
 !C3_MirrorEnd = $0200                    ; 16-bit, in the source's bank ($7F:0200 at C3Mod_Prog0):
                                          ; C3Mod_MirrorRows' first byte, from Y
 !C3_MirrorLeft = $0202                   ; 8-bit, $7F:0202: C3Mod_Prog0's C3Mod_MirrorRows calls left
@@ -435,6 +477,51 @@ endmacro
 !C3_TmpF8 = $F8
 !C3_PadB = $8000                         ; JOY1 as a word: B
 !Op_RTS = $60                            ; 65816 opcode RTS
+!C3_JobGroups = 0                        ; a picture job's fields (C3_BikeJob, C3_RivalJob): to
+!C3_JobState = 2                         ; C3Scale_Groups; the state (1 waiting, 2 done);
+!C3_JobSrc = 4                           ; C3Scale_SrcBase; C3Scale_Rows; C3Scale_YStep;
+!C3_JobRows = 6                          ; (C3Scale_XStep, set by C3Mod_ScaleJob);
+!C3_JobYStep = 8                         ; C3Scale_SrcLimit
+!C3_JobLimit = 12
+!C3_JobBytes = 14
+!C3_JobWaiting = $0001
+!C3_JobDone = $0002
+!C3_DepthMask = $0FFF                    ; the depth's bits
+!C3_DepthMin = $0040                     ; the least depth / 2 used for a size
+!C3_DepthNear = $0080                    ; the least depth for the bike's job
+!C3_SizeHeight = $0C00                   ; C3Mod_SizeBike: the height is this / (depth / 2)
+!C3_SizeWidth = $1000                    ; ... the width this / (depth / 2)
+!C3_SizeDepthX = $8000                   ; ... the X scale (2 x this / depth)
+!C3_ScreenMidX = $0080                   ; the screen's middle column
+!C3_LinesShown = $00E0                   ; 224 lines
+!C3_FacingMask = $000E                   ; a facing as an even index (8 entries)
+!C3_BarBase = $00B8                      ; the HUD bar's right end ($D8 in program 9, written)
+!C3_BarLeft = $0021                      ; the bar's length = C3_BarBase - this - 1
+!C3_BarRight = $0006                     ; C3Mod_MarkerX's X = C3_BarBase + this - ... - 1
+!C3_MarkerTop = $00C0                    ; the markers' Y = the side / 8 + this
+!C3_StepMid = $0080                      ; y steps: from here up, 4 sprites ...
+!C3_StepFar = $0100                      ; ... from here up, 1
+!C3_Count1 = $0002                       ; sprite-list counts (sprites + 1)
+!C3_Count4 = $0005
+!C3_Count9 = $000A
+!C3_SecondFrame = $0010                  ; the second frame's offset in the picture tables
+!C3_BikeGroups = $0004                   ; C3Scale_Groups of the bike (64 pixels)
+!C3_RivalGroups = $0003                  ; ... of the rival (48)
+!C3_RivalLimit = $0600                   ; the rival's C3Scale_SrcLimit
+!C3_RivalRows = $0030                    ; the rival's C3Scale_Rows
+!C3_IconX = $00EA                        ; the boost icons' first X
+!C3_IconY = $00D0                        ; ... and Y
+!C3_HudOffset = $0018                    ; C3Mod_DrawHud's .offset at first
+!C3_HudMax = $03E8                       ; the largest distance shown (1000)
+!C3_HudNumberX = $0010                   ; the HUD numbers' X
+!C3_HudDistanceY = $000E                 ; the distance's Y
+!C3_HudScoreY = $0018                    ; the score's Y
+!C3_HudEvery = $40                       ; .offset goes down every 64 frames
+!C3_BikeTilesVram = $4000                ; VRAM word of the bike's tiles (sprite tile $00)
+!C3_RivalTilesVram = $4400               ; ... of the rival's (sprite tile $40)
+!C3_TilesBytes = $0800                   ; a picture's tiles
+!C3_TilesBuffer = $0C00                  ; $00:0C00: where the copy code puts them
+!C3_CopyCodeAddr = $B574                 ; C3_CopyCode in bank $7E (JSR)
 !C3_PadR = $0010                         ; JOY1 as a word (C3_Pad..): R
 !C3_PadL = $0020                         ; L
 !C3_PadX = $0040                         ; X

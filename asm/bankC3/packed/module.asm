@@ -43,7 +43,7 @@ incsrc "module.inc"
 ; through ReentryVectors entry [0], the warm restart into
 ; GameLoop_Main.
 ; The idle call at $3023 is self-modifying: programs write another
-; routine's address over its operand ($3024: $51D1 at $3CE4, $7441 at
+; routine's address over its operand ($3024: C3Mod_ScaleIdle at $3CE4, $7441 at
 ; $70D7, $8278 at $79B7, $8930 at $8794 and $87D0, and back to
 ; C3Mod_Return at $96FE), so the loop runs that routine once per pass
 ; between frames; C3Mod_Return, the default, does nothing (an RTS).
@@ -337,12 +337,13 @@ C3Mod_WaitVblank:
 ; of the next add: the product is one too big in its bits 8-23 when
 ; $F8 bit 7 is set (the callers leave $F8 as it is).
 ; Callers note: C3Mod_MulSigned16 ($33F0) and $3591, $35A7, $35C9,
-;   $35E8, $4F4A, $56DE, $5BE7, $5C05, $5C22, $5CCD, $5CF0, $6025, $99CB
-;   and $99EB (code not matched yet).
+;   $35E8, C3Mod_Perspective ($4F4A) and $56DE, $5BE7, $5C05, $5C22,
+;   $5CCD, $5CF0, $6025, $99CB and $99EB (code not matched yet).
 ; Entry: M=0 (16-bit A for the product reads), X=0 (X and Y are pushed
 ;        and pulled as words), DP = the page of C3Math_A.. (the
 ;        script's page at C3Mod_BuildM7Tables' calls $3591-$35E8, the
-;        caller's own at C3Mod_MulSigned16's; the others' not traced),
+;        caller's own at C3Mod_MulSigned16's, 0 at C3Mod_Perspective's;
+;        the others' not traced),
 ;        DB any (saved); C3Math_A, C3Math_B = the operands.
 ; Exit:  P, X, Y, DB restored; A = the product's high word; C3Math_Lo
 ;        and C3Math_Hi = the product; $F8 shifted left (see above).
@@ -429,9 +430,10 @@ C3Mod_Div16:
 ; C3Math_B - 1 (in C3Math_Q) with the carry clear from the shift, one
 ; instruction less than SEC / SBC. Quirk: as for C3Mod_Div16, a remainder
 ; from $8000 up (a divisor above $8000) gives a wrong step.
-; Callers note: $4E30, $4E43, $4E55, $4EAB, $4EBF, $8210 and $896E (code
-;   not matched yet).
-; Entry: M=0, X any, DP = the page of C3Math_A.. (0 at the calls); DB
+; Callers note: C3Mod_SizeBike ($4E30, $4E43, $4E55), C3Mod_SizeRival
+;   ($4EAB, $4EBF) and $8210 and $896E (code not matched yet).
+; Entry: M=0, X any, DP = the page of C3Math_A.. (0 at the five
+;        C3Mod_Size* calls; $8210's and $896E's not traced); DB
 ;        any; A = the dividend, C3Math_B = the divisor (not 0).
 ; Exit:  A = the remainder, C3Math_Lo = the quotient; C3Math_A shifted
 ;        left by 8, with the entry carry in bit 7 (the first ROL takes
@@ -511,10 +513,12 @@ C3Mod_Div32:
 ; Signed 16 x 16-bit multiply: the operands are made positive in place,
 ; multiplied (C3Mod_Mul16) and the 32-bit product negated when their
 ; signs differed.
-; Callers note: C3Mod_ViewOffsetTask ($4458, $446B) and $4E61, $4ECB,
-;   $9939, $9953, $9B0A and $9B1D (code not matched yet).
+; Callers note: C3Mod_ViewOffsetTask ($4458, $446B), C3Mod_SizeBike
+;   ($4E61), C3Mod_SizeRival ($4ECB) and $9939, $9953, $9B0A and $9B1D
+;   (code not matched yet).
 ; Entry: M=0, X=0 (C3Mod_Mul16's), DP = the page of C3Math_A.. ($0A00 at
-;        C3Mod_ViewOffsetTask's calls; the others' not traced); DB any;
+;        C3Mod_ViewOffsetTask's calls, 0 at C3Mod_SizeBike's and
+;        C3Mod_SizeRival's; the others' not traced); DB any;
 ;        C3Math_A, C3Math_B = the signed operands.
 ; Exit:  P restored; C3Math_Lo/Hi = the signed product; C3Math_A and
 ;        C3Math_B = the operands' magnitudes; A = the product's high
@@ -656,10 +660,10 @@ C3Mod_TableRandom:
 ; probably for the screen's downward y). C3Mod_Cosine adds a quarter
 ; turn and falls into C3Mod_Sine ($3465), so it gives -cos.
 ; Callers note: C3Mod_BuildM7Tables ($357F), C3Mod_ViewOffsetTask
-;   ($444F) and $4D19, $56B6, $5867, $5BD7, $5BFB, $5CBC, $73C9, $76DB,
+;   ($444F), C3Mod_ProjectTask ($4D19) and $56B6, $5867, $5BD7, $5BFB, $5CBC, $73C9, $76DB,
 ;   $994A, $9990, $99DB and $9B01 (code not matched yet). C3Mod_Sine:
 ;   C3Mod_BuildM7Tables ($35B7), C3Mod_ViewOffsetTask ($4462) and
-;   $4D26, $56C2, $585B, $5C11, $5CE0, $6014, $73BD, $73FD, $76FE,
+;   C3Mod_ProjectTask ($4D26) and $56C2, $585B, $5C11, $5CE0, $6014, $73BD, $73FD, $76FE,
 ;   $9930, $9983, $99BB and $9B14 (code not matched yet).
 ; Entry: M=0, X=0 (16-bit index), DP any, DB any (the read is long); A
 ;        = the angle (only bits 0-9 count).
@@ -2126,7 +2130,7 @@ C3Mod_NmiTaskReplace:
 ; writes HTIMEL with 0). DB is set to $7E for the list with PEA $007E /
 ; PLB, and to $00 for the sprite builder by the second PLB (the PEA's
 ; other byte).
-; Callers note: $5187 and $51AE (code not matched yet).
+; Callers note: C3Mod_DrawHud ($5187, $51AE JMP).
 ; Entry: M=0, X any (8-bit set here), DP=0 (C3_ScratchF0, and
 ;        C3_SprListSmall's C3_OamPos..), DB any (left $00); C3_ScratchF0
 ;        = the number; C3_SprBaseX/Y = where its left end goes.
@@ -2391,7 +2395,7 @@ C3Mod_SprListMixed:
 ;     both: C3_FadeStep = C3_FadeTimer = 8;
 ;   - runs page $0A00's script once (C3Mod_ScriptTaskA: DP = $0A00,
 ;     DB = $7E until the PLB), writes C3Mod_Prog0Setup over
-;     C3Mod_BuildM7Tables' setup call ($35FD) and C3Mod_Unk51D1 over
+;     C3Mod_BuildM7Tables' setup call ($35FD) and C3Mod_ScaleIdle over
 ;     C3Mod_Start's idle call ($3024);
 ;   - builds the copy code at $7E:B574 (C3_BuildCopyCode, X = $0C00,
 ;     Y = $0200), sets the BG maps and tiles (BG1SC = $60, BG2SC =
@@ -2571,7 +2575,7 @@ C3Mod_Prog0:
     JSR C3Mod_ScriptTaskA
     LDA.w #C3Mod_Prog0Setup
     STA.w C3Mod_BuildM7Tables_setup+1   ; DB = $7E here
-    LDA.w #C3Mod_Unk51D1
+    LDA.w #C3Mod_ScaleIdle
     STA.w C3Mod_Start_wait_exit+1
     PLB
     SEP #$20
@@ -2913,9 +2917,9 @@ C3Mod_MirrorRows:                       ; header: see C3Mod_MirrorRows3
 ; $7E:3F14 — C3Mod_Prog0ScriptA (69 bytes, $3F14–$3F58)
 ; Page $0A00's first script (C3_EntryArg bit 6 clear): adds the frame
 ; tasks (C3Mod_ViewTask, C3Mod_PadDelayTask, both scripts' tasks,
-; C3Mod_TurnTask, C3Mod_Unk4F54, C3Mod_Unk4D0D, C3Mod_FadeInTask,
+; C3Mod_TurnTask, C3Mod_DrawTask, C3Mod_ProjectTask, C3Mod_FadeInTask,
 ; C3Mod_ViewOffsetTask) and the NMI tasks (C3Mod_OamUploadTask,
-; C3Mod_HideSprites, C3Mod_Unk5221, C3Mod_ScrollNmiTask,
+; C3Mod_HideSprites, C3Mod_TilesNmiTask, C3Mod_ScrollNmiTask,
 ; C3Mod_HorizonNmiTask, C3Mod_ClearColumnTask), sets the view (speed 0,
 ; distance $4C, scale $50, first divisor $28, X -$8C, angle 0, horizon
 ; $38) and goes on in C3Mod_Prog0RunA or C3Mod_Prog0RunB, picked at
@@ -2926,13 +2930,13 @@ C3Mod_Prog0ScriptA:
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskB
     db !C3Op_TaskAdd : dw C3Mod_TurnTask
-    db !C3Op_TaskAdd : dw C3Mod_Unk4F54
-    db !C3Op_TaskAdd : dw C3Mod_Unk4D0D
+    db !C3Op_TaskAdd : dw C3Mod_DrawTask
+    db !C3Op_TaskAdd : dw C3Mod_ProjectTask
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
     db !C3Op_TaskAdd : dw C3Mod_ViewOffsetTask
     db !C3Op_NmiAdd : dw C3Mod_OamUploadTask
     db !C3Op_NmiAdd : dw C3Mod_HideSprites
-    db !C3Op_NmiAdd : dw C3Mod_Unk5221
+    db !C3Op_NmiAdd : dw C3Mod_TilesNmiTask
     db !C3Op_NmiAdd : dw C3Mod_ScrollNmiTask
     db !C3Op_NmiAdd : dw C3Mod_HorizonNmiTask
     db !C3Op_NmiAdd : dw C3Mod_ClearColumnTask
@@ -3178,19 +3182,19 @@ C3Mod_Prog0WipeB:
 ; X speed $11, angle 0, horizon $38; returns (opcode $F4). The $F3's
 ; return point goes to C3Script_Ret ($30), which is also
 ; C3_ViewCache's first word: C3Mod_ViewTask then sees a changed scale
-; and rebuilds once more (and clears C3_Unk1446).
+; and rebuilds once more (and clears C3_DivisorCache).
 C3Mod_Prog0Start:
     db !C3Op_TaskAdd : dw C3Mod_ViewTask
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskB
     db !C3Op_TaskAdd : dw C3Mod_TurnTask
-    db !C3Op_TaskAdd : dw C3Mod_Unk4F54
-    db !C3Op_TaskAdd : dw C3Mod_Unk4D0D
+    db !C3Op_TaskAdd : dw C3Mod_DrawTask
+    db !C3Op_TaskAdd : dw C3Mod_ProjectTask
     db !C3Op_TaskAdd : dw C3Mod_WipeTask
     db !C3Op_TaskAdd : dw C3Mod_ViewOffsetTask
     db !C3Op_NmiAdd : dw C3Mod_OamUploadTask
     db !C3Op_NmiAdd : dw C3Mod_HideSprites
-    db !C3Op_NmiAdd : dw C3Mod_Unk5221
+    db !C3Op_NmiAdd : dw C3Mod_TilesNmiTask
     db !C3Op_NmiAdd : dw C3Mod_ScrollNmiTask
     db !C3Op_NmiAdd : dw C3Mod_HorizonNmiTask
     db !C3Op_Set|9 : dw $0011
@@ -3457,17 +3461,17 @@ C3Mod_PadDelayTask:
 ; page $0A00's scale, angle, horizon, first divisor or step mode
 ; differs from its copy in C3_ViewCache (5 words). The copies from the
 ; first that differs on are updated (they enter at that one's store);
-; a new scale also clears C3_Unk1446 (C3Mod_ClearUnk1446).
+; a new scale also clears C3_DivisorCache (C3Mod_ClearDivisorCache).
 ; Callers note: a task added by script opcode $FA at $3F14
 ;   (C3Mod_Prog0ScriptA) and $412D (C3Mod_Prog0Start).
 ; Entry: a task: M=0, X=0 (C3Mod_BuildM7Tables'), DP any (set to $0A00
 ;        here, restored by C3Mod_RunTasks), DB=$00 (a task's: the STZ
-;        before C3Mod_ClearUnk1446's MVN is absolute, so DB must map
+;        before C3Mod_ClearDivisorCache's MVN is absolute, so DB must map
 ;        low WRAM; C3Mod_BuildM7Tables sets its own).
 ; Exit:  unchanged: RTS with A = the step mode, DP = $0A00; else as
 ;        C3Mod_BuildM7Tables leaves them (M=0, X=0, DP = DP_CPU, DB =
 ;        $7E).
-; Calls: C3Mod_ClearUnk1446, C3Mod_BuildM7Tables (JMP).
+; Calls: C3Mod_ClearDivisorCache, C3Mod_BuildM7Tables (JMP).
 C3Mod_ViewTask:
     LDA.w #!C3_ScriptPageA
     TCD
@@ -3489,7 +3493,7 @@ C3Mod_ViewTask:
     RTS
 .scale:
     STA.b !C3_ViewCache
-    JSR C3Mod_ClearUnk1446
+    JSR C3Mod_ClearDivisorCache
     LDA.b !C3_ViewAngle
 .angle:
     STA.b !C3_ViewCache+2
@@ -3504,8 +3508,8 @@ C3Mod_ViewTask:
     STA.b !C3_ViewCache+8
     JMP C3Mod_BuildM7Tables
 
-; $7E:4309 — C3Mod_ClearUnk1446 (16 bytes, $4309–$4318)
-; Zeroes the 256 bytes of C3_Unk1446 ($1446-$1545: a word stored, then
+; $7E:4309 — C3Mod_ClearDivisorCache (16 bytes, $4309–$4318)
+; Zeroes the 256 bytes of C3_DivisorCache ($1446-$1545: a word stored, then
 ; an overlapping MVN in bank $00).
 ; Callers note: C3Mod_ViewTask ($42F3) and C3Mod_Prog0Vars ($4640,
 ;   JMP).
@@ -3514,11 +3518,11 @@ C3Mod_ViewTask:
 ;        or $7E, or another bank that maps low WRAM: $00 at both
 ;        calls).
 ; Exit:  M=0, X=0, DB = $00; A = $FFFF; X = $1545, Y = $1546.
-C3Mod_ClearUnk1446:
-    STZ.w !C3_Unk1446
-    LDX.w #!C3_Unk1446
-    LDY.w #!C3_Unk1446+1
-    LDA.w #!C3_Unk1446Bytes-2
+C3Mod_ClearDivisorCache:
+    STZ.w !C3_DivisorCache
+    LDX.w #!C3_DivisorCache
+    LDY.w #!C3_DivisorCache+1
+    LDA.w #!C3_DivisorCacheBytes-2
     MVN $00,$00                         ; lint-ok: MVN operands are bank bytes (bank $00)
     RTS
 
@@ -4020,34 +4024,35 @@ C3Mod_Prog0Setup:
 ; (C3_Prog9) writes $D8 over the low byte of the LDA #$00B8 operands
 ; at $4F74 and $50DA (they load $00D8) and into sprite-list data: $D8
 ; and $E8 into the X bytes at $53A0 and $53A4, 6 and 1 into the counts
-; at $5395 and $53AE (the lists $5116 passes by LDA #$5395 at $514B
-; and LDA #$53AE at $5152; code not matched yet); program 0 sets C3_BoostTimer = $80 and C3_BoostsLeft = 3.
+; at $5395 and $53AE (C3Mod_HudSprites and C3Mod_HudSmall, the lists
+; C3Mod_DrawHud passes by LDA #$5395 at $514B and LDA #$53AE at
+; $5152); program 0 sets C3_BoostTimer = $80 and C3_BoostsLeft = 3.
 ; Then the words: C3_BikeTopSpeed = C3_BikeTopBehind = $4000,
 ; C3_RivalTopSpeed = $3000, C3_RivalTopAhead = $5000, C3_BikeSteer =
 ; 0, C3_BikeSide = $6000, C3_RivalSide = $2000, C3_BumpLast = $20,
 ; C3_ColumnCleared = C3_BoostHeld = 1, C3_Unk1444 = 0,
 ; C3_PadSideMinus / C3_PadSidePlus = the angle-0 entries (Up / Down),
-; and C3_Unk1446 cleared (JMP C3Mod_ClearUnk1446).
+; and C3_DivisorCache cleared (JMP C3Mod_ClearDivisorCache).
 ; Callers note: C3Mod_Prog0 ($3C51).
 ; Entry: M=1, X=0, DP=0, DB=$00 (absolute RAM; the code stores are
 ;        long).
 ; Exit:  M=0 (REP #$20: CALL_EXITS in tools/c3module.py), X=0, DB =
-;        $00; as C3Mod_ClearUnk1446 leaves them (A = $FFFF, X = $1545,
+;        $00; as C3Mod_ClearDivisorCache leaves them (A = $FFFF, X = $1545,
 ;        Y = $1546).
-; Calls: C3Mod_ClearUnk1446 (JMP).
+; Calls: C3Mod_ClearDivisorCache (JMP).
 C3Mod_Prog0Vars:
     LDA.b !C3_Prog9
     BEQ .prog0
     LDA.b #!C3_Prog9Unk53A0
-    STA.l C3Mod_Unk53A0
-    STA.l C3Mod_Unk4F74
-    STA.l C3Mod_Unk50DA
+    STA.l C3Mod_HudSprites+11
+    STA.l C3Mod_DrawTask_bar+1
+    STA.l C3Mod_MarkerX_base+1
     LDA.b #!C3_Prog9Unk53A4
-    STA.l C3Mod_Unk53A4
+    STA.l C3Mod_HudSprites+15
     LDA.b #!C3_Prog9Unk5395
-    STA.l C3Mod_Unk5395
+    STA.l C3Mod_HudSprites
     LDA.b #!C3_Prog9Unk53AE
-    STA.l C3Mod_Unk53AE
+    STA.l C3Mod_HudSmall
     BRA .both
 .prog0:
     LDA.b #!C3_BoostTimerStart
@@ -4078,7 +4083,7 @@ C3Mod_Prog0Vars:
     STA.w !C3_PadSideMinus
     LDA.l C3Mod_SidePlusPads
     STA.w !C3_PadSidePlus
-    JMP C3Mod_ClearUnk1446
+    JMP C3Mod_ClearDivisorCache
 
 ; $7E:4643 — C3Mod_ClearColumnTask (52 bytes with C3Mod_RestoreColumnTask, $4643–$4676)
 ; NMI tasks that run once: DMA channel 7 writes 19 bytes to VRAM's low
@@ -4451,13 +4456,13 @@ C3Mod_RaceFinish:
 ;     equal to 8: JMP C3Mod_RaceFinish. Else the rival's equal to 8:
 ;     the race is lost: C3_RaceResult = 2 (a word store, so
 ;     C3_RacePrize = 0 too, as it already is), C3Mod_SteerTask removed,
-;     an RTS (Op_RTS) written over $510D, the shared end of the
-;     routines at $50F1 and $5100 (code not matched yet), which place
-;     the sprite lists at $538D / $5391 with X from each bike's lap
+;     an RTS (Op_RTS) written over $510D, the shared end (.draw) of
+;     C3Mod_RivalMarker and C3Mod_BikeMarker ($50F1, $5100), which
+;     place the HUD's progress markers C3Mod_RivalMarkerSpr /
+;     C3Mod_BikeMarkerSpr ($538D / $5391) with X from each bike's lap
 ;     progress and Y = its side's high byte / 8 + $C0 (the word at the
-;     side + 1), next to $5116's boost icons: probably the HUD's
-;     progress markers, so they are no longer drawn (not traced
-;     further); the view's X speed = (the two speeds + 1, the carry of
+;     side + 1), next to C3Mod_DrawHud's boost icons: the markers are
+;     no longer drawn; the view's X speed = (the two speeds + 1, the carry of
 ;     the equal CMP) / 2048, C3Mod_SkyNmiTask (NMI) and
 ;     C3Mod_CountDownTask (the score counted down) added, page $0A00 on
 ;     C3Mod_Prog0Quit, and the task ends (C3Mod_TaskEnd).
@@ -4585,7 +4590,7 @@ C3Mod_RaceStepTask:
     JSR C3Mod_TaskRemove
     SEP #$20
     LDA.b #!Op_RTS
-    STA.l C3Mod_Unk510D
+    STA.l C3Mod_BikeMarker_draw
     REP #$20
     LDA.b !C3_BikeSpeed                 ; C = 1 from the CMP
     ADC.b !C3_RivalSpeed
@@ -5252,8 +5257,1014 @@ C3Mod_BumpFromAbove:
     RTS
 
 %C3ModOrg($7E4D0D)
-C3Mod_Rest4D0D:
-    %C3ModRomBytes($7E4D0D, $7E5261)
+; ============================================================
+; The race on the screen: the two bikes' projection and sizes
+; ($4D0D–$4F53)
+; ============================================================
+; The bike and the rival are placed around the view's centre: along
+; the track by C3_RaceGap (its low byte, signed), across by their side
+; positions' high bytes - $40, both turned by the view's angle with the
+; C3_View* rotation words (C3_ViewNegCos = -cos, C3_ViewNegSin = -sin,
+; C3_ViewCos, C3_ViewSin; C3Mod_Sine gives -sin). Then each one's
+; height on the screen gives a depth from the hardware divider, and
+; the depth the sprite's size and its scaled picture.
+
+; $7E:4D0D — C3Mod_ProjectTask (65 bytes, $4D0D–$4D4D)
+; A task: the rotation words from the view's angle a (page $0A00's
+; C3_ViewAngle): x = $100 - a + C (EOR / INC, then ADC #$100 with the
+; carry as the task is entered: 0, from C3Mod_TaskNext's CPX, unless
+; it is the list's first task), C3_ViewNegSin = C3Mod_Cosine(x) =
+; -sin(a) and C3_ViewSin its negation, C3_ViewNegCos = C3Mod_Sine(x) =
+; -cos(a) and C3_ViewCos its negation (with C = 0); then
+; C3Mod_ProjectBike and C3Mod_ProjectRival, C3_DivisorStart = the
+; horizon (page $0A00's C3_ViewHorizon), and the two sizes: when
+; C3_BikeScrY - C3_RivalScrY has bit 15 set (CMP / BMI: the bike higher
+; on the screen), C3Mod_SizeBike then C3Mod_SizeRival (JMP), else
+; (equal included) C3Mod_SizeRival then C3Mod_SizeBike (JMP).
+; Callers note: a task added by script opcode $FA at $3F26
+;   (C3Mod_Prog0ScriptA) and $413C (C3Mod_Prog0Start).
+; Entry: a task (C3Mod_RunTasks): M=0, X=0, DP=0 (the race words, the
+;        C3_Mul* and C3Math_* scratch), DB=$00 (the page words and the
+;        divider are absolute).
+; Exit:  as C3Mod_SizeBike or C3Mod_SizeRival leaves them (JMP): M=0,
+;        X=0, DP=0, DB=$00.
+; Calls: C3Mod_Cosine, C3Mod_Sine, C3Mod_ProjectBike,
+;   C3Mod_ProjectRival, C3Mod_SizeBike, C3Mod_SizeRival.
+C3Mod_ProjectTask:
+    LDA.w !C3_ScriptPageA+!C3_ViewAngle
+    EOR.w #!Eng_Invert16
+    INC A
+    ADC.w #!C3_QuarterTurn              ; C as the task is entered
+    STA.b !C3_TmpF0
+    JSR C3Mod_Cosine
+    STA.b !C3_ViewNegSin
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C3_ViewSin
+    LDA.b !C3_TmpF0
+    JSR C3Mod_Sine
+    STA.b !C3_ViewNegCos
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C3_ViewCos
+    JSR C3Mod_ProjectBike
+    JSR C3Mod_ProjectRival
+    LDA.w !C3_ScriptPageA+!C3_ViewHorizon
+    STA.b !C3_DivisorStart
+    LDA.b !C3_BikeScrY
+    CMP.b !C3_RivalScrY
+    BMI .bike_first
+    JSR C3Mod_SizeRival
+    JMP C3Mod_SizeBike
+.bike_first:
+    JSR C3Mod_SizeBike
+    JMP C3Mod_SizeRival
+
+; $7E:4D4E — C3Mod_ProjectBike (87 bytes, $4D4E–$4DA4)
+; The bike's point: with g = C3_RaceGap's low byte (C3_FinishGap's
+; once C3_RacePhase is not 0: LDA / BEQ) and s = the word at
+; C3_BikeSide+1 - $40 (CLC / ADC #$FFC0; C3_MulB takes its low byte),
+; both signed bytes for C3_MulSigned (a 16-bit x 8-bit multiply):
+; C3_BikeScrX = (-cos) x g + (-sin) x s and C3_BikeScrY = (-sin) x g +
+; cos x s (the low words of the products, added with CLC).
+; Callers note: C3Mod_ProjectTask ($4D31).
+; Entry: M=0, X=0 (C3_MulSigned's 16-bit LDX), DP=0 (the race words and
+;        C3_MulA..), DB=$00 (C3_MulSigned's CPU registers).
+; Exit:  M=0, X=0; A = C3_BikeScrY; X = C3_ViewCos; Y unchanged; C =
+;        the last ADC's carry out; C3_MulA.. changed.
+; Calls: C3_MulSigned (JSL).
+C3Mod_ProjectBike:
+    LDX.b !C3_ViewNegCos
+    STX.b !C3_MulA
+    LDX.b !C3_RaceGap
+    LDA.b !C3_RacePhase
+    BEQ .gap_x
+    LDX.b !C3_FinishGap
+.gap_x:
+    STX.b !C3_MulB
+    JSL !C3_MulSigned
+    LDA.b !C3_MulProduct
+    PHA
+    LDX.b !C3_ViewNegSin
+    STX.b !C3_MulA
+    LDA.b !C3_BikeSide+1
+    CLC
+    ADC.w #-!C3_SideMiddle
+    STA.b !C3_MulB
+    JSL !C3_MulSigned
+    PLA
+    CLC
+    ADC.b !C3_MulProduct
+    STA.b !C3_BikeScrX
+    LDX.b !C3_ViewNegSin
+    STX.b !C3_MulA
+    LDX.b !C3_RaceGap
+    LDA.b !C3_RacePhase
+    BEQ .gap_y
+    LDX.b !C3_FinishGap
+.gap_y:
+    STX.b !C3_MulB
+    JSL !C3_MulSigned
+    LDA.b !C3_MulProduct
+    PHA
+    LDX.b !C3_ViewCos
+    STX.b !C3_MulA
+    LDA.b !C3_BikeSide+1
+    CLC
+    ADC.w #-!C3_SideMiddle
+    STA.b !C3_MulB
+    JSL !C3_MulSigned
+    PLA
+    CLC
+    ADC.b !C3_MulProduct
+    STA.b !C3_BikeScrY
+    RTS
+
+; $7E:4DA5 — C3Mod_ProjectRival (97 bytes, $4DA5–$4E05)
+; The rival's point, as C3Mod_ProjectBike's with the other sign along
+; the track: C3_RivalScrX = cos x g + (-sin) x s and C3_RivalScrY =
+; sin x g + cos x s, s from the word at C3_RivalSide+1; g =
+; C3_FinishGap's low byte instead of C3_RaceGap's only when
+; C3_RacePhase is not 0 and C3_Prog9 (read as a word, with $45) is
+; not 0. Nothing is done while C3_Unk1444 is not 0 (BEQ).
+; Quirk: no CLC before the four ADCs (C3_MulSigned restores P, so each
+; carry goes through): s = the side word - $40 + C, C the carry
+; C3Mod_ProjectBike's last ADC left (for the X term) or the X sum's
+; carry out (for the Y term), and each sum takes the carry out of the
+; ADC #$FFC0 before it.
+; Callers note: C3Mod_ProjectTask ($4D34).
+; Entry: M=0, X=0, DP=0, DB=$00, as C3Mod_ProjectBike; C = its last
+;        carry (C3Mod_ProjectTask calls it right after).
+; Exit:  M=0, X=0; A = C3_RivalScrY (or C3_Unk1444, not 0); X =
+;        C3_ViewCos (or unchanged); Y unchanged; C3_MulA.. changed.
+; Calls: C3_MulSigned (JSL).
+C3Mod_ProjectRival:
+    LDA.w !C3_Unk1444
+    BEQ .project
+    RTS
+.project:
+    LDX.b !C3_ViewCos
+    STX.b !C3_MulA
+    LDX.b !C3_RaceGap
+    LDA.b !C3_RacePhase
+    BEQ .gap_x
+    LDA.b !C3_Prog9
+    BEQ .gap_x
+    LDX.b !C3_FinishGap
+.gap_x:
+    STX.b !C3_MulB
+    JSL !C3_MulSigned
+    LDA.b !C3_MulProduct
+    PHA
+    LDX.b !C3_ViewNegSin
+    STX.b !C3_MulA
+    LDA.b !C3_RivalSide+1               ; C as left (no CLC)
+    ADC.w #-!C3_SideMiddle
+    STA.b !C3_MulB
+    JSL !C3_MulSigned
+    PLA
+    ADC.b !C3_MulProduct
+    STA.b !C3_RivalScrX
+    LDX.b !C3_ViewSin
+    STX.b !C3_MulA
+    LDX.b !C3_RaceGap
+    LDA.b !C3_RacePhase
+    BEQ .gap_y
+    LDA.b !C3_Prog9
+    BEQ .gap_y
+    LDX.b !C3_FinishGap
+.gap_y:
+    STX.b !C3_MulB
+    JSL !C3_MulSigned
+    LDA.b !C3_MulProduct
+    PHA
+    LDX.b !C3_ViewCos
+    STX.b !C3_MulA
+    LDA.b !C3_RivalSide+1
+    ADC.w #-!C3_SideMiddle
+    STA.b !C3_MulB
+    JSL !C3_MulSigned
+    PLA
+    ADC.b !C3_MulProduct
+    STA.b !C3_RivalScrY
+    RTS
+
+; $7E:4E06 — C3Mod_SizeBike (119 bytes, $4E06–$4E7C)
+; The bike's size on the screen, from its projected Y:
+;   - C3Mod_Perspective with C3_BikeScrY: A = the line under the bike
+;     (bottom), and it starts the divider on (C3_ViewScale x 256) / A's
+;     low byte (a 16-bit STA to WRDIVB: HTIMEL gets A's high byte);
+;   - C3_BikeScrY = A + C3_TmpF8 + C (C: the borrow of
+;     C3Mod_Perspective's SBC, as C3Mod_Mul16 restores P) - the last
+;     C3_BikeHeight (SEC);
+;   - C3_BikeDepth (page $0B00's var 0) = the quotient (RDDIVL, read
+;     four instructions later) AND $FFF; h = C3_BikeDepth / 2, at
+;     least $40 (CMP #$40 / BPL: kept when h - $40 has bit 15 clear);
+;   - C3_BikeHeight = $0C00 / h (C3Mod_DivHighByte: the dividend's
+;     high byte x 256 / h), C3_BikeBottom = C3_BikeScrY + it (CLC);
+;     C3_BikeWidth = $1000 / h, low byte;
+;   - C3_BikeScrX = ((2 x $8000 / C3_BikeDepth) x C3_BikeScrX (signed,
+;     C3Mod_MulSigned16), bits 16-31) + $80 (CLC) - C3_BikeWidth / 2
+;     (SBC with C = the bit the LSR shifted out); C3_BikeRight = it +
+;     C3_BikeWidth (CLC).
+; Callers note: C3Mod_ProjectTask ($4D45 JMP, $4D48).
+; Entry: M=0, X=0 (set again after C3Mod_Perspective's SEP #$10), DP=0
+;        (the race words, C3Math_*), DB=$00 (the divider and the page
+;        words are absolute); C as the caller leaves it (it goes into
+;        C3Mod_Perspective's first ADC).
+; Exit:  M=0, X=0; A = C3_BikeRight; X as C3Mod_Perspective leaves it
+;        (the divisor + 1); Y as it leaves it; C = the last ADC's
+;        carry out; C3Math_* and C3_TmpF8 changed.
+; Calls: C3Mod_Perspective, C3Mod_DivHighByte, C3Mod_MulSigned16.
+C3Mod_SizeBike:
+    LDA.b !C3_BikeScrY
+    STA.b !C3_TmpF0
+    JSR C3Mod_Perspective
+    STA.w WRDIVB                        ; and HTIMEL (16-bit)
+    ADC.b !C3_TmpF8                     ; C from C3Mod_Perspective's SBC
+    SEC
+    SBC.b !C3_BikeHeight
+    STA.b !C3_BikeScrY
+    LDA.w RDDIVL
+    AND.w #!C3_DepthMask
+    STA.w !C3_BikeDepth
+    LSR A
+    CMP.w #!C3_DepthMin
+    BPL .depth_ok
+    LDA.w #!C3_DepthMin
+.depth_ok:
+    STA.b !C3_TmpFC
+    STA.b !C3Math_B
+    LDA.w #!C3_SizeHeight
+    JSR C3Mod_DivHighByte
+    LDA.b !C3Math_Lo
+    STA.b !C3_BikeHeight
+    CLC
+    ADC.b !C3_BikeScrY
+    STA.b !C3_BikeBottom
+    LDA.b !C3_TmpFC
+    STA.b !C3Math_B
+    LDA.w #!C3_SizeWidth
+    JSR C3Mod_DivHighByte
+    LDA.b !C3Math_Lo
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_BikeWidth
+    LDA.w !C3_BikeDepth
+    STA.b !C3Math_B
+    LDA.w #!C3_SizeDepthX
+    JSR C3Mod_DivHighByte
+    LDA.b !C3Math_Lo
+    ASL A
+    STA.b !C3Math_A
+    LDA.b !C3_BikeScrX
+    STA.b !C3Math_B
+    JSR C3Mod_MulSigned16
+    LDA.b !C3Math_Hi
+    CLC
+    ADC.w #!C3_ScreenMidX
+    STA.b !C3Math_B
+    LDA.b !C3_BikeWidth
+    LSR A
+    STA.b !C3Math_A
+    LDA.b !C3Math_B
+    SBC.b !C3Math_A                     ; C = the bit the LSR shifted out
+    STA.b !C3_BikeScrX
+    CLC
+    ADC.b !C3_BikeWidth
+    STA.b !C3_BikeRight
+    RTS
+
+; $7E:4E7D — C3Mod_SizeRival (110 bytes, $4E7D–$4EEA)
+; As C3Mod_SizeBike for the rival (nothing while C3_Unk1444 is not 0,
+; BEQ): C3_RivalScrY = A + C3_TmpF8 + C - the last C3_RivalHeight
+; (SEC); C3_RivalDepth (page $0B00's var 6) = the quotient AND $FFF;
+; h = C3_RivalDepth / 2, at least $40 (the same CMP / BPL);
+; C3_RivalWidth = C3_RivalHeight = ($0C00 / h)'s low byte;
+; C3_RivalScrX = (the product's bits 16-31) + $80 + C - C3_RivalWidth
+; / 2 - (1 - C), C3_RivalRight = it + C3_RivalWidth + C and
+; C3_RivalBottom = C3_RivalScrY + C3_RivalHeight + C. Quirk: unlike
+; C3Mod_SizeBike there is no CLC before those three ADCs: the + $80
+; takes C3Mod_MulSigned16's restored carry (the ASL's, bit 15 of $8000 /
+; C3_RivalDepth: set only for a depth of 1), the SBC the LSR's bit,
+; the other two the carry out of the add or subtract before.
+; Callers note: C3Mod_ProjectTask ($4D42, $4D4B JMP).
+; Entry: M=0, X=0, DP=0, DB=$00, as C3Mod_SizeBike (C as the caller
+;        leaves it).
+; Exit:  M=0, X=0; A = C3_RivalBottom (or C3_Unk1444, not 0, with X, Y
+;        and C unchanged); X, Y as C3Mod_Perspective leaves them; C =
+;        the last ADC's carry out; C3Math_* and C3_TmpF8 changed.
+; Calls: C3Mod_Perspective, C3Mod_DivHighByte, C3Mod_MulSigned16.
+C3Mod_SizeRival:
+    LDA.w !C3_Unk1444
+    BEQ .size
+    RTS
+.size:
+    LDA.b !C3_RivalScrY
+    STA.b !C3_TmpF0
+    JSR C3Mod_Perspective
+    STA.w WRDIVB                        ; and HTIMEL (16-bit)
+    ADC.b !C3_TmpF8
+    SEC
+    SBC.b !C3_RivalHeight
+    STA.b !C3_RivalScrY
+    LDA.w RDDIVL
+    AND.w #!C3_DepthMask
+    STA.w !C3_RivalDepth
+    LSR A
+    CMP.w #!C3_DepthMin
+    BPL .depth_ok
+    LDA.w #!C3_DepthMin
+.depth_ok:
+    STA.b !C3Math_B
+    LDA.w #!C3_SizeHeight
+    JSR C3Mod_DivHighByte
+    LDA.b !C3Math_Lo
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_RivalWidth
+    STA.b !C3_RivalHeight
+    LDA.w !C3_RivalDepth
+    STA.b !C3Math_B
+    LDA.w #!C3_SizeDepthX
+    JSR C3Mod_DivHighByte
+    LDA.b !C3Math_Lo
+    ASL A
+    STA.b !C3Math_A
+    LDA.b !C3_RivalScrX
+    STA.b !C3Math_B
+    JSR C3Mod_MulSigned16
+    LDA.b !C3Math_Hi                    ; C from the ASL (no CLC)
+    ADC.w #!C3_ScreenMidX
+    STA.b !C3Math_B
+    LDA.b !C3_RivalWidth
+    LSR A
+    STA.b !C3Math_A
+    LDA.b !C3Math_B
+    SBC.b !C3Math_A
+    STA.b !C3_RivalScrX
+    ADC.b !C3_RivalWidth
+    STA.b !C3_RivalRight
+    LDA.b !C3_RivalScrY
+    ADC.b !C3_RivalHeight
+    STA.b !C3_RivalBottom
+    RTS
+
+; $7E:4EEB — C3Mod_Perspective (105 bytes, $4EEB–$4F53)
+; The line under a bike on the screen, from its projected Y (C3_TmpF0)
+; and the view (page $0A00's scale, distance, horizon, first divisor):
+;   - the dividend WRDIVL/H = C3_ViewScale's low byte x 256 (left set
+;     for the callers' own division);
+;   - t = (C3_ViewDist + ((-Y) >> 8, the high byte after an XBA) + C)
+;     AND $FF, C as the caller left it; when t is not 0: k = t +
+;     C3_ViewScale's low byte + C (the carry out of that 16-bit ADC),
+;     to C3_ScratchF4, and the divisor d for k: from C3_DivisorCache at
+;     k's low byte when that byte is not 0 (BNE), else counted up by
+;     C3_FindDivisor (DP = DP_CPU, 8-bit X) from C3_DivisorStart's low
+;     byte: the first d with (scale x 256) / d below k (unsigned), X
+;     returned as d + 1 and kept in the cache. With t = 0, X is
+;     whatever it was (its low byte: SEP #$10);
+;   - C3_DivisorStart = X - 1 (the next search starts there);
+;   - C3_TmpF8 = C3_TmpFE = the horizon - the first divisor - (1 - C)
+;     (no SEC: C from the ADC before, or 0 after C3_FindDivisor);
+;   - A = bits 16-31 of (X x 256) x ($E0 - C3_TmpF8 - (1 - C))
+;     (C3Mod_Mul16; the C of its SBC is the borrow of the one before);
+;     C3_TmpF8 is put back after it (C3Mod_Mul16 shifts it), but the
+;     product is one too big in bits 8-23 when C3_TmpF8 bit 7 is set
+;     (C3Mod_Mul16's quirk).
+; Quirk: the cache is indexed by k's low byte though k goes to $1FF,
+; and its entries were found from whatever C3_DivisorStart was then;
+; C3Mod_ViewTask clears it (C3Mod_ClearDivisorCache) when the scale
+; changes.
+; Callers note: C3Mod_SizeBike ($4E0A), C3Mod_SizeRival ($4E87).
+; Entry: M=0, X=0, DP=0 (set to DP_CPU and back), DB=$00 (the divider,
+;        the page words and C3_DivisorCache are absolute); C3_TmpF0 =
+;        the bike's projected Y; C as the caller left it.
+; Exit:  M=0, X=0 (REP #$10), DP=0; A = the line; X = d + 1 (or, with
+;        t = 0, its low byte as it came); Y = k's low byte (or, with
+;        t = 0, its own low byte: the SEP #$10 clears the high bytes);
+;        C as C3Mod_Mul16's entry (the SBC's borrow); C3_TmpF0, F2,
+;        C3_ScratchF4 (with t not 0) and C3Math_* changed, C3_TmpF8 =
+;        C3_TmpFE.
+; Calls: C3_FindDivisor (JSL), C3Mod_Mul16.
+C3Mod_Perspective:
+    LDA.w !C3_ScriptPageA+!C3_ViewScale
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_TmpF2
+    XBA
+    STA.w WRDIVL                        ; and WRDIVH: the scale x 256
+    SEP #$10
+    LDA.b !C3_TmpF0
+    EOR.w #!Eng_Invert16
+    INC A
+    XBA
+    ADC.w !C3_ScriptPageA+!C3_ViewDist  ; C as the caller left it
+    AND.w #!Eng_LowByteMask
+    BEQ .line
+    ADC.b !C3_TmpF2
+    STA.b !C3_ScratchF4                 ; C3_FindDivisor's bound
+    TAY
+    LDX.w !C3_DivisorCache,Y
+    BNE .line
+    LDA.w #!DP_CPU
+    TCD
+    LDX.w !C3_DivisorStart
+    STX.b WRDIVB-!DP_CPU
+    NOP
+    JSL !C3_FindDivisor
+    SEP #$20
+    LDY.w !C3_ScratchF4
+    TXA
+    STA.w !C3_DivisorCache,Y
+    REP #$20
+.line:
+    REP #$10
+    LDA.w #0
+    TCD
+    LDA.w !C3_ScriptPageA+!C3_ViewHorizon
+    SBC.w !C3_ScriptPageA+!C3_ViewFirstDiv
+    STA.b !C3_TmpF8
+    STA.b !C3_TmpFE
+    TXA
+    STA.b !C3_DivisorStart
+    DEC.b !C3_DivisorStart
+    XBA
+    STA.b !C3Math_A
+    LDA.w #!C3_LinesShown
+    SBC.b !C3_TmpF8
+    STA.b !C3Math_B
+    JSR C3Mod_Mul16
+    LDA.b !C3_TmpFE
+    STA.b !C3_TmpF8
+    LDA.b !C3Math_Hi
+    RTS
+
+; ============================================================
+; The race's sprites: the bikes, the HUD, the scaled pictures
+; ($4F54–$5260)
+; ============================================================
+; Each bike is drawn from a scaled picture: a job record (C3_BikeJob,
+; C3_RivalJob: 14 bytes, the C3Scale_* arguments from C3Scale_Groups
+; on, with a state word where C3Scale_* has a gap: 1 to do, 2 done)
+; is scaled in C3Mod_Start's idle loop (C3Mod_ScaleIdle), turned into
+; tiles at $0C00 by the generated copy code ($B574) and sent to VRAM
+; by C3Mod_TilesNmiTask; the sprite list then shows it.
+
+; $7E:4F54 — C3Mod_DrawTask (89 bytes, $4F54–$4FAC)
+; A task: the bikes' sprites and the HUD.
+;   - C3_TmpFE = ((angle + $40 + C) / 128 + page $0A00's
+;     C3_ViewFacing) x 2 AND $E: the bikes' facing (one of 8), from the
+;     view's angle (ADC with the carry as the task is entered: 0 from
+;     C3Mod_TaskNext's CPX, unless it is the list's first task; then
+;     CLC before the facing's add);
+;   - page $0B00's C3_RaceGo 0 (the count-down): C3_AnimFrame = 0;
+;   - WRMPYA (a 16-bit store: WRMPYB gets 0, starting a multiply by 0)
+;     = .bar's operand ($B8, or $D8 written by C3Mod_Prog0Vars in
+;     program 9) - $21 - (1 - C) (no SEC: C is the ASL's bit, 1 only
+;     when the facing sum is negative), the HUD bar's length for
+;     C3Mod_MarkerX;
+;   - when C3_BikeBottom - C3_RivalBottom has bit 15 clear (CMP / BMI:
+;     the bike lower on the screen, so nearer; equal included): unless
+;     C3_EntryArg bit 6 (BIT), C3Mod_BikeMarker, C3Mod_RivalMarker and
+;     C3Mod_DrawHud; then C3Mod_DrawBike and C3Mod_DrawRival (JMP).
+;     Else: C3Mod_RivalMarker, C3Mod_BikeMarker and C3Mod_DrawHud
+;     (unless bit 6), C3Mod_DrawRival, then it falls into
+;     C3Mod_DrawBike. The nearer bike goes first in OAM (in front).
+; Callers note: a task added by script opcode $FA at $3F23
+;   (C3Mod_Prog0ScriptA) and $4139 (C3Mod_Prog0Start).
+; Entry: a task (C3Mod_RunTasks): M=0, X=0, DP=0 (the race words, the
+;        sprite builders' C3_OamPos..), DB=$00 (the page words, the
+;        multiplier and the module's words are absolute; the sprite
+;        builders need a bank with the I/O registers).
+; Exit:  as C3Mod_DrawBike or C3Mod_DrawRival leaves them.
+; Calls: C3Mod_BikeMarker, C3Mod_RivalMarker, C3Mod_DrawHud,
+;   C3Mod_DrawBike, C3Mod_DrawRival (JMP, or falling in).
+C3Mod_DrawTask:
+    LDA.w !C3_ScriptPageA+!C3_ViewAngle
+    ADC.w #!C3_EighthTurn/2             ; C as the task is entered
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.w !C3_ScriptPageA+!C3_ViewFacing
+    ASL A
+    AND.w #!C3_FacingMask
+    STA.b !C3_TmpFE
+    LDA.w !C3_ScriptPageB+!C3_RaceGo
+    BNE .bar
+    STZ.w !C3_ScriptPageA+!C3_AnimFrame
+.bar:
+    LDA.w #!C3_BarBase                  ; written by C3Mod_Prog0Vars (program 9)
+    SBC.w #!C3_BarLeft                  ; C from the ASL
+    STA.w WRMPYA                        ; and WRMPYB = 0
+    LDA.b !C3_BikeBottom
+    CMP.b !C3_RivalBottom
+    BMI .rival_first
+    LDA.w !C3_EntryArg
+    BIT.w #!C3_EntryWipeStart
+    BNE .bike_rival
+    JSR C3Mod_BikeMarker
+    JSR C3Mod_RivalMarker
+    JSR C3Mod_DrawHud
+.bike_rival:
+    JSR C3Mod_DrawBike
+    JMP C3Mod_DrawRival
+.rival_first:
+    LDA.w !C3_EntryArg
+    BIT.w #!C3_EntryWipeStart
+    BNE .rival_bike
+    JSR C3Mod_RivalMarker
+    JSR C3Mod_BikeMarker
+    JSR C3Mod_DrawHud
+.rival_bike:
+    JSR C3Mod_DrawRival
+                                        ; falls into C3Mod_DrawBike
+
+; $7E:4FAD — C3Mod_DrawBike (154 bytes, $4FAD–$5046)
+; The bike's sprite and its next picture:
+;   - C3_BikeJob's state 1 (a job waiting): only the sprite. State 2
+;     (scaled and turned into tiles): state = 0 and C3_BikeTilesReady +
+;     1 (C3Mod_TilesNmiTask sends them); then, for state 2 or 0, a new
+;     job: the limit and the rows from C3Mod_BikeLimits /
+;     C3Mod_BikeRows by the facing (C3_TmpFE, also C3_TmpF0); the
+;     sprite count (C3Mod_BikeSprites' first byte, the last picture's
+;     size) from the job's old y step s: below $80 (CMP / BPL: kept
+;     below when s - $80 has bit 15 set) C3Mod_BikeCounts' entry, $80-
+;     $FF 5 (4 sprites), $100 up 2 (1 sprite); C3_BikeDepth made at
+;     least $80 (CMP / BPL, stored back), y step = it / 2;
+;     C3_AnimFrame + 1, and on odd values (LSR / BCC) the facing index
+;     + $10 (ADC #$F with C = 1: the second frame); the picture
+;     C3Mod_BikePics[C3_BikeSteer x 32 + the index] (ADC with C = 0,
+;     the ASLs' last bit); groups 4; state 1;
+;   - unless C3_BikeHidden (BNE): C3Mod_BikeSprites at C3_BikeScrX /
+;     C3_BikeScrY (C3_SprListLarge).
+; Callers note: C3Mod_DrawTask ($4F93; and it falls in at $4FAD).
+; Entry: M=0, X=0, DP=0, DB=$00 (as C3Mod_DrawTask); C3_TmpFE = the
+;        facing.
+; Exit:  M=0, X=0; A, X, Y as C3_SprListLarge leaves them (or A =
+;        C3_BikeHidden, X, Y as before); C3_TmpF0 = the index.
+; Calls: C3_SprListLarge (JSL).
+C3Mod_DrawBike:
+    LDA.w !C3_BikeJob+!C3_JobState
+    CMP.w #!C3_JobWaiting
+    BEQ .sprite
+    CMP.w #!C3_JobDone
+    BNE .new_job
+    STZ.w !C3_BikeJob+!C3_JobState
+    INC.b !C3_BikeTilesReady
+.new_job:
+    LDX.b !C3_TmpFE
+    STX.b !C3_TmpF0
+    LDA.l C3Mod_BikeLimits,X
+    STA.w !C3_BikeJob+!C3_JobLimit
+    LDA.l C3Mod_BikeRows,X
+    STA.w !C3_BikeJob+!C3_JobRows
+    LDA.w !C3_BikeJob+!C3_JobYStep
+    CMP.w #!C3_StepMid
+    BPL .not_near
+    LDA.l C3Mod_BikeCounts,X
+    BRA .count
+.not_near:
+    CMP.w #!C3_StepFar
+    BPL .far
+    LDA.w #!C3_Count4
+    BRA .count
+.far:
+    LDA.w #!C3_Count1
+.count:
+    SEP #$20
+    STA.l C3Mod_BikeSprites
+    REP #$20
+    LDA.w !C3_BikeDepth
+    CMP.w #!C3_DepthNear
+    BPL .depth_ok
+    LDA.w #!C3_DepthNear
+    STA.w !C3_BikeDepth
+.depth_ok:
+    LSR A
+    STA.w !C3_BikeJob+!C3_JobYStep
+    INC.w !C3_ScriptPageA+!C3_AnimFrame
+    LDA.w !C3_ScriptPageA+!C3_AnimFrame
+    LSR A
+    BCC .steer
+    LDA.b !C3_TmpF0
+    ADC.w #!C3_SecondFrame-1            ; C = 1
+    STA.b !C3_TmpF0
+.steer:
+    LDA.b !C3_BikeSteer
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C3_TmpF0
+    TAX
+    LDA.l C3Mod_BikePics,X
+    STA.w !C3_BikeJob+!C3_JobSrc
+    LDA.w #!C3_BikeGroups
+    STA.w !C3_BikeJob+!C3_JobGroups
+    LDA.w #!C3_JobWaiting
+    STA.w !C3_BikeJob+!C3_JobState
+.sprite:
+    LDA.b !C3_BikeHidden
+    BNE .done
+    LDA.b !C3_BikeScrX
+    STA.b !C3_SprBaseX
+    LDA.b !C3_BikeScrY
+    STA.b !C3_SprBaseY
+    LDA.w #C3Mod_BikeSprites
+    JSL !C3_SprListLarge
+.done:
+    RTS
+
+; $7E:5047 — C3Mod_DrawRival (140 bytes, $5047–$50D2)
+; As C3Mod_DrawBike for the rival (C3_RivalJob, C3_RivalTilesReady,
+; C3Mod_RivalSprites), with these differences: the y step is the new
+; one, C3_RivalDepth / 2 AND $FFF, at least $40 (CMP / BPL; when it is
+; raised, $40 is also stored to C3_RivalDepth itself, unhalved; the
+; next C3Mod_ProjectTask rewrites it); the count from it: below $80
+; (BPL) $0A (9 sprites), $80-$FF 5, $100 up 2; the picture
+; C3Mod_RivalPics[the facing index, + $10 when C3_AnimFrame is even:
+; LSR / BCS, ADC with C = 0], no steering; the limit $600, rows $30,
+; groups 3; unless C3_RivalHidden. C3_AnimFrame is not stepped here.
+; Callers note: C3Mod_DrawTask ($4F96 JMP, $4FAA).
+; Entry: M=0, X=0, DP=0, DB=$00, as C3Mod_DrawBike; C3_TmpFE = the
+;        facing.
+; Exit:  M=0, X=0; A, X, Y as C3_SprListLarge leaves them (or A =
+;        C3_RivalHidden, X = the index, Y as before).
+; Calls: C3_SprListLarge (JSL).
+C3Mod_DrawRival:
+    LDA.w !C3_RivalJob+!C3_JobState
+    CMP.w #!C3_JobWaiting
+    BEQ .sprite
+    CMP.w #!C3_JobDone
+    BNE .new_job
+    STZ.w !C3_RivalJob+!C3_JobState
+    INC.b !C3_RivalTilesReady
+.new_job:
+    LDA.w !C3_RivalDepth
+    LSR A
+    AND.w #!C3_DepthMask
+    CMP.w #!C3_DepthMin
+    BPL .step
+    LDA.w #!C3_DepthMin
+    STA.w !C3_RivalDepth
+.step:
+    STA.w !C3_RivalJob+!C3_JobYStep
+    LDA.w !C3_RivalJob+!C3_JobYStep
+    CMP.w #!C3_StepMid
+    BPL .not_near
+    LDA.w #!C3_Count9
+    BRA .count
+.not_near:
+    LDA.w !C3_RivalJob+!C3_JobYStep
+    CMP.w #!C3_StepFar
+    BPL .far
+    LDA.w #!C3_Count4
+    BRA .count
+.far:
+    LDA.w #!C3_Count1
+.count:
+    SEP #$20
+    STA.l C3Mod_RivalSprites
+    REP #$20
+    LDX.b !C3_TmpFE
+    LDA.w !C3_ScriptPageA+!C3_AnimFrame
+    LSR A
+    BCS .picture
+    TXA
+    ADC.w #!C3_SecondFrame              ; C = 0
+    TAX
+.picture:
+    LDA.l C3Mod_RivalPics,X
+    STA.w !C3_RivalJob+!C3_JobSrc
+    LDA.w #!C3_RivalLimit
+    STA.w !C3_RivalJob+!C3_JobLimit
+    LDA.w #!C3_RivalRows
+    STA.w !C3_RivalJob+!C3_JobRows
+    LDA.w #!C3_RivalGroups
+    STA.w !C3_RivalJob+!C3_JobGroups
+    LDA.w #!C3_JobWaiting
+    STA.w !C3_RivalJob+!C3_JobState
+.sprite:
+    LDA.b !C3_RivalHidden
+    BNE .done
+    LDA.b !C3_RivalScrX
+    STA.b !C3_SprBaseX
+    LDA.b !C3_RivalScrY
+    STA.b !C3_SprBaseY
+    LDA.w #C3Mod_RivalSprites
+    JSL !C3_SprListLarge
+.done:
+    RTS
+
+; $7E:50D3 — C3Mod_MarkerX (20 bytes, $50D3–$50E6)
+; A HUD marker's X from a distance's bytes 1-2 in A: WRMPYB = A / 8
+; (its low byte: the laps x 32 + 1/2048ths, wrapping each 8 laps; a
+; 16-bit store, so WRDIVL gets A / 8's high byte), times the bar's
+; length that C3Mod_DrawTask put in WRMPYA; C3_SprBaseX = .base's
+; operand ($B8, or $D8 written by C3Mod_Prog0Vars in program 9) + 6 -
+; RDMPYH - 1 (SEC then CLC: C = 0 for the ADC and for the SBC). The
+; SBC reads RDMPYH as a word, so JOY1L ($4218) is its high byte:
+; C3_SprBaseX's high byte is not used by C3_SprOneSmall's 8-bit add.
+; Callers note: C3Mod_RivalMarker ($50F3), C3Mod_BikeMarker ($5102).
+; Entry: M=0, X any, DP=0 (C3_SprBaseX), DB=$00 (the multiplier); A =
+;        the distance's bytes 1-2; WRMPYA set (C3Mod_DrawTask).
+; Exit:  M=0; A = C3_SprBaseX; X, Y unchanged.
+C3Mod_MarkerX:
+    LSR A
+    LSR A
+    LSR A
+    STA.w WRMPYB                        ; and WRDIVL (16-bit)
+.base:
+    LDA.w #!C3_BarBase                  ; written by C3Mod_Prog0Vars (program 9)
+    SEC
+    CLC
+    ADC.w #!C3_BarRight
+    SBC.w RDMPYH                        ; and JOY1L as the high byte
+    STA.b !C3_SprBaseX
+    RTS
+
+; $7E:50E7 — C3Mod_MarkerY (10 bytes, $50E7–$50F0)
+; A HUD marker's Y: C3_SprBaseY = A / 8 + $C0 (CLC), A = a side word at
+; +1 (the high byte, with the byte above it).
+; Callers note: C3Mod_RivalMarker ($50F8), C3Mod_BikeMarker ($5107).
+; Entry: M=0, X any, DP=0, DB any; A = the side's high-byte word.
+; Exit:  M=0; A = C3_SprBaseY; X, Y unchanged.
+C3Mod_MarkerY:
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C3_MarkerTop
+    STA.b !C3_SprBaseY
+    RTS
+
+; $7E:50F1 — C3Mod_RivalMarker (15 bytes, $50F1–$50FF)
+; The rival's HUD marker: C3Mod_MarkerX of the word at C3_RivalDist+1,
+; C3Mod_MarkerY of the word at C3_RivalSide+1, the sprite
+; C3Mod_RivalMarkerSpr through C3Mod_BikeMarker's .draw.
+; Callers note: C3Mod_DrawTask ($4F8D, $4FA1).
+; Entry: M=0, X=0 (the record's 16-bit LDX), DP=0, DB=$00.
+; Exit:  as C3Mod_BikeMarker's .draw.
+; Calls: C3Mod_MarkerX, C3Mod_MarkerY, C3Mod_BikeMarker (BRA .draw).
+C3Mod_RivalMarker:
+    LDA.b !C3_RivalDist+1
+    JSR C3Mod_MarkerX
+    LDA.b !C3_RivalSide+1
+    JSR C3Mod_MarkerY
+    LDX.w #C3Mod_RivalMarkerSpr
+    BRA C3Mod_BikeMarker_draw
+
+; $7E:5100 — C3Mod_BikeMarker (22 bytes, $5100–$5115)
+; The bike's HUD marker, as C3Mod_RivalMarker's with C3_BikeDist+1,
+; C3_BikeSide+1 and C3Mod_BikeMarkerSpr; .draw ($510D, also the
+; rival's): the sprite (C3_SprOneSmall) only while C3_RacePhase is 0
+; (BNE). C3Mod_RaceStepTask writes an RTS (Op_RTS) over .draw when the
+; race is lost: no markers after that.
+; Callers note: C3Mod_DrawTask ($4F8A, $4FA4). .draw: C3Mod_RivalMarker
+;   (BRA).
+; Entry: M=0, X=0, DP=0, DB=$00.
+; Exit:  M=0, X=0; A = C3_RacePhase or as C3_SprOneSmall leaves it; X =
+;        the record; Y = C3_OamPos (or unchanged).
+; Calls: C3Mod_MarkerX, C3Mod_MarkerY, C3_SprOneSmall (JSL).
+C3Mod_BikeMarker:
+    LDA.b !C3_BikeDist+1
+    JSR C3Mod_MarkerX
+    LDA.b !C3_BikeSide+1
+    JSR C3Mod_MarkerY
+    LDX.w #C3Mod_BikeMarkerSpr
+.draw:
+    LDA.b !C3_RacePhase                 ; an RTS is written here when the race is lost
+    BNE .done
+    JSL !C3_SprOneSmall
+.done:
+    RTS
+
+; $7E:5116 — C3Mod_DrawHud (155 bytes, $5116–$51B0)
+; The HUD:
+;   - the boosts left (C3_BoostsLeft, while not 0: BEQ), one icon each
+;     from X = $EA leftwards 8 pixels apart at Y = $D0:
+;     C3Mod_BoostIcon, but C3Mod_BoostIconLast for the last one drawn
+;     (count 1) while C3_BoostTimer is 0 (CMP #1 / BNE, BNE);
+;   - C3Mod_HudSprites (C3_SprListLarge) and C3Mod_HudSmall
+;     (C3_SprListSmall) at 0, 0;
+;   - the distance left, while racing (C3_RacePhase 0, BNE): (8 laps -
+;     C3_BikeDist, 32-bit, SEC / SBC) / 512 - .offset's operand ($18
+;     at first; SEC), shown as is when it minus $3E9 has bit 15 set
+;     (CMP / BMI: $3E8 or less, or bit 15 set, i.e. negative), else 0;
+;     0 too after the race; at X $10, Y $0E (C3Mod_DrawNumber);
+;   - every 64th frame (C3_RaceFrames + 1 AND $3F = 0) .offset's
+;     operand goes down by 1 while it is not 0 (self-modifying: the
+;     distance shown starts 24 too low, catching up over 24 x 64
+;     frames);
+;   - C3_Score made 0 when bit 15 is set (BPL; stored back), and
+;     C3_Score / 2 shown at Y $18 (C3Mod_DrawNumber, JMP; X as it
+;     left C3_SprBaseX).
+; Callers note: C3Mod_DrawTask ($4F90, $4FA7).
+; Entry: M=0, X=0, DP=0 (C3_TmpF0.., C3_SprBase*), DB=$00 (the sprite
+;        builders; C3Mod_DrawNumber sets its own and leaves $00).
+; Exit:  as C3Mod_DrawNumber leaves them (JMP).
+; Calls: C3_SprOneSmall, C3_SprListLarge, C3_SprListSmall (JSL),
+;   C3Mod_DrawNumber.
+C3Mod_DrawHud:
+    LDA.w #!C3_IconY
+    STA.b !C3_SprBaseY
+    LDA.w #!C3_IconX
+    STA.b !C3_SprBaseX
+    LDA.b !C3_BoostsLeft
+    BEQ .lists
+    STA.b !C3_TmpF0
+.icon:
+    LDX.w #C3Mod_BoostIcon
+    LDA.b !C3_TmpF0
+    CMP.w #1
+    BNE .draw_icon
+    LDA.b !C3_BoostTimer
+    BNE .draw_icon
+    LDX.w #C3Mod_BoostIconLast
+.draw_icon:
+    JSL !C3_SprOneSmall
+    LDA.b !C3_SprBaseX
+    SEC
+    SBC.w #8
+    STA.b !C3_SprBaseX
+    DEC.b !C3_TmpF0
+    BNE .icon
+.lists:
+    STZ.b !C3_SprBaseY
+    STZ.b !C3_SprBaseX
+    LDA.w #C3Mod_HudSprites
+    JSL !C3_SprListLarge
+    LDA.w #C3Mod_HudSmall
+    JSL !C3_SprListSmall
+    LDA.b !C3_RacePhase
+    BNE .no_distance
+    LDA.w #0
+    SEC
+    SBC.b !C3_BikeDist
+    STA.b !C3_TmpF0
+    LDA.w #!C3_RaceLaps
+    SBC.b !C3_BikeDist+2
+    STA.b !C3_TmpF2
+    LDA.b !C3_TmpF0+1                   ; bits 8-23 of the distance left
+    LSR A
+    SEC
+.offset:
+    SBC.w #!C3_HudOffset                ; counted down below
+    CMP.w #!C3_HudMax+1
+    BMI .distance
+.no_distance:
+    LDA.w #0
+.distance:
+    STA.b !C3_TmpF0
+    LDA.w #!C3_HudNumberX
+    STA.b !C3_SprBaseX
+    LDA.w #!C3_HudDistanceY
+    STA.b !C3_SprBaseY
+    JSR C3Mod_DrawNumber
+    LDA.b !C3_RaceFrames
+    INC A
+    AND.w #!C3_HudEvery-1
+    BNE .score
+    LDA.l .offset+1
+    BEQ .score
+    DEC A
+    STA.l .offset+1
+.score:
+    LDA.w #!C3_HudScoreY
+    STA.b !C3_SprBaseY
+    LDA.b !C3_Score
+    BPL .score_ok
+    LDA.w #0
+    STA.b !C3_Score
+.score_ok:
+    LSR A
+    STA.b !C3_TmpF0
+    JMP C3Mod_DrawNumber
+
+; $7E:51B1 — C3Mod_RivalPics (32 bytes, $51B1–$51D0)
+; The rival's pictures for C3Mod_DrawRival: the address in bank $7F
+; (C3_Prog0MirrorC's 64-byte rows from $8A00 up) by the facing (8
+; words), then the second frame's (8 more).
+C3Mod_RivalPics:
+    dw $8A00, $9C00, $A800, $C000, $AE00, $BA00, $A200, $9600
+    dw $9000, $9C00, $A800, $C000, $B400, $BA00, $A200, $9600
+
+; $7E:51D1 — C3Mod_ScaleIdle (35 bytes, $51D1–$51F3)
+; The idle routine C3Mod_Prog0 writes over C3Mod_Start's idle call
+; ($3024): runs a waiting picture job of the bike and then of the
+; rival (C3Mod_ScaleJob for each whose state is 1: CMP #1 / BNE) and
+; sets its state to 2 (done).
+; Callers note: the idle JSR at $3023 (C3Mod_Start's .wait_exit, its
+;   operand written at $3CE4 by C3Mod_Prog0).
+; Entry: M=0, X=0, DP=0, DB=$00 (as C3Mod_Start's loop runs: C3Mod_Init
+;        and C3_ModuleFrame).
+; Exit:  M=0, X=0, DP=0, DB=$00; A = 2 or the rival's state; X, Y as
+;        C3Mod_ScaleJob leaves them (or unchanged).
+; Calls: C3Mod_ScaleJob.
+C3Mod_ScaleIdle:
+    LDA.w !C3_BikeJob+!C3_JobState
+    CMP.w #!C3_JobWaiting
+    BNE .rival
+    LDX.w #!C3_BikeJob
+    JSR C3Mod_ScaleJob
+    STA.w !C3_BikeJob+!C3_JobState
+.rival:
+    LDA.w !C3_RivalJob+!C3_JobState
+    CMP.w #!C3_JobWaiting
+    BNE .done
+    LDX.w #!C3_RivalJob
+    JSR C3Mod_ScaleJob
+    STA.w !C3_RivalJob+!C3_JobState
+.done:
+    RTS
+
+; $7E:51F4 — C3Mod_ScaleJob (45 bytes, $51F4–$5220)
+; One picture job: the 14-byte record at X goes to C3Scale_Groups..
+; ($1F-$2C, MVN in bank $00); with DB = $7F (PEA $007F / PLB: the $00
+; stays for the last PLB), C3Scale_Dest = C3Scale_DestPos = $0200,
+; C3Scale_XStep = C3Scale_YStep x 2, and C3_ScaleBitmap scales the
+; picture to $7F:0200; then it waits (a loop on C3_TilesPending, which
+; C3Mod_TilesNmiTask clears after the last upload), sets
+; C3_TilesPending (INC) and runs the generated copy code at $B574
+; (C3_BuildCopyCode's: the bitmap at $7F:0200 as 4bpp tiles at
+; $0C00-$13FF), keeping DP around it; A = 2 (done).
+; Callers note: C3Mod_ScaleIdle ($51DC, $51ED).
+; Entry: M=0, X=0 (MVN's 16-bit X and Y), DP=0 (C3Scale_*), DB any (the
+;        MVN sets $00); X = the record.
+; Exit:  M=0, X=0, DP=0, DB=$00 (the PEA's $00); A = 2; X, Y as the
+;        copy code and C3_ScaleBitmap leave them.
+; Calls: C3_ScaleBitmap (JSL), the generated code at $B574.
+C3Mod_ScaleJob:
+    LDY.w #!C3Scale_Groups
+    LDA.w #!C3_JobBytes-1
+    MVN $00,$00                         ; lint-ok: MVN operands are bank bytes (bank $00)
+    PEA.w !Bank7F                       ; PLB takes the $7F; the $00 stays for the last PLB
+    PLB
+    LDX.w #!C3_BitmapSrc
+    STX.b !C3Scale_Dest
+    STX.b !C3Scale_DestPos
+    LDA.b !C3Scale_YStep
+    ASL A
+    STA.b !C3Scale_XStep
+    JSL !C3_ScaleBitmap
+.wait:
+    LDA.b !C3_TilesPending
+    BNE .wait
+    INC.b !C3_TilesPending
+    PHD
+    JSR !C3_CopyCodeAddr
+    PLD
+    PLB
+    LDA.w #!C3_JobDone
+    RTS
+
+; $7E:5221 — C3Mod_TilesNmiTask (64 bytes, $5221–$5260)
+; An NMI task: when C3_BikeTilesReady is set (an 8-bit test and clear),
+; the tiles at $00:0C00 ($800 bytes, the last picture's) go to VRAM
+; word $4000; else when C3_RivalTilesReady is, to $4400; by DMA channel
+; 7, two registers (VMDATAL/H), VMAIN = $80; then C3_TilesPending's low
+; byte = 0. One upload a frame (the bike's first).
+; Callers note: an NMI task added by script opcode $F8 at $3F35
+;   (C3Mod_Prog0ScriptA) and $414B (C3Mod_Prog0Start).
+; Entry: an NMI task (C3Mod_RunNmiTasks): M=1, X=0 (the 16-bit register
+;        pairs), DP=0 (the flags), DB=$00 (absolute registers).
+; Exit:  M=1, X=0; with an upload A = $80 (VMAIN and MDMAEN), X =
+;        $0C00, Y = $0800; else A = C3_RivalTilesReady (0), X, Y
+;        unchanged.
+C3Mod_TilesNmiTask:
+    LDA.b !C3_BikeTilesReady
+    BEQ .rival
+    STZ.b !C3_BikeTilesReady
+    LDX.w #!C3_BikeTilesVram
+    LDY.w #!C3_TilesBytes
+    BRA .upload
+.rival:
+    LDA.b !C3_RivalTilesReady
+    BEQ .done
+    STZ.b !C3_RivalTilesReady
+    LDX.w #!C3_RivalTilesVram
+    LDY.w #!C3_TilesBytes
+.upload:
+    STX.w VMADDL
+    STY.w DAS7L
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.w #!C3_TilesBuffer
+    STX.w A1T7L
+    LDA.b #0
+    STA.w A1B7
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STA.w MDMAEN                        ; the same $80: channel 7
+    STZ.b !C3_TilesPending
+.done:
+    RTS
 
 %C3ModOrg($7E5261)
 ; $7E:5261 — C3Mod_LampUpload (42 bytes, $5261–$528A)
@@ -5285,8 +6296,136 @@ C3Mod_LampUpload:
     RTS
 
 %C3ModOrg($7E528B)
-C3Mod_Rest528B:
-    %C3ModRomBytes($7E528B, $7EA651)
+; ============================================================
+; The race's sprite data ($528B–$53BA)
+; ============================================================
+
+; $7E:528B — C3Mod_BikePics (96 bytes, $528B–$52EA)
+; The bike's pictures for C3Mod_DrawBike: their addresses in bank $7F
+; (the 64-byte rows C3Mod_Prog0 built), by C3_BikeSteer (32 bytes
+; each), then the frame (16) and the facing (8 words).
+C3Mod_BikePics:
+    dw $0A00, $3200, $2400, $7200, $5A00, $6C00, $1C00, $2C00   ; steering 0, first frame
+    dw $3800, $3200, $5200, $7200, $7800, $6C00, $4A00, $2C00   ; ... second frame
+    dw $1000, $3200, $2400, $7200, $6600, $6C00, $1C00, $2C00   ; steering 1
+    dw $3E00, $3200, $5200, $7200, $8400, $6C00, $4A00, $2C00
+    dw $1600, $3200, $2400, $7200, $6000, $6C00, $1C00, $2C00   ; steering 2
+    dw $4400, $3200, $5200, $7200, $7E00, $6C00, $4A00, $2C00
+
+; $7E:52EB — C3Mod_BikeLimits (16 bytes, $52EB–$52FA)
+; The bike's C3Scale_SrcLimit by the facing (C3Mod_DrawBike).
+C3Mod_BikeLimits:
+    dw $0600, $0600, $0620, $0600, $0600, $0600, $0700, $0600
+
+; $7E:52FB — C3Mod_BikeRows (16 bytes, $52FB–$530A)
+; The bike's C3Scale_Rows by the facing.
+C3Mod_BikeRows:
+    dw $0030, $0030, $0031, $0030, $0030, $0030, $0038, $0030
+
+; $7E:530B — C3Mod_BikeCounts (16 bytes, $530B–$531A)
+; C3Mod_BikeSprites' count (sprites + 1) by the facing, for a near
+; bike: $0D (12 sprites, the top three rows) or $11 (all 16).
+C3Mod_BikeCounts:
+    dw $000D, $000D, $0011, $000D, $000D, $000D, $0011, $000D
+
+; $7E:531B — C3Mod_BikeSprites (65 bytes, $531B–$535B)
+; The bike's sprite list for C3_SprListLarge: a count (sprites + 1,
+; written by C3Mod_DrawBike), then 16 records of tile, attribute, X, Y:
+; 16x16 sprites in a 64x64 square, tiles $00-$2E of the first page
+; (palette 0, priority 3; VRAM word $4000 on,
+; where C3Mod_TilesNmiTask puts the bike's picture), the first four
+; the top-left 32x32.
+C3Mod_BikeSprites:
+    db $11
+    db $00, $30, $00, $00
+    db $02, $30, $10, $00
+    db $08, $30, $00, $10
+    db $0A, $30, $10, $10
+    db $04, $30, $20, $00
+    db $06, $30, $30, $00
+    db $0C, $30, $20, $10
+    db $0E, $30, $30, $10
+    db $20, $30, $00, $20
+    db $22, $30, $10, $20
+    db $24, $30, $20, $20
+    db $26, $30, $30, $20
+    db $28, $30, $00, $30
+    db $2A, $30, $10, $30
+    db $2C, $30, $20, $30
+    db $2E, $30, $30, $30
+
+; $7E:535C — C3Mod_RivalSprites (37 bytes, $535C–$5380)
+; The rival's list: a count (written by C3Mod_DrawRival), then 9
+; records: a 48x48 square of 16x16 sprites, tiles $40-$64 (VRAM word
+; $4400 on), palette 5.
+C3Mod_RivalSprites:
+    db $0A
+    db $40, $3A, $00, $00
+    db $42, $3A, $10, $00
+    db $48, $3A, $00, $10
+    db $4A, $3A, $10, $10
+    db $44, $3A, $20, $00
+    db $4C, $3A, $20, $10
+    db $60, $3A, $00, $20
+    db $62, $3A, $10, $20
+    db $64, $3A, $20, $20
+
+; $7E:5381 — C3Mod_Unk5381 (4 bytes, $5381–$5384)
+; A sprite record (tile $D1, attribute $3F, at 0, 0) that nothing reads
+; (no reference to $5381 was found).
+C3Mod_Unk5381:
+    db $D1, $3F, $00, $00
+
+; $7E:5385 — C3Mod_BoostIconLast (4 bytes, $5385–$5388)
+; The last boost icon while no boost runs (C3Mod_DrawHud): tile $0A of
+; the second tile page (attribute bit 0; VRAM word $5000 on), palette
+; 2, priority 3.
+C3Mod_BoostIconLast:
+    db $0A, $35, $00, $00
+
+; $7E:5389 — C3Mod_BoostIcon (4 bytes, $5389–$538C)
+; The other boost icons: the same tile, palette 3.
+C3Mod_BoostIcon:
+    db $0A, $37, $00, $00
+
+; $7E:538D — C3Mod_RivalMarkerSpr (4 bytes, $538D–$5390)
+; The rival's HUD marker (C3Mod_RivalMarker): tile $08 of the second
+; page, palette 1.
+C3Mod_RivalMarkerSpr:
+    db $08, $33, $00, $00
+
+; $7E:5391 — C3Mod_BikeMarkerSpr (4 bytes, $5391–$5394)
+; The bike's HUD marker (C3Mod_BikeMarker): tile $09 of the second
+; page, palette 0.
+C3Mod_BikeMarkerSpr:
+    db $09, $31, $00, $00
+
+; $7E:5395 — C3Mod_HudSprites (25 bytes, $5395–$53AD)
+; The HUD's large sprites (C3Mod_DrawHud, at 0, 0): a count, then 6
+; records. In program 9 C3Mod_Prog0Vars writes the count 6 (the last
+; record left out) and the X bytes $D8 and $E8 into the third and the
+; fourth records ($53A0, $53A4), moving them right by $20.
+C3Mod_HudSprites:
+    db $07
+    db $00, $35, $08, $C8
+    db $02, $35, $18, $C8
+    db $04, $3F, $B8, $C8
+    db $06, $3F, $C8, $C8
+    db $0B, $35, $34, $10
+    db $0D, $37, $DA, $C8
+
+; $7E:53AE — C3Mod_HudSmall (13 bytes, $53AE–$53BA)
+; The HUD's small sprites (C3_SprListSmall): a count, then 3 records;
+; program 9 writes the count 1 (none drawn, C3Mod_Prog0Vars).
+C3Mod_HudSmall:
+    db $04
+    db $18, $37, $DE, $CB
+    db $19, $37, $E6, $CB
+    db $0F, $37, $EA, $C8
+
+%C3ModOrg($7E53BB)
+C3Mod_Rest53BB:
+    %C3ModRomBytes($7E53BB, $7EA651)
 
 ; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
 ; The staff credits the module shows, in two texts to the module's end:
