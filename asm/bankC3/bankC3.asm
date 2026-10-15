@@ -645,22 +645,37 @@ WinFx_StepWipe:
 ; $C3:02DD — C3_RandomByte (42 bytes, $02DD–$0306)
 ; Returns a new pseudo-random byte in A and keeps it in C3_RandSeed: A
 ; (with C rotated in) plus C3_RandSeed, stored; then X's low byte, the
-; seed, C3_FrameCount, the H counter's low byte (OPHCT; the counters are
-; latched by the CMP that reads SLHV, and that CMP's carry, A against
-; the open-bus value SLHV returns, goes into this ADC), minus the V
-; counter's low byte (first OPVCT read), the seed again, C3_ScratchF0,
-; C3_ScratchF2 (EOR), C3_ScratchF4, and minus the V counter's high byte
-; (second OPVCT read: bit 0 = V bit 8, the rest open bus) are added or
-; subtracted in, each with the carry of the step before, and the result
-; stored back.
+; seed, C3_FrameCount, the H counter (OPHCT; the counters are latched
+; by the CMP that reads SLHV, and that CMP's carry, A against the
+; open-bus value SLHV returns, goes into this ADC), minus the V counter
+; (OPVCT), the seed again, C3_ScratchF0, C3_ScratchF2 (EOR),
+; C3_ScratchF4, and minus the V counter again are added or subtracted
+; in, each with the carry of the step before, and the result stored
+; back. Which byte each counter read gives is not fixed: OPHCT and
+; OPVCT each return the low byte or bit 8 (with open bus in bits 1-7)
+; by a flip-flop that every read toggles and only a STAT78 read clears,
+; and nothing on this path reads STAT78 (the module's one read, at
+; $7E:9AB3, is elsewhere). At M=1 OPHCT is read once a call, so it
+; alternates from call to call (bit 8 and open bus every other call),
+; and OPVCT twice, keeping the phase it had (low then high from a clear
+; flip-flop); at M=0 the word reads also take the next register
+; (OPHCT's read takes OPVCT, OPVCT's STAT77), so H is read once and V
+; three times a call, and both alternate.
 ; Callers (1 JSL site): WinFx_StepWipe ($C3:024A).
-; Callers note: the unpacked module also JSLs here (from $7E:3443).
-; Entry: M=1 (8-bit adds; WinFx_StepWipe has it, the module's site is
-;        not traced), X any (only its low byte is used), DP any (none
-;        used), DB = $00 or a bank that maps both low WRAM and the PPU
-;        registers (all operands are absolute).
-; Exit:  M as on entry; A = C3_RandSeed = the new value; flags from the
-;        last SBC; X, Y, DP, DB unchanged.
+; Callers note: the unpacked module also JSLs here, from
+;   C3Mod_KernelRandom ($7E:3443), whose twelve JSR sites
+;   tools/c3module.py's trace reaches: M=1 at seven, M=0 at $7F85,
+;   $7FA0, $80D3, $98E3 and $98EE.
+; Entry: M=1 or M=0 (WinFx_StepWipe and seven of the module's calls
+;        have M=1; with M=0 every add is 16-bit: X is used whole, each
+;        read takes the next register or byte as its high byte, and the
+;        seed is written as a word, $0386-$0387, the module's callers
+;        masking the result with an AND), X any (only its low byte is
+;        used at M=1), DP any (none used), DB = $00 or a bank that maps
+;        both low WRAM and the PPU registers (all operands are
+;        absolute).
+; Exit:  M as on entry; A = C3_RandSeed = the new value (a word at
+;        M=0); flags from the last SBC; X, Y, DP, DB unchanged.
 C3_RandomByte:
     ROL A
     ADC.w !C3_RandSeed

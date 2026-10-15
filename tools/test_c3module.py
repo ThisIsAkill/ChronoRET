@@ -22,6 +22,7 @@ strace, the same five plants are refused by the isolated assemblies
 ($3C57 decoded 16-bit, nothing decoded in the staff text).
 """
 
+import re
 import shutil
 import sys
 import tempfile
@@ -96,7 +97,13 @@ class Rules(unittest.TestCase):
 
 
 ABS_MODULE = str(Path('build/c3pack/rom_module.bin').resolve())
-MODULE_HOLE = '    %C3ModRomBytes($7E31BF, $7E377A)'
+HOLE = re.compile(r'^    %C3ModRomBytes\(\$7E([0-9A-F]{4}), \$7E([0-9A-F]{4})\)$', re.M)
+
+
+def first_hole(text):
+    """The first block of ROM bytes in module.asm: (line, start, end)."""
+    m = HOLE.search(text)
+    return m.group(0), int(m.group(1), 16), int(m.group(2), 16)
 
 
 def plant(root: Path, case: str) -> None:
@@ -105,25 +112,27 @@ def plant(root: Path, case: str) -> None:
     asm = root / 'asm'
     mod = asm / 'bankC3/packed/module.asm'
 
+    line, lo, hi = first_hole(mod.read_text())
+    o, e = lo - 0x3000, hi - 0x3000                 # offsets in the module
+
     def module_hole(text):
         src = mod.read_text()
-        assert MODULE_HOLE in src
-        mod.write_text(src.replace(MODULE_HOLE, text))
+        mod.write_text(src.replace(line, text, 1))
 
     if case == 'T2':        # a function reading the file, defined in an include
         with (asm / 'include/macros.inc').open('a') as f:
             f.write(f'\nfunction romb(o) = readfile1("{ABS_MODULE}", o)\n')
-        module_hole('\n'.join(f'    db romb(${o:X})' for o in range(0x1BF, 0x1C7))
-                    + '\n    %C3ModRomBytes($7E31C7, $7E377A)')
+        module_hole('\n'.join(f'    db romb(${k:X})' for k in range(o, o + 8))
+                    + f'\n    %C3ModRomBytes($7E{lo + 8:04X}, $7E{hi:04X})')
     elif case == 'T3':      # an incsrc'd include with an absolute incbin
-        (asm / 'include/evil.inc').write_text(f'incbin "{ABS_MODULE}":$1BF..$77A\n')
+        (asm / 'include/evil.inc').write_text(f'incbin "{ABS_MODULE}":${o:X}..${e:X}\n')
         module_hole('    incsrc "../../include/evil.inc"')
     elif case == 'T5':      # a symlink under asm/
         (asm / 'include/tiles.bin').symlink_to(ABS_MODULE)
-        module_hole('    incbin "../../include/tiles.bin":$1BF..$77A')
+        module_hole(f'    incbin "../../include/tiles.bin":${o:X}..${e:X}')
     elif case == 'T7':      # a labelled incbin in the stubs file
         with (asm / 'bankC3/packed/unmatched.asm').open('a') as f:
-            f.write(f'%C3ModOrg($7E31BF)\nC3Mod_Junk: incbin "{ABS_MODULE}":$1BF..$1C7\n')
+            f.write(f'%C3ModOrg($7E{lo:04X})\nC3Mod_Junk: incbin "{ABS_MODULE}":${o:X}..${o + 8:X}\n')
     elif case == 'T4b':     # a macro in include/ reading the ROM, used in a bank file
         with (asm / 'include/macros.inc').open('a') as f:
             f.write('\nmacro DataBlock(a, b)\n    incbin "../../roms/chrono_trigger.sfc":<a>..<b>\n'
@@ -137,10 +146,10 @@ def plant(root: Path, case: str) -> None:
                                       f'incsrc "module.inc"\n!C3Mod_RomImage = "{ABS_MODULE}"\n')
         mod.write_text(src)
     elif case == 'N2':      # a readfile name pasted from defines
-        module_hole(f'!rfA = rea\n!rfB = dfile1\n    db !rfA!rfB("{ABS_MODULE}", $1BF)\n'
-                    '    %C3ModRomBytes($7E31C0, $7E377A)')
+        module_hole(f'!rfA = rea\n!rfB = dfile1\n    db !rfA!rfB("{ABS_MODULE}", ${o:X})\n'
+                    f'    %C3ModRomBytes($7E{lo + 1:04X}, $7E{hi:04X})')
     elif case == 'N3':      # an incbin pasted from defines
-        module_hole(f'!dA = inc\n!dB = bin\n    !dA!dB "{ABS_MODULE}":$1BF..$77A')
+        module_hole(f'!dA = inc\n!dB = bin\n    !dA!dB "{ABS_MODULE}":${o:X}..${e:X}')
     elif case == 'N3c':     # the same in a macro of macros.inc, used in a bank file
         rom = str(c3pack.ROM_PATH.resolve())
         with (asm / 'include/macros.inc').open('a') as f:
@@ -196,7 +205,8 @@ class Trace(unittest.TestCase):
     def setUpClass(cls):
         cls.mem = c3module.module_bytes()
         cls.insns, cls.anomalies = c3module.trace(cls.mem)
-        cls.sites = c3module.call_sites(cls.insns)
+        d = c3module.discover(cls.mem)
+        cls.sites = c3module.call_sites(cls.insns, d.patched)
 
     def test_entries_reached(self):
         for a, *_ in c3module.ENTRIES:
@@ -208,14 +218,50 @@ class Trace(unittest.TestCase):
         # $45D6 returns with M=0 (CALL_EXITS): Prog0's BIT #$40 at $3C57 is 16-bit
         self.assertFalse(self.insns[0x3C57].m)
         self.assertEqual(self.insns[0x3C57].size, 3)
-        # the staff text is data: no instruction in it, the path into it reported
+        # the staff text is data: no instruction in it; the JSR $B574 at
+        # $82A5 is a call into generated code (GENERATED), not followed
         lo, hi, _ = c3module.DATA_RANGES[0]
         self.assertFalse([a for a in self.insns if lo <= a <= hi])
-        self.assertIn((0xB574, 'enters data'), self.anomalies)
+        self.assertEqual(self.insns[0x82A5].operand, 0xB574)
+        self.assertEqual(self.anomalies, [])
+
+    def test_discovery(self):
+        # the rules reach what the module only names at run time
+        d = c3module.discover(self.mem)
+        self.assertIn((0x3F14, 0x0A), d.scripts)          # LDA #$3F14 / STA $0A20 at $3C5C
+        self.assertIn(0x3749, d.entries)                  # task added by the script at $3F14
+        self.assertIn(0x45B0, d.patched[0x35FC])          # LDA #$45B0 / STA $35FD at $3CDB
+        self.assertIn(0x5EF8, d.patched[0x5E43])          # bytes $F8, $5E written over $5E44/5
+        self.assertIn(0x7F12, d.entries)                  # TASK_TABLES $7EC7
+        self.assertIn(0x9317, d.script_bytes)             # SCRIPT_REDIRECTS $8CD0
+        self.assertNotIn((0x9315, 0x0A), d.scripts)       # (resumed at + 2, not started)
+        # $564D and $5640, called by page $0B's script $5568, start page
+        # $0A at their values; page $0B goes on after the calls
+        self.assertIn((0x5635, 0x0A), d.scripts)
+        self.assertIn((0x5604, 0x0A), d.scripts)
+        self.assertIn(0x55D8, d.script_bytes)
+        # poke16 of page $0B's pointer by page $0A's script breaks the wait
+        # loops; the scripts after them add the tasks $992A and $997D
+        self.assertIn((0x97A9, 0x0B), d.scripts)
+        self.assertIn((0x934A, 0x0B), d.scripts)
+        self.assertIn(0x992A, d.entries)
+        self.assertIn(0x997D, d.entries)
+        # opcode $xF (end) has no operand: $424D, after one, is code only
+        self.assertIn(0x424D, d.insns)
+        self.assertNotIn(0x424D, d.script_bytes)
+        # task references the CALLERS rule wants: script opcodes and LDX #
+        self.assertIn(0x9453, d.refs[0x3176])             # opcode $F8
+        self.assertIn(0x94C6, d.refs[0x3176])             # opcode $F7
+        self.assertIn(0x63E8, d.refs[0x3495])             # LDX #$3495 / JSR $395E
+        self.assertGreater(len(c3module.code_bytes(d.insns)), 20000)
 
     def test_sites(self):
         self.assertEqual(self.sites[0x3063], [0x3000])
         self.assertIn(0x3187, self.sites[0x377E])
+        # the lint's sites include the script opcodes and LDX # task adds
+        sites = lint_c3module.module_sites()
+        self.assertIn(0x5B1D, sites[0x388B])              # opcode $F8: C3Mod_UploadPalette
+        self.assertIn(0x5BA9, sites[0x34AB])              # LDX #$34AB / JSR $395E
 
     def test_no_overlap(self):
         owner = {}
