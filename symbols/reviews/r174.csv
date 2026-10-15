@@ -1,0 +1,7 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$06BD,Spc_NotePitch,2026-10-09,rev174a,approved,5a429786f5dd,"Fixed: sim t=$20/$C0/$D0, h=0/$40/$80/$FF: P+Q (t<$80), Q (t>=$80), +(Q_hi*h)>>8; div 12, octave shifts vs 4 (oct 0: 4 right), callers $0557/$0657, Exit ok"
+$075E,Spc_PeekNote,2026-10-09,rev174a,approved,9317d4e45abb,"Fixed: $DC->$1B86 leaves Ptr93, DC 21 1C gives $21; table2/counts dumped, push $0786/$0789, $EB/$E9-$EA pop exit, Y=0. nit: jump handlers ($F6,$E9) move Ptr93 to a target, not past"
+$0768,Spc_PeekNoteFrom,2026-10-09,rev174a,approved,9fccaaf99773,"Shared header checked as Spc_PeekNote: re-entry via pushed $0768 (ret pops exact address), skip by Spc_SeqOperandCounts, $DC quirk true, X kept, Y=0 on every exit"
+$0892,Spc_QueueCommand,2026-10-09,rev174a,approved,0e13cf8bd6f4,"Fixed: callers $031C/$0340/$035C, StepTracks $03E0, unmatched $1308 (X = count ptr in $12F9). Double read, $FE/$10-$17 left, full queue reuses $3C, Y=id echo ok"
+$09F6,Spc_WriteVoice,2026-10-09,rev174a,approved,fe1c61b7ed34,"Fixed: sim p=$40/$7F/$80/$C0/$FF: <$80 vol+vol*2p/256, >=$80 vol*(2p-256)/256; $7F only at sum>=$180. Pan/mute/sides/PL-PH ok. nit: F220 is its low byte; note tremolo fall-in"
+$0ADE,Spc_LfoRate,2026-10-09,rev174a,approved,ac3b2ab42ce6,"Fixed: sim 6 calls for depth $40/$90/$C8: always negates; stage counts down, +base/4 on turns to + / to - / all (sign from TempB7.7); Entry TempB7 now stated; YA, 9D ok"
