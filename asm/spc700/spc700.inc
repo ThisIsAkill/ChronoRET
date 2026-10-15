@@ -36,6 +36,7 @@
 !SPC_CONTROL_Timers01 = $03              ; timers 0 and 1 on, IPL ROM off
 !SPC_CONTROL_ClearPorts01 = $13          ; the same plus clear the port 0/1 latches
 !SPC_CONTROL_Timer1 = $02                ; timer 1 on, timer 0 off (stopped to take a new divider)
+!SPC_CONTROL_Timer0 = $01                ; timer 0 on, timer 1 off (stopped, so it restarts at 0)
 !SPC_CONTROL_IplRom = $80                ; the IPL ROM mapped at $FFC0, timers off
 !SPC_IplRom = $FFC0                      ; the IPL ROM's entry
 !SPC_Timer0Divider = $2A                 ; 42 x 125 us = 5.25 ms: one pass of the main loop
@@ -51,6 +52,22 @@
 !DSP_EVOLR = $3C                         ; echo volume right
 !DSP_KOF = $5C                           ; key off (a bit per voice)
 !DSP_DIR = $5D                           ; sample directory page
+!DSP_SRCN = $04                          ; voice 0's sample number
+!DSP_OUTX = $09                          ; voice 0's current output sample (read)
+!DSP_EON = $4D                           ; echo on (a bit per voice)
+!DSP_EFB = $0D                           ; echo feedback
+!DSP_EDL = $7D                           ; echo delay (low nibble: 16 ms steps)
+!DSP_ESA = $6D                           ; echo buffer page
+!DSP_KON = $4C                           ; key on
+!DSP_PMON = $2D                          ; pitch modulation on
+!DSP_NON = $3D                           ; noise on
+!DSP_FIR0 = $0F                          ; FIR coefficient 0 (coefficient n: + n x $10)
+!DSP_FLG_EchoOff = $20                   ; FLG bit 5: echo writes off
+!DSP_FLG_EchoOnMask = $DF                ; FLG without bit 5
+!DSP_ADSR1_AttackMask = $0F              ; ADSR1 bits 0-3: attack rate
+!DSP_ADSR1_DecayMask = $70               ; ADSR1 bits 4-6: decay rate
+!DSP_ADSR2_RateMask = $1F                ; ADSR2 bits 0-4: sustain rate
+!DSP_ADSR2_LevelMask = $E0               ; ADSR2 bits 5-7: sustain level
 !DSP_VOLL = $00                          ; voice 0's volume left (VOLR is the next register)
 !DSP_ADSR1 = $05                         ; voice 0's ADSR1 (bit 7: ADSR on, else GAIN)
 !DSP_FLG = $6C                           ; reset, mute, echo-write disable, noise clock
@@ -68,8 +85,8 @@
 ; Tracks: 16 tracks, X = track x 2. Tracks 0-7 ($00-$0E) are the song's, one
 ; per voice; tracks 8-15 ($10-$1E) play sound effects on voices 0-7 (the
 ; voice of track t is t & 7). A track's voice bit is 1 << voice.
-!Spc_Scratch00 = $00                     ; word: scratch (Spc_StartSong: the offset that moves the
-                                         ; song's track pointers to where the song was loaded)
+!Spc_Scratch00 = $00                     ; word: the offset that moves the song's addresses to where it
+                                         ; was loaded (Spc_StartSong); the jump commands add it
 !Spc_TrackPtr = $02                      ; word per track ($02-$21): the track's read pointer in ARAM
 !Spc_KonShadow = $22                     ; KON for the next pass (written by Spc_MainLoop, then 0)
 !Spc_KofShadow = $23                     ; KOF for the next pass (written by Spc_MainLoop, then 0)
@@ -79,7 +96,8 @@
                                          ; these; Spc_StartSfx clears the new effect's
 !Spc_TrackWait = $26                     ; byte per track (+X): passes until the track's next step
                                          ; (Spc_InitTrack sets 1, decremented by $03A5)
-!Spc_TrackUnk27 = $27                    ; byte per track (+X): Spc_InitTrack sets it to X x 2
+!Spc_TrackUnk27 = $27                    ; byte per track (+X): the loop stack's slot (4 per track, from
+                                         ; X x 2; Spc_SeqLoopStart / Spc_SeqLoopEnd)
 !Spc_TempoWord = $46                     ; word: !Spc_Tempo ($47) with its fraction ($46), for its fade
 !Spc_Tempo = $47                         ; added to !Spc_TempoAccum each pass ($0377); a song step
                                          ; runs on the carry (inferred: tempo); 1 at a song's start
@@ -88,8 +106,8 @@
                                          ; tracks step on the carry (Spc_StepTracks)
 !Spc_TempoFadeSteps = $4A                ; steps left of the tempo's fade (Spc_StepSongFades)
 !Spc_TempoFadeDelta = $4B                ; word: added to !Spc_TempoWord each step
-!Spc_Unk4D = $4D                         ; Spc_StartSong stores !Spc_CmdArg1 here (byte 1 of the
-                                         ; song's AudioRom_SongEcho word on the 65816 side)
+!Spc_Unk4D = $4D                         ; the song's volume: !Spc_CmdArg1 of the song command (byte 1 of
+                                         ; AudioRom_SongEcho), or sequence command $F4 (Spc_WriteVoice)
 !Spc_EchoVolWord = $4E                   ; word: !Spc_EchoVolume ($4F) with its fraction, for its fade
 !Spc_EchoVolDelta = $50                  ; word: its step
 !Spc_EchoVolSteps = $52                  ; steps left
@@ -110,6 +128,7 @@
 !Spc_Unk61 = $61                         ; voice bits; Spc_StartSfx clears the new effect's
 !Spc_NoiseClock = $62                    ; ORed into !Spc_FlgShadow's low 5 bits (the FLG noise
                                          ; clock) when a song is resumed
+!Spc_SfxNoiseClock = $63                 ; the effects' noise clock (used while any effect voice has noise)
 !Spc_FirWord = $65                       ; 8 words ($65-$74): FIR0-7 with fractions (the high bytes are
                                          ; !Spc_FirShadow), faded by Spc_StepSongFades
 !Spc_FirShadow = $66                     ; 8 words ($66-$75): FIR0-7 take the low bytes ($66, $68, ...)
@@ -124,12 +143,14 @@
                                          ; compares the requested song with it
 !Spc_EchoDelay = $81                     ; the echo delay in effect (EDL), compared with each song
                                          ; command's !Spc_CmdArg2
-!Spc_Unk82 = $82                         ; passed to $12F9 (X = its address) after an echo change
-!Spc_Unk83 = $83                         ; cleared before that wait
+!Spc_Unk82 = $82                         ; the echo delay before a change (Spc_SetEchoDelay reads EDL);
+                                         ; Spc_WaitTimer1 waits on it
+!Spc_Unk83 = $83                         ; timer 1 counts since an echo change (Spc_CountTimer1 during
+                                         ; transfers; Spc_WaitTimer1 starts from it)
 !Spc_SfxVoices = $86                     ; voice bits taken by sound effects (set by Spc_StartSfx)
 !Spc_Flags87 = $87                       ; bit 3: echo volume doubled; bit 4: no song step or new
                                          ; effect (Spc_MainLoop, Spc_StartSfx); other bits not traced
-!Spc_Flags88 = $88                       ; bits 0/1: echo change to finish (Spc_StartSong; Spc_Unk1316
+!Spc_Flags88 = $88                       ; bits 0/1: echo change to finish (Spc_StartSong; Spc_StartEchoChange
                                          ; clears bit 1 when the old EDL was 0); bit 5:
                                          ; $0377 steps the song every pass, without the tempo; bit 7:
                                          ; Spc_MainLoop leaves CPUIO0-3 to $1438 (not traced)
@@ -149,13 +170,16 @@
 !Spc_XferDest = $99                      ; word: Spc_XferMove's destination
 !Spc_Ptr93 = $93                         ; word: a pointer (Spc_StartSfx: the effect's entry in the
                                          ; table at !AudioAram_Block2F00)
+!Spc_Ptr95 = $95                         ; word: a second pointer (save/restore, effect track lookup)
 !Spc_Temp92 = $92                        ; scratch byte
 !Spc_Temp9B = $9B                        ; scratch byte
 !Spc_Temp9C = $9C                        ; scratch byte
 !Spc_Temp9D = $9D                        ; scratch byte
 !Spc_Temp9E = $9E                        ; scratch byte
 !Spc_Temp9F = $9F                        ; scratch word ($9F-$A0)
+!Spc_TempA0 = $A0                        ; scratch byte
 !Spc_TempA1 = $A1                        ; scratch byte
+!Spc_TempA2 = $A2                        ; scratch byte
 !Spc_Mute = $A7                          ; voice bits: song tracks on these voices get volume 0
                                          ; (Spc_Unk09F6 at $0A40); commands $F4, $F8, $F9
 !Spc_TempoAdj = $A9                      ; word: $AA = a tempo adjustment (signed; Spc_Unk0377 scales
@@ -206,11 +230,13 @@
                                          ; high byte nonzero: the pan LFO on
 !Spc_Page1 = $0100                       ; page 1: what P=1 direct-page operands are relative to
 !Spc_FirDelta = $0100                    ; 8 words: the FIR coefficients' steps (Spc_StepSongFades)
-!Spc_TrackUnk110 = $0110                 ; byte per effect track (+X): its index into Spc_VibDepthTable
-                                         ; (song tracks use index 0)
+!Spc_TrackUnk110 = $0110                 ; byte per track (+X): a song track's vibrato delay (reloaded at
+                                         ; each note), an effect track's index into Spc_VibDepthTable
+                                         ; (song tracks use index 0) (Spc_SeqVibrato)
 !Spc_TrackVibDelay = $0111               ; byte per track (+X): passes before the vibrato starts (counted
                                          ; down by Spc_TrackSlides with P=1; song tracks only wait)
 !Spc_TrackTremDelay = $0131              ; the same for the tremolo (all tracks)
+!Spc_TrackTremDelayReload = $0130        ; byte per track (+X): the tremolo's delay, reloaded at each note
 
 ; --- Driver RAM: work area ---
 !Spc_GroupVol = $F160                    ; 3 words: a volume for the song's tracks, for effect tracks
@@ -267,6 +293,10 @@
 !Spc_TrackPitch = $F520                 ; word per track: the note's pitch (DSP pitch units), slides
                                          ; included
 !Spc_TrackAdsr = $F540                  ; word per track: the sample's ParamB word (ADSR1/ADSR2)
+!Spc_LoopIter = $F560                    ; byte per loop slot: the pass through a song track's loop (1, 2,
+                                         ; ...; Spc_SeqLoopJump compares it)
+!Spc_LoopCount = $F580                   ; byte per loop slot: passes left + 1 (0: endless)
+!Spc_LoopReturn = $F5C0                  ; word per loop slot: where the loop starts
 
 ; --- Values ---
 !Spc_StackTop = $FF                      ; SP at Spc_Start and at each song start (stack $01FF down)
@@ -283,6 +313,24 @@
 !Spc_InvertBits = $FF                    ; EOR mask: all eight bits inverted
 !Spc_StartTempo = $01                    ; !Spc_Tempo at a song's start (a step every 256 passes until
                                          ; the song sets its own, probably)
+!Spc_AddMax = $FF                        ; Spc_AddSigned's ceiling
+!Spc_DpSave = $0000                      ; the direct page bytes Spc_SaveSong keeps ($00-$7F)
+!Spc_SaveFirstPage = $F2                 ; Spc_SaveSong keeps $F200-$F7FF ...
+!Spc_SavePage = $F8                      ; ... at $F800-$FDFF, the direct page at $FE00 and page 1 at $FF00
+!Spc_SaveDpBytes = $80                   ; direct page bytes kept
+!Spc_SavePage1Bytes = $90                ; page 1 bytes kept ($0100-$018F: the FIR steps and per-track
+                                         ; bytes)
+!Spc_ResumeFadeSteps = $10               ; Spc_RestoreSong fades the song in over 16 steps,
+!Spc_ResumeVolume = $10                  ; from volume $10,
+!Spc_ResumeFadeDelta = $0EF0             ; by $0E.F0 a step (to $FF)
+!Spc_LevelMask = $70                     ; Spc_ReportLevels: a level's 3 bits
+!Spc_TempoScale = $14                    ; a tempo byte t gives !Spc_Tempo = t + t x 20 / 256
+!Spc_NumVibDepths = $0C                  ; effect tracks: Spc_VibDepthTable entries
+!Spc_LfoDepthMask = $3F                  ; an LFO depth byte's size bits
+!Spc_LfoMagnitudeMask = $7F              ; the pan LFO's depth without its sign
+!Spc_EvenMask = $FE                      ; clears bit 0
+!Spc_NoiseClockMask = $1F                ; FLG's noise clock bits
+!Spc_PmonNever = $50                     ; effect voices 6 and 4 never get pitch modulation
 !Spc_FadeTicks = 7                       ; passes per !Spc_FadeTimer round
 !Spc_UnkD8Start = $02                    ; !Spc_UnkD8 after Spc_Start
 !Spc_NumShadowRegs = $11                 ; DSP registers Spc_MainLoop writes each pass

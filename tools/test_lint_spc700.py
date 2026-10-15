@@ -154,8 +154,10 @@ class Pinned(unittest.TestCase):
             lo = int(sl['start'][1:3], 16) - 0xC0 << 16 | int(sl['start'][4:], 16)
             if lo <= block[-1] and block[0] < lo + 0x1000 and not sl['functions']:
                 self.assertEqual(sl['emitted_bytes'], 0, sl['start'])
-        spc_code = sum(int(r['size']) for r in generated.spc700_rows())
-        self.assertEqual(data['spc700']['emitted_bytes'], spc_code)
+        # every emitted byte of the block is in a row, but the length word
+        # before the program (2 bytes, no label), once it is emitted
+        spc_rows = sum(int(r['size']) for r in generated.spc700_rows())
+        self.assertIn(data['spc700']['emitted_bytes'] - spc_rows, (0, 2))
 
 
 if __name__ == '__main__':

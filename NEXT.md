@@ -1510,53 +1510,52 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     renamed from `Spc_Unk0892`/`08CD`/`100E`, `!Spc_UnkD2` -> `!Spc_SongCond`), `Spc_WriteDsp`,
     `Spc_ClearPorts01` and `Spc_PollCommand` (callers and callee names).
 
-    For the next edit of these approved headers (review nits not yet applied): `Spc_CmdFadeSong`:
-    $83 marks only $30 (voices 5-4) in !Spc_UnkD0 although its group is tracks 8-13 (round 170).
-    Round 173: `Spc_TrackEffects`: the vibrato offset uses the high byte of phase x 2 (the ASL/ROL
-    of the phase word), not the phase's high byte x 2 / 256; `Spc_AnimateBuiltin`: skipped while
+    For the next edit of these approved headers (review round 173 nits not yet applied; the
+    fourth batch applied the `Spc_MainLoop`, `Spc_StepSongFades` and `Spc_CmdFadeSong` ones):
+    `Spc_TrackEffects`: the vibrato offset uses the high byte of phase x 2 (the ASL/ROL of the
+    phase word), not the phase's high byte x 2 / 256; `Spc_AnimateBuiltin`: skipped while
     !Spc_Flags87 bit 4 pauses Spc_MainLoop, and at the last step only byte 1's high nibble ($70)
-    is flipped; `Spc_CmdTimer`: 125 us is timer 0's tick, not a pass; `Spc_MainLoop`: "the tempo
-    step" (Spc_StepTracks) steps all the tracks; `Spc_StepTracks`: a voice is cleared from
-    !Spc_Unk24 (25) even when an effect holds it (only the key-off is skipped);
-    `Spc_StepSongFades`: the "probably" can go, the sequence commands at `$1722`-`$1826` set those
-    fades; `Spc_TrackSlides`: a pitch slide with 0 steps runs as 256 (the count wraps).
+    is flipped; `Spc_CmdTimer`: 125 us is timer 0's tick, not a pass; `Spc_StepTracks`: a voice is
+    cleared from !Spc_Unk24 (25) even when an effect holds it (only the key-off is skipped);
+    `Spc_TrackSlides`: a pitch slide with 0 steps runs as 256 (the count wraps); `Spc_CmdMono`'s
+    second sentence is one overlong line.
 
-    **Third batch (branch match-c7-spc700-3, 1,954 bytes):** the track pass, `$0377`-`$07A2`,
-    `$07AF`-`$0891` and `$0903`-`$0B95`: `Spc_StepTracks` (the tempo, each track's next note and
-    key-off, the effects' own tempo), `Spc_LivePass` / `Spc_StepSongOnly` (the song alone, for
-    mode-5 transfers), `Spc_StepSongFades` (tempo, echo volume, EFB and FIR fades),
-    `Spc_TrackStep` / `Spc_TrackLookAhead` (note bytes, lengths, ties, rests, key-on, the look-ahead
-    for key-off and the pitch slide), `Spc_NotePitch`, `Spc_DrumNote`, `Spc_RunSeqCommand` /
-    `Spc_ReadSeqByte`, `Spc_PeekNote` / `Spc_PeekNoteFrom`, `Spc_TrackSlides` (volume, pan and
-    pitch slides, the pan LFO), `Spc_TrackEffects` / `Spc_TrackTremolo` (vibrato and tremolo),
-    `Spc_WriteVoice` / `Spc_WritePitch` (VOLL/VOLR and PL/PH), `Spc_LfoRate`,
-    `Spc_AnimateBuiltin`. Findings: sequence bytes are $00-$A7 notes (index = byte / 14 within the
-    track's base note, length = `Spc_DurationTable[byte % 14]`), $A8-$B5 ties, $B6-$C3 rests,
-    $C4-$FF commands; a note keys off two passes before its end unless the next is a tie (or the
-    voice is in legato mode, `!Spc_Unk5C`/`60`, probably); the song's 36-byte extra block at
-    `$F120` is a drum kit (12 entries: sample, note, pan) for voices in `!Spc_Unk7C`; the song
-    command's Arg1 (`!Spc_Unk4D`, from `AudioRom_SongEcho` byte 1) scales every song voice's volume,
-    a song volume probably; effects step on about half the passes (`!Spc_SfxTempo` $81) and only
-    tracks 12-15 (voices 4-7) are stepped; tempo and pitch adjustments ($86, $87, $89) scale up to
-    about 2x (values below $80) and down to about half (from $80; $89 only up); the built-in sample's loop is rewritten one nibble per
-    pass. Quirks: `Spc_StepTracks` picks the effect bytes with a BCS into the operand of
-    `mov a,#$FC` (`inc y`); `Spc_RunSeqCommand`'s SBC relies on C=1 from the caller's CMP; a
-    tremolo phase from $80 up adds nothing (one-sided); a pitch slide with 0 steps is not divided
-    (not traced further); `Spc_StepSongOnly` keeps neither the fast-mode bypass nor the queue. The
-    per-track defines named by address in batch 1 (`!Spc_TrackF240` volume, `!Spc_TrackF280` pan,
-    `!Spc_TrackF300` vibrato depth, ...) keep their names, with their meanings in spc700.inc's
-    comments; rename them at the next edit of the routines that use them. Verified headers
-    edited (back to review): `Spc_MainLoop`, `Spc_StartSong` (with its round-170 nits),
-    `Spc_QueueCommand` (with its nit), `Spc_CmdTempoPitch`, `Spc_CmdSongPitch`, `Spc_CmdSfxPitch`,
-    `Spc_CmdMono` (with its nit), `Spc_CmdTimer`, `Spc_XferLive`: callee names (`Spc_Unk0377`,
-    `0415`, `0903`, `09F6`, `0A78`, `0B5C` matched) and the meanings they now show.
+    **Fourth batch (branch match-c7-spc700-4): the rest of the driver.** `$12DE`-`$1543` (echo:
+    `Spc_SetEchoDelay`, `Spc_StartEchoChange`, `Spc_WaitTimer1`, `Spc_CountTimer1`,
+    `Spc_EchoWritesOn`, `Spc_CmdSetEchoDelay`; `Spc_SaveSong` / `Spc_RestoreSong`;
+    `Spc_ReportLevels`; `Spc_StepGroupFades`; `Spc_AddSigned`; `Spc_CmdWriteDsp`), the sequence
+    command handlers `$1722`-`$1D6C` (every command $C4-$FF and its look-ahead handler), the tables
+    `$1544`-`$1721` and `$1D6D`-`$1DEE`, and the length word at `$C7:24C3` (`dw Spc_DriverEnd -
+    !AudioAram_Driver`): the whole block is emitted from source and `asm/spc700/unmatched.asm` is
+    gone. Findings: the sequence commands, by number: $C4/$C5 volume / slide, $C6/$C7 pan / slide
+    (song tracks), $C8 pitch slide, $C9/$CA vibrato on / off, $CB/$CC tremolo, $CD/$CE pan LFO,
+    $CF noise clock, $D0-$D5 noise, pitch modulation and echo on / off, $D6-$D8 octave, $D9/$DA
+    transpose, $DB fine tune, $DC sample, $DD-$E1 ADSR fields, $E2/$E3 loop start / end (four
+    slots per track: `!Spc_TrackUnk27` is the loop stack's slot), $E4/$E6 legato-like flags ($E5,
+    $E7 null), $E8 next length, $E9/$EA continue with an effect's track, $EB-$EF/$FE/$FF end of
+    track, $F0/$F1 tempo, $F2/$F3 echo volume, $F4 song volume (`!Spc_Unk4D`), $F5 a jump on a
+    loop pass, $F6 jump, $F7 EFB, $F8 FIR set (`Spc_FirSets`), $F9 a marker shown in CPUIO2's low
+    nibble, $FA a branch on `!Spc_SongCond` (command $88: the game steers the song), $FB/$FC drum
+    mode, $FD the track's volume scale. Jump addresses are relative to the song's origin
+    (`!Spc_Scratch00` holds the move for the whole song). The port report (command $FF, Arg0 1) is
+    a level meter of four voices at a time, probably. Quirks: `Spc_LfoStart` branches into the
+    operand of `mov y,#$DD` (`mov a,y`) and takes Z from its caller's load; `Spc_SeqPanFade` on an
+    effect track stores the steps but no step; `Spc_EndTrack` clears the song's `!Spc_Unk5E` for an
+    effect track; `Spc_SeqEfbFade` has no same-value exit; `Spc_UpdateNoise` never gives effect
+    voice 0 noise; effect voices 6 and 4 never get pitch modulation; the pitch table's 13th word
+    is never read. The per-track defines named by address (`!Spc_TrackF240` ...) keep their names
+    (not every routine using them was edited). Verified headers edited (back to review): those
+    that named the stubs now matched or called "unmatched" code now matched: `Spc_Start` (banner),
+    `Spc_MainLoop`, `Spc_LivePass`, `Spc_TrackStep`, `Spc_RunSeqCommand`, `Spc_StepSongFades`,
+    `Spc_WriteVoice`, `Spc_WriteDsp`, `Spc_QueueCommand`, `Spc_RunQueue`, `Spc_StartSong`,
+    `Spc_CmdFadeSong`, `Spc_FadeDelta`, `Spc_CmdStopSong`, `Spc_CmdStopSfx`, `Spc_StopSfxB`,
+    `Spc_XferReceive`, `Spc_XferHeader`, `Spc_CmdControl`.
 
-    **Next batches**, in the order they make the rest readable: the sequence command handlers
-    (`$1722`-`$1D6C` with the tables `$1544`-`$1721`); echo, save/restore and the fades
-    (`$12DE`-`$1543`); the tables `$1D6D`-`$1DEE`, and the length word last. Headers to fix at
-    their next edit (verified, not edited here): `bankC7.asm`'s banner and Audio_Boot /
-    Audio_StartSong say the SPC700 side is not traced (now partly matched; the constants' comments
-    are updated).
+    **What is left of the SPC700 track:** review; renaming the address-named per-track defines at
+    the next edit of every routine that uses them; splitting `code_survey`'s `spc700_bytes` (7,153)
+    into code 6,543 / data 608; a generated Callers block for SPC700 headers; and the verified
+    bankC7 headers that still say the SPC700 side is not traced (`bankC7.asm`'s banner,
+    Audio_Boot, Audio_StartSong), to fix at their next edit.
 
 ## Code survey
 

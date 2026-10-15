@@ -50,4 +50,3 @@ incsrc "bankFF/bankFF.asm"
 ; --- Names for not-yet-matched routines (label-only, no bytes) ---
 incsrc "include/unmatched.asm"
 incsrc "include/unmatched_battle.asm"
-incsrc "spc700/unmatched.asm"
