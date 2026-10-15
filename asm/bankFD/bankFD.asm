@@ -7411,12 +7411,13 @@ FieldFD_UploadTileAnims:
 
 ; $FD:E275 — PalAnim_StopAll (29 bytes, $E275–$E291)
 ; FdVec_FFEE's routine: sets .Unk0 of all 12 FieldAnimB records to 0
-; (kind 0: PalAnim_TickAll leaves them alone), so every palette
-; animation stops. Saves P and DB; DB=$00. The SEP #$20 is redundant:
-; the LDA #0 before it is already the 8-bit form.
-; Callers note: FdVec_FFEE ($FD:FFEE) JMPs here; the JSL $FD:FFEE bytes
-;   at $C3:4D46 are probably data (xref: doubtful, plausible in 12 of 256
-;   sweeps; a BRK at $C3:4D42 precedes them).
+; (kind 0: PalAnim_TickAll still steps their .Unk4 counter but runs no
+; kind for them), so every palette animation stops. Saves P and DB;
+; DB=$00. The SEP #$20 is redundant: the LDA #0 before it is already
+; the 8-bit form.
+; Callers note: FdVec_FFEE ($FD:FFEE) JMPs here (the unpacked $C3
+;   module JSLs FdVec_FFEE; the JSL $FD:FFEE bytes at $C3:4D46 are a
+;   literal inside BankC3_PackedModule, not code: see FdVec_FFEE).
 ; Callers (1 JMP site): FdVec_FFEE ($FD:FFEE).
 ; Entry: M=1 (LDA #0 is 8-bit), X any (P saved; it sets X=1), DP any,
 ;        DB any (saved)
@@ -10625,9 +10626,12 @@ FdVec_FFEB:
 
 ; $FD:FFEE — FdVec_FFEE (3 bytes, $FFEE–$FFF0)
 ; JMP to PalAnim_StopAll.
-; Callers note: no confirmed caller; the JSL $FD:FFEE bytes at $C3:4D46
-;   are probably data (xref: doubtful, plausible in 12 of 256 sweeps; a
-;   BRK at $C3:4D42 precedes them).
+; Callers note: no caller in ROM as such; the unpacked $C3 module JSLs
+;   it (from $7E:5AA1 in C3Mod_Prog2, M=1, and $7E:62FD, $7E:6808,
+;   $7E:7972, $7E:86F2 and $7E:8EC1, module code not matched yet). The
+;   JSL $FD:FFEE bytes at $C3:4D46 are inside BankC3_PackedModule: a
+;   literal of the packed stream ($7E:7972's call, with the JSR $38AF
+;   before it), not code.
 ; Entry: as PalAnim_StopAll: M=1, X any, DP any, DB any
 ; Exit:  as PalAnim_StopAll
 FdVec_FFEE:

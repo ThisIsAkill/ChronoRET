@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:579B,C3Mod_StarsTask,2026-10-09,rev190a,changes,eea6505fc851,"JMP-entry carry fixed. d=$00 quirk gloss names only a kept $FF; also re-placed sums $7F/$FF with Random's C=1 (last SBC), and speed $FF+depth $7F+C=1 (BPL path). List all."

@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:579B,C3Mod_StarsTask,2026-10-09,rev191a,approved,21c32cb92998,"d=$00 rule and its 3 routes exhaustive (depth $7F iff sum $7F/$FF, per branch, carry-in 1 first star only); Random's SBC carry; JMP $99B2 C=1; CMP/BMI ranges, $582E patch, Entry/Exit."

@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:579B,C3Mod_StarsTask,2026-10-09,rev189a,changes,a453a594b71d,"CMP gloss now right. But via JMP $99B2 the first depth add gets C=1 (CMP #$0100 with OamPos>=$100, or FinishOamHigh's CPX #4 exit), not TaskNext's 0: say so."
