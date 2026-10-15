@@ -19,8 +19,9 @@ now are structural, not just function-matching:
 
 - **No ROM data, headers, or extracted assets in commits.** Ever. Tools
   and source only. If in doubt, don't commit it. The data layer's assets
-  live in the ignored `build/assets/` and `build/packs/`, written from your
-  own ROM by `tools/extract_data.py`; `asm/data/` and
+  live in the ignored `build/assets/`, `build/packs/` and `build/text/`,
+  written from your own ROM by `tools/extract_data.py` (the game's text as
+  readable files in `build/assets/text/`, `tools/text.py`); `asm/data/` and
   `symbols/data_assets.csv` are generated from `symbols/data_survey.csv`
   (`python3 tools/extract_data.py generate`, checked by `make data-check`),
   never edited by hand.

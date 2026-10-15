@@ -23,7 +23,9 @@ build: check-rom
 	python3 tools/build_rom.py -o $(OUT_ROM)
 
 # The data layer's assets, from your ROM into build/assets/ (never
-# committed; tools/extract_data.py). `make build` runs it when needed.
+# committed; tools/extract_data.py), the game's text among them as
+# readable files in build/assets/text/ (tools/text.py). `make build` runs
+# it when needed.
 extract: check-rom
 	python3 tools/extract_data.py extract
 
@@ -80,8 +82,9 @@ test-hooks:
 # held-out score), the lint's INDEX and SIZE rules, the SPC700 decoder and
 # the lint's SPC700 rules, the packer of the $C3 module (tools/c3pack.py), its
 # trace and the lint's module rules (tools/c3module.py, tools/lint_c3module.py),
-# the data survey's coverage (tools/data_survey.py), and the data layer's
-# manifest, lint and isolation (tools/test_data_layer.py).
+# the data survey's coverage (tools/data_survey.py), the data layer's
+# manifest, lint and isolation (tools/test_data_layer.py), and the text
+# encoder and its round trip (tools/test_text.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -94,6 +97,7 @@ test-tools:
 	python3 tools/test_c3module.py
 	python3 tools/test_data_survey.py
 	python3 tools/test_data_layer.py
+	python3 tools/test_text.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]

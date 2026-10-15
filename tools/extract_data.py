@@ -19,9 +19,11 @@ the survey into three things:
                             states, and incbin paths.
   build/assets/             the assets (ignored, never committed), written
                             from the user's ROM by `extract`: one file per
-                            extracted or packed piece. Packed streams are
-                            written unpacked; tools/build_rom.py packs them
-                            back with tools/c3pack.py at build time.
+                            extracted or packed piece, one readable text file
+                            per text unit. Packed streams are written
+                            unpacked; tools/build_rom.py packs them back with
+                            tools/c3pack.py at build time, and encodes the
+                            text with tools/text.py.
 
 How each piece's bytes are made (the manifest's `piece` column):
 
@@ -39,12 +41,19 @@ How each piece's bytes are made (the manifest's `piece` column):
              build/assets/packed_lz/<label>.bin with the mode in the
              manifest; the build packs them to build/packs/<label>.lz,
              which is incbin'd. Counted as "packed from extracted assets".
+  text       a row of a text unit (tools/text.py's UNITS): the unit's
+             readable text goes to build/assets/text/<unit>.txt (checked to
+             encode back to the ROM's bytes when it is written); the build
+             encodes it to build/text/<label>.bin, which is incbin'd. param
+             is the row's layout in the unit. Counted as "text encoded from
+             extracted text".
 
 Why the placement is committed: it is the readable map of the ROM's data
 (labels, addresses, what each region is, who reads it) and review sees how
 it changes; it contains no ROM data. Its incbin lines are the only ones the
 lint allows outside the two of the packed $C3 module (lint_readability.py,
-FILEREAD): each must name a path this manifest lists.
+FILEREAD): each must name a path this manifest lists (an asset, a pack or an
+encoded text piece).
 
     python3 tools/extract_data.py extract     write build/assets/ from the ROM
                                               (checked against rom.sha256;
@@ -74,6 +83,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import data_survey  # noqa: E402
+import text  # noqa: E402
 
 ROM_PATH = ROOT / 'roms' / 'chrono_trigger.sfc'
 ROM_SHA = ROOT / 'rom.sha256'
@@ -81,17 +91,20 @@ MANIFEST = ROOT / 'symbols' / 'data_assets.csv'
 DATA_DIR = ROOT / 'asm' / 'data'
 ASSETS = Path('build/assets')          # relative to the repository root
 PACKS = Path('build/packs')
+TEXT_OUT = Path('build/text')          # the encoded text pieces (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
 # Paths as the generated asm/data/*.asm write them (relative to asm/data/).
 ASSET_PREFIX = '../../build/assets/'
 PACK_PREFIX = '../../build/packs/'
+TEXT_PREFIX = '../../build/text/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed')
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
+TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
 FILL = re.compile(r'^(\d+) x \$([0-9A-F]{2})$')
 
@@ -231,6 +244,8 @@ def row_label(row: dict, start: int) -> str:
             return m.group(1)
         if m and m.group(1) in PACK_PREFIXES:
             return f'{PACK_PREFIXES[m.group(1)]}_{int(m.group(2)):03d}'
+    if row['kind'] == 'text' and notes.startswith('message table,'):
+        return f'MsgTable_{long_addr(start)[1:]}'
     m = re.match(r'sample (\d+) \(', notes)
     if m:
         return f'AudioSample_{int(m.group(1)):02d}'
@@ -280,6 +295,11 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
         elif kind == 'packed_lz':
             m = data_survey.PACK_FORMAT.match(row['format'])
             add(label, s, e, 'packed', param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
+        elif row['start'] in text.ROWS:
+            unit, fmt = text.ROWS[row['start']]
+            if kind not in ('text', 'table'):
+                raise DataError(f'{row["start"]}: a {kind} row cannot be a text unit\'s')
+            add(label, s, e, 'text', asset=f'text/{unit}.txt', param=fmt, row=row)
         elif row['start'] in TABLES:
             size = TABLES[row['start']]
             whole = (e - s) // size * size
@@ -348,6 +368,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
                     or Path(p['asset']).stem != p['label']:
                 problems.append(f'{where}: the asset must be <kind>/<label>.bin, once: {p["asset"]!r}')
             seen_assets.add(p['asset'])
+        elif p['piece'] == 'text':
+            m = TEXT_ASSET.match(p['asset'])
+            if not m or m.group(1) not in text.UNITS:
+                problems.append(f'{where}: a text piece\'s asset is text/<unit>.txt of a unit of '
+                                f'tools/text.py: {p["asset"]!r}')
         elif p['asset']:
             problems.append(f'{where}: a {p["piece"]} piece has no asset')
         if p['piece'] == 'packed' and not PACK_PARAM.match(p['param']):
@@ -370,6 +395,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[ASSET_PREFIX + p['asset']] = p
         elif p['piece'] == 'packed':
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
+        elif p['piece'] == 'text':
+            out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
     return out
 
 
@@ -383,6 +410,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[ASSETS / p['asset']] = int(p['size'])
         elif p['piece'] == 'packed':
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
+        elif p['piece'] == 'text':
+            out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
     return out
 
 
@@ -492,9 +521,10 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; piece is a row of the survey (its kind, format, readers and',
         '; confidence are there) at its address. fill and pointer tables are',
         '; source; incbin reads an asset that tools/extract_data.py writes',
-        '; from your own ROM to build/assets/, or a pack tools/build_rom.py',
-        '; makes from one in build/packs/ (symbols/data_assets.csv lists',
-        '; them; nothing here is ROM data).',
+        '; from your own ROM to build/assets/, a pack tools/build_rom.py',
+        '; makes from one in build/packs/, or text it encodes into',
+        '; build/text/ (symbols/data_assets.csv lists them; nothing here',
+        '; is ROM data).',
         '; ============================================================',
     ]
     for p in pieces:
@@ -522,6 +552,9 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{ASSET_PREFIX}{p["asset"]}"')
         elif p['piece'] == 'packed':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}')
+        elif p['piece'] == 'text':
+            out.append(f'    incbin "{TEXT_PREFIX}{p["label"]}.bin"          ; text unit '
+                       f'{Path(p["asset"]).stem} ({p["param"]})')
         elif tables is not None:
             out += tables[p['label']]
     return '\n'.join(out) + '\n'
@@ -619,6 +652,7 @@ def _stamp_key(rom_sha: str) -> str:
     h = hashlib.sha256(b'extract_data v1\0' + rom_sha.encode())
     h.update(MANIFEST.read_bytes())
     h.update(Path(__file__).read_bytes())
+    h.update(Path(text.__file__).read_bytes())         # the readable text's format
     return h.hexdigest()
 
 
@@ -626,9 +660,10 @@ def _stamp_text(key: str, out_dir: Path, pieces: list[dict]) -> str:
     """The stamp: the inputs' key, then the sha256 of every asset as it is
     now ('-' for a missing one), so an asset changed or removed by hand
     no longer matches the stamp written after extraction."""
-    lines = [key]
+    lines, seen = [key], set()
     for p in pieces:
-        if p['asset']:
+        if p['asset'] and p['asset'] not in seen:       # a text unit's file serves several pieces
+            seen.add(p['asset'])
             f = out_dir / p['asset']
             lines.append(f'{hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else "-"} {p["asset"]}')
     return '\n'.join(lines) + '\n'
@@ -648,7 +683,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         return out_dir
     rom = read_rom()
     stamp.unlink(missing_ok=True)
-    problems = []
+    problems = extract_text(rom, out_dir, pieces)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -656,7 +691,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             if rom[s:e] != bytes([value]) * (e - s):
                 problems.append(f'{p["label"]}: not uniform {p["param"]} fill in this ROM')
             continue
-        if p['piece'] == 'table':
+        if p['piece'] in ('table', 'text'):
             continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -678,9 +713,35 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         raise DataError('extraction failed:\n  ' + '\n  '.join(problems))
     stamp.write_text(_stamp_text(key, out_dir, pieces))
     if not quiet:
-        n = sum(1 for p in pieces if p['asset'])
+        n = len({p['asset'] for p in pieces if p['asset']})
         print(f'extract_data: {n:,} assets written to {ASSETS}/')
     return out_dir
+
+
+def extract_text(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:
+    """Write the readable file of every text unit (tools/text.py) and check
+    that the encoder makes the ROM's bytes from them again; the problems."""
+    import c3pack
+    units = text.units_of(pieces)
+    if not units:
+        return []
+    problems, texts = [], {}
+    try:
+        dic = text.rom_dictionary(rom)
+        for unit, ps in units.items():
+            texts[unit] = text.extract_unit(rom, unit, ps, dic)
+        encoded = text.encode_units(texts, units)
+    except text.TextError as err:
+        return [f'text: {err}']
+    for unit, ps in units.items():
+        bad = [p['label'] for p in ps if encoded[p['label']] != rom[p['offset']:p['stop']]]
+        if bad:
+            problems.append(f'text unit {unit}: {", ".join(bad)} do not encode back to the ROM\'s bytes')
+            continue
+        dest = out_dir / 'text' / f'{unit}.txt'
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        c3pack._write(dest, texts[unit].encode('utf-8'))
+    return problems
 
 
 # ── Command line ─────────────────────────────────────────────────────────────

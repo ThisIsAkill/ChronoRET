@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $FD:0000-$FD:0235 (566 B), packed_lz, confirmed: lz11 -> 1024 B: data for the $C3 module
@@ -244,12 +245,18 @@ org $FD9FEB
 Unknown_FD9FEB:
     incbin "../../build/assets/unknown/Unknown_FD9FEB.bin"
 
-; $FD:A000-$FD:A80A (2,059 B), text, confirmed: staff credits in ASCII: '/' ends a line, a byte
+; $FD:A000-$FD:A7D0 (2,001 B), text, confirmed: staff credits in ASCII: '/' ends a line, a byte
 ; >= $80 ends a block
 ; Read by Evt_Op29_StartCredits, Field_ServiceUnk54.
 org $FDA000
 Credits_Text:
-    incbin "../../build/assets/text/Credits_Text.bin"
+    incbin "../../build/text/Credits_Text.bin"          ; text unit Credits (ascii)
+
+; $FD:A7D1-$FD:A80A (58 B), unknown, unknown: 58 bytes after the last credits block ($00 bytes
+; and a few others)
+org $FDA7D1
+Unknown_FDA7D1:
+    incbin "../../build/assets/unknown/Unknown_FDA7D1.bin"
 
 ; $FD:A80B-$FD:A848 (62 B), table, confirmed: 2 B per battler slot: stat block address
 ; Read by BattleAi_AddPcByByte, BattleAi_RunAddStatBytes, BattleAi_RunAddStatsTech,

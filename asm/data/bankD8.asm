@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $D8:0000-$D8:1807 (6,152 B), packed_lz, confirmed: lz12 -> 8704 B: object sprite tile graphics
@@ -113,8 +114,8 @@ Padding_D8CF68:
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $D8D000
-Text_D8D000:
-    incbin "../../build/assets/text/Text_D8D000.bin"
+MsgTable_D8D000:
+    incbin "../../build/text/MsgTable_D8D000.bin"          ; text unit Messages_D8D000 (strtable)
 
 ; $D8:DD27-$D8:DD7F (89 B), padding, confirmed: 89 x $00
 org $D8DD27
@@ -127,8 +128,8 @@ Padding_D8DD27:
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $D8DD80
-Text_D8DD80:
-    incbin "../../build/assets/text/Text_D8DD80.bin"
+MsgTable_D8DD80:
+    incbin "../../build/text/MsgTable_D8DD80.bin"          ; text unit Messages_D8DD80 (strtable)
 
 ; $D8:FFBE-$D8:FFFF (66 B), padding, confirmed: 66 x $00
 org $D8FFBE

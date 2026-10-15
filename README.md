@@ -173,7 +173,8 @@ A C layer may come later for tooling purposes, but matching happens at the asm l
 Tools and source only. No ROM data, no copyrighted assets, no compressed
 graphics or music are stored here. Contributors must own a legal copy of the game.
 The data the source does not describe is extracted from each user's own ROM into
-the ignored `build/assets/` at build time; the repository holds only its map
+the ignored `build/assets/` at build time (the game's text too, as readable files
+that the build encodes back); the repository holds only its map
 (`symbols/data_survey.csv`, `symbols/data_assets.csv`) and the generated placement
 (`asm/data/`: addresses, labels, fill values, pointer tables written as labels, and
 incbin paths), never the bytes. The pre-commit hook refuses staged `.bin`, `.lz`

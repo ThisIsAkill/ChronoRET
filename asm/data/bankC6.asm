@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $C6:0000-$C6:07B5 (1,974 B), packed_lz, confirmed: lz12 -> 4096 B: scene sprite graphics
@@ -289,19 +290,25 @@ Padding_C6DD05:
     fillbyte $00
     fill 763
 
-; $C6:F000-$C6:F3FF (1,024 B), text, confirmed: strings of C2SceneRom_LabelStrings (TextWin
+; $C6:F000-$C6:F355 (854 B), text, confirmed: strings of C2SceneRom_LabelStrings (TextWin
 ; format)
 ; Read by C2Scene_LabelWait, C2Scene_MapViewLabel.
 org $C6F000
 Text_C6F000:
-    incbin "../../build/assets/text/Text_C6F000.bin"
+    incbin "../../build/text/Text_C6F000.bin"          ; text unit SceneLabels (strings)
+
+; $C6:F356-$C6:F3FF (170 B), padding, probable: 170 x $00
+org $C6F356
+Padding_C6F356:
+    fillbyte $00
+    fill 170
 
 ; $C6:F400-$C6:F4FF (256 B), text, confirmed: u16 string pointers (bank $C6) for
 ; TextWin_StrTable
 ; Read by C2Scene_LabelWait, C2Scene_MapViewLabel.
 org $C6F400
 C2SceneRom_LabelStrings:
-    incbin "../../build/assets/text/C2SceneRom_LabelStrings.bin"
+    incbin "../../build/text/C2SceneRom_LabelStrings.bin"          ; text unit SceneLabels (ptrs ptr)
 
 ; $C6:F500-$C6:F53F (64 B), graphics, confirmed: two 4bpp tiles: sprite tiles 0 and 2 of the map
 ; view

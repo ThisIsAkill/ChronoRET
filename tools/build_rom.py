@@ -15,7 +15,13 @@ assets, with no copy of the original.
      parallel. A pack whose size differs from its piece fails the build
      (the placement is fixed by the survey; an edited asset needs the
      layout regenerated, which is later work).
-  4. asar assembles asm/rom.asm (asm/main.asm, then the data layer
+  4. The text: every `text` piece is encoded from its unit's readable
+     text (build/assets/text/<unit>.txt) with tools/text.py, the
+     dictionary unit first (the message text is compressed with it), to
+     build/text/<label>.bin. It takes a fraction of a second, so it is
+     redone every build; a file is rewritten only when its bytes change. A
+     piece whose size differs fails the build, as a pack's does.
+  5. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets
      write every byte of the ROM; the result is build/chrono_trigger.built.sfc.
@@ -36,6 +42,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import c3pack  # noqa: E402
 import extract_data  # noqa: E402
+import text  # noqa: E402
 
 ROM_ASM = Path('asm/rom.asm')
 OUT_ROM = Path('build/chrono_trigger.built.sfc')
@@ -96,6 +103,35 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     return len(jobs)
 
 
+def build_text(root: Path = ROOT) -> int:
+    """Encode every `text` piece (see the docstring); returns how many files
+    were written."""
+    root = Path(root)
+    units = text.units_of(extract_data.read_manifest())
+    texts = {u: (root / extract_data.ASSETS / ps[0]['asset']).read_text(encoding='utf-8')
+             for u, ps in units.items()}
+    try:
+        encoded = text.encode_units(texts, units)
+    except text.TextError as e:
+        raise BuildError(f'text: {e}') from None
+    out_dir = root / extract_data.TEXT_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    wrong, written = [], 0
+    for ps in units.values():
+        for p in ps:
+            data = encoded[p['label']]
+            if len(data) != int(p['size']):
+                wrong.append(f'{p["label"]}: {len(data)} B, its piece {p["size"]} B')
+                continue
+            path = out_dir / f'{p["label"]}.bin'
+            if not path.exists() or path.read_bytes() != data:
+                c3pack._write(path, data)
+                written += 1
+    if wrong:
+        raise BuildError('text that does not fit its place:\n  ' + '\n  '.join(wrong))
+    return written
+
+
 def assemble(fill: int, out: Path, root: Path = ROOT) -> bytes:
     out.write_bytes(bytes([fill]) * ROM_SIZE)
     r = subprocess.run(['asar', '--no-title-check', '--fix-checksum=off', str(ROM_ASM), str(out.resolve())],
@@ -121,6 +157,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     finally:
         os.chdir(cwd)
     build_packs(root, quiet=quiet)
+    build_text(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp:

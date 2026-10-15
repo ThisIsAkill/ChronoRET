@@ -2,7 +2,8 @@
 """
 test_data_layer.py — Tests for the data layer: tools/extract_data.py, its
 manifest (symbols/data_assets.csv), the lint's FILEREAD rule for asm/data/
-and the isolated assembly of the whole ROM (tools/verify.py).
+and the isolated assembly of the whole ROM (tools/verify.py), with the
+encoded text pieces of tools/text.py among the files it lists.
 
     python3 tools/test_data_layer.py          (from the repository root)
 
@@ -11,13 +12,16 @@ covers it exactly; a manifest edited by hand (a path out of build/assets/,
 an added line) is refused; the lint refuses every planted file read in the
 data layer but the manifest's own incbins (the ROM by a relative or an
 absolute path, an asset the manifest does not list, a listed asset in the
-wrong file or twice, a path built from a define, a range of a listed file).
+wrong file or twice, a path built from a define, a range of a listed file;
+the same for the encoded text pieces, and the readable text itself, which
+is never incbin'd).
 
 With the ROM, asar and strace: asm/data/ is exactly what `generate` writes,
 and the isolated assembly of asm/rom.asm refuses the same planted reads
 (the file is not in the isolated tree, or strace sees asar open it outside);
 a data-layer write over code bytes that keeps their values is found; an
-asset or pack changed by hand is redone by the next build.
+asset, pack, readable text or encoded text piece changed by hand is redone
+by the next build.
 """
 
 import contextlib
@@ -58,6 +62,10 @@ def plants(root: Path) -> dict[str, tuple[str, str]]:
         'listed_in_code': ('bankC0/bankC0.asm', 'incbin "../../build/packs/C3Pack_000.lz"'),
         'define_path': ('data/bankC3.asm', '!p = "../../build/packs/C3Pack_000.lz"\nincbin "!p"'),
         'built_name': ('data/bankC3.asm', '!a = incbin\n!a!a'),
+        'text_not_listed': ('data/bankDE.asm', 'incbin "../../build/text/NotListed.bin"'),
+        'text_listed_twice': ('data/bankDE.asm', 'incbin "../../build/text/TextWin_DictPtrs.bin"'),
+        'text_listed_other_bank': ('data/bankC4.asm', 'incbin "../../build/text/TextWin_DictPtrs.bin"'),
+        'text_readable': ('data/bankDE.asm', 'incbin "../../build/assets/text/Dictionary.txt"'),
     }
 
 
@@ -85,11 +93,16 @@ class Manifest(unittest.TestCase):
             if p['piece'] in ('extracted', 'packed'):
                 self.assertRegex(p['asset'], ed.ASSET)
                 self.assertNotIn('..', p['asset'])
+            if p['piece'] == 'text':
+                self.assertRegex(p['asset'], ed.TEXT_ASSET)
 
     def test_hand_edits_refused(self):
         text = ed.MANIFEST.read_text()
         first = next(ln for ln in text.splitlines() if ',extracted,' in ln)
+        words = next(ln for ln in text.splitlines() if ',text,' in ln)
         edits = {
+            'text_path_out': text.replace(words, words.replace(words.split(',')[5], 'text/../../../roms/x.txt')),
+            'text_unknown_unit': text.replace(words, words.replace(words.split(',')[5], 'text/NoSuchUnit.txt')),
             'path_out': text.replace(first, first.replace(first.split(',')[5], '../../roms/chrono_trigger.sfc')),
             'added': text + 'Rom,$C0:0000,$C0:FFFF,65536,extracted,unknown/Rom.bin,\n',
             'renamed': text.replace(first, first.replace(first.split(',')[5],
@@ -143,6 +156,7 @@ class WithRom(unittest.TestCase):
         # A path into the copy's absent build/ fails as a missing file; an
         # absolute path out of it is opened, and strace refuses it.
         expect = {'rom_relative': "wasn't found", 'dotdot': "wasn't found",
+                  'text_not_listed': "wasn't found", 'text_readable': "wasn't found",
                   'not_listed': 'outside itself', 'not_listed_absolute': 'outside itself',
                   'rom_absolute': 'outside itself', 'listed_absolute': 'outside itself'}
         for case, why in expect.items():
@@ -190,14 +204,23 @@ class WithRom(unittest.TestCase):
         packed = next(p for p in pieces if p['piece'] == 'packed')
         asset = ROOT / ed.ASSETS / raw['asset']
         lz = ROOT / ed.PACKS / f'{packed["label"]}.lz'
-        for path in (asset, lz):
+        words = next(p for p in pieces if p['piece'] == 'text')
+        readable = ROOT / ed.ASSETS / words['asset']
+        encoded = ROOT / ed.TEXT_OUT / f'{words["label"]}.bin'
+        build_rom.build_text()
+        kept = readable.read_text(encoding='utf-8')
+        for path in (asset, lz, encoded):
             data = bytearray(path.read_bytes())
             data[0] ^= 0xFF
             path.write_bytes(bytes(data))
+        readable.write_text(kept.replace('@piece', '; @piece', 1), encoding='utf-8')
         ed.extract()
         build_rom.build_packs()
+        build_rom.build_text()
         self.assertEqual(asset.read_bytes(), rom[raw['offset']:raw['stop']])
         self.assertEqual(lz.read_bytes(), rom[packed['offset']:packed['stop']])
+        self.assertEqual(readable.read_text(encoding='utf-8'), kept)
+        self.assertEqual(encoded.read_bytes(), rom[words['offset']:words['stop']])
 
 
 if __name__ == '__main__':
