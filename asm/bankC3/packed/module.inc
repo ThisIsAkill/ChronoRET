@@ -110,7 +110,8 @@ endmacro
                                          ; bits 0-2 a special number (1-4), bits 5-7 1300/1500/2000
 !C3_ResultWord = $0382                   ; 16-bit: C3Mod_Prog0 clears it; the score at the finish
                                          ; (C3Mod_RaceFinish); the staff programs put the staff
-                                         ; text's address there ($86C2, $86D4)
+                                         ; text's address there ($86C2, $86D4); C3Mod_Prog1 counts
+                                         ; its credits pages (1-5) in the low byte
 ; The race (program 0), dp words with DP=0: the player's bike and the
 ; rival. Distances are 32-bit (the high word counts laps: 8 ends the
 ; race), the side is the position across the track (0-$7000, shown
@@ -761,6 +762,27 @@ endmacro
 !C3_Prog3Colours0 = $20                  ; C3Mod_Prog3PalAnims: record 0's first colour ...
 !C3_Prog3Colours1 = $50                  ; ... record 1's
 !C3_Prog3AnimColours = $20               ; ... and how many
+; Program 1 (a page of the staff credits).
+!C3_CreditsFontVram = $0100              ; VRAM word of the font made 4bpp
+!C3_CreditsFont = $0300                  ; $7F:0300: its 2bpp tiles (pack 58 after the first $100 bytes)
+!C3_CreditsFontTiles = $0036
+!C3_CreditsFontBytes = $0200             ; pack 58's bytes sent as they are
+!C3_CreditsMap = $0400                   ; VRAM word of BG1's map (BG1SC C3_CreditsBg1Sc)
+!C3_CreditsMapBytes = $0800
+!C3_CreditsBg1Sc = $04
+!C3_OamHighAddr = $0100                  ; OAMADD of the high table
+!C3_OamHighBytes = $0020
+!C3_CreditsPages = 5
+!C3_CreditsFrames = $005A                ; C3_FrameCount at which the page fades out
+!C3_CreditsPalA = $2200                  ; $7E: C3_PaletteBuf (colours 0-3) ...
+!C3_CreditsPalB = $2300                  ; ... and its colours $80-$83
+!C3_CreditsColour1 = $77BD               ; colours 1-3 (and $81-$83)
+!C3_CreditsColour2 = $4631
+!C3_CreditsColour3 = $1CE7
+!C3_CreditsEnd = $FF                     ; a record list's end
+!C3_CreditsTile0 = $40                   ; BG tile = character - this (a space made $40 first)
+!C3_CreditsSprTile0 = $21                ; sprite tile = character - this
+!C3_CreditsSprStep = 5                   ; pixels from one sprite character to the next
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the

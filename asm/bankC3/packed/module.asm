@@ -711,12 +711,12 @@ C3Mod_Sine:                             ; header: see C3Mod_Cosine
 ; A task: every C3_FadeStep frames (C3_FadeTimer counts them down), one
 ; step brighter (C3_Brightness + 1); at full brightness it ends itself
 ; (C3Mod_TaskEnd).
-; Callers note: a task: LDX #C3Mod_FadeInTask / JSR $395E at $6BD8;
-;   added by script opcode $FA at $3F29 (C3Mod_Prog0ScriptA), $554C
-;   (C3Mod_Prog4ScriptA), $6399 (C3Mod_Prog7Start), $6905
-;   (C3Mod_Prog3ScriptA), $7C93, $918E, $933D, $9403, $9528 and $966B,
-;   removed by $F9 at $92C1 and $961F (the others: code and scripts not
-;   matched yet).
+; Callers note: a task: LDX #C3Mod_FadeInTask / JSR $395E at $6BD8
+;   (C3Mod_Prog1); added by script opcode $FA at $3F29
+;   (C3Mod_Prog0ScriptA), $554C (C3Mod_Prog4ScriptA), $6399
+;   (C3Mod_Prog7Start), $6905 (C3Mod_Prog3ScriptA), $7C93, $918E, $933D,
+;   $9403, $9528 and $966B, removed by $F9 at $92C1 and $961F (the others:
+;   code and scripts not matched yet).
 ; Entry: a task (C3Mod_RunTasks): M=0 (8-bit set here), X=0, DP any, DB
 ;        = $00 (the variables are absolute).
 ; Exit:  RTS with M=1; A = C3_Brightness after a step, else as on entry
@@ -816,8 +816,8 @@ C3Mod_FadeOutStopTask:
 ;   (C3Mod_Prog4End), $6978 (C3Mod_Prog3ScriptB), $727F, $7EC1, $931F and
 ;   $95FE, by LDX #C3Mod_FadeOutExitTask / JSR $395E at $4684
 ;   (C3Mod_RaceTask), and by LDX #C3Mod_FadeOutExitTask / JMP
-;   C3Mod_TaskReplace at $6BF3 (the others: code and scripts not matched
-;   yet).
+;   C3Mod_TaskReplace at $6BF3 (C3Mod_CreditsTask; the others: code and
+;   scripts not matched yet).
 ; Entry: a task: M=0 (8-bit set here), X=0, DP=0, DB = $00.
 ; Exit:  RTS with M=1; at the end JMP C3Mod_TaskEnd.
 C3Mod_FadeOutExitTask:
@@ -1212,11 +1212,11 @@ C3Mod_M7StepBranches:
 ;   ($3DBF, $3DD1, $3DEA, $3DF7, $3E19, $3E29, $3E39, $3E7D, $3E93,
 ;   $3EA9), C3Mod_Prog4 ($53D2, $541B, $543A, $544A), C3Mod_Prog2 ($5989,
 ;   $599D, $59B9, $59C9, $59FA), C3Mod_Prog7 ($6259, $626B, $627F, $6295,
-;   $62AA, $62B6, $62C2, $62D1) and $6C3F, $78F2, $7905, $7945, $7987,
-;   $7ADE, $7AFD, $7B0D, $8549, $857B, $8598, $85A5, $85C3, $85E4, $85F0,
-;   $869B, $87B0, $87E9, $8A2C, $8A46, $8A5F, $8A78, $8A8A, $8BE4, $8C48,
-;   $8C76, $8C8E, $8CF8, $8D04, $8D10, $8EF4, $8F04, $8F14 and $8F2A (code
-;   not matched yet).
+;   $62AA, $62B6, $62C2, $62D1), C3Mod_CreditsGfx ($6C3F) and $78F2,
+;   $7905, $7945, $7987, $7ADE, $7AFD, $7B0D, $8549, $857B, $8598, $85A5,
+;   $85C3, $85E4, $85F0, $869B, $87B0, $87E9, $8A2C, $8A46, $8A5F, $8A78,
+;   $8A8A, $8BE4, $8C48, $8C76, $8C8E, $8CF8, $8D04, $8D10, $8EF4, $8F04,
+;   $8F14 and $8F2A (code not matched yet).
 ; Entry: M any (saved; M=1 at the calls), X=0 (16-bit offset), DP any,
 ;        DB any (Decomp_ToWram saves them; the stores are long); X = the
 ;        entry's offset; Decomp_Dest/DestBank set.
@@ -1805,9 +1805,9 @@ C3Mod_DmaFromArgs:
 ; Callers note: JSL from C3Mod_Prog0LoadGfx ($3DDD, $3E1C, $3E2C, $3E3C,
 ;   $3E86, $3E9C, $3EB2), C3Mod_Prog4 ($53F7, $543D), C3Mod_Prog2 ($5996,
 ;   $59A6, $59C2), C3Mod_MapToM7 ($5AB2), C3Mod_Prog7 ($6278, $6288,
-;   $6298) and $6C48, $78FE, $7AF6, $7B06, $8586, $85D0, $8A39, $8A49,
-;   $8A62, $8BE7, $8C51, $8EF7, $8F07, $8F1D and $8F2D (code not matched
-;   yet; most right after C3Mod_UnpackPack).
+;   $6298), C3Mod_CreditsGfx ($6C48) and $78FE, $7AF6, $7B06, $8586,
+;   $85D0, $8A39, $8A49, $8A62, $8BE7, $8C51, $8EF7, $8F07, $8F1D and
+;   $8F2D (code not matched yet; most right after C3Mod_UnpackPack).
 ; Entry: M=1, X=0, DP any, DB = $00.
 ; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = Decomp_OutLen; Y unchanged.
 C3Mod_DmaUnpacked:
@@ -1907,8 +1907,7 @@ C3Mod_NmiTaskRemove:
 ; word of C3_TaskList, searched without a bound.
 ; Callers note: C3Mod_RaceTask ($4687), C3Mod_RaceFinish ($4834),
 ;   C3Mod_RaceStepTask ($489D), C3Mod_SkipTask ($5BAC), C3Mod_FirstPicTask
-;   ($5D54), C3Mod_ResetWaitTask ($63EB) and $6BDB and $6BE1 (code not
-;   matched yet).
+;   ($5D54), C3Mod_ResetWaitTask ($63EB) and C3Mod_Prog1 ($6BDB, $6BE1).
 ; Entry: M any (P saved; 16-bit set here), X=0 (pushed and pulled as a
 ;        word), DP any, DB = $00 or $7E; X = the task's address.
 ; Exit:  P restored; A = the address, X = its offset; Y unchanged.
@@ -2036,8 +2035,8 @@ C3Mod_TaskEnd:
 ;   C3Mod_MusicFadeTask ($34BF, after LDX #C3Mod_FadeOutStopTask),
 ;   C3Mod_ExitTask ($427F), C3Mod_WaitSongEndTask ($476E),
 ;   C3Mod_RaceFinish ($485A), C3Mod_ResetWaitTask ($63F1),
-;   C3Mod_Prog3FadeTask1 ($6A71), C3Mod_Prog3FadeTask2 ($6A94), and $6BF6
-;   and $98A9 (code not matched yet).
+;   C3Mod_Prog3FadeTask1 ($6A71), C3Mod_Prog3FadeTask2 ($6A94),
+;   C3Mod_CreditsTask ($6BF6), and $98A9 (code not matched yet).
 ; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
 ;        task found it (C3Mod_RunTasks' JSR return address on top, as
 ;        for C3Mod_TaskEnd); X=0 (16-bit index: the address and the PLX
@@ -3986,7 +3985,8 @@ C3Mod_MathHdma:
 ; .fade: 32 pairs of $91
 ; (subtract, on BG1 and the sprites) with all three colours at 31 down
 ; to 0; C3Mod_MathHdma uses the last 15 (14 down to 0) under the
-; horizon.
+; horizon. .sky's COLDATA byte ($E0) is also C3Mod_Prog1's fixed DMA
+; source for OAM's low table (every sprite byte $E0).
 C3Mod_MathValues:
     db !C3_MathTop, !COLDATA_AllZero
 .sky:
@@ -9422,8 +9422,8 @@ C3Mod_FontTiles:
 ; tiles: each tile's 16 bytes go to VMDATAL / VMDATAH in pairs (planes
 ; 0 and 1), then 8 zero words (STY with Y = 0: planes 2 and 3), so
 ; VMAIN must step after the high byte. DP = DP_PPU meanwhile.
-; Callers note: C3Mod_Prog7 ($625F) and $6B1C and $854F (code not matched
-;   yet).
+; Callers note: C3Mod_Prog7 ($625F), C3Mod_Prog1 ($6B1C) and $854F (code
+;   not matched yet).
 ; Entry: M=1 (the 8-bit port reads), X=0 (the 16-bit Y stores), DP any
 ;        (saved), DB=$00 (Decomp_Dest is absolute); X = the tile count
 ;        (not 0); the tiles unpacked just before; VMADD and VMAIN set.
@@ -10154,8 +10154,364 @@ C3Mod_Prog3PalAnims:
     RTS
 
 %C3ModOrg($7E6B04)
-C3Mod_Rest6B04:
-    %C3ModRomBytes($7E6B04, $7EA651)
+; ============================================================
+; Program 1: a page of the staff credits ($6B04–$6E41)
+; ============================================================
+
+; $7E:6B04 — C3Mod_Prog1 (225 bytes, $6B04–$6BE4)
+; The program of C3Mod_ProgramTable entry 1: one page of the staff
+; credits, the next one each time it runs (C3_ResultWord's low byte
+; counts the pages 1-5).
+;   - C3Mod_CreditsGfx (colours, the font's first $200 bytes to VRAM
+;     word 0); the rest of pack 58 from $7F:0300 made 4bpp at VRAM word
+;     $0100 ($36 tiles, C3Mod_Font2To4);
+;   - VRAM words $0400-$07FF (BG1's map) cleared, and OAM's high table
+;     (32 bytes) cleared, both by DMA channel 7 from a fixed zero source
+;     (GfxRom_D2's first byte: two registers for VRAM, OAMDATA for OAM,
+;     OAMADD = $0100); OAM's low table (512 bytes, OAMADD = 0) filled
+;     with $E0 (the same way, from C3Mod_MathValues' COLDATA byte at
+;     .sky + 1: every sprite at X = Y = $E0, off the screen);
+;   - WMADDH = 0 (bank $7E: the STA of $7E keeps only bit 0); the page
+;     n = C3_ResultWord's low byte + 1, back to 1 after 5 (CMP #6 /
+;     BNE: equality), stored as a word; C3Mod_CreditsNames[n - 1]
+;     through WMDATA (C3Mod_CreditsBg: the names on BG1), then
+;     C3Mod_CreditsRoles[n - 1] from OAM address 0 (C3Mod_CreditsSprites:
+;     the roles as sprites);
+;   - TM = BG1 and the sprites, BG1SC = $04, OBSEL = 0 (8x8 and 16x16
+;     sprites, tiles from VRAM word 0), C3_FadeStep = C3_FadeTimer = 1,
+;     the tasks C3Mod_FadeInTask and C3Mod_CreditsTask.
+; Callers note: C3Mod_ProgramTable entry 1 (C3Mod_Start's JSR (table,X)
+;   at $300A).
+; Entry: M=1, X=0, DP=0, DB=$00 (as C3Mod_Start calls the programs).
+; Exit:  M=1, X=0, DP=0, DB=$00; A = C3Mod_CreditsTask's address, X its
+;        offset in C3_TaskList (C3Mod_TaskAdd's); Y as
+;        C3Mod_CreditsSprites leaves it.
+; Calls: C3Mod_CreditsGfx, C3Mod_Font2To4, C3Mod_CreditsBg,
+;   C3Mod_CreditsSprites, C3Mod_TaskAdd.
+C3Mod_Prog1:
+    LDX.w #0
+    STX.w VMADDL
+    JSR C3Mod_CreditsGfx
+    LDX.w #!C3_CreditsFontVram
+    STX.w VMADDL
+    LDX.w #!C3_CreditsFont
+    STX.w !Decomp_Dest
+    LDX.w #!C3_CreditsFontTiles
+    JSR C3Mod_Font2To4
+    LDX.w #!C3_CreditsMap
+    STX.w VMADDL
+    LDX.w #!BBAD_VMDATAL<<8|!DMAP_FixedSource|!DMAP_TwoRegs
+    STX.w DMAP7                         ; and BBAD7
+    LDX.w #!GfxRom_D2&$FFFF             ; a zero byte
+    STX.w A1T7L
+    LDA.b #!GfxRom_D2>>16
+    STA.w A1B7
+    LDX.w #!C3_CreditsMapBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDX.w #!C3_OamHighAddr
+    STX.w OAMADDL
+    LDX.w #!BBAD_OAMDATA<<8|!DMAP_FixedSource
+    STX.w DMAP7                         ; and BBAD7
+    LDX.w #!GfxRom_D2&$FFFF
+    STX.w A1T7L
+    LDA.b #!GfxRom_D2>>16
+    STA.w A1B7
+    LDX.w #!C3_OamHighBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDX.w #0
+    STX.w OAMADDL
+    LDX.w #!BBAD_OAMDATA<<8|!DMAP_FixedSource
+    STX.w DMAP7                         ; and BBAD7
+    LDX.w #C3Mod_MathValues_sky+1       ; a $E0 byte
+    STX.w A1T7L
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDX.w #!C3_OamLowBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDA.b #!Bank7E
+    STA.w WMADDH                        ; bit 0 only: bank $7E
+    REP #$20
+    LDA.w !C3_ResultWord
+    AND.w #!Eng_LowByteMask
+    INC A
+    CMP.w #!C3_CreditsPages+1
+    BNE .page
+    LDA.w #1
+.page:
+    STA.w !C3_ResultWord
+    DEC A
+    ASL A
+    TAX
+    LDA.l C3Mod_CreditsNames,X
+    STA.w WMADDL                        ; and WMADDM
+    SEP #$20
+    PHX
+    JSR C3Mod_CreditsBg
+    PLX
+    REP #$20
+    LDA.l C3Mod_CreditsRoles,X
+    STA.w WMADDL
+    LDA.w #0
+    STA.w OAMADDL                       ; and OAMADDH
+    SEP #$20
+    JSR C3Mod_CreditsSprites
+    LDA.b #!TM_Bg1|!TM_Obj
+    STA.w TM
+    LDA.b #!C3_CreditsBg1Sc
+    STA.w BG1SC
+    LDA.b #0
+    STA.w OBSEL
+    LDX.w #!C3_Prog2Fade
+    STX.w !C3_FadeStep                  ; and C3_FadeTimer
+    LDX.w #C3Mod_FadeInTask
+    JSR C3Mod_TaskAdd
+    LDX.w #C3Mod_CreditsTask
+    JSR C3Mod_TaskAdd
+.done:
+    RTS
+
+; $7E:6BE5 — C3Mod_CreditsTask (20 bytes, $6BE5–$6BF8)
+; A task: C3_OamPos = 0 and C3_OamHiPtr = Oam_HighTable (each frame);
+; when C3_FrameCount is $5A (16-bit CMP / BNE: equality, frame 90 of
+; the module's count) it hands its entry to C3Mod_FadeOutExitTask (the
+; screen fades out and the module ends); else RTS (C3Mod_Prog1's).
+; Callers note: a task: LDX #C3Mod_CreditsTask / JSR $395E at $6BDE,
+;   $6BE1 (C3Mod_Prog1).
+; Entry: a task: M=0, X=0 (16-bit stores and C3Mod_TaskReplace's), DP=0
+;        (C3_OamPos.., C3_FrameCount are direct page), DB any.
+; Exit:  RTS with M=0, A = C3_FrameCount, X = Oam_HighTable; or JMP
+;        C3Mod_TaskReplace with X = C3Mod_FadeOutExitTask.
+C3Mod_CreditsTask:
+    STZ.b !C3_OamPos
+    LDX.w #!Oam_HighTable
+    STX.b !C3_OamHiPtr
+    LDA.b !C3_FrameCount
+    CMP.w #!C3_CreditsFrames
+    BNE C3Mod_Prog1_done
+    LDX.w #C3Mod_FadeOutExitTask
+    JMP C3Mod_TaskReplace
+
+; $7E:6BF9 — C3Mod_CreditsGfx (84 bytes, $6BF9–$6C4C)
+; The credits' colours and font: with DB = $7E (PEA $007E / PLB; the
+; PLB after takes the $00), colours 0-3 and $80-$83 of C3_PaletteBuf =
+; black, $77BD, $4631 and $1CE7 (16-bit stores); then pack 58 to
+; $7F:0200 (C3Mod_UnpackPack) and its first $200 bytes (Decomp_OutLen
+; set to $200) to VRAM from the address set by the caller
+; (C3Mod_DmaUnpacked: C3_DmaMode two registers, C3_DmaBbad VMDATAL,
+; VMAIN = $80).
+; Callers note: C3Mod_Prog1 ($6B0A).
+; Entry: M=1, X=0 (the 16-bit colour stores), DP any, DB any (set to $7E,
+;        then $00); VMADD set.
+; Exit:  M=1, X=0, DB=$00; A = MDMAEN_Ch7, X = Decomp_OutLen ($200)
+;        (C3Mod_DmaUnpacked's); Y as C3Mod_UnpackPack leaves it.
+; Calls: C3Mod_UnpackPack, C3Mod_DmaUnpacked (JSL).
+C3Mod_CreditsGfx:
+    PEA.w !Bank7E                       ; PLB takes the $7E; the $00 stays for the next PLB
+    PLB
+    LDX.w #0
+    STX.w !C3_CreditsPalA
+    STX.w !C3_CreditsPalB
+    LDX.w #!C3_CreditsColour1
+    STX.w !C3_CreditsPalA+2
+    STX.w !C3_CreditsPalB+2
+    LDX.w #!C3_CreditsColour2
+    STX.w !C3_CreditsPalA+4
+    STX.w !C3_CreditsPalB+4
+    LDX.w #!C3_CreditsColour3
+    STX.w !C3_CreditsPalA+6
+    STX.w !C3_CreditsPalB+6
+    PLB
+    LDA.b #!DMAP_TwoRegs
+    STA.w !C3_DmaMode
+    LDA.b #!BBAD_VMDATAL
+    STA.w !C3_DmaBbad
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    LDX.w #!C3_BitmapSrc
+    STX.w !Decomp_Dest
+    LDX.w #58*!C3_PackPtrBytes
+    JSR C3Mod_UnpackPack
+    LDX.w #!C3_CreditsFontBytes
+    STX.w !Decomp_OutLen
+    JSL C3Mod_DmaUnpacked
+    RTS
+
+; $7E:6C4D — C3Mod_CreditsBg (36 bytes, $6C4D–$6C70)
+; Writes text records read through WMDATA (WMADD set by the caller) to
+; BG1's map, with DP = DP_PPU: a record is VMADDL, VMADDH, then
+; characters to a 0; each character c to VMDATAL (c - $40, SEC: "A" is
+; tile 1; a space, $20, is made $40 first: tile 0) with VMDATAH = 0;
+; a first byte of $FF (CMP / BEQ) ends the list.
+; Callers note: C3Mod_Prog1 ($6BAB).
+; Entry: M=1 (8-bit port accesses), X any, DP any (set to DP_PPU, not
+;        restored), DB any (all direct page); WMADD at the records;
+;        VMAIN stepping after the high byte.
+; Exit:  M=1, DP = DP_PPU; A = $FF; X, Y unchanged; WMADD past the list.
+C3Mod_CreditsBg:
+    PEA.w !DP_PPU
+    PLD
+.record:
+    LDA.b WMDATA-!DP_PPU
+    CMP.b #!C3_CreditsEnd
+    BEQ .done
+    STA.b VMADDL-!DP_PPU
+    LDA.b WMDATA-!DP_PPU
+    STA.b VMADDH-!DP_PPU
+.char:
+    LDA.b WMDATA-!DP_PPU
+    BEQ .record
+    CMP.b #!C3_TextSpace
+    BNE .tile
+    LDA.b #!C3_CreditsTile0
+.tile:
+    SEC
+    SBC.b #!C3_CreditsTile0
+    STA.b VMDATAL-!DP_PPU
+    STZ.b VMDATAH-!DP_PPU
+    BRA .char
+.done:
+    RTS
+
+; $7E:6C71 — C3Mod_CreditsSprites (59 bytes, $6C71–$6CAB)
+; Writes text records read through WMDATA as 8x8 sprites straight to
+; OAM (OAMDATA, from the OAM address the caller set), with DP =
+; DP_PPU: a record is X, Y (kept in C3_SprBaseX / C3_SprBaseY's low
+; bytes, absolute), then characters to a 0; each one but a space ($20:
+; BEQ) is a sprite at X, Y with tile c - $21 (SEC: "A" is tile $20)
+; and attribute 0; X + 5 after every character (CLC), spaces too. A
+; first byte of $FF (CMP / BEQ) ends the list.
+; Callers note: C3Mod_Prog1 ($6BC0).
+; Entry: M=1 (8-bit port accesses), X any, DP any (set to DP_PPU, not
+;        restored), DB=$00 (C3_SprBaseX/Y are absolute); WMADD at the
+;        records; OAMADD set.
+; Exit:  M=1, DP = DP_PPU; A = $FF; X, Y unchanged; WMADD past the list,
+;        OAMADD past the sprites.
+C3Mod_CreditsSprites:
+    PEA.w !DP_PPU
+    PLD
+.record:
+    LDA.b WMDATA-!DP_PPU
+    CMP.b #!C3_CreditsEnd
+    BEQ .done
+    STA.w !C3_SprBaseX
+    LDA.b WMDATA-!DP_PPU
+    STA.w !C3_SprBaseY
+.char:
+    LDA.b WMDATA-!DP_PPU
+    BEQ .record
+    CMP.b #!C3_TextSpace
+    BEQ .next
+    SEC
+    SBC.b #!C3_CreditsSprTile0
+    PHA
+    LDA.w !C3_SprBaseX
+    STA.b OAMDATA-!DP_PPU
+    LDA.w !C3_SprBaseY
+    STA.b OAMDATA-!DP_PPU
+    PLA
+    STA.b OAMDATA-!DP_PPU
+    LDA.b #0
+    STA.b OAMDATA-!DP_PPU               ; the attribute
+.next:
+    LDA.w !C3_SprBaseX
+    CLC
+    ADC.b #!C3_CreditsSprStep
+    STA.w !C3_SprBaseX
+    BRA .char
+.done:
+    RTS
+
+; $7E:6CAC — C3Mod_CreditsNames (10 bytes, $6CAC–$6CB5)
+; The pages' names (C3Mod_CreditsBg's records), by page - 1.
+C3Mod_CreditsNames:
+    dw C3Mod_Credits1Names, C3Mod_Credits2Names, C3Mod_Credits3Names
+    dw C3Mod_Credits4Names, C3Mod_Credits5Names
+
+; $7E:6CB6 — C3Mod_CreditsRoles (10 bytes, $6CB6–$6CBF)
+; ... and their roles (C3Mod_CreditsSprites' records).
+C3Mod_CreditsRoles:
+    dw C3Mod_Credits1Roles, C3Mod_Credits2Roles, C3Mod_Credits3Roles
+    dw C3Mod_Credits4Roles, C3Mod_Credits5Roles
+
+; $7E:6CC0 — C3Mod_Credits1Names (70 bytes, $6CC0–$6D05)
+; Page 1's names: each record the VRAM word of its first tile (low
+; byte first: $0528 is row 9, column 8 of the map at $0400), then the
+; text and a 0; $FF ends the list.
+C3Mod_Credits1Names:
+    dw $0528 : db "KAZUHIKO AOKI", 0
+    dw $05A8 : db "TAKASHI TOKITA", 0
+    dw $05C8 : db "YOSHINORI KITASE", 0
+    dw $05E8 : db "AKIHIKO MATSUI", 0
+    db !C3_CreditsEnd
+
+; $7E:6D06 — C3Mod_Credits1Roles (23 bytes, $6D06–$6D1C)
+; Page 1's roles: each record X, Y, the text, a 0; $FF ends it.
+C3Mod_Credits1Roles:
+    db $36, $3C, "PRODUCER", 0
+    db $36, $5C, "DIRECTER", 0
+    db !C3_CreditsEnd
+
+; $7E:6D1D — C3Mod_Credits2Names (52 bytes, $6D1D–$6D50)
+C3Mod_Credits2Names:
+    dw $0528 : db "AKIRA TORIYAMA", 0
+    dw $05A8 : db "YUJI HORII", 0
+    dw $05C8 : db "HIRONOBU SAKAGUCHI", 0
+    db !C3_CreditsEnd
+
+; $7E:6D51 — C3Mod_Credits2Roles (33 bytes, $6D51–$6D71)
+C3Mod_Credits2Roles:
+    db $36, $3C, "CHARACTER DESIGN", 0
+    db $36, $5C, "SUPERVISOR", 0
+    db !C3_CreditsEnd
+
+; $7E:6D72 — C3Mod_Credits3Names (50 bytes, $6D72–$6DA3)
+C3Mod_Credits3Names:
+    dw $0528 : db "YASUNORI MITSUDA", 0
+    dw $05A8 : db "MINORU AKAO", 0
+    dw $0628 : db "EIJI NAKAMURA", 0
+    db !C3_CreditsEnd
+
+; $7E:6DA4 — C3Mod_Credits3Roles (42 bytes, $6DA4–$6DCD)
+C3Mod_Credits3Roles:
+    db $36, $3C, "MUSIC", 0
+    db $36, $5C, "SOUND PROGRAM", 0
+    db $36, $7C, "SOUND ENGINEER", 0
+    db !C3_CreditsEnd
+
+; $7E:6DCE — C3Mod_Credits4Names (36 bytes, $6DCE–$6DF1)
+C3Mod_Credits4Names:
+    dw $0588 : db "KEIZO KOKUBO", 0
+    dw $05A8 : db "KATSUHISA HIGUCHI", 0
+    db !C3_CreditsEnd
+
+; $7E:6DF2 — C3Mod_Credits4Roles (11 bytes, $6DF2–$6DFC)
+C3Mod_Credits4Roles:
+    db $36, $54, "PROGRAM", 0
+    db !C3_CreditsEnd
+
+; $7E:6DFD — C3Mod_Credits5Names (58 bytes, $6DFD–$6E36)
+C3Mod_Credits5Names:
+    dw $0588 : db "YASUHIKO KAMATA", 0
+    dw $05A8 : db "MASANORI HOSHINO", 0
+    dw $05C8 : db "TETSUYA TAKAHASHI", 0
+    db !C3_CreditsEnd
+
+; $7E:6E37 — C3Mod_Credits5Roles (11 bytes, $6E37–$6E41)
+C3Mod_Credits5Roles:
+    db $36, $54, "GRAPHIC", 0
+    db !C3_CreditsEnd
+
+%C3ModOrg($7E6E42)
+C3Mod_Rest6E42:
+    %C3ModRomBytes($7E6E42, $7EA651)
 
 ; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
 ; The staff credits the module shows, in two texts to the module's end:
