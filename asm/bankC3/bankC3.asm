@@ -2630,9 +2630,8 @@ C3_SprListLarge:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5111, $7E:5137 and $7E:6629).
 ; Entry: M=0 (the tile and attribute are moved as a word), X=0, DP =
-;        the module's (0 at $7E:5111 and $7E:5137, under a task;
-;        $7E:6629's not traced), DB = $00 or $7E ($00 at those two); X
-;        = the record.
+;        the module's (0 at all three, under a task), DB = $00 or $7E
+;        ($00 at all three); X = the record.
 ; Exit:  P restored; A changed; Y = the new C3_OamPos; X unchanged.
 C3_SprOneSmall:
     PHP

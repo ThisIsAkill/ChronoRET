@@ -15,8 +15,6 @@ C3Mod_Prog3:
 C3Mod_Prog5:
 %C3ModOrg($7E78DD)
 C3Mod_Prog6:
-%C3ModOrg($7E6248)
-C3Mod_Prog7:
 %C3ModOrg($7E8538)
 C3Mod_Prog10:
 %C3ModOrg($7E8E95)
@@ -30,5 +28,7 @@ C3Mod_Prog13:
 C3Mod_Unk89ED:
 %C3ModOrg($7E8752)
 C3Mod_Unk8752:
+%C3ModOrg($7E8772)
+C3Mod_Unk8772:
 %C3ModOrg($7E90A7)
 C3Mod_Unk90A7:
