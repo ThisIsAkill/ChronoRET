@@ -168,9 +168,9 @@ C2SceneRom_ListPacks,$C6:FFC0,$C6:FFDD,30,table,,dl x 10
 C2SceneRom_ListPacks_Tail,$C6:FFDE,$C6:FFDF,2,extracted,table/C2SceneRom_ListPacks_Tail.bin,
 C2SceneRom_ScriptPacks,$C6:FFE0,$C6:FFFD,30,table,,dl x 10
 C2SceneRom_ScriptPacks_Tail,$C6:FFFE,$C6:FFFF,2,extracted,table/C2SceneRom_ScriptPacks_Tail.bin,
-AudioRom_SongSamples,$C7:0E11,$C7:1870,2656,records,records/AudioRom_SongSamples.tsv,table 83 x 32 B
+AudioRom_SongSamples,$C7:0E11,$C7:1870,2656,extracted,table/AudioRom_SongSamples.bin,
 AudioRom_SongExtra,$C7:1871,$C7:241C,2988,extracted,table/AudioRom_SongExtra.bin,
-AudioRom_SongEcho,$C7:241D,$C7:24C2,166,records,records/AudioRom_SongEcho.tsv,table 83 x 2 B
+AudioRom_SongEcho,$C7:241D,$C7:24C2,166,extracted,table/AudioRom_SongEcho.bin,
 AudioRom_Block4700,$C7:40B4,$C7:42B6,515,extracted,brr_sample/AudioRom_Block4700.bin,
 AudioRom_Block1E00,$C7:42B7,$C7:42DC,38,extracted,spc_data/AudioRom_Block1E00.bin,
 AudioRom_Block1F80,$C7:42DD,$C7:42F2,22,extracted,spc_data/AudioRom_Block1F80.bin,
@@ -394,7 +394,7 @@ BattleRom_TechListBase,$CC:F38C,$CC:F394,9,extracted,table/BattleRom_TechListBas
 BattleRom_TechEntryBase,$CC:F395,$CC:F39A,6,records,records/BattleRom_TechEntryBase.tsv,table 3 x 2 B
 BattleRom_TechRowMapOffset,$CC:F39B,$CC:F3A0,6,extracted,table/BattleRom_TechRowMapOffset.bin,
 BattleRom_TechEntryOffset,$CC:F3A1,$CC:F3B5,21,extracted,table/BattleRom_TechEntryOffset.bin,
-Table_CCF3B6,$CC:F3B6,$CC:F409,84,records,records/Table_CCF3B6.tsv,table 6 x 14 B
+Table_CCF3B6,$CC:F3B6,$CC:F409,84,extracted,table/Table_CCF3B6.bin,
 BattleRom_FrameBytes,$CC:F40A,$CC:F413,10,extracted,table/BattleRom_FrameBytes.bin,
 BattleRom_PathFromDir,$CC:F414,$CC:F433,32,extracted,table/BattleRom_PathFromDir.bin,
 BattleRom_PathFacing,$CC:F434,$CC:F453,32,extracted,table/BattleRom_PathFacing.bin,
@@ -425,9 +425,8 @@ Table_CCF6D4,$CC:F6D4,$CC:F753,128,extracted,table/Table_CCF6D4.bin,
 BattleRom_FxCycleList,$CC:F754,$CC:F77A,39,extracted,table/BattleRom_FxCycleList.bin,
 BattleRom_FxTintColours,$CC:F77B,$CC:F77E,4,extracted,palette/BattleRom_FxTintColours.bin,
 Table_CCF77F,$CC:F77F,$CC:F7BF,65,extracted,table/Table_CCF77F.bin,
-BattleRom_ActFrameBase,$CC:F7C0,$CC:F7FF,64,records,records/BattleRom_ActFrameBase.tsv,table 32 x 2 B
-Unknown_CCF800,$CC:F800,$CC:F81F,32,extracted,unknown/Unknown_CCF800.bin,
-BattleRom_Times16,$CC:F820,$CC:F828,9,records,records/BattleRom_Times16.tsv,table 9 x 1 B
+BattleRom_ActFrameBase,$CC:F7C0,$CC:F81F,96,extracted,table/BattleRom_ActFrameBase.bin,
+BattleRom_Times16,$CC:F820,$CC:F828,9,extracted,table/BattleRom_Times16.bin,
 BattleRom_HitSetOffset,$CC:F829,$CC:F82E,6,records,records/BattleRom_HitSetOffset.tsv,table 6 x 1 B
 BattleRom_EnemyListOffset,$CC:F82F,$CC:F836,8,extracted,table/BattleRom_EnemyListOffset.bin,
 BattleRom_PcNameOffset,$CC:F837,$CC:F83E,8,extracted,table/BattleRom_PcNameOffset.bin,
@@ -496,10 +495,10 @@ BattleRom_Kind3Scripts,$CD:63F0,$CD:64AF,192,extracted,battle_script/BattleRom_K
 BattleRom_PcAttackObjs,$CD:64B0,$CD:656D,190,extracted,table/BattleRom_PcAttackObjs.bin,
 BattleRom_TechObjs,$CD:656E,$CD:666D,256,extracted,table/BattleRom_TechObjs.bin,
 BattleRom_EnemyActObjs,$CD:666E,$CD:686D,512,extracted,table/BattleRom_EnemyActObjs.bin,
-BattleRom_PcAttackPals,$CD:686E,$CD:692B,190,records,records/BattleRom_PcAttackPals.tsv,table 95 x 2 B
+BattleRom_PcAttackPals,$CD:686E,$CD:692B,190,extracted,table/BattleRom_PcAttackPals.bin,
 BattleRom_PcTechPals,$CD:692C,$CD:6A2B,256,extracted,table/BattleRom_PcTechPals.bin,
 BattleRom_EnemyActPals,$CD:6A2C,$CD:6C2B,512,records,records/BattleRom_EnemyActPals.tsv,table 256 x 2 B
-BattleRom_Kind3Pals,$CD:6C2C,$CD:6CEB,192,records,records/BattleRom_Kind3Pals.tsv,table 96 x 2 B
+BattleRom_Kind3Pals,$CD:6C2C,$CD:6CEB,192,extracted,table/BattleRom_Kind3Pals.bin,
 BattleRom_WeaponColourIdx,$CD:6CEC,$CD:6D4B,96,extracted,table/BattleRom_WeaponColourIdx.bin,
 BattleRom_PcAttackSfxA,$CD:6D4C,$CD:6DAB,96,extracted,table/BattleRom_PcAttackSfxA.bin,
 BattleRom_PcAttackSfxB,$CD:6DAC,$CD:6E0B,96,extracted,table/BattleRom_PcAttackSfxB.bin,
@@ -536,7 +535,7 @@ BattleRom_DissolveRanges,$CE:F192,$CE:F1C1,48,extracted,table/BattleRom_Dissolve
 BattleRom_DissolveMask,$CE:F1C2,$CE:F1D1,16,records,records/BattleRom_DissolveMask.tsv,table 8 x 2 B
 BattleRom_FxBobSteps,$CE:F1D2,$CE:F24D,124,extracted,table/BattleRom_FxBobSteps.bin,
 BattleRom_HdmaSetOfs,$CE:F24E,$CE:F28D,64,extracted,table/BattleRom_HdmaSetOfs.bin,
-BattleRom_HalfPlaneEdge,$CE:F28E,$CE:F48D,512,records,records/BattleRom_HalfPlaneEdge.tsv,table 256 x 2 B
+BattleRom_HalfPlaneEdge,$CE:F28E,$CE:F48D,512,extracted,table/BattleRom_HalfPlaneEdge.bin,
 BattleRom_AbsSine,$CE:F48E,$CE:F58D,256,records,records/BattleRom_AbsSine.tsv,table 256 x 1 B
 BattleRom_HdmaSetRecs,$CE:F58E,$CE:FFFF,2674,extracted,table/BattleRom_HdmaSetRecs.bin,
 BattleRom_FxTileGfx,$CF:0000,$CF:7FFF,32768,extracted,graphics/BattleRom_FxTileGfx.bin,
@@ -1590,7 +1589,7 @@ MapData_F5F402,$F5:F402,$F5:F7E5,996,extracted,map/MapData_F5F402.bin,
 Unknown_F5F7E6,$F5:F7E6,$F5:FE03,1566,extracted,unknown/Unknown_F5F7E6.bin,
 Padding_F5FE04,$F5:FE04,$F5:FFFF,508,fill,,$00
 Table_F60000,$F6:0000,$F6:1BFF,7168,records,records/Table_F60000.tsv,table 512 x 14 B
-LocGfx_Lists,$F6:1C00,$F6:1DFF,512,records,records/LocGfx_Lists.tsv,table 64 x 8 B
+LocGfx_Lists,$F6:1C00,$F6:1DFF,512,extracted,table/LocGfx_Lists.bin,
 Map_PropsPtrs,$F6:1E00,$F6:20FF,768,table,,dl x 256
 LocGfx_Meta12Ptrs,$F6:2100,$F6:21BF,192,table,,dl x 64
 LocGfx_Meta3Ptrs,$F6:21C0,$F6:221F,96,table,,dl x 32
@@ -2231,8 +2230,8 @@ MenuRom_Icon2PalB,$FF:CE04,$FF:CE13,16,records,records/MenuRom_Icon2PalB.tsv,pal
 Unknown_FFCE14,$FF:CE14,$FF:CE2F,28,extracted,unknown/Unknown_FFCE14.bin,
 MenuRom_LoadPalB,$FF:CE30,$FF:CE4F,32,records,records/MenuRom_LoadPalB.tsv,palette 16 x 2 B
 Unknown_FFCE50,$FF:CE50,$FF:CE6F,32,extracted,unknown/Unknown_FFCE50.bin,
-MenuRom_PortraitTiles,$FF:CE70,$FF:CE77,8,records,records/MenuRom_PortraitTiles.tsv,table 8 x 1 B
-MenuRom_PortraitPals,$FF:CE78,$FF:CE87,16,records,records/MenuRom_PortraitPals.tsv,table 8 x 2 B
+MenuRom_PortraitTiles,$FF:CE70,$FF:CE77,8,extracted,table/MenuRom_PortraitTiles.bin,
+MenuRom_PortraitPals,$FF:CE78,$FF:CE87,16,extracted,table/MenuRom_PortraitPals.bin,
 MenuRom_CharIconTiles,$FF:CE88,$FF:CE91,10,extracted,table/MenuRom_CharIconTiles.bin,
 MenuRom_CharIconPals,$FF:CE92,$FF:CE99,8,extracted,table/MenuRom_CharIconPals.bin,
 MenuRom_NameChoicePal,$FF:CE9A,$FF:CEB9,32,records,records/MenuRom_NameChoicePal.tsv,palette 16 x 2 B
@@ -2251,7 +2250,7 @@ MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,text,text/MenuSlotTexts.txt,strtable
 MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,extracted,table/MenuRom_SlotEraNibbles.bin,
 MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,text,text/MenuEraTexts.txt,strtable
 MenuRom_CfgTextTable,$FF:D3FE,$FF:D553,342,text,text/MenuSettingsTexts.txt,strtable
-MenuRom_ButtonLetters,$FF:D554,$FF:D561,14,records,records/MenuRom_ButtonLetters.tsv,table 7 x 2 B
+MenuRom_ButtonLetters,$FF:D554,$FF:D561,14,extracted,table/MenuRom_ButtonLetters.bin,
 MenuRom_CfgIcons,$FF:D562,$FF:D579,24,records,records/MenuRom_CfgIcons.tsv,table 12 x 2 B
 MenuRom_XchgUnkD57A,$FF:D57A,$FF:D5E3,106,extracted,table/MenuRom_XchgUnkD57A.bin,
 MenuRom_Tiles4bpp,$FF:D5E4,$FF:DBE3,1536,extracted,graphics/MenuRom_Tiles4bpp.bin,

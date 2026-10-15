@@ -194,7 +194,7 @@ BattleRom_HdmaSetOfs:
 ; Read by BattleCD_FxOpHalfPlane.
 org $CEF28E
 BattleRom_HalfPlaneEdge:
-    incbin "../../build/records/BattleRom_HalfPlaneEdge.bin"          ; records: table 256 x 2 B
+    incbin "../../build/assets/table/BattleRom_HalfPlaneEdge.bin"
 
 ; $CE:F48E-$CE:F58D (256 B), table, confirmed: 256 B: |sine| scaled to 255, per angle
 ; Read by BattleCD_FxMiscSineOffsets, BattleCD_FxOpWaveTable, BattleCD_FxOpWaves,

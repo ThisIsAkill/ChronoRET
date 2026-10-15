@@ -123,8 +123,9 @@ def _struct_fields(name: str) -> list[tuple[str, str]]:
 
 # Row start -> (the ROM struct whose records fill it, record count).
 STRUCTS = {
-    '$CC:5E00': ('BattleRom_EnemyReward', 255),   # BattleFD reward sum: id = a byte of Battler_UnkAF0A, $FF (Battle_EntryNone) skipped
-    '$CC:F3B6': ('BattleRom_FrameLayout', 6),     # Battle_DrawBattlerFrame: layouts 0-4 (Battler_FrameLayout) and 5 (Battle_FrameLayoutTallAlt)
+    '$CC:5E00': ('BattleRom_EnemyReward', 255),   # BattleFD reward sum: id = a byte of Battler_UnkAF0A, $FF (Battle_EntryNone)
+                                                  # skipped. Caveat: this rests on a present enemy never having id $FF;
+                                                  # BattleSys_StealItem indexes the records by it with no $FF guard
     '$CC:F604': ('BattleRom_CursorSprite', 4),    # BattleMenu_DrawCursorSprites: X by 4 to CPX #BattleOam_CursorBytes ($10)
     '$CD:4000': ('BattleRom_PcAttackScript', 1),  # one header (its fields are read at fixed offsets)
     '$CD:5C26': ('BattleRom_Kind3Act', 68),       # BattleAct kind 3: index Battle_ActId - $BC, ids $BC-$FF
@@ -152,8 +153,6 @@ PC_SLOTS = 3        # Battle_NumPcSlots
 ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$C6:F560': (_f('Divisor', t='u16'), 32),                 # C2Scene zoom (M7A/M7B), 32 steps
     '$C6:F5A0': (_f('Divisor', t='u16'), 32),                 # C2Scene zoom (M7C/M7D), 32 steps
-    '$C7:0E11': (_rep(16, ('Sample', 'u16')), 83),            # AudioRom_SongSamples: 83 songs
-    '$C7:241D': (_f('Echo', t='u16'), 83),                    # AudioRom_SongEcho: 83 songs
     '$CC:2583': (_f('AttackNum'), 7),                         # BattleRom_PcAttackNum: character ids 0-6
     '$CC:258A': (_rep(4, ('Level', 'u8'), ('Gain', 'u8')), 7),    # BattleRom_HpGrowth: character ids 0-6
     '$CC:25C2': (_rep(4, ('Level', 'u8'), ('Gain', 'u8')), 7),    # BattleRom_MpGrowth: character ids 0-6
@@ -167,8 +166,6 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$CC:F544': (_f('Interval'), 32),                         # BattleRom_EnemyMoveInterval: (delay / 2) * 4 + speed / 2, at most 31
     '$CC:F5FD': (_f('Frames'), 7),                            # BattleRom_FxOverlayPeriod: overlay blocks 1-7
     '$CC:F63C': (_f('Flag'), 7),                              # BattleRom_PcPathAlways: character ids 0-6
-    '$CC:F7C0': (_f('Offset', t='u16'), 32),                  # BattleRom_ActFrameBase: action frames 0-31
-    '$CC:F820': (_f('Pixels'), 9),                            # BattleRom_Times16: n 0-8
     '$CC:F829': (_f('Offset'), 6),                            # BattleRom_HitSetOffset: record sets 0-5
     '$CC:F846': (_f('Offset'), 7),                            # BattleRom_CharTimes6: character ids 0-6
     '$CC:F8ED': (_f('Offset', t='u16'), SLOTS),               # BattleRom_StatsOffset: per battler slot
@@ -197,20 +194,17 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$CC:FB7F': (_f('WeightA', 'WeightB'), 7),                # BattleRom_ActLerpWeights: 7 pairs
     '$CC:FBC8': (_f('SlotA', 'SlotB'), PC_SLOTS),             # BattleRom_PcPartners: per PC slot
     '$CC:FC1E': (_f('Offset', t='u16'), 7),                   # BattleRom_CharRecOffset: character ids 0-6
-    '$CD:686E': (_f('PalStep', t='ptr16:CD'), 95),            # BattleRom_PcAttackPals: 95 palette indexes
     '$CD:6A2C': (_f('PalStep', t='ptr16:CD'), 256),           # BattleRom_EnemyActPals: 256 palette indexes
-    '$CD:6C2C': (_f('PalStep', t='ptr16:CD'), 96),            # BattleRom_Kind3Pals: 96 palette indexes
     '$CE:0000': (_f('Subscript', t='ptr16:CE'), 128),         # BattleRom_ActSubscripts: 128 subscripts
     '$CE:EFEA': (_f('Step'), 8),                              # BattleRom_DissolvePhaseStep: patterns 0-7
     '$CE:EFF2': (_f('Vram', t='u16'), 4),                     # BattleRom_FxTileVram: tile sets 0-3
     '$CE:EFFA': (_f('Byte0'), 2),                             # BattleRom_FxRecByte0: colour-math cases 0/1
     '$CE:F03E': (_f('Mask'), 8),                              # BattleRom_FxBitMask: bits 0-7
-    '$CE:F146': (_f('Value', t='u16'), 8),                    # BattleRom_Op80PairB: values 0-7
+    '$CE:F146': (_f('Byte0', 'Byte1'), 8),                    # BattleRom_Op80PairB: (arg AND $38) / 4; byte 0 -> PalAnimRecs89+3, byte 1 -> +15
     '$CE:F156': (_f('Bytes', t='u16'), 8),                    # BattleRom_LayoutFrameBytes: Battler_FrameLayout = Flags AND 7
     '$CE:F166': (_f('Address', t='u16'), SLOTS),              # BattleRom_SlotFrameBuf: per battler slot
     '$CE:F17C': (_f('Vram', t='u16'), SLOTS),                 # BattleRom_SlotFrameVram: per battler slot
     '$CE:F1C2': (_f('Mask', t='u16'), 8),                     # BattleRom_DissolveMask: pixel columns 0-7
-    '$CE:F28E': (_f('X', 'Y'), 256),                          # BattleRom_HalfPlaneEdge: angles 0-255
     '$CE:F48E': (_f('Sine'), 256),                            # BattleRom_AbsSine: angles 0-255
     '$D1:5F42': (_f('Frame'), 28),                            # BattleRom_PcKoFrame: Pc_CharId (0-6) x 4 + Battler_Facing (0-3)
     '$E4:2600': (_f('Offset', t='u16'), 256),                 # BattleRom_SprAnimFrames: 256 animations
@@ -218,16 +212,12 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$E4:FFE0': (_f('Low', t='u16'), 7),                      # RomE4_PtrInit: 7 table pointers
     '$E5:0000': (_f('Offset', t='u16'), 513),                 # ExitRom_LocOfs: 512 locations and the end
     '$F5:F000': (_f('Offset', t='u16'), 513),                 # TreasureRom_LocOfs: 512 locations and the end
-    '$F6:1C00': (_rep(8, ('Pack', 'u8')), 64),                # LocGfx_Lists: 64 tilesets
     '$FD:A849': (_f('Address', t='u16'), PC_SLOTS),           # BattleRom_CmdPtr: per PC slot
     '$FD:A89D': (_f('FirstTech'), 8),                         # BattleRom_CharFirstTech: character ids 0-6 and the end byte
     '$FF:C9AC': (_rep(10, ('Char', 'u8')), 8),                # MenuRom_NameChars: 8 rows of 10
-    '$FF:CE70': (_f('Tile'), 8),                              # MenuRom_PortraitTiles: 8 portraits
-    '$FF:CE78': (_f('Colours', t='ptr16:FF'), 8),             # MenuRom_PortraitPals: 8 portraits
     '$FF:CF0E': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesA: item categories 0-4
     '$FF:CF18': (_f('RecSize'), 5),                           # MenuRom_ItemRecSizesA: item categories 0-4
     '$FF:CF1D': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesB: item categories 0-4
-    '$FF:D554': (_f('Tile', t='u16'), 7),                     # MenuRom_ButtonLetters: Pad_Pressed bits 7-1
     '$FF:D562': (_f('Tile', t='u16'), 12),                    # MenuRom_CfgIcons: entries 0-11
 }
 

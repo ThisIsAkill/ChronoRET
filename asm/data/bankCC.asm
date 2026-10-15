@@ -467,7 +467,7 @@ BattleRom_TechEntryOffset:
 ; Also BattleRom_FrameLayout (a struct or label of the code source).
 org $CCF3B6
 Table_CCF3B6:
-    incbin "../../build/records/Table_CCF3B6.bin"          ; records: table 6 x 14 B
+    incbin "../../build/assets/table/Table_CCF3B6.bin"
 
 ; $CC:F40A-$CC:F413 (10 B), table, confirmed: 2 B per frame layout 0-4: bytes per frame record
 ; Read by Battle_DrawBattlerFrameAnyLayout.
@@ -670,24 +670,18 @@ org $CCF77F
 Table_CCF77F:
     incbin "../../build/assets/table/Table_CCF77F.bin"
 
-; $CC:F7C0-$CC:F7FF (64 B), table, confirmed: 2 B per action frame 0-31: frame * $C0, its block
+; $CC:F7C0-$CC:F81F (96 B), table, confirmed: 2 B per action frame 0-31: frame * $C0, its block
 ; in BattleActSprite
 ; Read by BattleAct_UnpackFrames, BattleCF_DrawActObj.
 org $CCF7C0
 BattleRom_ActFrameBase:
-    incbin "../../build/records/BattleRom_ActFrameBase.bin"          ; records: table 32 x 2 B
-
-; $CC:F800-$CC:F81F (32 B), unknown, unknown: 32 B after BattleRom_ActFrameBase (past its
-; reader's 32 records)
-org $CCF800
-Unknown_CCF800:
-    incbin "../../build/assets/unknown/Unknown_CCF800.bin"
+    incbin "../../build/assets/table/BattleRom_ActFrameBase.bin"
 
 ; $CC:F820-$CC:F828 (9 B), table, confirmed: 1 B per n 0-8: n * 16 (sprite column/row to pixels)
 ; Read by BattleAct_UnpackFrames.
 org $CCF820
 BattleRom_Times16:
-    incbin "../../build/records/BattleRom_Times16.bin"          ; records: table 9 x 1 B
+    incbin "../../build/assets/table/BattleRom_Times16.bin"
 
 ; $CC:F829-$CC:F82E (6 B), table, confirmed: 1 B per record set 0-5: offset of the set
 ; Read by BattleAct_OpShowHitNumbers.

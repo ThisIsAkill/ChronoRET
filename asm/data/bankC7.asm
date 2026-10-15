@@ -16,7 +16,7 @@
 ; Read by Audio_CmdLoadSong, Audio_LoadNewSamples.
 org $C70E11
 AudioRom_SongSamples:
-    incbin "../../build/records/AudioRom_SongSamples.bin"          ; records: table 83 x 32 B
+    incbin "../../build/assets/table/AudioRom_SongSamples.bin"
 
 ; $C7:1871-$C7:241C (2,988 B), table, confirmed: 83 x 36 B sent to ARAM $F120
 ; Read by Audio_SendSongData.
@@ -28,7 +28,7 @@ AudioRom_SongExtra:
 ; Read by Audio_SetEchoDelay.
 org $C7241D
 AudioRom_SongEcho:
-    incbin "../../build/records/AudioRom_SongEcho.bin"          ; records: table 83 x 2 B
+    incbin "../../build/assets/table/AudioRom_SongEcho.bin"
 
 ; $C7:40B4-$C7:42B6 (515 B), brr_sample, confirmed: u16 length + bytes for ARAM $4700: the
 ; built-in sample (513 B = 57 BRR blocks; Spc_BuiltinDir)

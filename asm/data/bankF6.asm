@@ -24,7 +24,7 @@ Table_F60000:
 ; Read by LocLoad_Unk0960.
 org $F61C00
 LocGfx_Lists:
-    incbin "../../build/records/LocGfx_Lists.bin"          ; records: table 64 x 8 B
+    incbin "../../build/assets/table/LocGfx_Lists.bin"
 
 ; $F6:1E00-$F6:20FF (768 B), table, confirmed: 256 x 3 B long pointers (201 used, 202-255
 ; $000000)

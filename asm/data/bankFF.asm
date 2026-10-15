@@ -755,13 +755,13 @@ Unknown_FFCE50:
 ; Read by Menu_DrawPortrait.
 org $FFCE70
 MenuRom_PortraitTiles:
-    incbin "../../build/records/MenuRom_PortraitTiles.bin"          ; records: table 8 x 1 B
+    incbin "../../build/assets/table/MenuRom_PortraitTiles.bin"
 
 ; $FF:CE78-$FF:CE87 (16 B), table, confirmed: 8 u16: bank-$FF address of 16 colours per portrait
 ; Read by Menu_DrawPortrait.
 org $FFCE78
 MenuRom_PortraitPals:
-    incbin "../../build/records/MenuRom_PortraitPals.bin"          ; records: table 8 x 2 B
+    incbin "../../build/assets/table/MenuRom_PortraitPals.bin"
 
 ; $FF:CE88-$FF:CE91 (10 B), table, confirmed: u16 per icon: first tile word
 ; Read by Menu_DrawCharIcon.
@@ -886,7 +886,7 @@ MenuRom_SlotLabelStrings:
 ; Read by Menu_ButtonLetter.
 org $FFD554
 MenuRom_ButtonLetters:
-    incbin "../../build/records/MenuRom_ButtonLetters.bin"          ; records: table 7 x 2 B
+    incbin "../../build/assets/table/MenuRom_ButtonLetters.bin"
 
 ; $FF:D562-$FF:D579 (24 B), table, confirmed: per entry 0-11: the first tile word of its 2 x 2
 ; icon

@@ -141,7 +141,7 @@ BattleRom_EnemyActObjs:
 ; Read by BattleAct_LoadAttack.
 org $CD686E
 BattleRom_PcAttackPals:
-    incbin "../../build/records/BattleRom_PcAttackPals.bin"          ; records: table 95 x 2 B
+    incbin "../../build/assets/table/BattleRom_PcAttackPals.bin"
 
 ; $CD:692C-$CD:6A2B (256 B), table, confirmed: u16 per palette index: palette-step offset in
 ; bank $CD
@@ -162,7 +162,7 @@ BattleRom_EnemyActPals:
 ; Read by BattleAct_LoadKind3.
 org $CD6C2C
 BattleRom_Kind3Pals:
-    incbin "../../build/records/BattleRom_Kind3Pals.bin"          ; records: table 96 x 2 B
+    incbin "../../build/assets/table/BattleRom_Kind3Pals.bin"
 
 ; $CD:6CEC-$CD:6D4B (96 B), table, confirmed: 1 B per weapon id: its !BattleRom_WeaponColours
 ; record
