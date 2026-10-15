@@ -15,7 +15,9 @@ wrong file or twice, a path built from a define, a range of a listed file).
 
 With the ROM, asar and strace: asm/data/ is exactly what `generate` writes,
 and the isolated assembly of asm/rom.asm refuses the same planted reads
-(the file is not in the isolated tree, or strace sees asar open it outside).
+(the file is not in the isolated tree, or strace sees asar open it outside);
+a data-layer write over code bytes that keeps their values is found; an
+asset or pack changed by hand is redone by the next build.
 """
 
 import contextlib
@@ -156,6 +158,47 @@ class WithRom(unittest.TestCase):
                 with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
                     verify.assemble_whole(0x00, 0xFF, work, root)
                 self.assertIn(why, err.getvalue())
+
+    @unittest.skipUnless(HAVE_STRACE, 'needs strace')
+    def test_data_write_over_code_refused(self):
+        # A data-layer write over code bytes that keeps their values is
+        # invisible in the whole ROM; the data layer assembled on its own
+        # shows it (the four bytes are the ROM's at $C0:0010).
+        import verify
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / 'clean'
+            work.mkdir()
+            self.assertEqual(verify.data_writes_outside(work, ROOT), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shutil.copytree(ROOT / 'asm', root / 'asm', symlinks=True)
+            bank = root / 'asm' / 'data' / 'bankDC.asm'
+            bank.write_text(bank.read_text() + '\norg $C00010\n    db $C2,$10,$20,$64\n')
+            work = root / 'work'
+            work.mkdir()
+            self.assertEqual(verify.data_writes_outside(work, root), [0x10, 0x11, 0x12, 0x13])
+
+    def test_caches_repaired(self):
+        # A byte of an asset or of a pack changed by hand is redone by the
+        # next build, not kept because its stamp or key still matches.
+        import build_rom
+        rom = ed.read_rom()
+        ed.extract()
+        build_rom.build_packs()
+        pieces = ed.read_manifest()
+        raw = next(p for p in pieces if p['piece'] == 'extracted')
+        packed = next(p for p in pieces if p['piece'] == 'packed')
+        asset = ROOT / ed.ASSETS / raw['asset']
+        lz = ROOT / ed.PACKS / f'{packed["label"]}.lz'
+        for path in (asset, lz):
+            data = bytearray(path.read_bytes())
+            data[0] ^= 0xFF
+            path.write_bytes(bytes(data))
+        ed.extract()
+        build_rom.build_packs()
+        self.assertEqual(asset.read_bytes(), rom[raw['offset']:raw['stop']])
+        self.assertEqual(lz.read_bytes(), rom[packed['offset']:packed['stop']])
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=1)

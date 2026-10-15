@@ -9,8 +9,9 @@ assets, with no copy of the original.
   3. The data packs: every `packed` piece of symbols/data_assets.csv is
      packed from its unpacked asset with tools/c3pack.py's packer, in the
      mode the manifest gives, to build/packs/<label>.lz. A pack is redone
-     only when its asset, its mode or the packer change (a key beside it,
-     build/packs/<label>.key); a first build packs about 2.3 MB, in
+     only when its asset, its mode or the packer change, or the .lz is no
+     longer what was packed (a key beside it, build/packs/<label>.key, holds
+     the inputs' hash and the output's sha256); a first build packs about 2.3 MB, in
      parallel. A pack whose size differs from its piece fails the build
      (the placement is fixed by the survey; an edited asset needs the
      layout regenerated, which is later work).
@@ -66,7 +67,8 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
         sizes[p['label']] = int(p['size'])
-        if out.exists() and stamp.exists() and stamp.read_text() == key:
+        if out.exists() and stamp.exists() and \
+                stamp.read_text() == f'{key} {hashlib.sha256(out.read_bytes()).hexdigest()}':
             continue
         jobs.append((p['label'], str(src), mode, key))
     if jobs:
@@ -83,7 +85,7 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
             stamp = out_dir / f'{label}.key'
             stamp.unlink(missing_ok=True)
             c3pack._write(out_dir / f'{label}.lz', data)
-            c3pack._write(stamp, keys[label].encode())
+            c3pack._write(stamp, f'{keys[label]} {hashlib.sha256(data).hexdigest()}'.encode())
     wrong = []
     for label, size in sizes.items():
         got = (out_dir / f'{label}.lz').stat().st_size

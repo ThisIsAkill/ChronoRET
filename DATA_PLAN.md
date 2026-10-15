@@ -219,7 +219,9 @@ ten `C2SceneRom_*Packs`, `BattleRom_BgMapPtrs`, `BattleRom_PcAttackFrames` and
 `LocGfx_Meta3Ptrs`, `LocGfx_PackPtrs`, `Evt_PackPtrs` and `C3Rom_PackPtrs`: every entry is a
 label, a label plus an offset (an entry into the middle of a row: the stale entries listed above,
 the module's raw blocks in `$FE`) or `$000000`; five stale `LocGfx_PackPtrs` entries (206-210)
-point into bank `$FD` code and are written relative to the code label before them.
+point into bank `$FD` code and are written relative to the code label before them. That is a
+label in name only: the offset restates the stored pointer value, which no reader uses (no
+LocRom record selects those entries); it keeps the table free of raw numbers, nothing more.
 
 Left:
 

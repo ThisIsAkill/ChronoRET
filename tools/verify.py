@@ -14,7 +14,9 @@ is asm/main.asm and the data layer) is checked apart and never counts as
 emitted by source here: the whole ROM is assembled isolated as well, with
 every file the manifest (symbols/data_assets.csv) lists as an incbin, and
 only those, present as placeholders of a third value, so the bytes they
-place are told apart from the bytes the source writes. Its figures: bytes
+place are told apart from the bytes the source writes; and asm/data/ is
+assembled on its own too (code labels as label-only stubs), and may write
+no byte outside the manifest's pieces. Its figures: bytes
 written by source as fill or as pointer tables of labels, bytes extracted
 from the ROM, and bytes packed by the build from extracted assets; every
 ROM byte must be one of these or emitted by the code source.
@@ -29,6 +31,7 @@ Exit status is non-zero on any mismatch or assembler error.
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -97,6 +100,76 @@ def assemble_whole(base: int, placeholder: int, workdir: Path, root: Path = Path
     return out.read_bytes()
 
 
+DATA_ONLY = Path('asm/data_only.asm')     # written into the isolated tree only
+
+
+def code_label_stubs(workdir: Path, root: Path = Path('.')) -> str:
+    """Label-only stubs (`org` and a label, no bytes) for the global labels
+    of the code source at banks $C0-$FF, from an isolated assembly of
+    asm/main.asm with asar's symbol output: what the data layer may
+    reference when it is assembled without the code."""
+    iso = Path(workdir) / 'labels'
+    iso.mkdir()
+    try:
+        tree = isolated.make_tree(root, iso)
+        ph = tree / c3pack.MODULE_LZ
+        ph.parent.mkdir(parents=True, exist_ok=True)
+        ph.write_bytes(bytes(c3pack.MODULE_PACKED_SIZE))
+        out, sym = iso / 'code.sfc', iso / 'code.sym'
+        out.write_bytes(bytes(ROM_SIZE))
+        isolated.run_asar(['--no-title-check', '--fix-checksum=off', '--symbols=wla',
+                           f'--symbols-path={sym.resolve()}', str(MAIN_ASM), str(out.resolve())], tree, iso)
+        text = sym.read_text()
+    except isolated.IsolationError as e:
+        sys.stderr.write(f'verify: {e}\n')
+        sys.exit(2)
+    stubs, section = ['hirom'], None
+    for line in text.splitlines():
+        if line.startswith('['):
+            section = line.strip()
+            continue
+        m = re.match(r'^([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4}) ([A-Za-z_][A-Za-z0-9_]*)$', line)
+        if section == '[labels]' and m and int(m.group(1), 16) >= 0xC0:
+            stubs.append(f'org ${m.group(1)}{m.group(2)}\n{m.group(3)}:')
+    return '\n'.join(stubs) + '\n'
+
+
+def assemble_data_only(base: int, placeholder: int, workdir: Path, stubs: str,
+                       root: Path = Path('.')) -> bytes:
+    """asm/data/data.asm assembled isolated without the code source (its
+    references to code labels resolved by label-only stubs), onto an image
+    of `base`, the manifest's files placeholders of `placeholder`."""
+    iso = Path(workdir) / f'data_{base:02x}'
+    iso.mkdir()
+    try:
+        tree = isolated.make_tree(root, iso)
+        for rel, size in extract_data.placeholder_files(extract_data.read_manifest()).items():
+            (tree / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tree / rel).write_bytes(bytes([placeholder]) * size)
+        (tree / DATA_ONLY).write_text(stubs + 'incsrc "data/data.asm"\n')
+        out = iso / 'data.sfc'
+        out.write_bytes(bytes([base]) * ROM_SIZE)
+        isolated.run_asar(['--no-title-check', '--fix-checksum=off', str(DATA_ONLY), str(out.resolve())],
+                          tree, iso)
+    except (isolated.IsolationError, extract_data.DataError) as e:
+        sys.stderr.write(f'verify: {e}\n')
+        sys.exit(2)
+    return out.read_bytes()
+
+
+def data_writes_outside(workdir: Path, root: Path = Path('.')) -> list[int]:
+    """Offsets the data layer, assembled on its own, writes outside the
+    manifest's pieces (a write over a code byte is caught here even when it
+    keeps the byte's value, which the whole-ROM comparison cannot see)."""
+    stubs = code_label_stubs(workdir, root)
+    a = assemble_data_only(0x00, 0xFF, workdir, stubs, root)
+    b = assemble_data_only(0xFF, 0x00, workdir, stubs, root)
+    inside = bytearray(ROM_SIZE)
+    for p in extract_data.read_manifest():
+        inside[p['offset']:p['stop']] = b'\x01' * (p['stop'] - p['offset'])
+    return [i for i in range(ROM_SIZE) if not inside[i] and not (a[i] == 0x00 and b[i] == 0xFF)]
+
+
 def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tuple[dict, list[str]]:
     """The data layer's figures and problems (see the docstring). `lo`/`hi`
     are the code source's isolated assemblies, `emitted` its bytes."""
@@ -105,7 +178,11 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     with tempfile.TemporaryDirectory() as tmp:
         a = assemble_whole(0x00, 0xFF, Path(tmp))
         b = assemble_whole(0xFF, 0x00, Path(tmp))
+        outside = data_writes_outside(Path(tmp))
     problems = []
+    if outside:
+        problems.append(f'asm/data/ writes {len(outside):,} byte(s) outside the manifest\'s pieces, '
+                        f'the first at {extract_data.addr(outside[0])}')
     kind = bytearray(ROM_SIZE)          # 0 unwritten, 1 source, 2 placeholder
     for i in range(ROM_SIZE):
         if a[i] == b[i]:

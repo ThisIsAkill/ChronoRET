@@ -458,7 +458,7 @@ def table_entries(piece: dict, rom: bytes, pieces: list[dict], code: dict[int, s
         if j < 0 or code_offsets[j] >> 16 != t >> 16:
             raise DataError(f'{piece["label"]} entry {(k - piece["offset"]) // size}: no label for {v:06X}')
         base = code_offsets[j]
-        out.append((f'{code[base]}+${t - base:X}', 'into code: a stale entry'))
+        out.append((f'{code[base]}+${t - base:X}', 'into code: stale; this restates the pointer value'))
     directive = 'dl' if size == 3 else 'dw'
     lines = []
     for n, (expr, note) in enumerate(out):
@@ -622,16 +622,29 @@ def _stamp_key(rom_sha: str) -> str:
     return h.hexdigest()
 
 
+def _stamp_text(key: str, out_dir: Path, pieces: list[dict]) -> str:
+    """The stamp: the inputs' key, then the sha256 of every asset as it is
+    now ('-' for a missing one), so an asset changed or removed by hand
+    no longer matches the stamp written after extraction."""
+    lines = [key]
+    for p in pieces:
+        if p['asset']:
+            f = out_dir / p['asset']
+            lines.append(f'{hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else "-"} {p["asset"]}')
+    return '\n'.join(lines) + '\n'
+
+
 def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     """Write build/assets/ from the ROM (see the docstring); returns its path.
-    Nothing is rewritten when the ROM, manifest and this tool are unchanged."""
+    Nothing is rewritten when the ROM, manifest and this tool are unchanged
+    and every asset still has the sha256 recorded at extraction; otherwise
+    all are written again."""
     import c3pack
     out_dir = Path(root) / ASSETS
     stamp = out_dir / STAMP_NAME
     pieces = read_manifest()
     key = _stamp_key(expected_sha())
-    if stamp.exists() and stamp.read_text() == key and all(
-            (out_dir / p['asset']).exists() for p in pieces if p['asset']):
+    if stamp.exists() and stamp.read_text() == _stamp_text(key, out_dir, pieces):
         return out_dir
     rom = read_rom()
     stamp.unlink(missing_ok=True)
@@ -663,7 +676,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         c3pack._write(dest, data)
     if problems:
         raise DataError('extraction failed:\n  ' + '\n  '.join(problems))
-    stamp.write_text(key)
+    stamp.write_text(_stamp_text(key, out_dir, pieces))
     if not quiet:
         n = sum(1 for p in pieces if p['asset'])
         print(f'extract_data: {n:,} assets written to {ASSETS}/')

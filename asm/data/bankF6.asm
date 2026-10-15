@@ -603,11 +603,11 @@ LocGfx_PackPtrs:
     dl LocGfxPack_203                     ; 203
     dl Unknown_FD8E64                     ; 204
     dl EvtPack_020+$2D                    ; 205: inside the piece: not a stream start
-    dl BattleFD_UnkAEF2_pc_next+$6        ; 206: into code: a stale entry
-    dl BankFD_RandomTableTail+$420        ; 207: into code: a stale entry
-    dl FieldHdma_BuildTopBandB_tm_c_set+$EC ; 208: into code: a stale entry
-    dl FieldFD_LoadAnimSetA_kind4_pair+$7 ; 209: into code: a stale entry
-    dl M7Scene_InitPalette_bg_colour+$26  ; 210: into code: a stale entry
+    dl BattleFD_UnkAEF2_pc_next+$6        ; 206: into code: stale; this restates the pointer value
+    dl BankFD_RandomTableTail+$420        ; 207: into code: stale; this restates the pointer value
+    dl FieldHdma_BuildTopBandB_tm_c_set+$EC ; 208: into code: stale; this restates the pointer value
+    dl FieldFD_LoadAnimSetA_kind4_pair+$7 ; 209: into code: stale; this restates the pointer value
+    dl M7Scene_InitPalette_bg_colour+$26  ; 210: into code: stale; this restates the pointer value
     dl LocGfxPack_211                     ; 211
     dl LocGfxPack_211+$BC3                ; 212: inside the piece: not a stream start
     dl EvtPack_004+$3B8                   ; 213: inside the piece: not a stream start
