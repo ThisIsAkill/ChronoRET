@@ -9,10 +9,11 @@ import sys
 REQUIRED = {
     "asar": "65816 assembler — install via AUR: yay -S asar-git",
     "python3": "should already be present if you're running this",
-    "strace": "verify.py and the $C3 module build check which files asar reads (tools/isolated.py) — apt-get install strace",
 }
 
 OPTIONAL = {
+    "strace": "recommended (Linux): verify.py checks which files asar opens (tools/isolated.py); "
+              "without it that check is skipped with a warning — apt-get install strace",
     "bsnes": "cycle-accurate emulator for tracing — yay -S bsnes-hd-git",
     "mesen-s": "alternative debugger-focused emulator",
 }

@@ -22,14 +22,19 @@ off, whatever the text:
     library; any other open (an absolute path, a path out of the copy) fails
     the run, and so does any asar error (a file not found included).
 
-strace is required (`sudo apt-get install strace`; CI's match job installs
-it); without it these checks refuse to run rather than trust the text.
+The file-open check needs strace (Linux). Where strace is missing (macOS,
+Windows) or cannot trace, the assembly still runs isolated (the copy, the
+placeholders, symlinks refused, asar errors failing) and one warning says
+the file-open check was skipped; the lint's FILEREAD rule closes the known
+ways round it on its own. Set CHRONORET_REQUIRE_STRACE=1 to make the check
+mandatory (CI's match job does, and installs strace).
 """
 
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -60,22 +65,47 @@ def make_tree(root: Path, dest: Path) -> Path:
     return Path(dest)
 
 
+REQUIRE_ENV = 'CHRONORET_REQUIRE_STRACE'
+_warned = []
+
+
+def strace_required() -> bool:
+    return os.environ.get(REQUIRE_ENV, '') not in ('', '0')
+
+
+def _without_strace(args, tree, why) -> subprocess.CompletedProcess:
+    """The isolated assembly without the file-open check: refused when the
+    environment requires the check, else run with one warning."""
+    if strace_required():
+        raise IsolationError(f'{why}, and {REQUIRE_ENV} requires the file-open check '
+                             f'(apt-get install strace)')
+    if not _warned:
+        _warned.append(True)
+        print(f'warning: {why}: the isolated assembly ran without its check of the files asar '
+              f'opens (the lint\'s FILEREAD rule still applies; set {REQUIRE_ENV}=1 to require '
+              f'it, as CI does)', file=sys.stderr)
+    r = subprocess.run(['asar', *args], cwd=tree, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise IsolationError(f'asar failed in the isolated tree:\n{r.stdout}{r.stderr}')
+    return r
+
+
 def run_asar(args: list[str], tree: Path, allowed: Path) -> subprocess.CompletedProcess:
     """Run asar with `args` in `tree` under strace; raise IsolationError when
-    it fails or opens a file outside `allowed` (and the system libraries)."""
+    it fails or opens a file outside `allowed` (and the system libraries).
+    Without strace (or ptrace), see _without_strace."""
     if shutil.which('strace') is None:
-        raise IsolationError('strace is needed to check that the source reads no file outside it '
-                             '(sudo apt-get install strace)')
+        return _without_strace(args, tree, 'strace is not installed')
     allowed = Path(os.path.realpath(allowed))
     with tempfile.TemporaryDirectory() as tmp:
         log = Path(tmp) / 'strace.txt'
         r = subprocess.run(['strace', '-f', '-qq', '-e', 'trace=open,openat,openat2,creat',
                             '-o', str(log), 'asar', *args], cwd=tree, capture_output=True, text=True)
         trace = log.read_text(errors='replace').splitlines() if log.exists() else []
+    if not trace:                       # strace could not trace (no ptrace here): asar did not run
+        return _without_strace(args, tree, f'strace could not trace asar ({r.stderr.strip()[:120]})')
     if r.returncode != 0:
         raise IsolationError(f'asar failed in the isolated tree:\n{r.stdout}{r.stderr}')
-    if not trace:
-        raise IsolationError('strace recorded nothing (is ptrace allowed here?)')
     outside = set()
     for line in trace:
         if 'open' not in line and 'creat' not in line:

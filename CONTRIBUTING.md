@@ -78,6 +78,12 @@ every tool that reads them regenerates them when they are stale, and
 
 ## Workflow tools
 
+- `tools/verify.py` (and progress, which uses it) assembles the source in an isolated copy of
+  `asm/` (`tools/isolated.py`: no `roms/` or `build/`, symlinks refused), so no byte read from
+  the ROM can count as source; the lint's FILEREAD rule names any file read in the text. With
+  `strace` installed (Linux) it also checks every file asar opens; without it (macOS, Windows)
+  that one check is skipped with a warning and everything else, the pre-commit hook included,
+  works as usual. CI requires it (`CHRONORET_REQUIRE_STRACE=1`).
 - `make draft ADDR=C1:3714` (`tools/draft.py`) starts a match from source instead of raw
   bytes. It disassembles the routine from that address until it ends (every path has returned
   or jumped away and no branch of its own reaches further; `END=C1:373A` fixes the end),

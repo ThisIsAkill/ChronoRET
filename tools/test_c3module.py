@@ -233,6 +233,23 @@ class Source(unittest.TestCase):
                 with self.assertRaises(c3pack.PackError):
                     c3pack.source_bytes(root)
 
+    def test_without_strace(self):
+        # No strace: the isolated assembly still runs (a warning), unless
+        # CHRONORET_REQUIRE_STRACE asks for the file-open check.
+        import os
+        from unittest import mock
+        import isolated
+        real_which = shutil.which
+        no_strace = mock.patch.object(isolated.shutil, 'which',
+                                      lambda n: None if n == 'strace' else real_which(n))
+        with mock.patch.dict(os.environ, {isolated.REQUIRE_ENV: ''}):
+            expected = c3pack.source_bytes()
+            with no_strace:
+                self.assertEqual(c3pack.source_bytes(), expected)
+        with no_strace, mock.patch.dict(os.environ, {isolated.REQUIRE_ENV: '1'}):
+            with self.assertRaises(c3pack.PackError):
+                c3pack.source_bytes()
+
     @unittest.skipUnless(shutil.which('strace'), 'needs strace')
     def test_bank_read_rejected(self):
         import verify

@@ -27,6 +27,11 @@ jobs:
   match:
     name: Reassemble and diff
     runs-on: ubuntu-latest
+    # tools/isolated.py's check of the files asar opens is mandatory here
+    # (strace is installed below); locally it is skipped with a warning
+    # where strace is missing.
+    env:
+      CHRONORET_REQUIRE_STRACE: '1'
 
     steps:
       - uses: actions/checkout@v4
