@@ -34,6 +34,12 @@ runs these and reports them the same way (a finding keeps the routine at
          label on the other side holds that label's address. Needs the
          ROM and asar.
 
+  ROMBYTES the bytes not matched yet come from the ROM's module only
+         through %C3ModRomBytes: no incbin (or readfile..()) anywhere in
+         asm/bankC3/packed/ but the one in that macro's body in module.inc.
+         Cannot be opted out of. (lint_readability.py's PLUMB rule does the
+         same for the bank files, and for module.asm too.)
+
 A label whose body is only %C3ModRomBytes (a block not matched yet, kept as
 the ROM's bytes) is not a routine: no rule applies to it.
 
@@ -186,6 +192,33 @@ def kernel_findings(module_labels, rom_labels):
     return out
 
 
+ROMBYTES_LINE = 'incbin "!C3Mod_RomImage":<start>-!C3Mod_Code..<end>-!C3Mod_Code'
+
+
+def rombytes_findings(root: Path = Path('asm/bankC3/packed')):
+    """ROMBYTES: (path, function, line, rule, text) for every file read in
+    the module's source but the one in %C3ModRomBytes."""
+    import lint_readability as L
+    out = []
+    for path in sorted(root.glob('*')):
+        if path.suffix not in ('.asm', '.inc'):
+            continue
+        macro = None
+        for no, raw in enumerate(path.read_text().splitlines(), 1):
+            code = L.split_comment(raw)[0].strip()
+            if code.lower().startswith('macro '):
+                macro = code.split()[1].split('(')[0]
+            elif code.lower() == 'endmacro':
+                macro = None
+            if not (code.lower().startswith('incbin') or L.READS_FILE.search(code)):
+                continue
+            if path.name == 'module.inc' and macro == 'C3ModRomBytes' and code == ROMBYTES_LINE:
+                continue
+            out.append((str(path), '<file>', no, 'ROMBYTES',
+                        f'bytes read from a file outside %C3ModRomBytes: {code}'))
+    return out
+
+
 def module_sites():
     """{target: [site, ...]} from tools/c3module.py's trace, or None without the ROM."""
     import c3module
@@ -216,6 +249,7 @@ def findings(rows=None, sites=None, labels=None):
             continue
         found = L.lint_file(path) + header_findings(path, rows, sites)
         out += [(str(path), f, no, rule, text) for f, no, rule, text in found]
+    out += rombytes_findings()
     if labels is not None:
         out += kernel_findings(*labels)
     return out

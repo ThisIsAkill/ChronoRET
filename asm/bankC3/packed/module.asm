@@ -113,14 +113,16 @@ C3Mod_ProgramTable:
 ;     (C3Mod_SoundReset); hides every sprite (C3Mod_HideSprites);
 ;     C3_OamHiPtr = Oam_HighTable; then sets the PPU registers
 ;     $2100-$2133 to a blank state: forced blank, OBSEL = C3_Obsel,
-;     everything else 0 (mode 0, scrolls, mode-7 matrix, windows,
+;     the others written 0 (mode 0, scrolls, mode-7 matrix, windows,
 ;     layers and colour math off; COLDATA first gets C3_ColdataBlack,
-;     then 0, which selects no colour and so changes nothing).
+;     then 0, which selects no colour and so changes nothing). Left
+;     untouched, never written: OAMDATA ($2104), VMADDL/H and
+;     VMDATAL/H ($2116-$2119) and CGDATA ($2122).
 ; The 8-bit stores of the 16-bit pause words clear their high bytes
 ; one by one. The SEP #$20 / REP #$10 before the PPU part change
-; nothing (M=1 and X=0 already). The scroll and mode-7 registers are written twice each
-; (low, then high byte), M7Y once and then with STX, which also writes
-; CGADD.
+; nothing (M=1 and X=0 already). The scroll and mode-7 registers are
+; written twice each (low, then high byte), M7Y once and then with
+; STX, which also writes CGADD.
 ; Sub-entry: C3Mod_Return ($3176), its final RTS, which C3Mod_Start
 ; calls as an idle step.
 ; Callers note: C3Mod_Start ($3000). C3Mod_Return: C3Mod_Start
@@ -444,8 +446,10 @@ C3Mod_SpaceRows:
 ; WRAM as $00:00F0.
 ; Callers note: the kernel's C3_RunScript (JSL !C3Mod_CallW at
 ;   $C3:0C58, script opcode 0, which puts its operand in C3_ScratchF0).
-; Entry: M and X as the called code wants (X's value is lost: 0), DP
-;        any, DB any; the address in C3_ScratchF0.
+; Entry: X=0 (LDX.w #0 is three bytes, A2 00 00: with X=1 the last
+;        $00 would run as BRK), M as the called code wants, DP any, DB
+;        any (C3_RunScript calls it with M=0, X=0, DB=$7E); the address
+;        in C3_ScratchF0.
 ; Exit:  what the called code leaves, X included.
 C3Mod_CallW:
     LDX.w #0
@@ -530,9 +534,10 @@ C3Mod_Rest38AF:
 ; Runs the frame's tasks: JSRs each nonzero word of C3_TaskRun (the
 ; copy C3_ModuleFrame makes of C3_TaskList) in turn, saving DB, X, P
 ; and DP around each, with M=0 and DP and DB as the frame left them.
-; A task can leave early through C3Mod_TaskEnd (it frees its own
-; entry of C3_TaskList) or C3Mod_TaskReplace (it puts the address in
-; A there); both come back into this loop at C3Mod_TaskNext. A task
+; A task can leave by JMP to C3Mod_TaskEnd (it frees its own entry of
+; C3_TaskList) or to C3Mod_TaskReplace (it puts the address in X
+; there) instead of returning; both come back into this loop at
+; C3Mod_TaskNext. A task
 ; that changes C3_TaskList changes what runs next frame, not this
 ; one (C3_TaskRun is the copy).
 ; Sub-entry: C3Mod_TaskNext ($399F), the next entry.
@@ -567,16 +572,21 @@ C3Mod_TaskNext:                         ; header: see C3Mod_RunTasks
     RTL
 
 ; $7E:39A7 — C3Mod_TaskEnd (10 bytes, $39A7–$39B0)
-; A task's way out, called by JSR from the task's own level (with
-; nothing else of the task's left on the stack): drops this JSR's
-; return address, pulls what C3Mod_RunTasks saved (DP, P, X, DB),
+; A task's way out, reached by JMP from the task's own level (with
+; nothing of the task's left on the stack): drops the task's return
+; address (C3Mod_RunTasks' JSR), pulls what C3Mod_RunTasks saved (DP,
+; P, X, DB),
 ; clears the task's entry of C3_TaskList and goes on with the next
 ; task (C3Mod_TaskNext).
-; Callers note: JSR from tasks; the trace found none yet (the tasks
-;   are reached through C3_TaskList).
-; Entry: called by JSR from a task run by C3Mod_RunTasks, with the
-;        stack as the task found it; X=0 (the first PLX must pull the
-;        2-byte return address), M any; DP, DB any (restored).
+; Callers note: JMP from tasks, in code neither matched nor traced yet
+;   (the tasks are reached through C3_TaskList): JMP byte patterns at
+;   $3492, $34A8, $34E0, $34F8, $44F8, $48A6, $5BBB, $5BCB, $5CB7,
+;   $5D47, $6ACA, $9A9F, $9B7B and $9EF9.
+; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
+;        task found it (C3Mod_RunTasks' JSR return address on top: a JSR
+;        here would push a second one and misalign the pulls); X=0
+;        (the first PLX must pull that 2-byte address), M any; DP, DB
+;        any (restored).
 ; Exit:  into C3Mod_TaskNext with P, X, DP and DB as C3Mod_RunTasks
 ;        saved them (M=0, X=0); A unchanged.
 C3Mod_TaskEnd:
@@ -592,11 +602,14 @@ C3Mod_TaskEnd:
 ; As C3Mod_TaskEnd, but the task's entry of C3_TaskList gets the
 ; address in X instead (the task hands itself over to another, from
 ; next frame).
-; Callers note: JSR from tasks; the trace found none yet.
-; Entry: called by JSR from a task run by C3Mod_RunTasks, with the
-;        stack as the task found it; X=0 (16-bit index: the address
-;        and the PLX of the return address) with the new task's address
-;        in the X register; M any; DP, DB any (restored).
+; Callers note: JMP from tasks, in code neither matched nor traced yet:
+;   JMP byte patterns at $34BF (after LDX #$34C2), $427F, $476E, $485A,
+;   $63F1, $6A71, $6A94, $6BF6 and $98A9.
+; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
+;        task found it (C3Mod_RunTasks' JSR return address on top, as
+;        for C3Mod_TaskEnd); X=0 (16-bit index: the address and the PLX
+;        of the return address) with the new task's address in the X
+;        register; M any; DP, DB any (restored).
 ; Exit:  into C3Mod_TaskNext with P, X, DP and DB as C3Mod_RunTasks
 ;        saved them (M=0, X=0); A = the new address.
 C3Mod_TaskReplace:
@@ -650,12 +663,16 @@ C3Mod_NmiTaskNext:                      ; header: see C3Mod_RunNmiTasks
     RTL
 
 ; $7E:39DE — C3Mod_NmiTaskEnd (10 bytes, $39DE–$39E7)
-; C3Mod_TaskEnd for an NMI task: clears its entry of C3_NmiTaskList
-; and goes on with the next NMI task (C3Mod_NmiTaskNext).
-; Callers note: JSR from NMI tasks; the trace found none yet.
-; Entry: called by JSR from a task run by C3Mod_RunNmiTasks, with the
-;        stack as the task found it; X=0 (the first PLX must pull the
-;        2-byte return address), M any; DP, DB any (restored).
+; C3Mod_TaskEnd for an NMI task (reached by JMP the same way): clears
+; its entry of C3_NmiTaskList and goes on with the next NMI task
+; (C3Mod_NmiTaskNext).
+; Callers note: JMP from NMI tasks, in code neither matched nor traced
+;   yet: JMP byte patterns at $4674, $78A8, $7A32, $7A65, $8DF0, $8E85,
+;   $9D22, $9F56 and $9F87.
+; Entry: JMP from a task run by C3Mod_RunNmiTasks, with the stack as
+;        the task found it (C3Mod_RunNmiTasks' JSR return address on
+;        top: a JSR here would misalign the pulls); X=0 (the first PLX
+;        must pull that 2-byte address), M any; DP, DB any (restored).
 ; Exit:  into C3Mod_NmiTaskNext with P, X, DP and DB as
 ;        C3Mod_RunNmiTasks saved them (M=0, X=0); A unchanged.
 C3Mod_NmiTaskEnd:
@@ -668,8 +685,8 @@ C3Mod_NmiTaskEnd:
     BRA C3Mod_NmiTaskNext
 
 ; $7E:39E8 — C3Mod_NmiTaskReplace (13 bytes, $39E8–$39F4)
-; C3Mod_TaskReplace for an NMI task: its entry of C3_NmiTaskList gets
-; the address in X. Quirk: it then branches to C3Mod_TaskNext, the
+; C3Mod_TaskReplace for an NMI task (reached by JMP the same way): its
+; entry of C3_NmiTaskList gets the address in X. Quirk: it then branches to C3Mod_TaskNext, the
 ; frame task loop, not to C3Mod_NmiTaskNext: the NMI tasks after it
 ; are skipped for this frame, and the C3_TaskRun entries after the
 ; replaced entry's index run instead, in the forced blank (C3_TaskRun
@@ -677,11 +694,13 @@ C3Mod_NmiTaskEnd:
 ; C3_TaskList after the NMI tasks), before the RTL; they run again
 ; later in the frame from C3Mod_RunTasks. Kept as it is (the bytes of
 ; the BRA say so: $80 $AA, to $399F).
-; Callers note: JSR from NMI tasks; the trace found none yet.
-; Entry: called by JSR from a task run by C3Mod_RunNmiTasks, with the
-;        stack as the task found it; X=0 (16-bit index: the address
-;        and the PLX of the return address) with the new task's address
-;        in the X register; M any; DP, DB any (restored).
+; Callers note: none found: no JMP $39E8 byte pattern in the module.
+;   It would be reached by JMP, as C3Mod_TaskReplace is.
+; Entry: JMP from a task run by C3Mod_RunNmiTasks, with the stack as
+;        the task found it (C3Mod_RunNmiTasks' JSR return address on
+;        top); X=0 (16-bit index: the address and the PLX of the return
+;        address) with the new task's address in the X register; M any;
+;        DP, DB any (restored).
 ; Exit:  into C3Mod_TaskNext (see above) with P, X, DP and DB as
 ;        C3Mod_RunNmiTasks saved them (M=0, X=0); A = the new address.
 C3Mod_NmiTaskReplace:

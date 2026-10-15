@@ -21,7 +21,10 @@ asm/include/ and are exempt):
          a named macro from asm/include/macros.inc instead.
   PLUMB  no test/scaffolding plumbing in game code: print/assert/warnpc/
          error directives, or label-only `org` stubs (those belong in
-         asm/include/unmatched.asm).
+         asm/include/unmatched.asm); no bytes read from a file (incbin,
+         readfile..()), except bankC3.asm's incbin of the packed $C3
+         module that tools/c3pack.py builds from source (this one cannot
+         be opted out of).
   HEADER every routine's header (the comment block tools/asm_source.py
          attributes to its label) has an Entry line and an Exit line: a
          comment line starting `Entry`, `On entry`, `Exit` or `Entry/Exit`,
@@ -150,6 +153,12 @@ def literal_value(text: str):
     return int(m.group(3))
 
 
+# The only incbin allowed in the source: the packed $C3 module, which
+# tools/c3pack.py builds from asm/bankC3/packed/ (see lint_c3module.py).
+PACKED_MODULE_INCBIN = ('asm/bankC3/bankC3.asm', 'incbin "../../build/c3pack/module.lz"')
+READS_FILE = re.compile(r'\b(?:readfile[124]|canreadfile[124]?|filesize|getfilestatus)\s*\(', re.I)
+
+
 def split_comment(line: str) -> tuple[str, str]:
     idx = line.find(';')
     return (line, '') if idx < 0 else (line[:idx], line[idx + 1:])
@@ -202,6 +211,13 @@ def lint_file(path: Path):
         if lower in PLUMBING:
             report('PLUMB')
             continue
+        if lower == 'incbin' or READS_FILE.search(stripped):
+            # Bytes from a file are not source. The one exception is the
+            # packed $C3 module, built from source by tools/c3pack.py.
+            if (str(path), stripped) != PACKED_MODULE_INCBIN:
+                findings.append((function, no, 'PLUMB', raw.strip()))   # not suppressible
+            emitted_since_org = True
+            continue
         if lower in ('db', 'dw', 'dl', 'dd'):
             emitted_since_org = True
             first = comment.strip().split()[:1]
@@ -215,7 +231,7 @@ def lint_file(path: Path):
                              'namespace', 'pushpc', 'pullpc', 'base',
                              'fillbyte', 'fill', 'padbyte', 'pad', 'table',
                              'cleartable', 'check', 'math', 'warn'):
-            if stripped.startswith('%') or lower == 'incbin':
+            if stripped.startswith('%'):
                 emitted_since_org = True
             continue
 

@@ -16,9 +16,17 @@ entries:
                    (JSR (table,X)); every entry is traced.
 
 A call (JSR, JSL into $7E) is assumed to return with the widths it was
-entered with. A path that decodes BRK, COP, WDM or STP, or runs off the
-module, is dropped from the code and reported (`--anomalies`): it is a
-wrong guess at a width, or data.
+entered with, except the callees in CALL_EXITS. A path (the straight run
+from a branch point: an entry, a branch target or a call target) that
+decodes BRK, COP, WDM or STP, runs off the module or enters DATA_RANGES is
+dropped whole, back to that branch point, and reported (`--anomalies`): it
+is a wrong guess at a width, or data; so is any path that runs into a
+dropped one. Paths queued from a dropped path (its branch and call
+targets) are still traced on their own. The anomalies found so far are
+handled in CALL_EXITS ($45D6 returns with M=0, so C3Mod_Prog0's BIT at
+$3C57 is 16-bit) and DATA_RANGES (the staff text, which a JSR $B574 at
+$82A5 reaches; its path, $8280 on, is kept but looks mis-decoded: a PLB
+with no PHB follows; open).
 
 The traced instruction bytes are the module's known code; tools/progress.py
 counts the matched code against them together with any matched code the
@@ -62,6 +70,18 @@ ENTRIES = [
 # (table, entries, M=1?, X=1?, dispatcher)
 DISPATCH_TABLES = [
     (0x3043, 16, True, False, 'the programs, JSR ($3043,X) at $300A (C3_EntryArg bits 0-4)'),
+]
+# Known anomalies, handled so that the trace decodes them right:
+# callees that do not return with the widths they were entered with:
+# {address: (M=1 after?, X=1 after?)}, None = as on entry.
+CALL_EXITS = {
+    0x45D6: (False, None),      # REP #$20 at $4604, then JMP $4309, whose RTS is at M=0
+                                # (so C3Mod_Prog0's BIT #$40 at $3C57 is 16-bit)
+}
+# Data no path may enter: (first, last, what). A path that reaches it is
+# dropped as an anomaly.
+DATA_RANGES = [
+    (0xAADE, 0xB57E, 'the staff text ("EXECUTIVE PRODUCER/..." to "CODE END 7E")'),
 ]
 
 BRANCHES = {'BPL', 'BMI', 'BVC', 'BVS', 'BCC', 'BCS', 'BNE', 'BEQ'}
@@ -135,14 +155,27 @@ def trace(mem: bytes, entries=None):
         entries = [(a, m, x) for a, m, x, _ in ENTRIES] + table_entries(mem)
     insns: dict[int, Insn] = {}
     seen = set()
+    dropped = set()                     # states on a path that ended in an anomaly
+    kept = []                           # (instructions, states, the state it ran into)
     anomalies = []
+    data = {a for lo, hi, _ in DATA_RANGES for a in range(lo, hi + 1)}
     work = [(a, m, x, ()) for a, m, x in entries]
     while work:
         pc, m, x, stack = work.pop()
         path = []
         ok = True
-        while (pc, m, x) not in seen:
+        states = []
+        join = None
+        while True:
+            if (pc, m, x) in seen:
+                join = (pc, m, x)               # runs into a path traced before
+                break
             seen.add((pc, m, x))
+            states.append((pc, m, x))
+            if pc in data:
+                anomalies.append((pc, 'enters data'))
+                ok = False
+                break
             ins = decode(mem, pc, m, x)
             if ins is None:
                 anomalies.append((pc, 'runs off the module'))
@@ -172,12 +205,27 @@ def trace(mem: bytes, entries=None):
                 continue
             elif ins.mnemonic in ('JSR', 'JSL') and t is not None:
                 work.append((t, m, x, ()))
+                em, ex = CALL_EXITS.get(t, (None, None))
+                m = m if em is None else em
+                x = x if ex is None else ex
             elif ins.mnemonic in STOPS:
                 break
             pc = nxt
-        if ok or path:
-            for ins in path:
-                insns.setdefault(ins.pc, ins)
+        if ok:
+            kept.append((path, states, join))
+        else:
+            dropped.update(states)          # back to the path's start, its last branch point
+    # A path that runs into a dropped one shares its anomaly: drop it too.
+    changed = True
+    while changed:
+        changed = False
+        for item in [k for k in kept if k[2] in dropped]:
+            kept.remove(item)
+            dropped.update(item[1])
+            changed = True
+    for path, _, _ in kept:
+        for ins in path:
+            insns.setdefault(ins.pc, ins)
     return insns, anomalies
 
 

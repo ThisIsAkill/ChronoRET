@@ -57,7 +57,9 @@ incbins at $C3:1313. Nothing is rebuilt when the inputs are unchanged.
 
 import argparse
 import hashlib
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -352,48 +354,64 @@ def build(root: Path = Path('.'), quiet: bool = True) -> Path:
     bdir = root / BUILD_DIR
     key = _inputs_hash(root)
     stamp = root / STAMP
-    if (stamp.exists() and stamp.read_text() == key and (root / MODULE_LZ).exists()
-            and (root / MODULE_BIN).exists()):
+    outputs = (ROM_MODULE, MODULE_BIN, MODULE_SYM, MODULE_LZ)
+    if stamp.exists() and stamp.read_text() == key and all((root / o).exists() for o in outputs):
         return root / MODULE_LZ
     rom_path = root / ROM_PATH
     if not rom_path.exists():
         raise PackError(f'no ROM at {rom_path}: the module source incbins the bytes it does not cover')
     rom = rom_path.read_bytes()
     bdir.mkdir(parents=True, exist_ok=True)
+    stamp.unlink(missing_ok=True)       # current again only once every output is written
     original, end, _ = unpack(rom, MODULE_ROM)
     if len(original) != MODULE_SIZE or end - MODULE_ROM != MODULE_PACKED_SIZE:
         raise PackError('the ROM\'s module is not the expected one')
-    (root / ROM_MODULE).write_bytes(original)
+    _write(root / ROM_MODULE, original)
     with tempfile.TemporaryDirectory() as tmp:
-        lo, hi = Path(tmp) / 'lo.bin', Path(tmp) / 'hi.bin'
-        _assemble(root, 0x00, lo, root / MODULE_SYM)
+        lo, hi, sym = Path(tmp) / 'lo.bin', Path(tmp) / 'hi.bin', Path(tmp) / 'module.sym'
+        _assemble(root, 0x00, lo, sym)
         _assemble(root, 0xFF, hi)
-        a, b = lo.read_bytes(), hi.read_bytes()
+        a, b, symbols = lo.read_bytes(), hi.read_bytes(), sym.read_bytes()
     gaps = [i for i in range(MODULE_SIZE) if a[i] != b[i]]
     if gaps:
         raise PackError(f'{MODULE_SOURCE} leaves {len(gaps)} byte(s) unwritten, the first at '
                         f'$7E:{(MODULE_BASE + gaps[0]) & 0xFFFF:04X}')
-    (root / MODULE_BIN).write_bytes(a)
-    (root / MODULE_LZ).write_bytes(pack(a))
+    _write(root / MODULE_SYM, symbols)
+    _write(root / MODULE_BIN, a)
+    _write(root / MODULE_LZ, pack(a))
     if a != original and not quiet:
         first = next(i for i in range(MODULE_SIZE) if a[i] != original[i])
         print(f'c3pack: the module differs from the ROM\'s from $7E:{(MODULE_BASE + first) & 0xFFFF:04X} '
               f'(unpacked); the packed bytes will not match', file=sys.stderr)
-    stamp.write_text(key)
+    _write(stamp, key.encode())
     return root / MODULE_LZ
+
+
+def _write(path: Path, data: bytes) -> None:
+    """Write a file whole or not at all (a temporary file, then a rename)."""
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
 
 
 def source_bytes(root: Path = Path('.')) -> list[int]:
     """Offsets into the module of the bytes its source writes itself (not
-    incbin'd from the ROM's module): the source assembled twice, with the
-    image and the ROM's module all $00 and all $FF; the bytes that agree."""
+    incbin'd from the ROM's module): the source assembled twice, onto an
+    image all $00 and all $FF, the bytes that agree. Each assembly runs in a
+    copy of asm/ with no roms/ beside it and build/c3pack/rom_module.bin
+    (and the image the define points to) made of the fill byte, so no path
+    in the source can read the ROM's bytes there. (lint_c3module.py's
+    ROMBYTES rule keeps file reads out of the source in the first place.)"""
     ensure_built(root)
     with tempfile.TemporaryDirectory() as tmp:
+        tree = Path(tmp) / 'tree'
+        shutil.copytree(Path(root) / 'asm', tree / 'asm')
+        (tree / BUILD_DIR).mkdir(parents=True)
         built = []
         for fill in (0x00, 0xFF):
-            image, out = Path(tmp) / f'image{fill:02x}.bin', Path(tmp) / f'out{fill:02x}.bin'
+            image, out = tree / ROM_MODULE, Path(tmp) / f'out{fill:02x}.bin'
             image.write_bytes(bytes([fill]) * MODULE_SIZE)
-            _assemble(Path(root), fill, out, image=image)
+            _assemble(tree, fill, out, image=image)
             built.append(out.read_bytes())
     return [i for i in range(MODULE_SIZE) if built[0][i] == built[1][i]]
 

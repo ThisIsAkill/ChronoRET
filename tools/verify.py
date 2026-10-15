@@ -81,8 +81,16 @@ def main() -> int:
     emitted = [i for i in range(ROM_SIZE) if lo[i] == hi[i]]
     mismatched = [i for i in emitted if lo[i] != rom[i]]
 
+    # The packed $C3 module is emitted whole (bankC3.asm incbins what
+    # tools/c3pack.py packs from the module's source); it is checked like
+    # every other byte but reported apart, with how much of the unpacked
+    # module is source.
+    packed = range(c3pack.MODULE_ROM, c3pack.MODULE_ROM + c3pack.MODULE_PACKED_SIZE)
+    packed_emitted = sum(1 for i in packed if lo[i] == hi[i])
     per_bank: dict[str, int] = {}
     for i in emitted:
+        if i in packed:
+            continue
         name = bank_name(i)
         per_bank[name] = per_bank.get(name, 0) + 1
 
@@ -91,11 +99,17 @@ def main() -> int:
             'emitted_bytes': len(emitted),
             'mismatched_bytes': len(mismatched),
             'per_bank': per_bank,
+            'packed_module_bytes': packed_emitted,
             'ranges': [[s, e] for s, e in to_ranges(emitted)] if args.ranges else None,
         }, indent=2))
     else:
         for name in sorted(per_bank):
             print(f'  {name:<16} {per_bank[name]:>7,} bytes emitted by source')
+        if packed_emitted:
+            source = len(c3pack.source_bytes())
+            print(f'  {"$C3 packed":<16} {packed_emitted:>7,} bytes packed by tools/c3pack.py from the '
+                  f'module ({source:,} of its {c3pack.MODULE_SIZE:,} unpacked bytes from source, '
+                  f'the rest the ROM\'s)')
         print(f'  {"total":<16} {len(emitted):>7,} bytes')
         if args.ranges:
             for s, e in to_ranges(emitted):

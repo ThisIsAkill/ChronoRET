@@ -940,7 +940,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    C3_ScratchF0, so add entries to `tools/c3module.py` as they are found (the programs at
    `C3Mod_Prog*` set tasks up: their `LDA #addr` / `STA C3_TaskList,X` stores give the task
    entries; `$31BF` (a multiply/divide pair), `$3870` and `$37FA` are code no trace reaches
-   yet). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   yet; `JMP` byte patterns to C3Mod_TaskEnd/TaskReplace/NmiTaskEnd and `JSR`/`JSL` patterns
+   to C3Mod_AudioSend ($426D, $4BC8, $63E5), C3Mod_DoubleRows ($87B3), C3Mod_SpaceRows
+   ($8A8D) and C3Mod_UploadPalette ($8AC7, $8C97) point at more of it: once traced, the CALLERS
+   rule will want them named). Trace anomalies: `JSR $B574` at `$82A5` runs into the staff text
+   ($AADE-$B57E, `DATA_RANGES`; the path from `$8280` looks mis-decoded). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
    and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
    the module reads them. Re-review needed (verified headers edited by this batch):
