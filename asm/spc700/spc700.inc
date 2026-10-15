@@ -80,11 +80,19 @@
 !Spc_TrackWait = $26                     ; byte per track (+X): passes until the track's next step
                                          ; (Spc_InitTrack sets 1, decremented by $03A5)
 !Spc_TrackUnk27 = $27                    ; byte per track (+X): Spc_InitTrack sets it to X x 2
+!Spc_TempoWord = $46                     ; word: !Spc_Tempo ($47) with its fraction ($46), for its fade
 !Spc_Tempo = $47                         ; added to !Spc_TempoAccum each pass ($0377); a song step
                                          ; runs on the carry (inferred: tempo); 1 at a song's start
 !Spc_TempoAccum = $48                    ; the accumulator; $FF at a song's start (first pass steps)
+!Spc_SfxTempoAccum = $49                 ; the effects' accumulator: + !Spc_SfxTempo each pass, the effect
+                                         ; tracks step on the carry (Spc_StepTracks)
+!Spc_TempoFadeSteps = $4A                ; steps left of the tempo's fade (Spc_StepSongFades)
+!Spc_TempoFadeDelta = $4B                ; word: added to !Spc_TempoWord each step
 !Spc_Unk4D = $4D                         ; Spc_StartSong stores !Spc_CmdArg1 here (byte 1 of the
                                          ; song's AudioRom_SongEcho word on the 65816 side)
+!Spc_EchoVolWord = $4E                   ; word: !Spc_EchoVolume ($4F) with its fraction, for its fade
+!Spc_EchoVolDelta = $50                  ; word: its step
+!Spc_EchoVolSteps = $52                  ; steps left
 !Spc_EchoVolume = $4F                    ; source of both EVOL shadows (!Spc_EvolShadow)
 !Spc_SongTracks = $53                    ; voice bits of the tracks the song uses (set by
                                          ; Spc_StartSong from the header's pointers)
@@ -96,12 +104,20 @@
 !Spc_Unk5B = $5B                         ; voice bits; Spc_StartSfx clears the new effect's
 !Spc_Unk5C = $5C                         ; cleared at a song's start
 !Spc_Unk5D = $5D                         ; voice bits; Spc_StartSfx clears the new effect's
+!Spc_Unk5E = $5E                         ; song voices keyed on once while in !Spc_Unk5C (Spc_TrackStep)
+!Spc_Unk5F = $5F                         ; the same for effect voices (!Spc_Unk5D)
 !Spc_Unk60 = $60                         ; cleared at a song's start
 !Spc_Unk61 = $61                         ; voice bits; Spc_StartSfx clears the new effect's
 !Spc_NoiseClock = $62                    ; ORed into !Spc_FlgShadow's low 5 bits (the FLG noise
                                          ; clock) when a song is resumed
+!Spc_FirWord = $65                       ; 8 words ($65-$74): FIR0-7 with fractions (the high bytes are
+                                         ; !Spc_FirShadow), faded by Spc_StepSongFades
 !Spc_FirShadow = $66                     ; 8 words ($66-$75): FIR0-7 take the low bytes ($66, $68, ...)
 !Spc_EfbShadow = $76                     ; EFB
+!Spc_EfbWord = $75                       ; word: EFB ($76, !Spc_EfbShadow) with its fraction
+!Spc_FirSteps = $77                      ; steps left of the FIR fade
+!Spc_EfbSteps = $78                      ; steps left of the EFB fade
+!Spc_EfbDelta = $79                      ; word: the EFB step
 !Spc_Unk7B = $7B                         ; low nibble of what Spc_MainLoop writes to CPUIO2
 !Spc_Unk7C = $7C                         ; cleared at a song's start
 !Spc_CurSong = $80                       ; the song playing ($FF: none); inferred: Spc_CmdSongCheck
@@ -133,20 +149,30 @@
 !Spc_XferDest = $99                      ; word: Spc_XferMove's destination
 !Spc_Ptr93 = $93                         ; word: a pointer (Spc_StartSfx: the effect's entry in the
                                          ; table at !AudioAram_Block2F00)
+!Spc_Temp92 = $92                        ; scratch byte
 !Spc_Temp9B = $9B                        ; scratch byte
 !Spc_Temp9C = $9C                        ; scratch byte
+!Spc_Temp9D = $9D                        ; scratch byte
+!Spc_Temp9E = $9E                        ; scratch byte
+!Spc_Temp9F = $9F                        ; scratch word ($9F-$A0)
+!Spc_TempA1 = $A1                        ; scratch byte
 !Spc_Mute = $A7                          ; voice bits: song tracks on these voices get volume 0
                                          ; (Spc_Unk09F6 at $0A40); commands $F4, $F8, $F9
 !Spc_TempoAdj = $A9                      ; word: $AA = a tempo adjustment (signed; Spc_Unk0377 scales
                                          ; !Spc_Tempo by it, probably), $A9 its fraction
+!Spc_TempoAdjHi = $AA                    ; !Spc_TempoAdj's value byte (bit 7: slower)
 !Spc_TempoAdjDelta = $AB                 ; word: added to !Spc_TempoAdj each fade step
 !Spc_TempoAdjSteps = $AD                 ; fade steps left
 !Spc_PitchAdj = $AE                      ; word: $AF = the song tracks' pitch adjustment (signed;
                                          ; Spc_Unk0A78 scales the pitch by it), $AE its fraction
+!Spc_PitchAdjHi = $AF                    ; !Spc_PitchAdj's value byte (bit 7: lower)
 !Spc_SfxPitchAdj = $B1                   ; the same for effect tracks 14-15 (Spc_Unk0A78, X >= $1C)
 !Spc_PitchAdjDelta = $B2                 ; word: added to !Spc_PitchAdj each fade step
 !Spc_PitchAdjSteps = $B4                 ; fade steps left
-!Spc_Quotient = $B5                      ; word: Spc_FadeDelta's result
+!Spc_Quotient = $B5                      ; scratch word: Spc_FadeDelta's result, Spc_NotePitch's pitch,
+                                         ; the LFO step in Spc_LfoRate
+!Spc_TempB7 = $B7                        ; scratch word ($B7-$B8)
+!Spc_TempBA = $BA                        ; scratch byte (Spc_PeekNote: the track's !Spc_TrackUnk27)
 !Spc_TrackBits = $A3                     ; the voice bits a loop over tracks has still to visit
 !Spc_TempA4 = $A4                        ; scratch byte
 !Spc_TempA5 = $A5                        ; scratch byte
@@ -168,12 +194,23 @@
 !Spc_VoiceVol = $BE                      ; 16 bytes: each voice's last VOLL/VOLR (Spc_Unk09F6, $0A57)
 !Spc_UnkD3 = $D3                         ; high nibble of what Spc_MainLoop writes to CPUIO2
 !Spc_QueueEnd = $D7                      ; offset of the first free !Spc_CmdQueue entry
-!Spc_UnkD8 = $D8                         ; 2 after Spc_Start
+!Spc_UnkD8 = $D8                         ; Spc_AnimateBuiltin's position in Spc_BuiltinSampleLoop (2 after
+                                         ; Spc_Start, then 3-$23)
 !Spc_EvolShadow = $D9                    ; EVOL (left and right both)
 
 ; --- Driver RAM: page 1 (per track, +X) ---
-!Spc_Track150 = $0150                    ; word per track, cleared by Spc_InitTrack
-!Spc_Track170 = $0170                    ; word per track, cleared by Spc_InitTrack
+!Spc_Track150 = $0150                    ; word per track: low byte a pitch slide asked for (semitones,
+                                         ; taken by the next note's Spc_TrackLookAhead), high byte the
+                                         ; vibrato's depth byte (0: off)
+!Spc_Track170 = $0170                    ; word per track: low byte the tremolo's depth byte (0: off),
+                                         ; high byte nonzero: the pan LFO on
+!Spc_Page1 = $0100                       ; page 1: what P=1 direct-page operands are relative to
+!Spc_FirDelta = $0100                    ; 8 words: the FIR coefficients' steps (Spc_StepSongFades)
+!Spc_TrackUnk110 = $0110                 ; byte per effect track (+X): its index into Spc_VibDepthTable
+                                         ; (song tracks use index 0)
+!Spc_TrackVibDelay = $0111               ; byte per track (+X): passes before the vibrato starts (counted
+                                         ; down by Spc_TrackSlides with P=1; song tracks only wait)
+!Spc_TrackTremDelay = $0131              ; the same for the tremolo (all tracks)
 
 ; --- Driver RAM: work area ---
 !Spc_GroupVol = $F160                    ; 3 words: a volume for the song's tracks, for effect tracks
@@ -184,19 +221,52 @@
 !Spc_GroupFadeDelta = $F16C              ; 3 words: each group's volume step (signed, x 256)
 !Spc_CmdQueue = $F172                    ; 16 x 4 bytes: commands received while the tracks are
                                          ; stepped ($0892), run later by $08CD; id 0 = free
-!Spc_TrackF200 = $F200                   ; word per track: low byte $48 at an effect's start (Spc_StartSfx),
-                                         ; high byte the track's sample (Spc_SetTrackSample)
-!Spc_TrackF220 = $F220                   ; byte per track, Spc_StartSong sets $FF
-!Spc_TrackF240 = $F240                   ; word per track, Spc_StartSfx sets the high byte to $46
-!Spc_TrackF280 = $F280                   ; word per track, Spc_StartSfx sets the high byte to
-                                         ; !Spc_CmdArg1
-!Spc_TrackF2C0 = $F2C0                   ; word per track, cleared by Spc_StartSfx
-!Spc_TrackF300 = $F300                   ; word per track: Spc_InitTrack sets $1000
-!Spc_TrackF360 = $F360                   ; word per track: Spc_InitTrack clears the high byte
-!Spc_TrackF3A0 = $F3A0                   ; byte per track, cleared by Spc_InitTrack
-!Spc_TrackF3C0 = $F3C0                   ; word per track, cleared by Spc_InitTrack
-!Spc_TrackF4C0 = $F4C0                   ; word per track, cleared by Spc_InitTrack
-!Spc_TrackF4E0 = $F4E0                   ; byte per track, cleared by Spc_InitTrack
+!Spc_TrackF200 = $F200                   ; word per track: low byte = the note a note byte's index is
+                                         ; added to (Spc_TrackStep; $48 at an effect's start), high
+                                         ; byte the track's sample (Spc_SetTrackSample)
+!Spc_TrackF220 = $F220                   ; word per track: low byte a song track's volume scale
+                                         ; (Spc_WriteVoice; $FF at a song's start), high byte the LFO
+                                         ; stages (bits 0-2 vibrato, 4-6 tremolo; Spc_TrackEffects)
+!Spc_TrackF240 = $F240                   ; word per track: the track's volume in the high byte, a
+                                         ; fraction in the low (Spc_WriteVoice, Spc_TrackSlides); $46 at
+                                         ; an effect's start
+!Spc_TrackVolDelta = $F260              ; word per track: the volume slide's step (Spc_TrackSlides)
+!Spc_TrackF280 = $F280                   ; word per track: the pan in the high byte ($80: centre;
+                                         ; Spc_WriteVoice), a fraction in the low; an effect starts
+                                         ; with !Spc_CmdArg1
+!Spc_TrackPanDelta = $F2A0              ; word per track: the pan slide's step
+!Spc_TrackF2C0 = $F2C0                   ; word per track: steps left of the volume slide (low) and of
+                                         ; the pan slide (high) (Spc_TrackSlides)
+!Spc_TrackVibTimer = $F2E0              ; word per track: the vibrato rate's reload (low) and counter
+                                         ; (high) (Spc_TrackEffects)
+!Spc_TrackF300 = $F300                   ; word per track: the vibrato's depth in pitch units, set at
+                                         ; each note (Spc_TrackStep); Spc_InitTrack sets $1000
+!Spc_TrackTremTimer = $F320             ; word per track: the tremolo rate's reload and counter
+!Spc_TrackPanLfoTimer = $F340           ; word per track: the pan LFO's reload and counter
+!Spc_TrackF360 = $F360                   ; word per track: low byte the pitch slide's steps, high byte
+                                         ; a transpose in semitones (Spc_TrackStep); Spc_InitTrack
+                                         ; clears the transpose
+!Spc_TrackTuning = $F380                ; word per track: the sample's ParamA word (Spc_SetTrackSample),
+                                         ; its tuning in Spc_NotePitch
+!Spc_TrackF3A0 = $F3A0                   ; word per track: low byte a fine tune added to the tuning
+                                         ; (Spc_NotePitch), high byte the note playing
+!Spc_TrackF3C0 = $F3C0                   ; word per track: the pitch slide's step, bits 8-23 (bits 0-7
+                                         ; in !Spc_TrackF4E0's low byte)
+!Spc_TrackPanLfoDelta = $F3E0           ; word per track: the pan LFO's step (its sign flips at each turn)
+!Spc_TrackVibRate = $F400               ; word per track: the vibrato's base rate (Spc_LfoRate)
+!Spc_TrackVibStep = $F420               ; word per track: the vibrato's step now
+!Spc_TrackTremRate = $F440              ; word per track: the tremolo's base rate
+!Spc_TrackTremStep = $F460              ; word per track: the tremolo's step now
+!Spc_TrackVibPhase = $F480              ; word per track: the vibrato's phase
+!Spc_TrackTremPhase = $F4A0             ; word per track: the tremolo's phase
+!Spc_TrackF4C0 = $F4C0                   ; word per track: the pan LFO's value (high byte added to the pan
+                                         ; in Spc_WriteVoice)
+!Spc_TrackF4E0 = $F4E0                   ; word per track: low byte the pitch slide step's bits 0-7,
+                                         ; high byte the pitch's fraction
+!Spc_TrackVibOffset = $F500             ; word per track: the vibrato's pitch offset now
+!Spc_TrackPitch = $F520                 ; word per track: the note's pitch (DSP pitch units), slides
+                                         ; included
+!Spc_TrackAdsr = $F540                  ; word per track: the sample's ParamB word (ADSR1/ADSR2)
 
 ; --- Values ---
 !Spc_StackTop = $FF                      ; SP at Spc_Start and at each song start (stack $01FF down)
@@ -258,6 +328,32 @@
 !Spc_BuiltinParamB1 = $E0                ; envelope on, fastest attack and decay)
 !Spc_SfxEntry = 4                        ; bytes per entry of the effect table at $2F00: two track
                                          ; pointers
+!Spc_TempoMax = $FF                      ; a raised tempo is capped here
+!Spc_SfxTempo = $81                      ; added to !Spc_SfxTempoAccum each pass: effects step on about
+                                         ; half the passes
+!Spc_TrackFirstSfx = $10                 ; X of the first effect track (8)
+!Spc_TrackSfxStep = $18                  ; X of the first effect track Spc_StepTracks steps (12: voices
+                                         ; 4-7 are the only ones effects use)
+!Spc_TrackSfxA = $1C                     ; X of track 14, the first of !Spc_SfxPitchAdj's tracks
+!Spc_VoiceBit4 = $10                     ; voice 4's bit
+!Spc_SeqFirstTie = $A8                   ; sequence bytes: $00-$A7 notes, $A8-$B5 ties, $B6-$C3 rests,
+!Spc_SeqFirstRest = $B6                  ; $C4-$FF commands (each with its length: byte % 14)
+!Spc_SeqFirstCmd = $C4
+!Spc_SeqEndTrack = $EB                   ; the command that ends a track (Spc_PeekNote stops on it)
+!Spc_NumDurations = $0E                  ; lengths per note value (Spc_DurationTable)
+!Spc_NotesPerOctave = $0C
+!Spc_NoteBase = $0A                      ; subtracted from base + index + transpose
+!Spc_FirBytes = $10                      ; 8 FIR words
+!Spc_VibStageMask = $07                  ; !Spc_TrackF220 high byte: the vibrato's stage
+!Spc_TremStageMask = $70                 ; ... and the tremolo's
+!Spc_LfoShape80 = $80                    ; depth bytes from here use Spc_LfoRate's second shape
+!Spc_LfoShapeC0 = $C0                    ; ... and from here the third
+!Spc_PanCentre = $80                     ; the pan with !Spc_Flags87 bit 0 (mono)
+!Spc_VolMax = $7F                        ; a tremolo-raised volume that overflows is capped here
+!Spc_BuiltinFirst = $03                  ; !Spc_UnkD8 runs from here (2 x the byte index in
+!Spc_BuiltinLast = $23                   ; Spc_BuiltinSampleLoop, nibble in bit 0) up to here
+!Spc_BuiltinFlip = $70                   ; XORed into the byte (swapped for the low nibble)
+!Spc_BrrBlock = $09                      ; bytes per BRR block (its header byte is skipped)
 
 ; Commands (!Spc_CmdId; the 65816 side's numbering, Audio_RunCommand)
 !SpcCmd_FirstSong = $10                  ; $10-$1F: Spc_CmdTable10 (and Spc_CmdFirstTable10)
