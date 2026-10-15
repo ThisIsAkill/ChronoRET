@@ -376,8 +376,14 @@ as "events", never as source, with how much is disassembled.
   `$B8`'s pointer as the message table's label (all 416 of them), bytes no opcode reaches as
   `@bytes`, and an opcode a jump reaches inside another's operands as an `@inner` line.
 - **Results.** 461 of 462 packs disassemble and assemble back byte-exact (the 462nd is empty):
-  142,406 opcodes; of the 568,478 unpacked bytes 565,436 are code and headers and 3,042 bytes
+  142,701 opcodes; of the 568,478 unpacked bytes 566,815 are code and headers and 1,663 bytes
   are never reached by an opcode (data).
+- **Not pinned down:** the walking and following opcodes (`$8F`, `$94`-`$9A`, `$9E`-`$A1`) call
+  object searches through a dispatch on game state that the interpreter cannot follow; on that
+  path the next position is unknown (their other paths give their length and wait), so it adds
+  nothing to the disassembly. The same holds for some `$FF` sub-opcodes and the menu, sound and
+  sprite callees of `$29`, `$82`, `$83`, `$AF`/`$B0`, `$CF`-`$D7`, `$E8`-`$EC` and `$F8`-`$FA`,
+  whose handlers keep the script position in direct page or on the stack around the call.
 - **Left:** the battle scripts, the scene scripts and the music sequences (step 7); a
   message's string number is still a number (the text units' strings have no names yet).
 

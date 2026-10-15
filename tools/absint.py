@@ -563,14 +563,24 @@ class Machine:
         if mn in ('AND', 'ORA', 'EOR'):
             v = operand_value(wm)
             s.at = s.at | operand_taint(wm)
-            acc = self.get_a(s)
-            if mn == 'AND' and (v == 0 or acc == 0):
-                r = 0
-            elif acc is None or v is None:
-                r = None
-            else:
-                r = {'AND': acc & v, 'ORA': acc | v, 'EOR': acc ^ v}[mn]
-            self.set_a(s, r)
+            # byte by byte: an AND with a zero byte, or an ORA with $FF, is
+            # known whatever the other byte is
+            regs = [s.a, s.b] if wm else [s.a]
+            vals = [None if v is None else v & 0xFF, None if v is None else v >> 8 & 0xFF][:len(regs)]
+            res = []
+            for x, y in zip(regs, vals):
+                if mn == 'AND' and (x == 0 or y == 0):
+                    res.append(0)
+                elif mn == 'ORA' and (x == 0xFF or y == 0xFF):
+                    res.append(0xFF)
+                elif x is None or y is None:
+                    res.append(None)
+                else:
+                    res.append({'AND': x & y, 'ORA': x | y, 'EOR': x ^ y}[mn])
+            s.a = res[0]
+            if wm:
+                s.b = res[1]
+            r = None if None in res else res[0] | (res[1] << 8 if wm else 0)
             self.flags_nz(s, r, wm)
             return None
         if mn in ('CMP', 'CPX', 'CPY'):
