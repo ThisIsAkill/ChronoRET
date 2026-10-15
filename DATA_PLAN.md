@@ -262,8 +262,9 @@ None found beyond what is already known:
   its unpacked bytes, 18 in its packed literals); seven other places have one each (five in
   packed streams, one in an unpacked sprite pack, one in a sample). Chance alone gives about
   14: about 7.9 million bytes scanned (3.9 M raw, 4.0 M unpacked) x 2/256 (the two opcodes) x
-  3,736/2^24 (the share of 24-bit targets that are routine entries). Seven is below that, so
-  nothing points at hidden code. The code survey's check that no instruction of matched code
+  3,736/2^24 (the share of 24-bit targets that are routine entries). Seven is within what chance
+  gives, so this scan finds no sign of hidden code; it cannot prove there is none (see the limits
+  below). The code survey's check that no instruction of matched code
   reaches an unmatched byte also covers the raw bytes; its further claim that routine-shaped
   runs in unmatched ROM are no longer than 19 instructions (PR #106) was not re-checked here.
 - A limit no static scan removes: code reached only through a RAM pointer loaded from data (a
