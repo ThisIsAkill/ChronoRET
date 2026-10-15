@@ -492,7 +492,8 @@ WinFx_FillEmptyFrom:                    ; header: see WinFx_FillEmpty
 ; ($7E/$7F: STA.l + MVN), the steps read and write with DB =
 ; WinFx_C3ETableBank and WMADDH = it (so it must be $7E or $7F).
 ; Callers (1 JMP site): BankC3_Entry000E ($C3:000E).
-; Callers note: the unpacked module JSLs here directly (from $7E:6844).
+; Callers note: the unpacked module JSLs here directly (from $7E:6844,
+;   C3Mod_Prog3WipeTask, a task: M=0, DB=$00).
 ; Entry: M, X any (P saved; REP #$30 here); DP any and DB any (saved;
 ;        DP_WinFx inside); WinFx_C3EMode, WinFx_C3ETablePtr/TableBank
 ;        set; C3_RandomByte needs DB=$00 or another bank that maps the

@@ -9,8 +9,6 @@
 ; has not been traced).
 %C3ModOrg($7E6B04)
 C3Mod_Prog1:
-%C3ModOrg($7E671F)
-C3Mod_Prog3:
 %C3ModOrg($7E7092)
 C3Mod_Prog5:
 %C3ModOrg($7E78DD)
@@ -26,6 +24,14 @@ C3Mod_Prog13:
 ; names, by address (what they are has not been traced).
 %C3ModOrg($7E89ED)
 C3Mod_Unk89ED:
+%C3ModOrg($7E73C6)
+C3Mod_Unk73C6:
+%C3ModOrg($7E7441)
+C3Mod_Unk7441:
+%C3ModOrg($7E783C)
+C3Mod_Unk783C:
+%C3ModOrg($7E7841)
+C3Mod_Unk7841:
 %C3ModOrg($7E8752)
 C3Mod_Unk8752:
 %C3ModOrg($7E8772)

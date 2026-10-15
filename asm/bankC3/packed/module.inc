@@ -721,6 +721,46 @@ endmacro
 !C3_SparkDelayMask = $3F
 !C3_SparkLife = $0A
 !C3_SparkTile0 = $80
+; Program 3 (the field's picture waved and wiped).
+!WinFx_StepWipe = $C301E4                ; bankC3.asm: one frame of the per-line wipe (JSL)
+!C3_OffsetTable = $0043                  ; 2 rows of 32 words: mode 2's offset-per-tile table
+!C3_OffsetTableBytes = $0080
+!C3_OffsetTableHalf = $0020              ; the first 16 words
+!C3_OffsetTableRow = $0040               ; a row (32 words)
+!C3_Prog3Bg3Hofs = $003D                 ; 16-bit: BG3HOFS (C3Mod_Prog3NmiTask)
+!C3_Prog3Bg2Vofs = $003F                 ; 16-bit: BG2VOFS from line 70 (HDMA channel 2)
+!C3_Unk3B = $3B                          ; dp: C3Mod_Prog3 adds 1 (read by code not matched yet)
+!C3_MosaicTimer = $C3                    ; dp, 8-bit: frames to the next mosaic step
+!C3_MosaicSize = $C4                     ; dp, 8-bit: the mosaic size left
+!C3_MosaicFrames = $14
+!C3_Prog3Wave = $00                      ; page $0B00's var 0 in program 3: the wave's size
+!C3_Prog3ScrollY = $02                   ; var 1: BG1VOFS
+!C3_Prog3Bg2Line = $04                   ; var 2: BG2VOFS x 4 (counts down)
+!C3_Prog3WaveMask = $0007
+!C3_Prog3Ones = $1400                    ; $7E:1400-$167F: words $0100
+!C3_Prog3OnesBytes = $0280
+!C3_Prog3MapSave = $6140                 ; VRAM word of the field's map copied ...
+!C3_Prog3MapCopy = $1680                 ; ... to $7E:1680
+!C3_Prog3MapBytes = $0580
+!C3_Prog3Tiles = $11                     ; BG12NBA: BG1 and BG2 tiles at VRAM word $1000
+!C3_Prog3Unk7442 = $1C                   ; written over C3Mod_Unk7441's operand
+!C3_Prog3Windows = $33                   ; W12SEL: window 1 on BG1 and BG2, inverted
+!C3_Prog3WindowsWipe = $FF               ; ... both windows on both, inverted
+!C3_WipeFadeStep1 = 6                    ; C3Mod_Prog3FadeTask1's step in the wipe run
+!C3_WipeFadeStep2 = 8                    ; ... Task2's and Task3's
+!C3_Prog3HdmaOn = $000E                  ; C3_HdmaEnable: channels 1-3
+!C3_Prog3HdmaWipe = $000F                ; ... and 0 (the window)
+!C3_Prog3BgMode = $02                    ; BGMODE 2
+!C3_Prog3Sub = $12                       ; TS: BG2 and the sprites
+!C3_Prog3Window1 = $F808                 ; WH0 = 8, WH1 = $F8
+!C3_Prog3Window2Right = $FF              ; WH3
+!C3_Prog3WipeTable = $F1C4                    ; $7E: WinFx_StepWipe's table (two buffers of WinFx_Lines)
+!C3_LineShift = $F000                    ; $7E: 224 BG1HOFS words (C3Mod_LineShiftTask)
+!C3_LineShiftBytes = $01C0
+!BBAD_BG2SC = $08                        ; B-bus address of BG2SC ($2108)
+!C3_Prog3Colours0 = $20                  ; C3Mod_Prog3PalAnims: record 0's first colour ...
+!C3_Prog3Colours1 = $50                  ; ... record 1's
+!C3_Prog3AnimColours = $20               ; ... and how many
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
