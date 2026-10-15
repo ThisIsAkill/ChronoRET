@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $E4:0000-$E4:1FFF (8,192 B), table, confirmed: anim tables: word offset table at $E4:0000,
@@ -291,13 +291,13 @@ BattleRom_SprFramesPtr:
 ; Read by Battle_InitScene, Menu_SprLoad.
 org $E42600
 BattleRom_SprAnimFrames:
-    incbin "../../build/assets/table/BattleRom_SprAnimFrames.bin"
+    incbin "../../build/records/BattleRom_SprAnimFrames.bin"          ; records: table 256 x 2 B
 
 ; $E4:2800-$E4:29FF (512 B), table, confirmed: 256 u16 offsets of animation duration lists
 ; Read by Battle_InitScene, Menu_SprLoad.
 org $E42800
 BattleRom_SprAnimDurs:
-    incbin "../../build/assets/table/BattleRom_SprAnimDurs.bin"
+    incbin "../../build/records/BattleRom_SprAnimDurs.bin"          ; records: table 256 x 2 B
 
 ; $E4:2A00-$E4:2FFF (1,536 B), palette, probable: u16 offsets per sprite set, then 12-colour
 ; palettes (BGR555)
@@ -330,18 +330,24 @@ Padding_E4F522:
     fillbyte $00
     fill 222
 
-; $E4:F600-$E4:FFDF (2,528 B), table, confirmed: 10 B per enemy sprite record
+; $E4:F600-$E4:FFD7 (2,520 B), table, confirmed: 10 B per enemy sprite record
 ; Read by Evt_Op83_InitEnemySprite, Battle_InitScene.
 ; Also BattleRom_EnemySpr (a struct or label of the code source).
 org $E4F600
 RomE4_EnemySprRec:
-    incbin "../../build/assets/table/RomE4_EnemySprRec.bin"
+    incbin "../../build/records/RomE4_EnemySprRec.bin"          ; records: table 252 x 10 B
+
+; $E4:FFD8-$E4:FFDF (8 B), unknown, unknown: 8 B after RomE4_EnemySprRec (not read as its
+; records)
+org $E4FFD8
+Unknown_E4FFD8:
+    incbin "../../build/assets/unknown/Unknown_E4FFD8.bin"
 
 ; $E4:FFE0-$E4:FFED (14 B), table, confirmed: 7 u16: low words of the bank-$E4 table pointers
 ; Read by Field_InitLoadState, Menu_SprLoad.
 org $E4FFE0
 Table_E4FFE0:
-    incbin "../../build/assets/table/Table_E4FFE0.bin"
+    incbin "../../build/records/Table_E4FFE0.bin"          ; records: table 7 x 2 B
 
 ; $E4:FFEE-$E4:FFFF (18 B), padding, confirmed: 18 x $00
 org $E4FFEE

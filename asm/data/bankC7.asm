@@ -7,16 +7,16 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $C7:0E11-$C7:1870 (2,656 B), table, confirmed: 83 x 16 words: sample numbers per song
 ; Read by Audio_CmdLoadSong, Audio_LoadNewSamples.
 org $C70E11
 AudioRom_SongSamples:
-    incbin "../../build/assets/table/AudioRom_SongSamples.bin"
+    incbin "../../build/records/AudioRom_SongSamples.bin"          ; records: table 83 x 32 B
 
 ; $C7:1871-$C7:241C (2,988 B), table, confirmed: 83 x 36 B sent to ARAM $F120
 ; Read by Audio_SendSongData.
@@ -28,7 +28,7 @@ AudioRom_SongExtra:
 ; Read by Audio_SetEchoDelay.
 org $C7241D
 AudioRom_SongEcho:
-    incbin "../../build/assets/table/AudioRom_SongEcho.bin"
+    incbin "../../build/records/AudioRom_SongEcho.bin"          ; records: table 83 x 2 B
 
 ; $C7:40B4-$C7:42B6 (515 B), brr_sample, confirmed: u16 length + bytes for ARAM $4700: the
 ; built-in sample (513 B = 57 BRR blocks; Spc_BuiltinDir)

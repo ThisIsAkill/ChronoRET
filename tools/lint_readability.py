@@ -30,9 +30,10 @@ asm/include/ and are exempt):
          %C3ModRomBytes) and the data layer's assets: in
          asm/data/bankXX.asm only, a line that is exactly
          `incbin "../../build/assets/<kind>/<label>.bin"`,
-         `incbin "../../build/packs/<label>.lz"` or
+         `incbin "../../build/packs/<label>.lz"`,
          `incbin "../../build/text/<label>.bin"` (text tools/text.py
-         encodes) for a piece of bank $XX
+         encodes) or `incbin "../../build/records/<label>.bin"` (tables
+         and palettes tools/records.py encodes) for a piece of bank $XX
          that the manifest symbols/data_assets.csv lists, once each; the
          manifest itself must be well formed and exactly what
          tools/extract_data.py makes from symbols/data_survey.csv (so no

@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $FE:0000-$FE:00DD (222 B), table, confirmed: 73 x 3 B long pointers + $000000 end
@@ -213,7 +213,7 @@ C3Pack_017:
 ; Read by the $C3 module (C3_CopyFEto7E/7F MVN from bank $FE).
 org $FE4B7A
 Palette_FE4B7A:
-    incbin "../../build/assets/palette/Palette_FE4B7A.bin"
+    incbin "../../build/records/Palette_FE4B7A.bin"          ; records: palette 96 x 2 B
 
 ; $FE:4C3A-$FE:5306 (1,741 B), packed_lz, confirmed: lz12 -> 2048 B: data for the $C3 module
 ; (graphics, tile maps, tables; PR #106)
@@ -324,7 +324,7 @@ C3Pack_036:
 ; Read by the $C3 module (C3_CopyFEto7E/7F MVN from bank $FE).
 org $FE8D15
 Palette_FE8D15:
-    incbin "../../build/assets/palette/Palette_FE8D15.bin"
+    incbin "../../build/records/Palette_FE8D15.bin"          ; records: palette 16 x 2 B
 
 ; $FE:8D35-$FE:9EB0 (4,476 B), packed_lz, confirmed: lz12 -> 6144 B: data for the $C3 module
 ; (graphics, tile maps, tables; PR #106)
@@ -400,4 +400,4 @@ C3Pack_047:
 ; Read by the $C3 module (C3_CopyFEto7E/7F MVN from bank $FE).
 org $FEF91E
 Palette_FEF91E:
-    incbin "../../build/assets/palette/Palette_FEF91E.bin"
+    incbin "../../build/records/Palette_FEF91E.bin"          ; records: palette 881 x 2 B

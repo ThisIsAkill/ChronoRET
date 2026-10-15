@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $CD:4000-$CD:4014 (21 B), table, confirmed: 21 B: PC attack script header
@@ -18,7 +18,7 @@
 ; Also BattleRom_PcAttackScript (a struct or label of the code source).
 org $CD4000
 Table_CD4000:
-    incbin "../../build/assets/table/Table_CD4000.bin"
+    incbin "../../build/records/Table_CD4000.bin"          ; records: table 1 x 21 B
 
 ; $CD:4015-$CD:451E (1,290 B), table, confirmed: 15 B per PC attack record: far, near and
 ; alternate (gfx A, gfx B, frames, palette, object)
@@ -26,7 +26,7 @@ Table_CD4000:
 ; Also BattleRom_PcAttackAct (a struct or label of the code source).
 org $CD4015
 Table_CD4015:
-    incbin "../../build/assets/table/Table_CD4015.bin"
+    incbin "../../build/records/Table_CD4015.bin"          ; records: table 86 x 15 B
 
 ; $CD:451F-$CD:45A5 (135 B), padding, probable: 135 x $00
 org $CD451F
@@ -40,7 +40,7 @@ Padding_CD451F:
 ; Also BattleRom_PcTechAct (a struct or label of the code source).
 org $CD45A6
 Table_CD45A6:
-    incbin "../../build/assets/table/Table_CD45A6.bin"
+    incbin "../../build/records/Table_CD45A6.bin"          ; records: table 128 x 7 B
 
 ; $CD:4926-$CD:4F25 (1,536 B), table, confirmed: 6 B per !Battler_Unk984D value: enemy attack
 ; records (two attacks)
@@ -48,7 +48,7 @@ Table_CD45A6:
 ; Also BattleRom_EnemyAttackAct (a struct or label of the code source).
 org $CD4926
 Table_CD4926:
-    incbin "../../build/assets/table/Table_CD4926.bin"
+    incbin "../../build/records/Table_CD4926.bin"          ; records: table 256 x 6 B
 
 ; $CD:4F26-$CD:5525 (1,536 B), table, confirmed: enemy second-attack records
 ; (BattleRom_EnemyAttack2Act struct)
@@ -56,7 +56,7 @@ Table_CD4926:
 ; Also BattleRom_EnemyAttack2Act (a struct or label of the code source).
 org $CD4F26
 Table_CD4F26:
-    incbin "../../build/assets/table/Table_CD4F26.bin"
+    incbin "../../build/records/Table_CD4F26.bin"          ; records: table 256 x 6 B
 
 ; $CD:5526-$CD:5C25 (1,792 B), table, confirmed: enemy tech action records
 ; (BattleRom_EnemyTechAct struct)
@@ -64,7 +64,7 @@ Table_CD4F26:
 ; Also BattleRom_EnemyTechAct (a struct or label of the code source).
 org $CD5526
 Table_CD5526:
-    incbin "../../build/assets/table/Table_CD5526.bin"
+    incbin "../../build/records/Table_CD5526.bin"          ; records: table 256 x 7 B
 
 ; $CD:5C26-$CD:5E01 (476 B), table, confirmed: 7 B per !Battle_ActId - $BC (68 ids up to $FF):
 ; kind-3 action records
@@ -72,7 +72,7 @@ Table_CD5526:
 ; Also BattleRom_Kind3Act (a struct or label of the code source).
 org $CD5C26
 Table_CD5C26:
-    incbin "../../build/assets/table/Table_CD5C26.bin"
+    incbin "../../build/records/Table_CD5C26.bin"          ; records: table 68 x 7 B
 
 ; $CD:5E02-$CD:5EC5 (196 B), padding, confirmed: 196 x $FF
 org $CD5E02
@@ -120,49 +120,49 @@ BattleRom_Kind3Scripts:
 ; Read by BattleAct_LoadAttack.
 org $CD64B0
 BattleRom_PcAttackObjs:
-    incbin "../../build/assets/table/BattleRom_PcAttackObjs.bin"
+    incbin "../../build/records/BattleRom_PcAttackObjs.bin"          ; records: table 95 x 2 B
 
 ; $CD:656E-$CD:666D (256 B), table, confirmed: u16 per object index: object-record offset in
 ; bank $CE
 ; Read by BattleAct_LoadKind3, BattleAct_LoadTech.
 org $CD656E
 BattleRom_TechObjs:
-    incbin "../../build/assets/table/BattleRom_TechObjs.bin"
+    incbin "../../build/records/BattleRom_TechObjs.bin"          ; records: table 128 x 2 B
 
 ; $CD:666E-$CD:686D (512 B), table, confirmed: u16 per object index: object-record offset in
 ; bank $CE
 ; Read by BattleAct_LoadAttack, BattleAct_LoadTech.
 org $CD666E
 BattleRom_EnemyActObjs:
-    incbin "../../build/assets/table/BattleRom_EnemyActObjs.bin"
+    incbin "../../build/records/BattleRom_EnemyActObjs.bin"          ; records: table 256 x 2 B
 
 ; $CD:686E-$CD:692B (190 B), table, confirmed: u16 per palette index (95): palette-step offset
 ; in bank $CD ($FFFF none)
 ; Read by BattleAct_LoadAttack.
 org $CD686E
 BattleRom_PcAttackPals:
-    incbin "../../build/assets/table/BattleRom_PcAttackPals.bin"
+    incbin "../../build/records/BattleRom_PcAttackPals.bin"          ; records: table 95 x 2 B
 
 ; $CD:692C-$CD:6A2B (256 B), table, confirmed: u16 per palette index: palette-step offset in
 ; bank $CD
 ; Read by BattleAct_LoadTech.
 org $CD692C
 BattleRom_PcTechPals:
-    incbin "../../build/assets/table/BattleRom_PcTechPals.bin"
+    incbin "../../build/records/BattleRom_PcTechPals.bin"          ; records: table 128 x 2 B
 
 ; $CD:6A2C-$CD:6C2B (512 B), table, confirmed: u16 per palette index (256): palette-step offset
 ; in bank $CD ($FFFF none)
 ; Read by BattleAct_LoadAttack, BattleAct_LoadTech.
 org $CD6A2C
 BattleRom_EnemyActPals:
-    incbin "../../build/assets/table/BattleRom_EnemyActPals.bin"
+    incbin "../../build/records/BattleRom_EnemyActPals.bin"          ; records: table 256 x 2 B
 
 ; $CD:6C2C-$CD:6CEB (192 B), table, confirmed: u16 per palette index (96): palette-step offset
 ; in bank $CD ($FFFF none)
 ; Read by BattleAct_LoadKind3.
 org $CD6C2C
 BattleRom_Kind3Pals:
-    incbin "../../build/assets/table/BattleRom_Kind3Pals.bin"
+    incbin "../../build/records/BattleRom_Kind3Pals.bin"          ; records: table 96 x 2 B
 
 ; $CD:6CEC-$CD:6D4B (96 B), table, confirmed: 1 B per weapon id: its !BattleRom_WeaponColours
 ; record
@@ -170,19 +170,19 @@ BattleRom_Kind3Pals:
 org $CD6CEC
 BattleRom_WeaponColourIdx:
 MenuRom_WeaponUnkIdx:
-    incbin "../../build/assets/table/BattleRom_WeaponColourIdx.bin"
+    incbin "../../build/records/BattleRom_WeaponColourIdx.bin"          ; records: table 96 x 1 B
 
 ; $CD:6D4C-$CD:6DAB (96 B), table, confirmed: 1 B per PC attack record: sound id (opcode $7C)
 ; Read by BattleAct_OpPcAttackSfxA.
 org $CD6D4C
 BattleRom_PcAttackSfxA:
-    incbin "../../build/assets/table/BattleRom_PcAttackSfxA.bin"
+    incbin "../../build/records/BattleRom_PcAttackSfxA.bin"          ; records: table 96 x 1 B
 
 ; $CD:6DAC-$CD:6E0B (96 B), table, confirmed: 1 B per PC attack record: sound id (opcode $7D)
 ; Read by BattleAct_OpPcAttackSfxB.
 org $CD6DAC
 BattleRom_PcAttackSfxB:
-    incbin "../../build/assets/table/BattleRom_PcAttackSfxB.bin"
+    incbin "../../build/records/BattleRom_PcAttackSfxB.bin"          ; records: table 96 x 1 B
 
 ; $CD:6E0C-$CD:96F9 (10,478 B), battle_script, confirmed: action scripts (BattleAct opcodes
 ; $00-$DA)

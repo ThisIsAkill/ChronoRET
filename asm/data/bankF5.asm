@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $F5:0000-$F5:029F (672 B), packed_lz, confirmed: lz11 -> 1726 B: location map: MapProps header
@@ -274,7 +274,7 @@ Unknown_F5EE02:
 ; Read by Map_LoadTreasureTiles.
 org $F5F000
 TreasureRom_LocOfs:
-    incbin "../../build/assets/table/TreasureRom_LocOfs.bin"
+    incbin "../../build/records/TreasureRom_LocOfs.bin"          ; records: table 513 x 2 B
 
 ; $F5:F402-$F5:F7E5 (996 B), map, confirmed: 249 x 4 B treasure records (TreasureRom struct)
 ; Read by Field_CheckTileInFront, Map_LoadTreasureTiles.

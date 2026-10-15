@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $E1:0000-$E1:00A9 (170 B), packed_lz, confirmed: lz12 -> 192 B: object sprite tile graphics
@@ -124,7 +124,7 @@ Padding_E1DE2C:
 ; Read by BattleMenu_UpdateCursorOverlay.
 org $E1DE80
 BattleRom_UnkE1DE80:
-    incbin "../../build/assets/table/BattleRom_UnkE1DE80.bin"
+    incbin "../../build/records/BattleRom_UnkE1DE80.bin"          ; records: table 251 x 1 B
 
 ; $E1:DF7B-$E1:DFFF (133 B), padding, probable: 133 x $00
 org $E1DF7B

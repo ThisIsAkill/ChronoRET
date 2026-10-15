@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $D0:0000-$D0:DEBF (57,024 B), graphics, confirmed: action graphics source tiles (2bpp, some
@@ -84,19 +84,19 @@ Padding_D0F98F:
 ; Read by BattleFx_LoadBgSet.
 org $D0FA00
 BattleRom_BgSetPalettes:
-    incbin "../../build/assets/palette/BattleRom_BgSetPalettes.bin"
+    incbin "../../build/records/BattleRom_BgSetPalettes.bin"          ; records: palette 241 x 2 B
 
 ; $D0:FBE2-$D0:FCFF (286 B), palette, confirmed: 9 sets of 14 colours, $20 apart
 ; Read by BattleFx_FindGradStart, BattleFx_HpGradientTick.
 org $D0FBE2
 BattleRom_GradColours:
-    incbin "../../build/assets/palette/BattleRom_GradColours.bin"
+    incbin "../../build/records/BattleRom_GradColours.bin"          ; records: palette 143 x 2 B
 
 ; $D0:FD00-$D0:FD5F (96 B), palette, confirmed: 48 colours (BGR555)
 ; Read by BattleFx_LoadBgRows2To4.
 org $D0FD00
 Palette_D0FD00:
-    incbin "../../build/assets/palette/Palette_D0FD00.bin"
+    incbin "../../build/records/Palette_D0FD00.bin"          ; records: palette 48 x 2 B
 
 ; $D0:FD60-$D0:FFFF (672 B), padding, confirmed: 672 x $FF
 org $D0FD60

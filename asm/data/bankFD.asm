@@ -7,9 +7,9 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text it encodes into
-; build/text/ (symbols/data_assets.csv lists them; nothing here
-; is ROM data).
+; makes from one in build/packs/, or text or records it encodes
+; into build/text/ and build/records/ (symbols/data_assets.csv
+; lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $FD:0000-$FD:0235 (566 B), packed_lz, confirmed: lz11 -> 1024 B: data for the $C3 module
@@ -275,7 +275,7 @@ BattleRom_PcStatBlock:
 ; BattleSys_UpdateKo.
 org $FDA849
 BattleRom_CmdPtr:
-    incbin "../../build/assets/table/BattleRom_CmdPtr.bin"
+    incbin "../../build/records/BattleRom_CmdPtr.bin"          ; records: table 3 x 2 B
 
 ; $FD:A84F-$FD:A89C (78 B), table, confirmed: 2 B per PC slot: Tech_MenuEntry block address
 ; Read by BattleSys_UnkC96A, BattleSys_UnkCA1A, BattleSys_UnkCCCB.
@@ -288,4 +288,4 @@ BattleRom_TechEntryPtr:
 ; Read by BattleSys_UnkC96A.
 org $FDA89D
 BattleRom_CharFirstTech:
-    incbin "../../build/assets/table/BattleRom_CharFirstTech.bin"
+    incbin "../../build/records/BattleRom_CharFirstTech.bin"          ; records: table 8 x 1 B
