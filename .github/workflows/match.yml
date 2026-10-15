@@ -23,6 +23,14 @@ jobs:
         run: python3 tools/validate_functions.py
       - name: Generated files stay untracked, docs carry no generated numbers
         run: python3 tools/progress.py --check
+      # The data layer without assets: the manifest is what
+      # tools/extract_data.py makes from the survey, asm/data/ matches it
+      # (the pointer tables' entries are compared in the match job), and the
+      # lint's planted-read tests.
+      - name: Data layer manifest and placement (no ROM)
+        run: |
+          python3 tools/extract_data.py check
+          python3 tools/test_data_layer.py
 
   match:
     name: Reassemble and diff
@@ -96,6 +104,13 @@ jobs:
       - name: Check environment
         if: env.SKIP_CHECK != '1'
         run: python3 tools/check_env.py
+
+      # The data the source does not emit comes from the ROM, extracted
+      # into the ignored build/assets/ (never committed); the build then
+      # assembles from the source and those assets onto a blank image.
+      - name: Extract the data layer's assets from the ROM
+        if: env.SKIP_CHECK != '1'
+        run: python3 tools/extract_data.py extract
 
       - name: Build and diff
         if: env.SKIP_CHECK != '1'

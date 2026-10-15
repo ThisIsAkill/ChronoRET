@@ -193,6 +193,54 @@ binary unless an editor-friendly form is wanted.
 that no longer decodes, old strings, a song no table reaches). They stay raw blobs with their
 own labels; 1 session to re-check each with an emulator trace.
 
+## Where the data layer stands (steps 2-4)
+
+Done on the `data-packs` branch. `make build` no longer starts from a copy of the ROM:
+`tools/build_rom.py` extracts the assets (`tools/extract_data.py extract`, into the ignored
+`build/assets/`, checked against `rom.sha256`), packs the module and the 1,515 data packs from
+their unpacked assets (cached per pack by asset, mode and packer), and assembles `asm/rom.asm`
+(`asm/main.asm`, then the generated `asm/data/`) onto blank `$00` and `$FF` images, which must
+be identical. The placement is generated from this survey and committed: per bank, one piece
+per row (a pointer-table row with a partial last entry is two), each with an `org` and a label
+(the survey's name, else the pointer table and entry that reach it, a sample or song number, or
+kind and address). `symbols/data_assets.csv` is its manifest. Pieces:
+
+| piece | bytes | how |
+|---|---:|---|
+| fill | 64,953 | the 76 padding rows, `fill` of the value in the survey (source) |
+| table | 5,044 | 20 pointer tables of labels (source; below) |
+| extracted | 1,468,246 | 613 blobs (605 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
+| packed | 2,349,626 | 1,515 streams packed at build time from their unpacked assets |
+
+`tools/verify.py` reports these four apart from the code figures, which do not change; with
+the code's 306,435 bytes they account for all 4,194,304. The tables written as labels are the
+ten `C2SceneRom_*Packs`, `BattleRom_BgMapPtrs`, `BattleRom_PcAttackFrames` and
+`BattleRom_ActFrames` (words), `BattleRom_SprTilesPtr`, `Map_PropsPtrs`, `LocGfx_Meta12Ptrs`,
+`LocGfx_Meta3Ptrs`, `LocGfx_PackPtrs`, `Evt_PackPtrs` and `C3Rom_PackPtrs`: every entry is a
+label, a label plus an offset (an entry into the middle of a row: the stale entries listed above,
+the module's raw blocks in `$FE`) or `$000000`; five stale `LocGfx_PackPtrs` entries (206-210)
+point into bank `$FD` code and are written relative to the code label before them. That is a
+label in name only: the offset restates the stored pointer value, which no reader uses (no
+LocRom record selects those entries); it keeps the table free of raw numbers, nothing more.
+
+Left:
+
+- **Code-side references to packs.** The code reaches the data through defines
+  (`!Credits_GfxPack`, `!MenuRom_ScreenGfx`, `!C3Rom_PackPtrs`, ...) and `C2Scene_DialPacks`
+  (`$C2:7220`) holds raw words, because `asm/main.asm` is assembled without the data layer by
+  every measuring tool. `tools/extract_data.py` checks that each survey name that is a define or
+  a ROM struct holds the address of the piece placed there. Making them labels needs the code
+  tools to assemble `asm/rom.asm`.
+- **Pointer tables inside other rows** (step 5 onward): `TextWin_DictPtrs` and the message
+  tables (word pointers before their strings), `BattleRom_SprFramesPtr` (`$E4:2300`), the `$E4`
+  animation offset tables, the offset tables of the battle scripts.
+- **Readable formats**: every extracted piece is still a binary blob (steps 5-8). BRR samples
+  keep their length word inside the blob.
+- **Edited assets**: the placement is fixed by the survey's addresses; a pack whose size
+  changes fails the build. Relocating data needs a layout pass (labels already carry it).
+- The module's unmatched bytes still come from the ROM through `tools/c3pack.py`
+  (`build/c3pack/rom_module.bin`), counted in the module's figure as before.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
@@ -206,15 +254,15 @@ own labels; 1 session to re-check each with an emulator trace.
    assumes extraction.
 1. **Done in PR #113**: the packer and the packed-module build path (`tools/c3pack.py`), the
    prerequisite for everything packed. Its build step is the model for step 3.
-2. **Extraction and placement framework** (1-2 sessions): `tools/extract_data.py` writes one
+2. **Extraction and placement framework** (done, above): `tools/extract_data.py` writes one
    asset per CSV row; a generated `asm/data/*.asm` per bank places each row (`incbin` of its
    asset, fill directives, labels at row starts). The bytes of an extracted blob come from the
    ROM, not from source, so verify must count them apart from "emitted by source", the way it
    counts the packed module apart, never as source. This is the step that ends the ROM copy for
    the structure; content is still binary.
-3. **Packed streams from unpacked assets** (1-2 sessions): pack at build time with a cache;
+3. **Packed streams from unpacked assets** (done, above; code-side labels left): pack at build time with a cache;
    pointer tables as labels. Biggest share (56%) and the packer is done.
-4. **Blobs that need no decoder** (1 session): padding, BRR samples, song and effect blocks,
+4. **Blobs that need no decoder** (done as placement, above; per-format files left): padding, BRR samples, song and effect blocks,
    raw graphics, sprite layout, unknown rows. With 2 and 3 this covers about 85% of the
    remaining bytes.
 5. **Text** (2-4 sessions): the encoder and the dictionary question; the pointer tables.
