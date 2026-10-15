@@ -109,8 +109,9 @@ asm/        65816 source, organized by bank; main.asm includes them all
   bankFF/   Bank $FF — a copy of the bank $00 wave tables so far
   hardware.inc  SNES register names
   include/  Shared names: RAM (ram_*.inc), constants, macros, unmatched-routine labels
-symbols/    review log (reviews/, one file per round), progress history and the
-            per-bank code survey, code_survey.csv (tracked); functions.csv (every function and its status) and
+symbols/    review log (reviews/, one file per round), progress history, the
+            per-bank code survey, code_survey.csv, and the map of the data not
+            in source yet, data_survey.csv (tracked); functions.csv (every function and its status) and
             progress.json are generated on demand by tools/progress.py and
             never committed
 tools/      Build, diff and verify scripts, lint, drafting and xref tools,

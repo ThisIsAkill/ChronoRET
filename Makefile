@@ -66,7 +66,7 @@ test-hooks:
 
 # The analysis tools' regression tests: xref's verdicts (including the
 # held-out score), the lint's INDEX and SIZE rules, the SPC700 decoder and
-# the lint's SPC700 rules.
+# the lint's SPC700 rules, and the data survey's coverage.
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -75,6 +75,7 @@ test-tools:
 	python3 tools/test_lint_size.py
 	python3 tools/test_spc700.py
 	python3 tools/test_lint_spc700.py
+	python3 tools/test_data_survey.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]
