@@ -128,9 +128,11 @@ C3Mod_ProgramTable:
 ; written twice each (low, then high byte), M7Y once and then with
 ; STX, which also writes CGADD.
 ; Sub-entry: C3Mod_Return ($3176), its final RTS, which C3Mod_Start
-; calls as an idle step.
+; calls as an idle step and the script at $9450 adds as an NMI task
+; (an empty one) and removes again.
 ; Callers note: C3Mod_Start ($3000). C3Mod_Return: C3Mod_Start
-;   ($3023).
+;   ($3023); the NMI task added by script opcode $F8 at $9453 and
+;   removed by $F7 at $94C6 (script $9450, page $0A).
 ; Entry: M=1, X=0, DP any (set here: DP_DMA, DP_PPU, then 0), DB=$00
 ;        (absolute register and RAM stores).
 ; Exit:  M=1, X=0, DP=0, DB=$00; A = 0 (16-bit); X =
@@ -429,7 +431,9 @@ C3Mod_Div16:
 ; Entry: M=0, X any, DP = the page of C3Math_A.. (0 at the calls); DB
 ;        any; A = the dividend, C3Math_B = the divisor (not 0).
 ; Exit:  A = the remainder, C3Math_Lo = the quotient; C3Math_A shifted
-;        left by 8; C3Math_Q = the divisor - 1; X, Y unchanged.
+;        left by 8, with the entry carry in bit 7 (the first ROL takes
+;        it in, the next seven take in zeros); C3Math_Q = the divisor -
+;        1; X, Y unchanged.
 C3Mod_DivHighByte:
     STA.b !C3Math_A
     LDA.b !C3Math_B
@@ -504,8 +508,8 @@ C3Mod_Div32:
 ; Signed 16 x 16-bit multiply: the operands are made positive in place,
 ; multiplied (C3Mod_Mul16) and the 32-bit product negated when their
 ; signs differed.
-; Callers note: $4458, $446B, $4E61, $4ECB, $9B0A and $9B1D (code not
-;   matched yet).
+; Callers note: $4458, $446B, $4E61, $4ECB, $9939, $9953, $9B0A and
+;   $9B1D (code not matched yet).
 ; Entry: M=0, X=0 (C3Mod_Mul16's), DP = the page of C3Math_A.. (0 at the
 ;        calls); DB any; C3Math_A, C3Math_B = the signed operands.
 ; Exit:  P restored; C3Math_Lo/Hi = the signed product; C3Math_A and
@@ -599,9 +603,13 @@ C3Mod_DivSigned16:
 ; target for the JSL).
 ; Callers note: $577A, $5780, $5786, $57B3, $57B9, $7397, $7F85, $7FA0,
 ;   $80A6, $80D3, $98E3 and $98EE (code not matched yet).
-; Entry: M, X, DP and DB as C3_RandomByte needs (M=1, X=0 at the
-;        calls).
-; Exit:  as C3_RandomByte leaves them (A = the byte).
+; Entry: M, X, DP and DB as C3_RandomByte needs; X=0 at the calls, M=1
+;        at $577A, $5780, $5786, $57B3, $57B9, $7397 and $80A6, M=0 at
+;        $7F85, $7FA0, $80D3, $98E3 and $98EE (there C3_RandomByte's adds
+;        are 16-bit, it stores a word to C3_RandSeed, and the callers
+;        mask the result with an AND).
+; Exit:  as C3_RandomByte leaves them (A = the new C3_RandSeed, a byte
+;        or a word by M).
 ; Calls: C3_RandomByte (JSL).
 C3Mod_KernelRandom:
     JSL !C3_RandomByte
@@ -643,9 +651,10 @@ C3Mod_TableRandom:
 ; for the screen's downward y). C3Mod_Cosine adds a quarter turn and
 ; falls into C3Mod_Sine ($3465).
 ; Callers note: $357F, $444F, $4D19, $56B6, $5867, $5BD7, $5BFB, $5CBC,
-;   $73C9, $76DB, $99DB and $9B01 (code not matched yet). C3Mod_Sine:
-;   $35B7, $4462, $4D26, $56C2, $585B, $5C11, $5CE0, $6014, $73BD,
-;   $73FD, $76FE, $99BB and $9B14 (code not matched yet).
+;   $73C9, $76DB, $994A, $9990, $99DB and $9B01 (code not matched yet).
+;   C3Mod_Sine: $35B7, $4462, $4D26, $56C2, $585B, $5C11, $5CE0, $6014,
+;   $73BD, $73FD, $76FE, $9930, $9983, $99BB and $9B14 (code not
+;   matched yet).
 ; Entry: M=0, X=0 (16-bit index), DP any, DB any (the read is long); A
 ;        = the angle (only bits 0-9 count).
 ; Exit:  A = the signed value; X = the angle AND C3_AngleMask; Y
@@ -673,12 +682,15 @@ C3Mod_Sine:                             ; header: see C3Mod_Cosine
 ; A task: every C3_FadeStep frames (C3_FadeTimer counts them down), one
 ; step brighter (C3_Brightness + 1); at full brightness it ends itself
 ; (C3Mod_TaskEnd).
-; Callers note: a task: LDX #C3Mod_FadeInTask / JSR $395E at $6BD8
-;   (code not matched yet).
+; Callers note: a task: LDX #C3Mod_FadeInTask / JSR $395E at $6BD8;
+;   added by script opcode $FA at $3F29, $554C, $6399, $6905, $7C93,
+;   $918E, $933D, $9403, $9528 and $966B, removed by $F9 at $92C1 and
+;   $961F (code and scripts not matched yet).
 ; Entry: a task (C3Mod_RunTasks): M=0 (8-bit set here), X=0, DP any, DB
 ;        = $00 (the variables are absolute).
-; Exit:  RTS with M=1, A = C3_Brightness (or C3_FadeTimer); at the end
-;        JMP C3Mod_TaskEnd.
+; Exit:  RTS with M=1; A = C3_Brightness after a step, else as on entry
+;        (the DEC of C3_FadeTimer loads nothing); at the end JMP
+;        C3Mod_TaskEnd.
 C3Mod_FadeInTask:
     SEP #$20
     DEC.w !C3_FadeTimer
@@ -697,7 +709,10 @@ C3Mod_FadeInTask:
 ; $7E:3495 — C3Mod_FadeOutTask (22 bytes, $3495–$34AA)
 ; A task: every C3_FadeStep frames one step darker (C3_Brightness - 1);
 ; at 0 (C3_ModuleFrame then shows forced blank) it ends itself.
-; Callers note: a task added by the script at $94E6 (opcode $xA).
+; Callers note: a task added by script opcode $FA at $41F6, $423F,
+;   $9149, $91A0, $91F5, $9280, $94E6 and $96CB, and by LDX
+;   #C3Mod_FadeOutTask / JSR $395E at $63E8 (code and scripts not
+;   matched yet).
 ; Entry: a task: M=0 (8-bit set here), X=0, DP any, DB = $00.
 ; Exit:  RTS with M=1; at the end JMP C3Mod_TaskEnd.
 C3Mod_FadeOutTask:
@@ -717,7 +732,9 @@ C3Mod_FadeOutTask:
 ; A task that runs once: it has the sound driver fade the song out
 ; (C3_SndFadeSong, $40 steps to volume 0, by Audio_DriverCommand) and
 ; hands its entry over to C3Mod_FadeOutStopTask (C3Mod_TaskReplace).
-; Callers note: a task added by the script at $5B92 (opcode $xA).
+; Callers note: a task added by script opcode $FA at $5B92 and by LDX
+;   #C3Mod_MusicFadeTask / JSR $395E at $5BA9 (M=1; code and script not
+;   matched yet).
 ; Entry: a task: M=0 (8-bit set here), X=0, DP any, DB = $00 (the
 ;        Audio_Cmd* block is absolute).
 ; Exit:  JMP C3Mod_TaskReplace with X = C3Mod_FadeOutStopTask.
@@ -762,7 +779,10 @@ C3Mod_FadeOutStopTask:
 ; $7E:34E3 — C3Mod_FadeOutExitTask (24 bytes, $34E3–$34FA)
 ; A task: fades out as C3Mod_FadeOutTask; at 0 it sets C3_ExitFlag (the
 ; module leaves) and ends itself.
-; Callers note: a task added by the script at $95FE (opcode $xA).
+; Callers note: a task added by script opcode $FA at $562F, $6978,
+;   $727F, $7EC1, $931F and $95FE, by LDX #C3Mod_FadeOutExitTask / JSR
+;   $395E at $4684, and by LDX #C3Mod_FadeOutExitTask / JMP
+;   C3Mod_TaskReplace at $6BF3 (code and scripts not matched yet).
 ; Entry: a task: M=0 (8-bit set here), X=0, DP=0, DB = $00.
 ; Exit:  RTS with M=1; at the end JMP C3Mod_TaskEnd.
 C3Mod_FadeOutExitTask:
@@ -793,8 +813,9 @@ C3Mod_FadeOutExitTask:
 ; Callers note: $7699 (code not matched yet).
 ; Entry: M=0, X any, DP = the page of C3_SqrtRoot (0 at the call); DB
 ;        any; A = the value; C as above.
-; Exit:  C3_SqrtRoot = the root; A = what is left (A minus the sum
-;        taken); C clear; X, Y unchanged.
+; Exit:  C3_SqrtRoot = the root; A = A minus the sum taken, including
+;        the failed last subtraction, so it has wrapped below 0
+;        (16-bit); C clear; X, Y unchanged.
 C3Mod_SquareRoot:
     STZ.b !C3_SqrtRoot
 .take:
@@ -809,9 +830,12 @@ C3Mod_SquareRoot:
 
 ; $7E:350A — C3Mod_FillBytes (4 bytes, $350A–$350D)
 ; DMA fill sources: the zero word at $350B is the fixed source of the
-; VRAM clears at $3D9D, $5AEE and $90B0 (DMAP $09: fixed address, two
-; registers); the $FF bytes around it have no reader found (probably
-; fill bytes too).
+; VRAM fills at $3D9D (DMAP $09 to VMDATAL: fixed address, two
+; registers, so whole words cleared), $5AEE (DMAP $08 to VMDATAL: one
+; register, only the low bytes cleared) and $90B0 (DMAP/BBAD from Y:
+; $1808 when entered at $90A7, $1809 from the callers of $90AA, at
+; $8A50, $8A69 and $9F81); the $FF bytes around it have no reader found
+; (probably fill bytes too).
 C3Mod_FillBytes:
     db $FF, $00, $00, $FF
 
@@ -826,7 +850,8 @@ C3Mod_FillBytes:
 ; Entry: M=1 (set here), X=0, DP any (saved; DP_PPU inside), DB = $00
 ;        (C3_StackSave is absolute); Y = the byte count (not 0).
 ; Exit:  M=1, X=0, DP restored, S restored; A = the last high nibble, X
-;        = S, Y = 0; WMADD past the pixels.
+;        = S as saved after the PHD (the entry S - 2), Y = 0; WMADD past
+;        the pixels.
 C3Mod_UnpackNibbles:
     SEP #$20
     PHD
@@ -868,7 +893,8 @@ C3Mod_UnpackNibbles:
 ; Entry: M=1 (set here), X=0, DP any (saved; DP_PPU inside), DB any; Y
 ;        = the byte count (not 0).
 ; Exit:  M=1, X=0, DP restored; A = the last high nibble, X = the last
-;        byte, Y = 0; WMADD past the bytes.
+;        byte with B (A's high byte, as on entry) above it (TAX is
+;        16-bit), Y = 0; WMADD past the bytes.
 C3Mod_NibblesToVram:
     SEP #$20
     PHD
@@ -952,7 +978,7 @@ C3Mod_M7HdmaCDNext:
 ;     columns in the order that puts the negated sine in M7C, by the
 ;     sine's sign;
 ;   - then the JSR at .setup calls the routine whose address the caller
-;     wrote over its operand (C3Mod_Code + $35FD; the assembled $0000 is
+;     wrote over its operand ($35FD; the assembled $0000 is
 ;     never called): $45B0, $801F, $8042 or $9B46 (not matched yet)
 ;     set the first divisor X and the first line's offset Y for their
 ;     view; $801F and $8042 also write the end offset over .end's CPY
@@ -974,9 +1000,14 @@ C3Mod_M7HdmaCDNext:
 ; Entry: M=0, X=0 (16-bit X and Y), DP = the script's page
 ;        (C3_M7Angle, C3_M7Scale; C3Math_A.. at $F0 of it), DB any
 ;        (set to $7E: PHK / PLB).
-; Exit:  M=0, X=0, DP = DP_CPU (not restored), DB = $7E; A = the last
-;        quotient stored; X = the last distance, Y = the end offset;
-;        C3Math_A.. as C3Mod_Mul16 leaves them.
+; Exit:  M=0, X=0, DP = DP_CPU (not restored), DB = $7E; Y = the end
+;        offset; A = what the last line left: the negated quotient
+;        stored by .store_c, or, after a variant at .step, 0
+;        (.blank_line), the doubled M7D word (.double_d), the WMDATA
+;        byte (.stream_x) or the copied M7C word (.copy_line); X = the
+;        divisor the next line would take (stepped after the last
+;        line, or the WMDATA byte with .stream_x); C3Math_A.. as
+;        C3Mod_Mul16 leaves them.
 ; Calls: C3Mod_Cosine, C3Mod_Sine, C3Mod_Mul16, the setup routine (JSR
 ;   over a written operand).
 C3Mod_BuildM7Tables:
@@ -1169,8 +1200,10 @@ C3Mod_UnpackPack:
 ; Callers note: $540A, $5488, $5493, $7963, $8663, $866C, $8675, $867E,
 ;   $868C, $8841, $884A, $8AC1, $8BFC, $8E0B, $8E14, $8ED6 and $8F42
 ;   (code not matched yet).
-; Entry: M any (saved; M=1 at the calls), X=0 (16-bit X and Y), DP =
-;        the page of the count, DB any (saved; the reads are long); X =
+; Entry: M any (saved; M=1 at the calls but $7963's, M=0), X=0 (16-bit
+;        X and Y), DP = the page of the count, DB = $00 or $7E (a bank
+;        that maps low WRAM: LDA.w Decomp_DestBank is absolute; saved,
+;        and the table read is long); X =
 ;        the entry's offset (3 x its number), Y = the destination,
 ;        C3_RowCount = the byte count (not 0), Decomp_DestBank bit 0 =
 ;        the WRAM bank.
@@ -1210,8 +1243,9 @@ C3Mod_CopyRawPack:
 ; Callers note: $3C49, $67AD, $70E0, $7A2A, $7A5D, $8714, $8ACD, $8B12,
 ;   $8DAF, $8E7D and $8F7D (code not matched yet).
 ; Entry: M=1 (M=0 set here), X=0, DP any (saved), DB any; Y = the list.
-; Exit:  M=1, X=0, DP restored, DB = $00; A = the end record's first
-;        word; X = 16 x the channels set, Y = the end record.
+; Exit:  M=1, X=0, DP restored, DB = $00; A = $00FF (the end record's
+;        first byte, ANDed with $FF before the CMP); X = 16 x the
+;        channels set, Y = the end record.
 C3Mod_SetupHdma:
     PHD
     PEA.w !DP_DMA
@@ -1257,7 +1291,9 @@ C3Mod_SetupHdma:
 ; Entry: M=1, X=0 (the 16-bit count load), DP = DP_PPU, DB = $00 or $7E
 ;        (the $00F0 reads are absolute); WMADD = where the table goes.
 ; Exit:  P restored (X high byte cleared by the SEP #$30: X = 0 after
-;        the loop anyway); A = 0, X = 0, Y = 1; WMADD past the table.
+;        the loop anyway); A = the byte copied from $00F3 (the last
+;        LDA immediate; STZ writes the end), X = 0, Y = 1; WMADD past
+;        the table.
 C3Mod_HdmaAlternate:
     LDA.w !C3_ScratchF0
     STA.l .first_a+1
@@ -1412,8 +1448,8 @@ C3Mod_AudioSend:
 ; source pointer saved for the second). The row count lives in the
 ; caller's direct page (C3_RowCount). What the bitmap is (probably a
 ; picture for C3_ScaleBitmap, which reads 64-byte rows) is not traced.
-;   Its JSL callers each call $3691 first (code not matched yet), which
-; probably puts the picture at $7F:0200.
+;   Its JSL callers each call C3Mod_UnpackPack ($3691) first (code not
+; matched yet), which probably puts the picture at $7F:0200.
 ; Callers note: JSL from $3DED, $3DFA, $7908 and $87B3 (code not
 ;   matched yet).
 ; Entry: M any (REP #$20 here), X=0 (MVN's 16-bit X and Y), DP any
@@ -1564,7 +1600,10 @@ C3Mod_OamUploadTask:
 ; C3_OamHideY): every byte $E0, so every sprite at X = Y = $E0, below
 ; the screen (the tile and attribute bytes $E0 too; the high table is
 ; not touched). M7B is set back to 0 after.
-; Callers note: C3Mod_Init ($30F6).
+; Callers note: C3Mod_Init ($30F6); an NMI task (C3Mod_RunNmiTasks,
+;   once a frame in vblank) added by script opcode $F8 at $3F32, $4148,
+;   $5B23, $639F, $7184, $7C76, $9328 and $93EF (scripts not matched
+;   yet).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute register stores).
 ; Exit:  M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X =
 ;        C3_OamLowBytes; Y unchanged; DMA channel 7's registers set.
@@ -1629,6 +1668,9 @@ C3Mod_FinishOamHigh:
 ; Sends the 256 colours of C3_PaletteBuf ($7E:2200) to CGRAM from
 ; colour 0, by DMA channel 7 (one register, CGDATA).
 ; Callers note: C3Mod_Start ($300D) and $8AC7, $8C97 (code not matched
+;   yet); an NMI task (C3Mod_RunNmiTasks, once a frame in vblank) added
+;   by script opcode $F8 at $5B1D, $63A2, $6999, $717E, $7CF9, $7EB6,
+;   $932B and $93F5, and removed by $F7 at $7D0F (scripts not matched
 ;   yet).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute register stores).
 ; Exit:  M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X =
@@ -1725,11 +1767,13 @@ C3Mod_DmaUnpacked:
 
 ; $7E:390B — C3Mod_SetM7Scroll (41 bytes, $390B–$3933)
 ; Writes BG1HOFS / BG1VOFS (the mode-7 scroll) and M7X / M7Y (the
-; centre) from script variables 1-4 (C3Script_Vars + 2.. + 9 of the
-; caller's page), each register twice (low, then high byte). No caller
-; was found (no call, stored address or script call).
-; Entry: M=1, X any, DP = a script page, DB = $00 (absolute register
-;        stores).
+; centre) from the direct page's bytes $02-$09 (script variables 1-4,
+; C3Script_Vars + 2.. + 9, if DP is a script page, as the names
+; assume), each register twice (low, then high byte). No caller was
+; found (no call, stored address or script call), so the DP is an
+; inference.
+; Entry: M=1, X any, DP = the page of the values (a script page,
+;        probably), DB = $00 (absolute register stores).
 ; Exit:  M=1; A = variable 4's high byte; X, Y unchanged.
 C3Mod_SetM7Scroll:
     LDA.b !C3Script_Vars+2
@@ -1898,10 +1942,11 @@ C3Mod_TaskNext:                         ; header: see C3Mod_RunTasks
 ; P, X, DB),
 ; clears the task's entry of C3_TaskList and goes on with the next
 ; task (C3Mod_TaskNext).
-; Callers note: JMP from tasks, in code neither matched nor traced yet
-;   (the tasks are reached through C3_TaskList): JMP byte patterns at
-;   $3492, $34A8, $34E0, $34F8, $44F8, $48A6, $5BBB, $5BCB, $5CB7,
-;   $5D47, $6ACA, $9A9F, $9B7B and $9EF9.
+; Callers note: JMP from tasks (reached through C3_TaskList; the trace
+;   follows them): C3Mod_FadeInTask ($3492), C3Mod_FadeOutTask ($34A8),
+;   C3Mod_FadeOutStopTask ($34E0), C3Mod_FadeOutExitTask ($34F8), and
+;   $44F8, $48A6, $5BBB, $5BCB, $5CB7, $5D47, $6ACA, $9A9F, $9B7B and
+;   $9EF9 (code not matched yet).
 ; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
 ;        task found it (C3Mod_RunTasks' JSR return address on top: a JSR
 ;        here would push a second one and misalign the pulls); X=0
@@ -1922,9 +1967,10 @@ C3Mod_TaskEnd:
 ; As C3Mod_TaskEnd, but the task's entry of C3_TaskList gets the
 ; address in X instead (the task hands itself over to another, from
 ; next frame).
-; Callers note: JMP from tasks, in code neither matched nor traced yet:
-;   JMP byte patterns at $34BF (after LDX #$34C2), $427F, $476E, $485A,
-;   $63F1, $6A71, $6A94, $6BF6 and $98A9.
+; Callers note: JMP from tasks (the trace follows them):
+;   C3Mod_MusicFadeTask ($34BF, after LDX #C3Mod_FadeOutStopTask), and
+;   $427F, $476E, $485A, $63F1, $6A71, $6A94, $6BF6 and $98A9 (code not
+;   matched yet).
 ; Entry: JMP from a task run by C3Mod_RunTasks, with the stack as the
 ;        task found it (C3Mod_RunTasks' JSR return address on top, as
 ;        for C3Mod_TaskEnd); X=0 (16-bit index: the address and the PLX
@@ -1986,9 +2032,10 @@ C3Mod_NmiTaskNext:                      ; header: see C3Mod_RunNmiTasks
 ; C3Mod_TaskEnd for an NMI task (reached by JMP the same way): clears
 ; its entry of C3_NmiTaskList and goes on with the next NMI task
 ; (C3Mod_NmiTaskNext).
-; Callers note: JMP from NMI tasks, in code neither matched nor traced
-;   yet: JMP byte patterns at $4674, $78A8, $7A32, $7A65, $8DF0, $8E85,
-;   $9D22, $9F56 and $9F87.
+; Callers note: JMP from NMI tasks (the trace follows them): $4674,
+;   $7A32, $7A65, $8DF0, $8E85, $9D22, $9F56 and $9F87 (code not matched
+;   yet); also a JMP byte pattern at $78A8, right after the RTS at
+;   $78A7, which no trace reaches (probably dead).
 ; Entry: JMP from a task run by C3Mod_RunNmiTasks, with the stack as
 ;        the task found it (C3Mod_RunNmiTasks' JSR return address on
 ;        top: a JSR here would misalign the pulls); X=0 (the first PLX
@@ -2168,10 +2215,12 @@ C3Mod_SprListMixedEnd:                  ; header: see C3Mod_SprListMixed
 ; Callers note: JSL from $7F9C, $7FB0, $7FBF, $8386 and $9A6A (code not
 ;   matched yet).
 ; Entry: M=0 (A stored to WMADDL/M as a word), X=0 (16-bit Y), DP=0
-;        (C3_OamPos.., C3_SprAttr), DB = $00 (the ports and the OAM
-;        shadow are absolute); A = the list's address.
+;        (C3_OamPos.., C3_SprAttr), DB = $00-$3F (the ports and the
+;        OAM shadow are absolute); A = the list's address.
 ; Exit:  RTL with M=0, X=0; Y = C3_OamPos (advanced); C3_OamHiPtr
-;        advanced; C3_SprLeft = 0; A changed; WMADD after the list.
+;        advanced; C3_SprLeft = 0; C3_SprAttr = the last record's
+;        attribute (unchanged for an empty list); A changed; WMADD after
+;        the list.
 C3Mod_SprListMixed:
     STA.w WMADDL                        ; and WMADDM
     LDY.b !C3_OamPos
@@ -2282,9 +2331,9 @@ C3Mod_Rest3B48:
 ;   - $A651-$AADA: "PRODUCER/KAZU`KO AOKI@DIRECTOR/..." up to "...KANAME
 ;     TANAKA@" and a $00: names after their job, "/" between names, "@"
 ;     between jobs, "`" standing for HI (and "[", "]", "^", "_" for
-;     other pairs of letters, probably); C3Mod_Code + $86BF and $86D1
-;     load $A651 as a text pointer (into $0382) when C3_EntryArg bits
-;     0-3 are $A;
+;     other pairs of letters, probably); $86BF and $86D1 load $A651
+;     as a text pointer (into $0382) when C3_EntryArg bits 0-3 are $A
+;     ($86BF) or $B ($86D1);
 ;   - $AADB on: a $1C, then "XEXECUTIVE PRODUCER/..." to the end, the
 ;     same list with "/" between names, then "CHRONO TRIGGER", the
 ;     translators, test players and special thanks; no reader of it was

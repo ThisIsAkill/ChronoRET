@@ -20,9 +20,11 @@ discover() (applied until nothing new turns up; `--entries` lists every
 address each one found and the instructions that show it): tasks (X loaded
 before the task-list adders or replace exits, TASK_TABLES copied whole into
 C3_TaskList), scripts (addresses stored to C3Script_Ptr of page $0A00 or
-$0B00, parsed with C3_RunScript's opcodes for their own flow, the routines
-they call and the tasks they add; SCRIPT_REDIRECTS for the routines that
-move the script pointer themselves) and patches (addresses written over a
+$0B00, each parsed on its page with C3_RunScript's opcodes for its own
+flow, the routines it calls and the tasks it adds or removes, and the
+scripts it starts on the other page by poke16 to that page's pointer;
+SCRIPT_REDIRECTS for the routines that write a script pointer themselves)
+and patches (addresses written over a
 JSR / JMP operand: self-modifying calls). Calls into GENERATED code (the
 copy routine C3_BuildCopyCode writes at $B574) are not followed.
 
@@ -37,14 +39,14 @@ targets) are still traced on their own. The anomalies found so far are
 handled: CALL_EXITS ($45D6 returns with M=0, so C3Mod_Prog0's BIT at $3C57
 is 16-bit), DATA_RANGES (the staff texts), GENERATED (JSR $B574 at $82A5),
 the patches ($0000 at $35FC is a placeholder) and SCRIPT_REDIRECTS ($9315
-is resumed at $9317); none is left.
+is resumed at $9317; $5640 and $564D, called by page $0B's script, start
+page $0A's); none is left.
 
 The traced instruction bytes are the module's known code; tools/progress.py
 counts the matched code against them together with any matched code the
 trace has not reached yet. A few blocks still look like code that no rule
-reaches (e.g. $3209, called only from $3425 in another unreached block,
-and scripts entered only by a wait loop being broken from outside), so
-the figure can still grow a little.
+reaches (e.g. $3209, called only from $3425 in another unreached block),
+so the figure can still grow a little.
 
 Usage:
     python3 tools/c3module.py [START [END]] [--linear] [--m 0|1 --x 0|1]
@@ -115,19 +117,28 @@ GENERATED = {
 #               X=0);
 #   scripts     a script address stored to C3Script_Ptr of page $0A00 or
 #               $0B00 ($0A20 / $0B20, which C3_RunScript runs from); each
-#               script is parsed (C3_RunScript's opcodes) for its own flow
-#               and for the routines it calls (opcode $x0: C3Mod_CallW, M=0,
-#               X=0) and the tasks it adds (opcodes $x8: NMI task, $xA: task);
+#               script is parsed (C3_RunScript's opcodes) on its page for
+#               its own flow, the routines it calls (opcode $x0:
+#               C3Mod_CallW, M=0, X=0), the tasks it adds (opcodes $x8: NMI
+#               task, $xA: task) and the scripts it starts on the other
+#               page (opcode $x2, poke16 of that page's pointer: how a
+#               page's wait loop, a jump-and-yield to itself, is broken);
 #   patches     an address stored over the operand of a JSR / JMP abs: the
 #               call is to that address (self-modifying code), with the
 #               widths at the call; the static operand is followed too when
 #               it is in the module (the default: C3Mod_Return at $3023,
 #               $5E54 at $5E43), not when it is a placeholder ($0000 at
 #               $35FC).
-# Script routines that set C3Script_Ptr themselves (the script does not go
-# on after the opcode, or not only): {routine: ([script addresses], also
-# goes on?, evidence)}. C3_RunScript adds 2 to the pointer after the call,
-# so a table value v resumes at v + 2.
+# Script routines that set a C3Script_Ptr themselves: {routine: (pointer,
+# [values], conditional?, evidence)}. The pointer is $20 (direct page: the
+# page the calling script runs on, DP = $0A00 or $0B00) or $0A20 / $0B20
+# (that page, whichever runs). Written to the running page, the script
+# resumes at value + 2 (C3_RunScript adds 2 to the pointer after the call)
+# and does not go on after the opcode, unless the write is conditional;
+# written to the other page, the script goes on and the other page starts
+# at the value itself. A script that calls a routine storing to a pointer
+# that is not here is an anomaly, as is a routine with a page-$0A/$0B
+# pointer called from a script whose page is unknown.
 TASK_CALLS = {
     0x395E: (False, False, 'JSR to the task-list adder at $395E'),
     0x3974: (True, False, 'JSR to the NMI-task-list adder at $3974'),
@@ -141,7 +152,7 @@ TASK_TABLES = [
     (0x7EC7, 5, 'LDX #$7EC7 / LDA #9 / LDY #C3_TaskList / MVN at $7ED4: five tasks'),
     (0x7EDC, 6, 'LDX #$7EDC / LDA #$B / LDY #C3_TaskList / MVN at $7EEB: six tasks'),
 ]
-SCRIPT_TABLES = []
+SCRIPT_TABLES = []                  # (table, entries, page $0A / $0B, evidence)
 # Instructions overwritten with a BRA from a table of BRA words: (site,
 # table, entries, evidence); each BRA's target is traced (M=0, X=0: the
 # loop around the site runs with both 16-bit).
@@ -153,14 +164,22 @@ PATCHED_BRANCHES = [
                         '($45D1) there'),
 ]
 SCRIPT_REDIRECTS = {
-    0x3F59: ([0x3F6A, 0x3FAC], False, 'LDA $3F66,X (X = 0 or 2: the table $3F68, $3FAA) / STA $20'),
-    0x996F: ([0x9417], True, 'LDA #$9415 / STA $20 when $006A is nonzero, else the script goes on'),
-    0x564D: ([0x5637], False, 'LDA #$5635 / STA $0A20'),
-    0x8CD0: ([0x9317], True, 'LDX #$9315 / STX $0A20 when C3_EntryArg bits 0-3 are all set (then '
-                             'JMP $8AF0), else the script goes on'),
-    0x7286: ([0x72A4, 0x72C3, 0x72E4, 0x72FC], True,
+    0x3F59: (0x20, [0x3F68, 0x3FAA], False, 'LDA $3F66,X (X = 0 or 2: the table $3F68, $3FAA) / STA $20'),
+    0x996F: (0x20, [0x9415], True, 'LDA #$9415 / STA $20 when $006A is nonzero, else nothing'),
+    0x564D: (0x0A20, [0x5635], False, 'LDA #$5635 / STA $0A20 / RTS'),
+    0x5640: (0x0A20, [0x5604], False, 'LDA #$0080 / STA $582E / LDA #$5604 / STA $0A20 / RTS'),
+    0x8CD0: (0x0A20, [0x9315], True, 'LDX #$9315 / STX $0A20 when C3_EntryArg bits 0-3 are all set '
+                                     '(then JMP $8AF0), else nothing'),
+    0x7286: (0x0A20, [0x72A2, 0x72C1, 0x72E2, 0x72FA], True,
              'when $004B is nonzero, LDA $729C,X (X = $3448\'s value AND 6: the table $72A2, $72C1, '
-             '$72E2, $72FA) / STA $0A20; else the script goes on'),
+             '$72E2, $72FA) / STA $0A20; else nothing'),
+}
+# Tasks named by the module's own task-list removers (LDX #task / JSR):
+# {remover: (NMI list?, what)}; their sites are references to the task
+# (the CALLERS rule wants them), not entries.
+TASK_REMOVES = {
+    0x3934: (False, 'JSR to the task-list remover at $3934'),
+    0x3949: (True, 'JSR to the NMI-task-list remover at $3949'),
 }
 
 BRANCHES = {'BPL', 'BMI', 'BVC', 'BVS', 'BCC', 'BCS', 'BNE', 'BEQ'}
@@ -317,13 +336,17 @@ def trace(mem: bytes, entries=None, patched=frozenset()):
 class Discovery:
     """The module's code and scripts as far as the rules above reach."""
 
-    def __init__(self, insns, anomalies, entries, scripts, script_bytes, patched):
+    def __init__(self, insns, anomalies, entries, scripts, script_bytes, patched, refs):
         self.insns = insns              # {pc: Insn}
         self.anomalies = anomalies      # [(pc, why)]
         self.entries = entries          # {address: (M=1?, X=1?, evidence)}, beyond ENTRIES and tables
-        self.scripts = scripts          # {script start: evidence}
+        self.scripts = scripts          # {(script start, page $0A / $0B): evidence}
         self.script_bytes = script_bytes
         self.patched = patched          # {JSR/JMP site: {targets written over its operand}}
+        # {address: [site, ...]}: the script opcodes that call it ($x0) or add or remove it
+        # as a task ($x7-$xA), and the LDX #address before a JSR / JMP to the task-list
+        # adders, replace exits and removers
+        self.refs = refs
 
 
 def _predecessors(insns):
@@ -369,15 +392,24 @@ def immediates_before(insns, pred, pc, reg, depth=12, size=3):
     return found
 
 
-def parse_script(mem, start, sets_ptr, out):
-    """Follow a C3_RunScript script from `start`; fills out['bytes'],
-    out['calls'], out['nmi'], out['tasks'] ([(address, opcode site)]),
-    out['bad']."""
+def parse_script(mem, start, page, sets_ptr, out):
+    """Follow a C3_RunScript script from `start`, running on `page` ($0A or
+    $0B: its DP is page << 8); fills out['bytes'], out['calls'],
+    out['nmi'], out['tasks'], out['removes'] ([(address, opcode site)]),
+    out['starts'] ([((address, page), evidence)]: scripts it starts on the
+    other page) and out['bad']."""
     def byte(a):
         return mem[a - BASE]
 
     def word(a):
         return mem[a - BASE] | mem[a + 1 - BASE] << 8
+
+    def other(dest, v, p, why):
+        """A pointer write: (resume addresses on this page, goes on?)."""
+        if dest == 0x20 or dest >> 8 == page:
+            return [v + 2], False
+        out['starts'].append(((v, dest >> 8), f'{why}: opcode at ${p:04X} of a script on page ${page:02X}'))
+        return [], True
     work = [start]
     while work:
         p = work.pop()
@@ -385,9 +417,9 @@ def parse_script(mem, start, sets_ptr, out):
             if not BASE <= p < BASE + len(mem) - 4:
                 out['bad'].append((p, 'script runs off the module'))
                 break
-            if p in out['ops']:
+            if (p, page) in out['ops']:
                 break
-            out['ops'].add(p)
+            out['ops'].add((p, page))
             op, q, stop = byte(p), p + 1, False
             if op < 0x80:                           # variables
                 kind = op >> 4
@@ -398,17 +430,30 @@ def parse_script(mem, start, sets_ptr, out):
             else:
                 f = op & 0x0F
                 nxt = q + {0: 2, 1: 3, 2: 4, 3: 2, 4: 0, 5: 1, 6: 4, 7: 2, 8: 2, 9: 2, 0xA: 2,
-                           0xB: 2, 0xC: 0, 0xD: 2, 0xE: 2, 0xF: 1}[f]
+                           0xB: 2, 0xC: 0, 0xD: 2, 0xE: 2, 0xF: 0}[f]
                 if f == 0:
                     r = word(q)
                     out['calls'].append((r, p))
                     if sets_ptr(r):
-                        targets, goes_on, _ = SCRIPT_REDIRECTS.get(r, ([], False, ''))
-                        work += targets
-                        stop = not goes_on
-                        if r not in SCRIPT_REDIRECTS:
+                        if r in SCRIPT_REDIRECTS:
+                            dest, values, cond, why = SCRIPT_REDIRECTS[r]
+                            goes_on = True
+                            for v in values:
+                                resume, on = other(dest, v, p, f'${r:04X} ({why})')
+                                work += resume
+                                goes_on = on or cond
+                            stop = not goes_on
+                        else:
                             out['bad'].append((p, f'calls ${r:04X}, which sets the script pointer '
                                                   f'(not in SCRIPT_REDIRECTS)'))
+                elif f in (1, 2) and word(q) in (0x0A20, 0x0A21, 0x0B20, 0x0B21):
+                    a, v = word(q), word(q + 2)
+                    if f == 2 and a & 0xFF == 0x20:     # poke16 C3Script_Ptr: STA, then skip 2
+                        resume, on = other(a, v, p, f'poke16 ${a:04X} = ${v:04X}')
+                        work += resume
+                        stop = not on
+                    else:
+                        out['bad'].append((p, f'pokes half of the script pointer ${a:04X}'))
                 elif f in (3, 0xD, 0xE):
                     work.append(word(q))
                     stop = f != 3
@@ -416,6 +461,8 @@ def parse_script(mem, start, sets_ptr, out):
                     out['nmi'].append((word(q), p))
                 elif f == 0xA:
                     out['tasks'].append((word(q), p))
+                elif f in (7, 9):
+                    out['removes'].append((word(q), p))
                 elif f in (4, 0xF):
                     stop = True
             out['bytes'].update(range(p, nxt))
@@ -455,10 +502,10 @@ def discover(mem: bytes) -> Discovery:
                     if v not in entries:
                         entries[v] = (False, False, f'patched branch: entry {k} of the table at '
                                                     f'${table:04X} written over ${site:04X} ({why})')
-        for table, count, why in SCRIPT_TABLES:
+        for table, count, page, why in SCRIPT_TABLES:
             for k in range(count):
                 v = mem[table + 2 * k - BASE] | mem[table + 2 * k + 1 - BASE] << 8
-                scripts.setdefault(v, f'entry {k} of the script table at ${table:04X} ({why})')
+                scripts.setdefault((v, page), f'entry {k} of the script table at ${table:04X} ({why})')
         insns, anomalies = trace(mem, base + [(a, m, x) for a, (m, x, _) in entries.items()],
                                  frozenset(patched))
         pred = _predecessors(insns)
@@ -495,19 +542,24 @@ def discover(mem: bytes) -> Discovery:
                     add(v, site.m, site.x, f'patched: bytes ${lo:02X} (LDA at ${lat:04X}, store at ${lst:04X}) '
                                            f'and ${hi:02X} (LDA at ${hat:04X}, store at ${hst:04X}) written '
                                            f'over the {site.mnemonic} at ${spc:04X}')
+        refs = {}
         for ins in insns.values():
             if ins.mnemonic in ('JSR', 'JMP') and ins.mode == 'abs' and ins.operand in TASK_CALLS:
                 m, x, why = TASK_CALLS[ins.operand]
                 for v, at in immediates_before(insns, pred, ins.pc, 'X'):
                     add(v, m, x, f'task: LDX #${v:04X} at ${at:04X}, {why} at ${ins.pc:04X}')
+                    refs.setdefault(v, set()).add(at)
+            if ins.mnemonic == 'JSR' and ins.mode == 'abs' and ins.operand in TASK_REMOVES:
+                for v, at in immediates_before(insns, pred, ins.pc, 'X'):
+                    refs.setdefault(v, set()).add(at)
             reg = {'STA': 'A', 'STX': 'X', 'STY': 'Y'}.get(ins.mnemonic)
             if reg is None or ins.mode not in ('abs', 'long') or (ins.mode == 'long' and ins.operand >> 16 != BANK):
                 continue
             dest = ins.operand & 0xFFFF
             if dest in SCRIPT_PTRS and ins.pc not in redirect_sites:
                 for v, at in immediates_before(insns, pred, ins.pc, reg):
-                    if BASE <= v < BASE + len(mem) and v not in scripts:
-                        scripts[v] = (f'{LOADS[reg]} #${v:04X} at ${at:04X}, {ins.mnemonic} ${dest:04X} '
+                    if BASE <= v < BASE + len(mem) and (v, dest >> 8) not in scripts:
+                        scripts[(v, dest >> 8)] = (f'{LOADS[reg]} #${v:04X} at ${at:04X}, {ins.mnemonic} ${dest:04X} '
                                       f'at ${ins.pc:04X}')
                         new += 1
             site = insns.get(dest - 1)
@@ -518,18 +570,27 @@ def discover(mem: bytes) -> Discovery:
                         new += 1
                     add(v, site.m, site.x, f'patched: {LOADS[reg]} #${v:04X} at ${at:04X} written over '
                                            f'the {site.mnemonic} at ${site.pc:04X} by ${ins.pc:04X}')
-        out = {'bytes': set(), 'ops': set(), 'calls': [], 'nmi': [], 'tasks': [], 'bad': []}
-        for s in scripts:
-            parse_script(mem, s, lambda r: _sets_ptr(mem, r, sets_ptr), out)
+        out = {'bytes': set(), 'ops': set(), 'calls': [], 'nmi': [], 'tasks': [], 'removes': [],
+               'starts': [], 'bad': []}
+        for s, page in list(scripts):
+            parse_script(mem, s, page, lambda r: _sets_ptr(mem, r, sets_ptr), out)
+        for key, why in out['starts']:
+            if key not in scripts:
+                scripts[key] = why
+                new += 1
         for lst, (m, x), kind in ((out['calls'], (False, False), 'script call (opcode $x0)'),
                                   (out['nmi'], (True, False), 'script NMI task (opcode $x8)'),
                                   (out['tasks'], (False, False), 'script task (opcode $xA)')):
             for v, at in lst:
                 add(v, m, x, f'{kind} at ${at:04X}')
+        for lst in (out['calls'], out['nmi'], out['tasks'], out['removes']):
+            for v, at in lst:
+                refs.setdefault(v, set()).add(at)
         if not new:
             break
     anomalies = anomalies + [(p, why) for p, why in out['bad']]
-    d = Discovery(insns, anomalies, entries, scripts, out['bytes'], patched)
+    d = Discovery(insns, anomalies, entries, scripts, out['bytes'], patched,
+                  {v: sorted(sites) for v, sites in refs.items()})
     _DISCOVERED[key] = d
     return d
 
@@ -550,11 +611,12 @@ def code_bytes(insns) -> set[int]:
     return {a for ins in insns.values() for a in range(ins.pc, ins.pc + ins.size)}
 
 
-def call_sites(insns, patched=None) -> dict[int, list[int]]:
+def call_sites(insns, patched=None, refs=None) -> dict[int, list[int]]:
     """{target: [site, ...]} for every JSR, JSL, JMP, JML and BRL into the
     module; with `patched` (Discovery.patched), also the patched calls
     (the site of a JSR / JMP whose operand is written at run time, for
-    each address written there)."""
+    each address written there); with `refs` (Discovery.refs), also the
+    script opcodes and task-list calls that name it."""
     out = {}
     for ins in insns.values():
         if ins.mnemonic in ('JSR', 'JSL', 'JMP', 'JML', 'BRL'):
@@ -563,6 +625,10 @@ def call_sites(insns, patched=None) -> dict[int, list[int]]:
                 out.setdefault(t, []).append(ins.pc)
     for site, targets in (patched or {}).items():
         for t in targets:
+            if site not in out.setdefault(t, []):
+                out[t].append(site)
+    for t, sites in (refs or {}).items():
+        for site in sites:
             if site not in out.setdefault(t, []):
                 out[t].append(site)
     return out
@@ -658,8 +724,8 @@ def main(argv=None) -> int:
         if args.entries:
             for a, (m, x, why) in sorted(d.entries.items()):
                 print(f'entry  ${a:04X} M{8 if m else 16} X{8 if x else 16}  {why}')
-            for a, why in sorted(d.scripts.items()):
-                print(f'script ${a:04X}  {why}')
+            for (a, page), why in sorted(d.scripts.items()):
+                print(f'script ${a:04X} page ${page:02X}  {why}')
             for site, targets in sorted(d.patched.items()):
                 print(f'patch  ${site:04X} -> ' + ', '.join(f'${v:04X}' for v in sorted(targets)))
             print(f'{len(d.script_bytes):,} script bytes')

@@ -23,8 +23,12 @@ runs these and reports them the same way (a finding keeps the routine at
   CALLERS until a generator exists the callers are hand-written: every
          JSR, JSL, JMP, JML or BRL to the routine or its sub-entries from
          outside them that tools/c3module.py's trace of the module finds
-         (in matched code or not) is named by its address ($XXXX) on the
-         header's `Callers note:` lines (or the lines continuing them).
+         (in matched code or not), every patched call to it, every script
+         opcode that calls it ($x0) or adds or removes it as a task ($x7
+         to $xA), and every LDX #address before a JSR / JMP to the
+         module's task-list adders, replace exits and removers, is
+         named by its address ($XXXX) on the header's `Callers note:`
+         lines (or the lines continuing them).
          Needs the ROM. Cannot be opted out of.
   KERNEL the module is assembled apart from asm/main.asm, so it reaches
          kernel and engine labels through defines named after them
@@ -198,7 +202,7 @@ def module_sites():
     if not c3pack.ROM_PATH.exists():
         return None
     d = c3module.discover(c3module.module_bytes())
-    return c3module.call_sites(d.insns, d.patched)
+    return c3module.call_sites(d.insns, d.patched, d.refs)
 
 
 def rom_labels():

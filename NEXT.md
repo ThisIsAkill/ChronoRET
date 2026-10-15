@@ -942,16 +942,22 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `PEA $007E` that leaves DB = `$00`). The trace (`tools/c3module.py --entries` lists each
    entry with its evidence) now follows the task-list stores (X loaded before the add/replace
    calls and jumps, and the two MVN task tables at `$7EC7`/`$7EDC`), the script pointers
-   stored to `$0A20`/`$0B20` with the scripts parsed by `C3_RunScript`'s opcodes, the routines
-   that move a script pointer (`SCRIPT_REDIRECTS`), stores over JSR/JMP operands, the patched
-   BRA table at `$3689`, and models `JSR $B574` at `$82A5` as a call into
-   `C3_BuildCopyCode`'s generated code (`GENERATED`): about 20.5 KB of code, no anomalies.
-   Next: `C3Mod_Rest3B48` (`$3B48`-`$A650`), the programs and their tasks; about 6 KB of the
-   module is reached by no trace and looks like tables (and two scripts, `$934A` and `$97A9`,
-   entered only when a wait loop is broken; `$3209`'s divide is reached only from the unused
-   `C3Mod_DivSigned16`). Re-review needed (headers edited by the second batch for the round-178 leads):
-   `C3Mod_Start`, `C3Mod_Init`, `C3Mod_AudioSend`, `C3Mod_DoubleRows`, `C3Mod_SpaceRows`,
-   `C3Mod_UploadPalette`. Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   stored to `$0A20`/`$0B20` with the scripts parsed on their page by `C3_RunScript`'s
+   opcodes, the scripts one page starts on the other by poke16 of its pointer (how the wait
+   loops, a jump-and-yield to itself, are broken: `$934A` and `$97A9` among them, which add
+   the tasks `$997D` and `$992A`), the routines that write a script pointer
+   (`SCRIPT_REDIRECTS`, each with the page it writes: `$5640` and `$564D`, called by page
+   `$0B`'s script, start page `$0A`'s), stores over JSR/JMP operands, the patched BRA table
+   at `$3689`, and models `JSR $B574` at `$82A5` as a call into `C3_BuildCopyCode`'s
+   generated code (`GENERATED`): about 20.6 KB of code, no anomalies. The CALLERS rule now
+   also wants the script opcodes that call a routine or add or remove it as a task, and the
+   `LDX #task` before the task-list calls. Next: `C3Mod_Rest3B48` (`$3B48`-`$A650`), the
+   programs and their tasks; about 6 KB of the module is reached by no trace and looks like
+   tables (`$3209`'s divide is reached only from the unused `C3Mod_DivSigned16`; the JMP at
+   `$78A8` after an RTS, probably dead). `C3_RandomByte`'s header (kernel, verified) still
+   says M=1 and that the module's site is not traced: five module calls are M=0 (see
+   `C3Mod_KernelRandom`). Re-review needed: the module headers changed in round 179's fixes
+   (`symbols/c3module_functions.csv` hashes differ from `symbols/reviews/r179.csv`). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
    and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
    the module reads them. Re-review needed (verified headers edited by this batch):

@@ -228,17 +228,40 @@ class Trace(unittest.TestCase):
     def test_discovery(self):
         # the rules reach what the module only names at run time
         d = c3module.discover(self.mem)
-        self.assertIn(0x3F14, d.scripts)                  # LDA #$3F14 / STA $0A20 at $3C5C
+        self.assertIn((0x3F14, 0x0A), d.scripts)          # LDA #$3F14 / STA $0A20 at $3C5C
         self.assertIn(0x3749, d.entries)                  # task added by the script at $3F14
         self.assertIn(0x45B0, d.patched[0x35FC])          # LDA #$45B0 / STA $35FD at $3CDB
         self.assertIn(0x5EF8, d.patched[0x5E43])          # bytes $F8, $5E written over $5E44/5
         self.assertIn(0x7F12, d.entries)                  # TASK_TABLES $7EC7
         self.assertIn(0x9317, d.script_bytes)             # SCRIPT_REDIRECTS $8CD0
+        self.assertNotIn((0x9315, 0x0A), d.scripts)       # (resumed at + 2, not started)
+        # $564D and $5640, called by page $0B's script $5568, start page
+        # $0A at their values; page $0B goes on after the calls
+        self.assertIn((0x5635, 0x0A), d.scripts)
+        self.assertIn((0x5604, 0x0A), d.scripts)
+        self.assertIn(0x55D8, d.script_bytes)
+        # poke16 of page $0B's pointer by page $0A's script breaks the wait
+        # loops; the scripts after them add the tasks $992A and $997D
+        self.assertIn((0x97A9, 0x0B), d.scripts)
+        self.assertIn((0x934A, 0x0B), d.scripts)
+        self.assertIn(0x992A, d.entries)
+        self.assertIn(0x997D, d.entries)
+        # opcode $xF (end) has no operand: $424D, after one, is code only
+        self.assertIn(0x424D, d.insns)
+        self.assertNotIn(0x424D, d.script_bytes)
+        # task references the CALLERS rule wants: script opcodes and LDX #
+        self.assertIn(0x9453, d.refs[0x3176])             # opcode $F8
+        self.assertIn(0x94C6, d.refs[0x3176])             # opcode $F7
+        self.assertIn(0x63E8, d.refs[0x3495])             # LDX #$3495 / JSR $395E
         self.assertGreater(len(c3module.code_bytes(d.insns)), 20000)
 
     def test_sites(self):
         self.assertEqual(self.sites[0x3063], [0x3000])
         self.assertIn(0x3187, self.sites[0x377E])
+        # the lint's sites include the script opcodes and LDX # task adds
+        sites = lint_c3module.module_sites()
+        self.assertIn(0x5B1D, sites[0x388B])              # opcode $F8: C3Mod_UploadPalette
+        self.assertIn(0x5BA9, sites[0x34AB])              # LDX #$34AB / JSR $395E
 
     def test_no_overlap(self):
         owner = {}
