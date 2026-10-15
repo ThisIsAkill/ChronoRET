@@ -57,6 +57,7 @@ incbins at $C3:1313. Nothing is rebuilt when the inputs are unchanged.
 
 import argparse
 import hashlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -397,9 +398,15 @@ def source_bytes(root: Path = Path('.')) -> list[int]:
     return [i for i in range(MODULE_SIZE) if built[0][i] == built[1][i]]
 
 
-def module_figures(root: Path = Path('.')) -> dict:
-    """tools/progress.py's figures for the module (key "c3module")."""
-    return {'unpacked_bytes': MODULE_SIZE, 'source_bytes': len(source_bytes(root))}
+def module_labels(root: Path = Path('.')) -> dict[str, int]:
+    """{label: $7Exxxx} of the module's source (asar's symbol file)."""
+    ensure_built(root)
+    out = {}
+    for line in (Path(root) / MODULE_SYM).read_text().splitlines():
+        m = re.match(r'^([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4}) (\S+)$', line)
+        if m:
+            out[m.group(3)] = int(m.group(1), 16) << 16 | int(m.group(2), 16)
+    return out
 
 
 def ensure_built(root: Path = Path('.')) -> None:

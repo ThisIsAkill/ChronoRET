@@ -18,6 +18,9 @@ readability job) only the review log is checked.
     beside functions.csv): known columns, ARAM addresses `$AAAA` strictly
     ascending with their ROM addresses `$C7:AAAA`, kind, status and notes
     as above. Review rows name these routines like any other;
+  - symbols/c3module_functions.csv (the packed $C3 module's routines, by
+    their WRAM addresses `$7E:AAAA`, strictly ascending): known columns,
+    kind, status and notes as above; reviewed like any other;
   - every `verified` function (of either table) has an approved review of
     its current source_hash, and no function is `verified` without one.
 """
@@ -33,6 +36,8 @@ import review_log  # noqa: E402
 
 FUNCTIONS = Path('symbols/functions.csv')
 SPC700 = Path('symbols/spc700_functions.csv')
+C3MODULE = Path('symbols/c3module_functions.csv')
+M_COLS = ['address', 'end', 'size', 'name', 'kind', 'status', 'source_hash', 'notes']
 S_COLS = ['address', 'end', 'size', 'rom', 'rom_end', 'name', 'kind', 'status', 'source_hash', 'notes']
 ARAM = re.compile(r'^\$[0-9A-F]{4}$')
 OLD_REVIEWS = Path('symbols/reviews.csv')
@@ -49,6 +54,7 @@ def main() -> int:
     errors = []
     functions = []
     spc_rows = []
+    c3_rows = []
     have_functions = generated.ensure() and FUNCTIONS.exists()
     if have_functions:
         with FUNCTIONS.open() as f:
@@ -64,6 +70,14 @@ def main() -> int:
                 spc_rows = list(reader)
         else:
             errors.append(f'{SPC700} is missing; run tools/progress.py --update')
+        if C3MODULE.exists():
+            with C3MODULE.open() as f:
+                reader = csv.DictReader(f)
+                if reader.fieldnames != M_COLS:
+                    errors.append(f'{C3MODULE}: columns {reader.fieldnames}, expected {M_COLS}')
+                c3_rows = list(reader)
+        else:
+            errors.append(f'{C3MODULE} is missing; run tools/progress.py --update')
     else:
         print(f'{FUNCTIONS} cannot be generated here (needs the ROM and asar): '
               f'checking the review log only.')
@@ -104,6 +118,24 @@ def main() -> int:
     clash = {r['name'] for r in functions} & {r['name'] for r in spc_rows}
     errors += [f'{SPC700}: {name} is also a row of {FUNCTIONS}' for name in sorted(clash)]
 
+    last = -1
+    for n, row in enumerate(c3_rows, 2):
+        where = f'{C3MODULE}:{n} {row.get("name")}'
+        if not ADDR.match(row['address'] or '') or not row['address'].startswith('$7E:'):
+            errors.append(f'{where}: bad address {row["address"]!r}')
+            continue
+        if addr_key(row['address']) <= last:
+            errors.append(f'{where}: addresses must be strictly ascending')
+        last = addr_key(row['address'])
+        if row['status'] not in ('matched', 'readable', 'verified'):
+            errors.append(f'{where}: unknown status {row["status"]!r}')
+        if row['kind'] not in ('code', 'data'):
+            errors.append(f'{where}: unknown kind {row["kind"]!r}')
+        if '\n' in row['notes'] or len(row['notes']) > 200:
+            errors.append(f'{where}: notes must be one line, 200 characters at most')
+    clash = ({r['name'] for r in functions} | {r['name'] for r in spc_rows}) & {r['name'] for r in c3_rows}
+    errors += [f'{C3MODULE}: {name} is also a row of another table' for name in sorted(clash)]
+
     if OLD_REVIEWS.exists():
         errors.append(f'{OLD_REVIEWS}: the review log is one file per round now; move its rows '
                       f'to {review_log.REVIEWS_DIR}/rNNN.csv (tools/review_log.py)')
@@ -115,8 +147,9 @@ def main() -> int:
         if cols != R_COLS:
             errors.append(f'{path}: header {cols}, expected {R_COLS}')
     reviews = review_log.read_rows()
-    names = {row['name']: row for row in functions + spc_rows}
-    table_of = {**{r['name']: FUNCTIONS for r in functions}, **{r['name']: SPC700 for r in spc_rows}}
+    names = {row['name']: row for row in functions + spc_rows + c3_rows}
+    table_of = {**{r['name']: FUNCTIONS for r in functions}, **{r['name']: SPC700 for r in spc_rows},
+                **{r['name']: C3MODULE for r in c3_rows}}
     latest = {}
     historical = 0
     for path, n, _, row in reviews:
@@ -153,6 +186,7 @@ def main() -> int:
         print(f'symbols/ review log valid: {len(reviews)} review row(s).')
         return 0
     print(f'symbols/ valid: {len(functions)} functions, {len(spc_rows)} SPC700 routines, '
+          f'{len(c3_rows)} $C3 module routines, '
           f'{len(reviews)} review row(s)'
           f' ({historical} for routines since renamed or removed).')
     return 0

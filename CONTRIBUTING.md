@@ -37,7 +37,9 @@ A routine goes to `main` only when it is **matched, readable and reviewed**. Its
 `symbols/functions.csv` is computed by `tools/progress.py`, never set by hand (routines of the
 SPC700 sound driver, `asm/spc700/`, are rows of `symbols/spc700_functions.csv` instead, by ARAM
 and ROM address, with their own progress figure; the lint's SPC700 rules are in
-`tools/lint_spc700.py`, and their reviews are rows of the same log); each level
+`tools/lint_spc700.py`, and their reviews are rows of the same log; likewise the packed `$C3`
+module's, `asm/bankC3/packed/`, in `symbols/c3module_functions.csv` by WRAM address, with
+`tools/lint_c3module.py`); each level
 includes the one before. (`functions.csv` and `progress.json` are generated and not tracked:
 every tool that reads them regenerates them when they are stale, and
 `python3 tools/progress.py --update` writes them on disk.)

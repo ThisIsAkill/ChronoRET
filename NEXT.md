@@ -924,9 +924,23 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    bankC3.asm incbins. What the source does not cover yet is incbin'd from the ROM's module
    (`%C3ModRomBytes`, from `build/c3pack/rom_module.bin`), as unmatched bytes stay ROM bytes
    elsewhere; it is counted apart like the SPC700 driver (`tools/progress.py`'s "packed $C3
-   module" line). Next: match its code in unpacked form; the module routines the kernel
-   calls by address are stubs (`!C3Mod_AudioCommand`, `!C3Mod_CallW`, `!C3Mod_RunTasks`,
-   `!C3Mod_RunNmiTasks` in ram_engine.inc). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   module" line, rows in `symbols/c3module_functions.csv`, rules in `tools/lint_c3module.py`;
+   the module's code bytes are what `tools/c3module.py`'s trace reaches plus the matched code).
+   Matched so far (first batch, to review): the start and setup `$3000`-`$31BE`
+   (`C3Mod_Start`, `C3Mod_ProgramTable`, `C3Mod_Init` with `C3Mod_Return`, `C3Mod_SoundReset`,
+   `C3Mod_WaitVblank`), the sound port and row copies `$377A`-`$37F9` (`C3Mod_AudioCommand`,
+   `C3Mod_AudioSend`, `C3Mod_DoubleRows`, `C3Mod_SpaceRows`, `C3Mod_CallW`),
+   `C3Mod_HideSprites` (`$3843`), `C3Mod_UploadPalette` (`$388B`) and the task runners
+   `$398A`-`$39F4` (`C3Mod_RunTasks` with `C3Mod_TaskNext`, `C3Mod_TaskEnd`,
+   `C3Mod_TaskReplace`, `C3Mod_RunNmiTasks` with `C3Mod_NmiTaskNext`, `C3Mod_NmiTaskEnd`,
+   `C3Mod_NmiTaskReplace`; quirk: the last one branches back into the frame-task loop). The
+   kernel's `!C3Mod_*` defines now name matched routines (the lint's KERNEL rule checks them).
+   Next: the rest of the module, `C3Mod_Rest*` blocks; the trace (6.8 KB of code from the
+   entries and the program table) misses code reached through the task lists and
+   C3_ScratchF0, so add entries to `tools/c3module.py` as they are found (the programs at
+   `C3Mod_Prog*` set tasks up: their `LDA #addr` / `STA C3_TaskList,X` stores give the task
+   entries; `$31BF` (a multiply/divide pair), `$3870` and `$37FA` are code no trace reaches
+   yet). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
    and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
    the module reads them. Re-review needed (verified headers edited by this batch):

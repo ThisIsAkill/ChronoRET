@@ -159,6 +159,29 @@ The SPC700 program in bank $C7 (`asm/spc700/`) follows the same rules, checked b
   (`tools/spc700.py`) outside the routine and its sub-entries is named there by its ARAM
   address (`$0299`). Table dispatch (a pushed address and `ret`) is said in words.
 
+## The packed $C3 module
+
+The jet-bike race module (`BankC3_PackedModule`, packed at `$C3:1313`) is matched unpacked, in
+`asm/bankC3/packed/module.asm`, with the same rules as the bank files, checked by
+`tools/lint_c3module.py` (run by the lint):
+
+- **Assembly.** The file is assembled on its own at base `$7E:3000` by `tools/c3pack.py`, which
+  packs it back to the ROM's bytes; `%C3ModOrg(addr)` starts a block at a module address
+  (labels take `$7E:xxxx`). Bytes not matched yet are `%C3ModRomBytes(start, end)` under a
+  `C3Mod_Rest<addr>` label (no rule applies to those); label-only stubs for module code not
+  matched yet go in `asm/bankC3/packed/unmatched.asm`, names and constants in `module.inc`.
+- **Names.** Module routines are `C3Mod_*`; its RAM and constants `!C3_*` (the kernel's are in
+  `ram_engine.inc` / `constants_engine.inc`, the module's own in `module.inc`). Kernel and engine
+  labels it calls are defines named after the label (`JSL !C3_ModuleFrame`), and the kernel
+  reaches module routines through `!C3Mod_*` defines in `ram_engine.inc`; the lint's `KERNEL`
+  rule checks both sides' addresses.
+- **Headers.** As for the bank files (Entry/Exit, DP and DB, `header: see`), with the title in
+  module addresses: `; $7E:3000 — C3Mod_Start (67 bytes, $3000–$3042)` (`SIZE` checks it
+  against `symbols/c3module_functions.csv`).
+- **Callers.** Hand-written on `; Callers note:` lines until a generator exists: every JSR, JSL,
+  JMP, JML and BRL site that the module's trace (`tools/c3module.py`) finds outside the routine
+  and its sub-entries is named by its address (`$3187`), and calls from the kernel by name.
+
 ## Layout
 
 - One file per bank, `asm/bank<NN>/bank<NN>.asm`, in address order, grouped by subsystem with a
