@@ -9,8 +9,6 @@
 ; has not been traced).
 %C3ModOrg($7E6B04)
 C3Mod_Prog1:
-%C3ModOrg($7E5978)
-C3Mod_Prog2:
 %C3ModOrg($7E671F)
 C3Mod_Prog3:
 %C3ModOrg($7E7092)

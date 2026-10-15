@@ -52,6 +52,7 @@ endmacro
 !Audio_DriverCommand = $C70004           ; bankC7.asm: sends the Audio_Cmd* block (JSL)
 !C3_SprListSmall = $C30D0E              ; bankC3.asm: a list of small sprites (JSL)
 !FdVec_FFF7 = $FDFFF7                    ; bankFD.asm: JMP PalAnim_TickAll (JSL)
+!FdVec_FFEE = $FDFFEE                    ; bankFD.asm: JMP PalAnim_StopAll (JSL)
 !RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
 !BankC3_Entry000E = $C3000E              ; bankC3.asm: BRA/JMP to the wipe, WinFx_StepWipe (JSL)
 !C3_BuildCopyCode = $C309E9              ; bankC3.asm: writes the bitmap-to-tiles copy code (JSL)
@@ -569,6 +570,103 @@ endmacro
 !C3_AtanUp = $0300                       ; C3Mod_Atan's angle for X = 0, Y positive
 !C3_FullTurn = $0400                     ; a turn (C3Mod_Sine's 1024 steps)
 !C3_TanTableBytes = $0080                ; C3Mod_TanTable's size
+; Program 2 (the rocking mode-7 picture, then mode 2 with a wave).
+!C3_Prog2M7Tiles = $A0                   ; mode-7 characters made of pack 23's first tiles
+!C3_Prog2Bg1Map = $6400                  ; VRAM word of BG1's map in mode 2 (pack 26)
+!C3_Prog2Bg2Map = $6000                  ; ... BG2's (pack 25; the mode-7 map's source too)
+!C3_Prog2Bg3Map = $7000                  ; ... BG3's: mode 2's offset-per-tile table
+!C3_Prog2MapClear = $6480                ; VRAM word from which BG1's map is cleared ...
+!C3_Prog2MapClearBytes = $0F00           ; ... this many bytes
+!C3_Prog2Bg1Sc = $65                     ; BG1SC: map at $6400, 64x32
+!C3_Prog2Bg2Sc = $60                     ; BG2SC: map at $6000, 32x32
+!C3_Prog2Bg3Sc = $70                     ; BG3SC: map at $7000
+!C3_Prog2Tiles = $55                     ; BG12NBA: BG1 and BG2 tiles at VRAM word $5000
+!CGADSUB_AddBg1Backdrop = $21            ; colour math on BG1 and the backdrop, add, not halved
+!C3_Prog2M7X = $0020                     ; M7X
+!C3_Prog2M7Y = $FFC0                     ; M7Y (-$40)
+!C3_Prog2Bg2Hofs = $FF40                 ; BG2HOFS (-$C0)
+!C3_Prog2Fade = $0101                    ; C3_FadeStep and C3_FadeTimer
+!C3_SongProg2 = $30                      ; program 2's song (C3Mod_PlaySong)
+!C3_ColourWhite = $FFFF                  ; a colour word: white (bit 15 unused)
+!C3_Prog2WhiteOffset = $01E2             ; colour $F1's offset in a palette buffer
+!C3_M7MapCells = $20                     ; C3Mod_MapToM7: map cells a row, and rows
+!C3_M7MapRest = $60                      ; ... zero bytes after each row (a 128-wide map)
+!C3_M7MapClear = $1000                   ; ... bytes cleared after the 32 rows
+!C3_SlideX = $46                         ; dp (DP=0): 5 words, the slide groups' X x 16
+!C3_SlideStop = $50                      ; 5 words: where each stops
+!C3_SlideStart = $05A0                   ; their start (90 pixels)
+!C3_SlideStop0 = $0670                   ; the stops (103, 119, 134, 154, 169 pixels)
+!C3_SlideStop1 = $0770
+!C3_SlideStop2 = $0860
+!C3_SlideStop3 = $09A0
+!C3_SlideStop4 = $0A90
+!C3_SlideY = $0052                       ; the slide pictures' Y
+!C3_SlideBytes = $000A                   ; 5 words
+!C3_RockMatrix = $5A                     ; dp: 4 words, M7A, M7B, M7C, M7D (C3Mod_RockNmiTask)
+!C3_SwingX = $62                         ; dp: 16-bit, C3Mod_SwingDrawTask's X
+!C3_SwingY = $64                         ; ... and Y
+!C3_RockPhase = $66                      ; dp: 16-bit, C3Mod_RockTask's angle
+!C3_SwingAngle = $68                     ; dp: 16-bit, C3Mod_SwingTask's angle
+!C3_RockSwing = $6C                      ; dp: 16-bit, the rocking's size ($200 down to 1)
+!C3_Prog2Done = $6E                      ; dp: 16-bit, set (low byte 1) at the end: no skip
+!C3_Prog2Skip = $70                      ; dp: 16-bit, set (low byte 1) when skipped
+!C3_FirstPicTimer = $72                  ; dp: 16-bit, C3Mod_FirstPicTask's frames left
+!C3_FirstPicFrames = $006E               ; ... from 110
+!C3_Prog2Skipped = $7F0060               ; 8-bit: 1 when a button skipped program 2 without R or L
+!C3_SwingAngleStart = $00F8
+!C3_SwingXStart = $00D8
+!C3_SwingYStart = $0082
+!C3_RockPhaseStart = $14C8
+!C3_RockSwingStart = $0200
+!C3_RockScale = $00                      ; page $0A00's var 0 in program 2: the mode-7 scale
+!C3_Prog2ScrollX = $02                   ; var 1: BG1HOFS
+!C3_Prog2ScrollY = $04                   ; var 2: BG1VOFS
+!C3_WaveSize = $0C                       ; var 6: the wave's size (C3Mod_WaveTask)
+!C3_RockStep = $0007                     ; C3Mod_RockTask: the phase step a frame
+!C3_RockScrollBase = $0100               ; ... BG1VOFS = $10000 / the scale - this
+!C3_SwingStop = $0070                    ; C3Mod_SwingTask: the swing ends below this angle
+!C3_SwingEndX = $0038                    ; ... the pictures' place after it
+!C3_SwingEndY = $003A
+!C3_SwingRadiusX = $00D8                 ; ... the arc's sizes and offsets
+!C3_SwingOffsetX = $FFE0
+!C3_SwingRadiusY = $00C3
+!C3_SwingOffsetY = $FFC0
+!C3_SwingPicBGap = $0040                 ; C3Mod_SwingPicB's Y below C3Mod_SwingPicA's
+!C3_SidePicX = $003A
+!C3_SidePicY = $0064
+!C3_FirstPicX = $0090
+!C3_FirstPicY = $00B0
+!C3_SkipFrom = $003C                     ; C3_FirstPicTimer value that adds C3Mod_SkipTask
+!C3_BottomPicY = $00D0
+!C3_BottomPicAX = $0078
+!C3_BottomPicBX = $00B8
+!C3_WaveEvery = $001F                    ; C3Mod_WaveCountTask: every 32 frames
+!C3_BgMode2NoMosaic = $0002              ; BGMODE 2 (and MOSAIC 0: a 16-bit store)
+!C3_Prog2Mode2Y = $FFB9                  ; BG1VOFS in mode 2 (-$47)
+!C3_FadeAnimKind = $50                   ; FieldAnimB.Unk0: kind 5 (PalAnim_Fade)
+!C3_FadeAnimFirst = $C0                  ; ... its first colour
+!C3_FadeAnimCount = $10                  ; ... colours
+!C3_FadeAnimTarget = $FF                 ; ... its target level
+!C3_WhitenAnimKind = $40                 ; kind 4 (PalAnim_FadeWhite)
+!C3_WhitenAnimFirst = $B0
+!C3_WhitenAnimCount = $0B
+!C3_WhitenAnimLevel = $80
+!C3_TileRow = $3B                        ; dp: a tile row's plane bytes (4, or 8 at $3B-$42)
+!C3_TileRowsLeft = $3F                   ; dp: C3Mod_Tile4ToM7's row count
+!C3_Tile8RowsLeft = $31                  ; dp: C3Mod_Tile8ToM7's
+!C3_TilePlanes23 = $10                   ; a tile's planes 2-3 after planes 0-1
+!C3_TilePlanes45 = $20                   ; ... 4-5 (8bpp)
+!C3_TilePlanes67 = $30                   ; ... 6-7
+!C3_Tile4Skip = $0010                    ; C3Mod_TilesToM7: X + this after a tile's 16 row bytes
+!C3_WaveTable = $0C00                    ; mode 2's offset-per-tile table: 2 rows of 32 words
+!C3_WaveTableBytes = $0080
+!C3_WaveVRow = $40                       ; its second row (the vertical offsets)
+!C3_WaveShiftLast = $007C                ; C3Mod_WaveTask: the last word moved up ...
+!C3_WaveShiftEnd = $003E                 ; ... and where the loop ends
+!C3_WaveBase = $004A                     ; ... the offset taken off
+!C3_OffsetMask = $03FF                   ; an offset-per-tile entry's offset
+!C3_OffsetBg1 = $2000                    ; ... bit 13: it applies to BG1
+!C3_Prog2Bg3Hofs = $0044                 ; 16-bit: BG3HOFS (C3Mod_WaveNmiTask; C3_Prog9's byte)
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
@@ -633,4 +731,42 @@ macro C3ModDivZeroStep()                ; its last 8: a zero bit (ASL) in place 
     CLC
 ?fits:
     ROL.b !C3Math_Lo
+endmacro
+
+; ------------------------------------------------------------
+; One mode-7 pixel of C3Mod_Tile4ToM7 / Tile8ToM7: the top bits of the
+; row's plane bytes (the highest plane first) shifted into A, written
+; to VMDATAH (long: DB is the tiles' bank).
+; ------------------------------------------------------------
+macro C3ModPixel4()
+    TDC                                 ; A = DP's low byte (0)
+    ASL.b !C3_TileRow+3
+    ROL A
+    ASL.b !C3_TileRow+2
+    ROL A
+    ASL.b !C3_TileRow+1
+    ROL A
+    ASL.b !C3_TileRow
+    ROL A
+    STA.l VMDATAH
+endmacro
+
+macro C3ModPixel8()
+    ASL.b !C3_TileRow+7
+    ROL A
+    ASL.b !C3_TileRow+6
+    ROL A
+    ASL.b !C3_TileRow+5
+    ROL A
+    ASL.b !C3_TileRow+4
+    ROL A
+    ASL.b !C3_TileRow+3
+    ROL A
+    ASL.b !C3_TileRow+2
+    ROL A
+    ASL.b !C3_TileRow+1
+    ROL A
+    ASL.b !C3_TileRow
+    ROL A
+    STA.l VMDATAH
 endmacro
