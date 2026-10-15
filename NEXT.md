@@ -926,25 +926,32 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    elsewhere; it is counted apart like the SPC700 driver (`tools/progress.py`'s "packed $C3
    module" line, rows in `symbols/c3module_functions.csv`, rules in `tools/lint_c3module.py`;
    the module's code bytes are what `tools/c3module.py`'s trace reaches plus the matched code).
-   Matched so far (first batch, to review): the start and setup `$3000`-`$31BE`
+   Matched so far (to review): first batch, the start and setup `$3000`-`$31BE`
    (`C3Mod_Start`, `C3Mod_ProgramTable`, `C3Mod_Init` with `C3Mod_Return`, `C3Mod_SoundReset`,
-   `C3Mod_WaitVblank`), the sound port and row copies `$377A`-`$37F9` (`C3Mod_AudioCommand`,
-   `C3Mod_AudioSend`, `C3Mod_DoubleRows`, `C3Mod_SpaceRows`, `C3Mod_CallW`),
-   `C3Mod_HideSprites` (`$3843`), `C3Mod_UploadPalette` (`$388B`) and the task runners
-   `$398A`-`$39F4` (`C3Mod_RunTasks` with `C3Mod_TaskNext`, `C3Mod_TaskEnd`,
-   `C3Mod_TaskReplace`, `C3Mod_RunNmiTasks` with `C3Mod_NmiTaskNext`, `C3Mod_NmiTaskEnd`,
-   `C3Mod_NmiTaskReplace`; quirk: the last one branches back into the frame-task loop). The
-   kernel's `!C3Mod_*` defines now name matched routines (the lint's KERNEL rule checks them).
-   Next: the rest of the module, `C3Mod_Rest*` blocks; the trace (6.8 KB of code from the
-   entries and the program table) misses code reached through the task lists and
-   C3_ScratchF0, so add entries to `tools/c3module.py` as they are found (the programs at
-   `C3Mod_Prog*` set tasks up: their `LDA #addr` / `STA C3_TaskList,X` stores give the task
-   entries; `$31BF` (a multiply/divide pair), `$3870` and `$37FA` are code no trace reaches
-   yet; `JMP` byte patterns to C3Mod_TaskEnd/TaskReplace/NmiTaskEnd and `JSR`/`JSL` patterns
-   to C3Mod_AudioSend ($426D, $4BC8, $63E5), C3Mod_DoubleRows ($87B3), C3Mod_SpaceRows
-   ($8A8D) and C3Mod_UploadPalette ($8AC7, $8C97) point at more of it: once traced, the CALLERS
-   rule will want them named). Trace anomalies: `JSR $B574` at `$82A5` runs into the staff texts
-   ($A651-$B57E, `DATA_RANGES`; the path from `$8280` looks mis-decoded). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   `C3Mod_WaitVblank`), the sound port and row copies `$377A`-`$37F9`, `C3Mod_HideSprites`,
+   `C3Mod_UploadPalette` and the task runners `$398A`-`$39F4`; second batch, everything from
+   `$31BF` to `$3B47` (the math: `C3Mod_Mul16`, `Div16`, `DivHighByte`, `Div32`,
+   `MulSigned16`, `DivSigned16`, `SquareRoot`, `Cosine`/`Sine`, the two random helpers; the
+   fade and music tasks; the nibble unpackers; the mode-7 HDMA tables and the self-modifying
+   plane builder `C3Mod_BuildM7Tables`; packs, DMA and HDMA set-up; the palette and OAM tasks;
+   `C3Mod_TaskAdd`/`TaskRemove` and the NMI pair; `C3Mod_DrawNumber` and
+   `C3Mod_SprListMixed`) and the staff texts `$A651`-`$B57E` as data (`C3Mod_StaffTexts`).
+   Quirks are in the headers (the dividers above `$8000`, `DivSigned16`'s unused sign,
+   `Mul16`'s stray carry, the 16-bit store to WRDIVB that also writes HTIMEL, the open-bus reads
+   of the multiplier in `C3Mod_PalAnimTask` and of WMDATA in `C3Mod_SprListMixed`, the
+   `PEA $007E` that leaves DB = `$00`). The trace (`tools/c3module.py --entries` lists each
+   entry with its evidence) now follows the task-list stores (X loaded before the add/replace
+   calls and jumps, and the two MVN task tables at `$7EC7`/`$7EDC`), the script pointers
+   stored to `$0A20`/`$0B20` with the scripts parsed by `C3_RunScript`'s opcodes, the routines
+   that move a script pointer (`SCRIPT_REDIRECTS`), stores over JSR/JMP operands, the patched
+   BRA table at `$3689`, and models `JSR $B574` at `$82A5` as a call into
+   `C3_BuildCopyCode`'s generated code (`GENERATED`): about 20.5 KB of code, no anomalies.
+   Next: `C3Mod_Rest3B48` (`$3B48`-`$A650`), the programs and their tasks; about 6 KB of the
+   module is reached by no trace and looks like tables (and two scripts, `$934A` and `$97A9`,
+   entered only when a wait loop is broken; `$3209`'s divide is reached only from the unused
+   `C3Mod_DivSigned16`). Re-review needed (headers edited by the second batch for the round-178 leads):
+   `C3Mod_Start`, `C3Mod_Init`, `C3Mod_AudioSend`, `C3Mod_DoubleRows`, `C3Mod_SpaceRows`,
+   `C3Mod_UploadPalette`. Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
    unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
    and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
    the module reads them. Re-review needed (verified headers edited by this batch):

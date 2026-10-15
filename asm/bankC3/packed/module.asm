@@ -2034,8 +2034,338 @@ C3Mod_NmiTaskReplace:
     STA.w !C3_NmiTaskList,X
     BRA C3Mod_TaskNext
 
-%C3ModOrg($7E39F5)
-C3Mod_Rest39F5:
-    %C3ModRomBytes($7E39F5, $7EB57F)
+; ============================================================
+; Sprites: a number, a list with mixed sizes ($39F5–$3B47)
+; ============================================================
+
+; $7E:39F5 — C3Mod_DrawNumber (136 bytes, $39F5–$3A7C)
+; Draws C3_ScratchF0 as up to 5 decimal digits with C3_SprListSmall:
+; the digits go into the tile bytes of C3Mod_NumberSprites (tile
+; C3_DigitTile0 + the digit; its records place them right to left, 7
+; pixels apart from C3_SprBaseX / C3_SprBaseY); the leading zeros are
+; left out by the list's count (the ones digit always shows). The
+; ten-thousands, thousands and hundreds come from subtraction loops, the
+; tens and ones from the hardware divider (16-bit stores: WRDIVB's also
+; writes HTIMEL with 0). DB is set to $7E for the list with PEA $007E /
+; PLB, and to $00 for the sprite builder by the second PLB (the PEA's
+; other byte).
+; Callers note: $5187 and $51AE (code not matched yet).
+; Entry: M=0, X any (8-bit set here), DP=0 (C3_ScratchF0, and
+;        C3_SprListSmall's C3_OamPos..), DB any (left $00); C3_ScratchF0
+;        = the number; C3_SprBaseX/Y = where its left end goes.
+; Exit:  M=0, X=0, DB = $00; A, X, Y as C3_SprListSmall leaves them;
+;        C3Mod_NumberSprites rewritten.
+; Calls: C3_SprListSmall (JSL).
+C3Mod_DrawNumber:
+    LDA.b !C3_ScratchF0
+    SEP #$10
+    PEA.w !Bank7E                       ; PLB takes the $7E; the $00 stays for the second PLB
+    PLB
+    LDY.b #!C3_DigitTile0-1
+.ten_thousands:
+    SEC
+    SBC.w #!C3_Dec10000
+    INY
+    BCS .ten_thousands
+    ADC.w #!C3_Dec10000
+    STY.w C3Mod_NumberSprites_ten_thousands
+    LDY.b #!C3_DigitTile0-1
+.thousands:
+    SEC
+    SBC.w #!C3_Dec1000
+    INY
+    BCS .thousands
+    ADC.w #!C3_Dec1000
+    STY.w C3Mod_NumberSprites_thousands
+    LDY.b #!C3_DigitTile0-1
+.hundreds:
+    SEC
+    SBC.w #!C3_Dec100
+    INY
+    BCS .hundreds
+    ADC.w #!C3_Dec100
+    STY.w C3Mod_NumberSprites_hundreds
+    STA.l WRDIVL                        ; and WRDIVH
+    LDA.w #!C3_Dec10
+    STA.l WRDIVB                        ; and HTIMEL (0)
+    SEP #$20
+    LDY.w C3Mod_NumberSprites_ten_thousands
+    LDX.b #!C3_NumberRecords+1
+    NOP                                 ; (the divider's time)
+    LDA.b #!C3_DigitTile0
+    CLC
+    ADC.l RDDIVL
+    STA.w C3Mod_NumberSprites_tens
+    LDA.l RDMPYL                        ; the remainder
+    CLC
+    ADC.b #!C3_DigitTile0
+    STA.w C3Mod_NumberSprites_ones
+    TYA
+    CMP.b #!C3_DigitTile0
+    BNE .count
+    DEX                                 ; a leading zero: one record less
+    LDA.w C3Mod_NumberSprites_thousands
+    CMP.b #!C3_DigitTile0
+    BNE .count
+    DEX
+    LDA.w C3Mod_NumberSprites_hundreds
+    CMP.b #!C3_DigitTile0
+    BNE .count
+    DEX
+    LDA.w C3Mod_NumberSprites_tens
+    CMP.b #!C3_DigitTile0
+    BNE .count
+    DEX
+.count:
+    STX.w C3Mod_NumberSprites
+    PLB                                 ; DB = $00
+    REP #$30
+    LDA.w #C3Mod_NumberSprites
+    JSL !C3_SprListSmall
+    RTS
+
+; $7E:3A7D — C3Mod_NumberSprites (21 bytes, $3A7D–$3A91)
+; C3Mod_DrawNumber's sprite list for C3_SprListSmall: the count (records
+; + 1, written) and 5 records of tile (written), attribute, X, Y: the
+; ones, tens, hundreds, thousands and ten-thousands, X = $1C down to 0.
+C3Mod_NumberSprites:
+    db 0
+.ones:
+    db 0, !C3_DigitAttr, $1C, 0
+.tens:
+    db 0, !C3_DigitAttr, $15, 0
+.hundreds:
+    db 0, !C3_DigitAttr, $0E, 0
+.thousands:
+    db 0, !C3_DigitAttr, $07, 0
+.ten_thousands:
+    db 0, !C3_DigitAttr, $00, 0
+
+; $7E:3A92 — C3Mod_SprListMixedEnd (5 bytes, $3A92–$3A96)
+; C3Mod_SprListMixed's exit, placed before its entry.
+C3Mod_SprListMixedEnd:                  ; header: see C3Mod_SprListMixed
+    REP #$20
+    STY.b !C3_OamPos
+    RTL
+
+; $7E:3A97 — C3Mod_SprListMixed (177 bytes, $3A97–$3B47)
+; Adds a list of sprites to the OAM shadow, like the kernel's
+; C3_SprListSmall / C3_SprListLarge but with both sizes and signed
+; offsets: the list (in bank $7E at A, read through WMDATA) is a byte n +
+; 1, then n records of tile, attribute, X, Y. The attribute's bit 4
+; (C3_SprLargeBit) picks the large size and is cleared in OAM (so the
+; sprites have priority 0 or 2 only). X and Y are signed bytes added to
+; C3_SprBaseX / C3_SprBaseY: an X below 0 gets X bit 8 set, an X from
+; $100 up hides the sprite (Y = $E0; its X byte is not written, and its
+; high-table bits are small, X bit 8 clear); a Y below 0 or from $E0 up
+; becomes $E0 (below the screen). Each sprite's two high-table bits are
+; shifted in at the top of the byte at C3_OamHiPtr, which moves on after
+; every 4 sprites; C3_OamPos is stored back at the end, through
+; C3Mod_SprListMixedEnd ($3A92), placed before the entry. The Y byte
+; is read with a 16-bit LDA (WMDATA and the write-only WMADDL: open bus
+; in the high byte, which the sign extension drops).
+; Sub-entry: C3Mod_SprListMixedEnd, the exit (RTL).
+; Callers note: JSL from $7F9C, $7FB0, $7FBF, $8386 and $9A6A (code not
+;   matched yet).
+; Entry: M=0 (A stored to WMADDL/M as a word), X=0 (16-bit Y), DP=0
+;        (C3_OamPos.., C3_SprAttr), DB = $00 (the ports and the OAM
+;        shadow are absolute); A = the list's address.
+; Exit:  RTL with M=0, X=0; Y = C3_OamPos (advanced); C3_OamHiPtr
+;        advanced; C3_SprLeft = 0; A changed; WMADD after the list.
+C3Mod_SprListMixed:
+    STA.w WMADDL                        ; and WMADDM
+    LDY.b !C3_OamPos
+    LDA.w #!Bank7E
+    SEP #$20
+    STA.w WMADDH
+    LDA.w WMDATA
+    STA.b !C3_SprLeft
+.next:
+    DEC.b !C3_SprLeft
+    BEQ C3Mod_SprListMixedEnd
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+2,Y             ; the tile
+    LDA.w WMDATA
+    STA.b !C3_SprAttr
+    AND.b #!C3_SprLargeBit^$FF
+    STA.w !Oam_LowTable+3,Y             ; the attribute
+    LDA.w WMDATA                        ; X
+    REP #$20
+    ORA.w #!C3_SignExtend
+    BIT.w #!C3_SignBit8
+    BNE .x_signed
+    AND.w #!Eng_LowByteMask
+.x_signed:
+    CLC
+    ADC.b !C3_SprBaseX
+    BMI .left
+    CMP.w #!C3_ScreenRight
+    BPL .off_right
+    SEP #$20
+    STA.w !Oam_LowTable,Y
+    LDA.b !C3_SprAttr
+    BIT.b #!C3_SprLargeBit
+    BEQ .small
+    LDA.b (!C3_OamHiPtr)
+    LSR A
+    SEC
+    ROR A                               ; %10: large, X bit 8 clear
+    BRA .high_bits
+.small:
+    LDA.b (!C3_OamHiPtr)
+    LSR A
+    LSR A                               ; %00
+    BRA .high_bits
+.left:
+    SEP #$20
+    STA.w !Oam_LowTable,Y
+    LDA.b !C3_SprAttr
+    BIT.b #!C3_SprLargeBit
+    BEQ .left_small
+    LDA.b (!C3_OamHiPtr)
+    SEC
+    ROR A
+    SEC
+    ROR A                               ; %11: large, X bit 8
+    BRA .high_bits
+.left_small:
+    LDA.b (!C3_OamHiPtr)
+    SEC
+    ROR A
+    LSR A                               ; %01: small, X bit 8
+.high_bits:
+    STA.b (!C3_OamHiPtr)
+    REP #$20
+    LDA.w WMDATA                        ; Y (the high byte: see above)
+    ORA.w #!C3_SignExtend
+    BIT.w #!C3_SignBit8
+    BNE .y_signed
+    AND.w #!Eng_LowByteMask
+.y_signed:
+    CLC
+    ADC.b !C3_SprBaseY
+    BMI .y_off
+    CMP.w #!C3_SprHideY
+    BMI .y_ok
+.y_off:
+    LDA.w #!C3_SprHideY
+.y_ok:
+    SEP #$20
+.store_y:
+    STA.w !Oam_LowTable+1,Y
+    INY
+    INY
+    INY
+    INY
+    TYA
+    AND.b #!C3_OamGroupMask
+    BNE .same_byte
+    INC.b !C3_OamHiPtr                  ; the next high-table byte after 4 sprites
+.same_byte:
+    JMP .next
+.off_right:
+    SEP #$20
+    LDA.b (!C3_OamHiPtr)
+    LSR A
+    LSR A
+    STA.b (!C3_OamHiPtr)
+    LDA.w WMDATA                        ; the Y byte, unused
+    LDA.b #!C3_SprHideY
+    BRA .store_y
+
+%C3ModOrg($7E3B48)
+C3Mod_Rest3B48:
+    %C3ModRomBytes($7E3B48, $7EA651)
+
+; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
+; The staff credits the module shows, in two texts to the module's end:
+;   - $A651-$AADA: "PRODUCER/KAZU`KO AOKI@DIRECTOR/..." up to "...KANAME
+;     TANAKA@" and a $00: names after their job, "/" between names, "@"
+;     between jobs, "`" standing for HI (and "[", "]", "^", "_" for
+;     other pairs of letters, probably); C3Mod_Code + $86BF and $86D1
+;     load $A651 as a text pointer (into $0382) when C3_EntryArg bits
+;     0-3 are $A;
+;   - $AADB on: a $1C, then "XEXECUTIVE PRODUCER/..." to the end, the
+;     same list with "/" between names, then "CHRONO TRIGGER", the
+;     translators, test players and special thanks; no reader of it was
+;     found ("X" and the $1C are probably control bytes);
+;   - it ends with the module's end marker "\CODE END 7E" (as the kernel
+;     ends with "CODE END C3").
+; The copy code C3_BuildCopyCode writes at run time ($B574) overwrites
+; the last bytes (GENERATED in tools/c3module.py).
+%C3ModOrg($7EA651)
+C3Mod_StaffTexts:
+    db "PRODUCER/KAZU`KO AOKI@DIRECTOR/TAKAS` TOKITA/YOS`NORI KI"
+    db "TASE/AKI`KO MATSUI@CHARACTER DESIGN/AKIRA TORIYAMA@SUPER"
+    db "VISOR/YUJI HORII/`RONOBU SAKAGUC`@MUSIC/YASUNORI MITSUDA"
+    db "/NOBUO UEMATSU@MAIN PROGRAM/KEIZO KOKUBO/KATSU`SA `GUC`@"
+    db "SOUND PROGRAM/MINORU AKAO@SOUND ENGINEER/EIJI NAKAMURA@G"
+    db "RAP`C DIRECTOR/YASU`KO KAMATA/MASANORI HOS`NO/TETSUYA TA"
+    db "K]^_`@STORY PLAN/MASATO KATO@EVENT PLAN/`ROYUKI ITOU/KEI"
+    db "SUKE MATSUHARA/`ROKI C`BA@FIELD PLAN/KEITA ETO/KENIC` NI"
+    db "S`@BATTLE PLAN/MAKOTO S`MAMOTO/HARUYUKI NIS`DA/TOS`AKI S"
+    db "UZUKI@BATTLE PROGRAM/TOS`O ENDO/KIYOS` YOS`I@WORLDMAP PR"
+    db "OGRAM/KAZUMI KOBAYAS`@MENU PROGRAM/AKI`RO S`MIZU@VISUAL "
+    db "PROGRAM/KOJI SUGIMOTO/KEN NARITA@EFFECT GRAP`C/`ROKATSU "
+    db "SASAKI/YUKIO NAKATANI@FIELD GRAP`C/S`NIC`RO OKANIWA/MANA"
+    db "BU DAIS`MA/TOS`YA HASUI/MATSUZO ITAKURA@FIELD GRAP`C/TET"
+    db "SUYA NOMURA/KAZU`RO OKAWA/YOS`NORI OGURA@FIELD GRAP`C/YU"
+    db "SUKE NAORA/TAKAMIC` S`BUYA/S`NIC`RO HAMASAKA/AKIYOS` MAS"
+    db "UDA@FIELD GRAP`C/MASAAKI HAYAS`/TAKAYUKI ODAC`/YASUYUKI "
+    db "HONNE@CHARACTER GRAP`C/`ROS` UC`YAMA/TAIZO INUKAI/FUMI N"
+    db "AKAS`MA@MONSTER GRAP`C/KOUIC` EBE/TSUTOMU TERADA/TADA`RO"
+    db " USUDA@MAP DESIGN/MAMI KAWAI/AKANE HARUKI/`ROTO YAMAMOTO"
+    db "@MAP DESIGN/`DETOS` KEZUKA/KANAME TANAKA@"
+    db $00
+    db $1C
+    db "XEXECUTIVE PRODUCER/TETSUO MIZUNO/`TOS` TAKEMURA/`SAS` S"
+    db "UZUKI@PRODUCER//KAZUHIKO AOKI/////DIRECTOR//TAKASHI TOKI"
+    db "TA/YOSHINORI KITASE/AKIHIKO MATSUI/////CHARACTER DESIGN/"
+    db "/AKIRA TORIYAMA/////SUPERVISOR//YUJI HORII/HIRONOBU SAKA"
+    db "GUCHI/////MUSIC//YASUNORI MITSUDA/NOBUO UEMATSU/////MAIN"
+    db " PROGRAM//KEIZO KOKUBO/KATSUHISA HIGUCHI/////SOUND PROGR"
+    db "AM//MINORU AKAO/////SOUND ENGINEER//EIJI NAKAMURA/////GR"
+    db "APHIC DIRECTOR//YASUHIKO KAMATA/MASANORI HOSHINO/TETSUYA"
+    db " TAKAHASHI/////STORY PLAN//MASATO KATO/////EVENT PLAN//H"
+    db "IROYUKI ITOU/KEISUKE MATSUHARA/HIROKI CHIBA/////FIELD PL"
+    db "AN//KEITA ETO/KENICHI NISHI/////BATTLE PLAN//MAKOTO SHIM"
+    db "AMOTO/HARUYUKI NISHIDA/TOSHIAKI SUZUKI/////BATTLE PROGRA"
+    db "M//TOSHIO ENDO/KIYOSHI YOSHII/////WORLDMAP PROGRAM//KAZU"
+    db "MI KOBAYASHI/////MENU PROGRAM//AKIHIRO SHIMIZU/////VISUA"
+    db "L PROGRAM//KOJI SUGIMOTO/KEN NARITA/////EFFECT GRAPHIC//"
+    db "HIROKATSU SASAKI/YUKIO NAKATANI/////FIELD GRAPHIC//SHINI"
+    db "CHIRO OKANIWA/MANABU DAISHIMA/TOSHIYA HASUI/MATSUZO ITAK"
+    db "URA//TETSUYA NOMURA/KAZUHIRO OKAWA/YOSHINORI OGURA/YUSUK"
+    db "E NAORA/TAKAMICHI SHIBUYA/SHINICHIRO HAMASAKA/AKIYOSHI M"
+    db "ASUDA/MASAAKI HAYASHI/TAKAYUKI ODACHI/YASUYUKI HONNE////"
+    db "/CHARACTER GRAPHIC//HIROSHI UCHIYAMA/TAIZO INUKAI/FUMI N"
+    db "AKASHIMA/////MONSTER GRAPHIC//KOUICHI EBE/TSUTOMU TERADA"
+    db "/TADAHIRO USUDA/////MAP DESIGN//MAMI KAWAI/AKANE HARUKI/"
+    db "HIROTO YAMAMOTO/HIDETOSHI KEZUKA/KANAME TANAKA/////EXECU"
+    db "TIVE PRODUCER//TETSUO MIZUNO/HITOSHI TAKEMURA/HISASHI SU"
+    db "ZUKI//////////////////////////////////      CHRONO TRIGG"
+    db "ER//////////\\//////TRANSLATOR//TED WOOLSEY//WEIMIN LI/"
+    db "AIKO ITO/RIKA MARUYA/NORIKO WADA/////SOUND EFFECT//YOSHITA"
+    db "KA HIROTA/CHIHARU MINEKAWA/TADAKAZU OKANO/YASUAKI YABUTA"
+    db "/////TEST PLAYER//KENICHI SHINODA/KEN SAKUYAMA/TOMOKO MO"
+    db "RIYASU/HARUO OGURA/HIROTSUGU YAMAMOTO/REO NOMOTO/AKIHIRO"
+    db " ICHIKAWA/AKITOSHI TAKAHASHI/////////ADVERTISEMENT//K[YA"
+    db "MASHITA/Y[HIRATA/T[NOMURA/K[SOUSUI/T[TSURUZONO/M[OKAMIYA"
+    db "/N[WATANABE/K[MAEDA/M[MIZUSHIMA/////SYSTEM ADMINISTER//M"
+    db "[NAKAJIMA/M[OGURA/Y[ORIKASA/Y[OHDAIRA/////TEST COORDINAT"
+    db "OR//S[KAJITANI/R[KODA/K[INAGI/N[HANADA/H[MASUDA/N[KANAI/"
+    db "H[SAKURAI/////SPECIAL THANKS//K[TORISHIMA///N[HORIE/F[TA"
+    db "KEDA/T[TAKAHASHI/T[KONDOH//S[HASHIMOTO////K[ADACHI/Y[KUW"
+    db "AHARA/H[OKAWA/Y[UENISHI///N[MATSUEDA/I[DOBASHI/M[SAITO/H"
+    db "[KAWAI///S[MORIYA/K[SUZUKI/T[KONDO/S[TANAKA////K[TANIKAW"
+    db "A/J[SAITO/S[HIDAKI/K[OOGO/H[SUZUKI/M[ITOH/R[MIYAMOTO///H"
+    db "[YOKOTA/M[YUMOTO/N[ISHIKAWA/H[KIZUKA/S[ARAI/K[MATSUMOTO/"
+    db "K[HIRATA/M[KOUNO/R[TSUKAKOSHI/K[KANEKO/H[SHIMODAIRA/M[NO"
+    db "UMURA/A[HINO/H[HAMADA///T[OHNO/H[NOGUCHI/M[HORIE/M[MORI/"
+    db "M[KOBAYASHI///M[KANESHIGE/M[SOMENO/Y[TANAKA/R[TAKEDA///T"
+    db "[MORITA/Y[SUEMITSU/W[SATO/H[NAKAMURA/S[AOYAMA/H[NAGAHARA"
+    db "/H[SHINGU///R[SILVEIRA/J[YANAGIHARA/T[HORII/D[SMITH/C[CH"
+    db "AMBERLAIN/E[GREGORY/D[ABRAHAM/C[BUDD/M[FREGUIA//////////"
+    db "///////////////////////\\CODE END 7E"
 
 incsrc "unmatched.asm"

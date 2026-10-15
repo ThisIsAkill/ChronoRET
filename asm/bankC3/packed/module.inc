@@ -50,6 +50,7 @@ endmacro
 !C3_CopyFEto7F = $C309A0                 ; bankC3.asm: the same to $7F (JSL)
 !C3_RunScript = $C30AFF                  ; bankC3.asm: the script interpreter (JSL)
 !Audio_DriverCommand = $C70004           ; bankC7.asm: sends the Audio_Cmd* block (JSL)
+!C3_SprListSmall = $C30D0E              ; bankC3.asm: a list of small sprites (JSL)
 !FdVec_FFF7 = $FDFFF7                    ; bankFD.asm: JMP PalAnim_TickAll (JSL)
 !RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
 
@@ -73,6 +74,7 @@ endmacro
 !C3_DmaAddr = $00F4                      ; ... 16-bit A-bus address (DmaFromArgs)
 !C3_DmaBank = $00F6                      ; ... A-bus bank
 !C3_DmaCount = $00F8                     ; ... 16-bit byte count
+!C3_SprAttr = $0A                        ; 8-bit, dp: C3Mod_SprListMixed's attribute byte
 !C3_StackSave = $00FE                    ; 16-bit: S while C3Mod_UnpackNibbles reads with PLA
 !C3_Unk0366 = $0366                      ; 8-bit: C3Mod_Init clears it (use not traced)
 !C3_PaletteBuf = $7E2200                 ; 512 bytes: the 256 CGRAM colours C3Mod_UploadPalette sends
@@ -149,6 +151,17 @@ endmacro
 !C3_OamPriorityRotate = $80              ; OAMADDH bit 7: priority rotation
 !C3_OamSlotMask = $03                    ; sprites in a high-table byte so far (offset / 4, mod 4)
 !C3_OamSlotsPerByte = 4                  ; sprites per Oam_HighTable byte
+!C3_DigitTile0 = $20                     ; C3Mod_DrawNumber: the tile of digit 0 (1-9 follow)
+!C3_DigitAttr = $3F                      ; ... its attribute: priority 3, palette 7, tile bit 8
+!C3_NumberRecords = 5
+!C3_Dec10000 = 10000                     ; ... the decimal places
+!C3_Dec1000 = 1000
+!C3_Dec100 = 100
+!C3_Dec10 = 10                    ; ... digits
+!C3_SprLargeBit = $10                    ; C3Mod_SprListMixed: attribute bit 4, the large size
+!C3_SignExtend = $FF00                   ; ORA: a negative byte as a 16-bit value
+!C3_SignBit8 = $0080                     ; ... the byte's sign bit
+!C3_SprHideY = $00E0                     ; Y of a hidden sprite (below the 224 lines)
 !C3_NibbleMask = $0F                     ; a byte's low nibble (one 4-bit pixel)
 !C3_Div32Steps = 32                      ; C3Mod_Div32: one step per dividend bit
 !C3_NibbleStack = $0BFF                  ; C3Mod_UnpackNibbles: S before its first PLA (reads
