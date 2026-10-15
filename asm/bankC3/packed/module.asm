@@ -7086,7 +7086,8 @@ C3Mod_InitStars:
 ; arithmetic, M=1):
 ;   - its depth + the speed (page $0B00's C3_StarSpeed's low byte) + C:
 ;     with the speed's bit 7 clear (BMI), the star is kept when that
-;     sum - $7F has bit 7 set (CMP #$7F / BMI: below $7F, signed);
+;     sum - $7F has bit 7 set (8-bit CMP #$7F / BMI: kept for sums
+;     $00-$7E and $FF, respawned for $7F-$FE);
 ;     with it set, kept when the sum has bit 7 clear (BPL); else it
 ;     gets a new random X and Y (C3Mod_KernelRandom twice) and keeps
 ;     the sum;
