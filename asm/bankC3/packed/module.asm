@@ -7110,9 +7110,21 @@ C3Mod_InitStars:
 ; changes C). Each next star takes the CPY's (0, Y below $200); the + $80 the
 ; CMP's (the sum >= $7F, unsigned) or the ADC's, or C3Mod_KernelRandom's
 ; after a new place; the X and Y adds the carry out of the one before.
-; Quirk: C3_StarDivisor is C3_Prog9's byte ($44) reused. Quirk: depth
-; $7F with C = 1 wraps d to $00 (a kept sum of $FF: the CMP's carry is
-; 1), so the divider divides by zero (quotient $FFFF).
+; Quirk: C3_StarDivisor is C3_Prog9's byte ($44) reused.
+; Quirk: d wraps to $00 whenever the depth is $7F and the carry into
+; ADC #$80 is 1, and the divider then divides by zero (quotient
+; $FFFF). The depth (stored AND $7F) is never above $7F, and a later
+; star enters with C = 0 (the CPY's), so the routes are:
+;   - re-placed with a sum of $7F (speed bit 7 clear) or $FF (set):
+;     the carry is the one C3_RandomByte's last SBC left (through
+;     C3Mod_KernelRandom; STA and PLA keep it), 1 when that SBC did
+;     not borrow; any star;
+;   - speed bit 7 clear, kept sum $FF (CMP carry 1): needs depth $7F,
+;     speed $7F and a carry in of 1, so only the first star (the JMP
+;     entry, or the list's first task);
+;   - speed bit 7 set: speed $FF, depth $7F and a carry in of 1 give
+;     $17F, kept (BPL on $7F) with the carry out 1; the first star
+;     only, likewise.
 ; Callers note: a task added by script opcode $FA at $5546
 ;   (C3Mod_Prog4ScriptA) and $93E6 (script not matched yet); JMP from
 ;   $99B2 (code not matched yet: the code from $999C first, when
