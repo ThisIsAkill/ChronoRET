@@ -162,7 +162,8 @@ references where it differs. The string pointer tables follow from string length
 point into the middle of five tables (op `$B8` with an address inside the tables at `$F7:0000`,
 `$F7:4900`, `$F8:4650`, `$F9:B000` and `$FC:BA00`), and a few
 stale strings sit between tables (rows marked probable), so the tables keep labels for those.
-Difficulty medium; 2-4 sessions.
+Difficulty medium; 2-4 sessions. Done (step 5, below): the original rule is a greedy longest
+match, left to right over each run of glyphs, with dictionary entries 116-118 left out.
 
 **Tables** (178 KB in 298 rows) and **palettes** (32 KB). Battle data in `$CC` (items, techs,
 enemies, growth, shop lists), `$CD`/`$CE` action records, `$E4` animation lists, `$F6` location
@@ -209,10 +210,11 @@ kind and address). `symbols/data_assets.csv` is its manifest. Pieces:
 |---|---:|---|
 | fill | 64,953 | the 76 padding rows, `fill` of the value in the survey (source) |
 | table | 5,044 | 20 pointer tables of labels (source; below) |
-| extracted | 1,468,246 | 613 blobs (605 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
+| extracted | 1,263,717 | 570 blobs (562 rows, 8 table tails) incbin'd from `build/assets/<kind>/<label>.bin` |
 | packed | 2,349,626 | 1,515 streams packed at build time from their unpacked assets |
+| text | 204,529 | 43 rows in 31 text units, encoded at build time from readable text (step 5, below) |
 
-`tools/verify.py` reports these four apart from the code figures, which do not change; with
+`tools/verify.py` reports these five apart from the code figures, which do not change; with
 the code's 306,435 bytes they account for all 4,194,304. The tables written as labels are the
 ten `C2SceneRom_*Packs`, `BattleRom_BgMapPtrs`, `BattleRom_PcAttackFrames` and
 `BattleRom_ActFrames` (words), `BattleRom_SprTilesPtr`, `Map_PropsPtrs`, `LocGfx_Meta12Ptrs`,
@@ -231,15 +233,57 @@ Left:
   every measuring tool. `tools/extract_data.py` checks that each survey name that is a define or
   a ROM struct holds the address of the piece placed there. Making them labels needs the code
   tools to assemble `asm/rom.asm`.
-- **Pointer tables inside other rows** (step 5 onward): `TextWin_DictPtrs` and the message
-  tables (word pointers before their strings), `BattleRom_SprFramesPtr` (`$E4:2300`), the `$E4`
-  animation offset tables, the offset tables of the battle scripts.
-- **Readable formats**: every extracted piece is still a binary blob (steps 5-8). BRR samples
+- **Pointer tables inside other rows** (step 6 onward): `BattleRom_SprFramesPtr` (`$E4:2300`),
+  the `$E4` animation offset tables, the offset tables of the battle scripts. (The text's
+  tables are labels in its readable form, step 5.)
+- **Readable formats**: every extracted piece is still a binary blob (steps 6-8). BRR samples
   keep their length word inside the blob.
 - **Edited assets**: the placement is fixed by the survey's addresses; a pack whose size
   changes fails the build. Relocating data needs a layout pass (labels already carry it).
 - The module's unmatched bytes still come from the ROM through `tools/c3pack.py`
   (`build/c3pack/rom_module.bin`), counted in the module's figure as before.
+
+## The text (step 5)
+
+Done on the `data-text` branch. `tools/text.py` holds the encoding, derived from the matched
+decoder in bank `$C2`: the control codes and their operands come from `TextWin_CodeTable`
+(read from the source; `$01`, `$02`, `$03` and `$12` take a byte), the dictionary bytes
+`$21`-`$9F` from `TextWin_DictPtrs`, and the character of each glyph `$A0`-`$FF` from the
+font as drawn and from `TextWin_HexGlyphs` and `TextWin_StrNadia`. No text is committed: the
+tool holds the character map, the tag names and which survey rows form which unit.
+
+- **Readable form.** `extract` writes one UTF-8 file per unit to `build/assets/text/<unit>.txt`:
+  the 15 message tables (one each), the dictionary, the treasure messages, the map labels
+  (`$C6`), the battle and menu string tables, the item, tech and enemy names (11-byte records),
+  the staff credits (ASCII) and the stale rows between tables. Text is fully expanded; control
+  codes are tags (`{line indent}`, `{wait 0B}`, `{char0}`, `{item}`, ...); a pointer table is a
+  `@table`, and each string carries the entries that point at it (`@at 455 456 457`), so shared
+  and mid-string entries (after a `{wait 00}`) need no address. Extraction checks that the
+  file encodes back to the ROM's bytes.
+- **The dictionary rule.** Every run of glyphs in the 4,579 strings of the message tables is
+  what a greedy longest match gives, left to right, over dictionary entries 0-126 without
+  116-118 (no string uses those three; with them 171 runs would differ). Entries never tie, so
+  the encoder recompresses the expanded text byte-exact, with no dictionary tag anywhere in the
+  message tables. The menu tables at `$FF:CF3B`-`$FF:D553` use no dictionary at all (`@mode
+  plain`); only the stale rows need explicit runs (`«...»` with `[xyz]` per entry, 30 runs).
+- **Build and verify.** `tools/build_rom.py` encodes every unit (the dictionary first) to
+  `build/text/<label>.bin`, which `asm/data/` incbins like a pack (the manifest's piece kind
+  `text`, the same FILEREAD rule and tests); a piece whose size changes fails the build.
+  `tools/verify.py` counts these bytes apart ("text ... encoded by the build from text extracted
+  from the ROM"), never as emitted by source.
+- **Rows that run past their text** (ends inferred, written as `@bytes` in the readable form, to
+  split in step 6): `$CC:2EB1` (strings end at `$CC:36F3`; then `$FF` fill and other data),
+  `$CC:3A09` (123 pointers, then 14 bytes that are no pointers), `$CC:CBC9` (one byte between
+  table and strings; the strings end at `$CC:DDC5`, 570 bytes of other data follow), `$FF:CF3B`
+  (26 bytes of a rising table after the strings), `$CC:6500` (251 names and 2 bytes), `$FD:A000`
+  (the credits end at the last block mark; the rest is not ASCII). The last string of `$CE:EF11`
+  ends at `$CE:EFE0`, the first byte of `BattleRom_DissolveRec` (a byte its reader skips).
+  `$DE:FAFE` (the 128th dictionary pointer) is a `table` row but part of the dictionary unit.
+- **Left:** the menu formats that are not TextWin strings (`MenuRom_ItemTextPtrs`,
+  `MenuRom_StringPtrs`, the equipment labels at `$FF:C96A`-`$FF:C9AB`) stay extracted blobs;
+  editing text needs extraction to keep an edited file (it restores every asset now) and a
+  layout pass for strings whose length changes; the event scripts' op `$B8` addresses into the
+  tables become labels with the event script disassembly (step 7).
 
 ## Order of work
 
@@ -265,7 +309,7 @@ Left:
 4. **Blobs that need no decoder** (done as placement, above; per-format files left): padding, BRR samples, song and effect blocks,
    raw graphics, sprite layout, unknown rows. With 2 and 3 this covers about 85% of the
    remaining bytes.
-5. **Text** (2-4 sessions): the encoder and the dictionary question; the pointer tables.
+5. **Text** (done, above): the encoder and the dictionary question; the pointer tables.
 6. **Tables and palettes** (3-5 sessions), in bank order; settles the inferred table ends.
 7. **Script languages**: battle scripts (3-5), location event scripts (3-6, depends on 3),
    scene scripts (2-3), music sequences (2-3).

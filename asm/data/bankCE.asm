@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $CE:0000-$CE:00FF (256 B), table, confirmed: 128 u16 offsets of subscripts (bank $CE)
@@ -58,7 +59,7 @@ Padding_CEDC1A:
 ; Read by BattleCD_ShowMessage, BattleCD_ShowMessageTimed, BattleCD_ShowTargetInfo.
 org $CEEF11
 BattleRom_MsgStrings:
-    incbin "../../build/assets/text/BattleRom_MsgStrings.bin"
+    incbin "../../build/text/BattleRom_MsgStrings.bin"          ; text unit BattleMessages (strtable)
 
 ; $CE:EFE0-$CE:EFE9 (10 B), table, confirmed: 10 B record (bytes 1-9 read)
 ; Read by BattleCD_EnemyDissolveFx.

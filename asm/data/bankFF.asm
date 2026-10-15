@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $FF:0000-$FF:205F (8,288 B), graphics, probable: tile-like bytes (2bpp, by their look)
@@ -35,47 +36,47 @@ TextWinRom_FontRight:
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $FF4460
-Text_FF4460:
-    incbin "../../build/assets/text/Text_FF4460.bin"
+MsgTable_FF4460:
+    incbin "../../build/text/MsgTable_FF4460.bin"          ; text unit Messages_FF4460 (strtable)
 
 ; $FF:583D-$FF:585F (35 B), text, probable: bytes in the text encoding
 org $FF583D
 Text_FF583D:
-    incbin "../../build/assets/text/Text_FF583D.bin"
+    incbin "../../build/text/Text_FF583D.bin"          ; text unit StaleText (strings)
 
 ; $FF:5860-$FF:6AB5 (4,694 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $FF5860
-Text_FF5860:
-    incbin "../../build/assets/text/Text_FF5860.bin"
+MsgTable_FF5860:
+    incbin "../../build/text/MsgTable_FF5860.bin"          ; text unit Messages_FF5860 (strtable)
 
 ; $FF:6AB6-$FF:6AFF (74 B), text, probable: bytes in the text encoding
 org $FF6AB6
 Text_FF6AB6:
-    incbin "../../build/assets/text/Text_FF6AB6.bin"
+    incbin "../../build/text/Text_FF6AB6.bin"          ; text unit StaleText (strings)
 
 ; $FF:6B00-$FF:83C4 (6,341 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $FF6B00
-Text_FF6B00:
-    incbin "../../build/assets/text/Text_FF6B00.bin"
+MsgTable_FF6B00:
+    incbin "../../build/text/MsgTable_FF6B00.bin"          ; text unit Messages_FF6B00 (strtable)
 
 ; $FF:83C5-$FF:83FF (59 B), text, probable: bytes in the text encoding
 org $FF83C5
 Text_FF83C5:
-    incbin "../../build/assets/text/Text_FF83C5.bin"
+    incbin "../../build/text/Text_FF83C5.bin"          ; text unit StaleText (strings)
 
 ; $FF:8400-$FF:8C02 (2,051 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $FF8400
-Text_FF8400:
-    incbin "../../build/assets/text/Text_FF8400.bin"
+MsgTable_FF8400:
+    incbin "../../build/text/MsgTable_FF8400.bin"          ; text unit Messages_FF8400 (strtable)
 
 ; $FF:8C03-$FF:8C5F (93 B), unknown, unknown: mixed bytes
 org $FF8C03
@@ -810,13 +811,13 @@ MenuRom_StatCaps:
 ; Read by Menu_LoadAskSlot, Menu_NameChoiceText, Menu_NameInit, Menu_XchgPreviewA.
 org $FFCF3B
 MenuRom_NameStrings:
-    incbin "../../build/assets/text/MenuRom_NameStrings.bin"
+    incbin "../../build/text/MenuRom_NameStrings.bin"          ; text unit MenuNameTexts (strtable)
 
 ; $FF:D03E-$FF:D295 (600 B), text, confirmed: string table (TextWin_StrTable) of the slot texts
 ; Read by Menu_DrawSlotText.
 org $FFD03E
 MenuRom_SlotStrings:
-    incbin "../../build/assets/text/MenuRom_SlotStrings.bin"
+    incbin "../../build/text/MenuRom_SlotStrings.bin"          ; text unit MenuSlotTexts (strtable)
 
 ; $FF:D296-$FF:D395 (256 B), table, confirmed: a nibble per location: era string index
 ; Read by Menu_UnkD36C.
@@ -828,7 +829,7 @@ MenuRom_SlotEraNibbles:
 ; Read by Menu_UnkD36C.
 org $FFD396
 MenuRom_SlotEraStrings:
-    incbin "../../build/assets/text/MenuRom_SlotEraStrings.bin"
+    incbin "../../build/text/MenuRom_SlotEraStrings.bin"          ; text unit MenuEraTexts (strtable)
 
 ; $FF:D3FE-$FF:D553 (342 B), text, confirmed: string table of the settings texts (entry, then
 ; value strings)
@@ -836,7 +837,7 @@ MenuRom_SlotEraStrings:
 org $FFD3FE
 MenuRom_CfgTextTable:
 MenuRom_SlotLabelStrings:
-    incbin "../../build/assets/text/MenuRom_CfgTextTable.bin"
+    incbin "../../build/text/MenuRom_CfgTextTable.bin"          ; text unit MenuSettingsTexts (strtable)
 
 ; $FF:D554-$FF:D561 (14 B), table, confirmed: 7 tile words: font letters A, X, L, R, B, Y, S for
 ; Pad_Pressed bits 7-1

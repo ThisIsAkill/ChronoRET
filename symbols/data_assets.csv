@@ -134,8 +134,8 @@ Scene7200Pack_000,$C6:DA76,$C6:DB72,253,packed,packed_lz/Scene7200Pack_000.bin,l
 Scene7200Pack_001,$C6:DB73,$C6:DC3B,201,packed,packed_lz/Scene7200Pack_001.bin,lz11 -> 3072 B
 Scene7200Pack_002,$C6:DC3C,$C6:DD04,201,packed,packed_lz/Scene7200Pack_002.bin,lz11 -> 3072 B
 Padding_C6DD05,$C6:DD05,$C6:DFFF,763,fill,,$00
-Text_C6F000,$C6:F000,$C6:F3FF,1024,extracted,text/Text_C6F000.bin,
-C2SceneRom_LabelStrings,$C6:F400,$C6:F4FF,256,extracted,text/C2SceneRom_LabelStrings.bin,
+Text_C6F000,$C6:F000,$C6:F3FF,1024,text,text/SceneLabels.txt,strings
+C2SceneRom_LabelStrings,$C6:F400,$C6:F4FF,256,text,text/SceneLabels.txt,ptrs ptr
 C2SceneRom_MapMarkerTiles,$C6:F500,$C6:F53F,64,extracted,graphics/C2SceneRom_MapMarkerTiles.bin,
 C2SceneRom_MapViewObjPal,$C6:F540,$C6:F55F,32,extracted,palette/C2SceneRom_MapViewObjPal.bin,
 C2SceneRom_ZoomDivA,$C6:F560,$C6:F59F,64,extracted,table/C2SceneRom_ZoomDivA.bin,
@@ -333,8 +333,8 @@ BattleRom_EquipRec1,$CC:06A4,$CC:08BF,540,extracted,table/BattleRom_EquipRec1.bi
 BattleRom_EquipRec2,$CC:08C0,$CC:0985,198,extracted,table/BattleRom_EquipRec2.bin,
 BattleRom_EquipRec3,$CC:0986,$CC:0ABB,310,extracted,table/BattleRom_EquipRec3.bin,
 BattleRom_ItemUseFlags,$CC:0ABC,$CC:0B5D,162,extracted,table/BattleRom_ItemUseFlags.bin,
-TextWinRom_ItemNames,$CC:0B5E,$CC:15C3,2662,extracted,text/TextWinRom_ItemNames.bin,
-MenuRom_TechNames,$CC:15C4,$CC:1ACA,1287,extracted,text/MenuRom_TechNames.bin,
+TextWinRom_ItemNames,$CC:0B5E,$CC:15C3,2662,text,text/ItemNames.txt,records 11 $EF
+MenuRom_TechNames,$CC:15C4,$CC:1ACA,1287,text,text/TechNames.txt,records 11 $EF
 BattleRom_TechInfo,$CC:1ACB,$CC:1BB4,234,extracted,table/BattleRom_TechInfo.bin,
 BattleRom_ItemTargetMode,$CC:1BB5,$CC:1BEA,54,extracted,table/BattleRom_ItemTargetMode.bin,
 Table_CC1BEB,$CC:1BEB,$CC:213F,1365,extracted,table/Table_CC1BEB.bin,
@@ -363,19 +363,19 @@ BattleRom_TechWaitNib,$CC:2BDC,$CC:2C6C,145,extracted,table/BattleRom_TechWaitNi
 MenuRom_ShopLists,$CC:2C6D,$CC:2D68,252,extracted,table/MenuRom_ShopLists.bin,
 MenuRom_Char5Attack,$CC:2D69,$CC:2E30,200,extracted,table/MenuRom_Char5Attack.bin,
 BattleRom_UnkCC2E31,$CC:2E31,$CC:2EB0,128,extracted,table/BattleRom_UnkCC2E31.bin,
-MenuRom_DescStrTable,$CC:2EB1,$CC:3A08,2904,extracted,text/MenuRom_DescStrTable.bin,
-BattleRom_TechInfoStrings,$CC:3A09,$CC:43AE,2470,extracted,text/BattleRom_TechInfoStrings.bin,
+MenuRom_DescStrTable,$CC:2EB1,$CC:3A08,2904,text,text/MenuDescriptions.txt,strtable
+BattleRom_TechInfoStrings,$CC:3A09,$CC:43AE,2470,text,text/TechInfo.txt,strtable
 Padding_CC43AF,$CC:43AF,$CC:46FF,849,fill,,$FF
 BattleRom_EnemyStats,$CC:4700,$CC:5DFF,5888,extracted,table/BattleRom_EnemyStats.bin,
 Table_CC5E00,$CC:5E00,$CC:64FF,1792,extracted,table/Table_CC5E00.bin,
-BattleRom_EnemyNames,$CC:6500,$CC:6FCA,2763,extracted,text/BattleRom_EnemyNames.bin,
+BattleRom_EnemyNames,$CC:6500,$CC:6FCA,2763,text,text/EnemyNames.txt,records 11 $EF
 BattleRom_UnkCC6FCB,$CC:6FCB,$CC:7AC8,2814,extracted,table/BattleRom_UnkCC6FCB.bin,
 BattleRom_EnemyEffectRecA,$CC:7AC9,$CC:86C8,3072,extracted,table/BattleRom_EnemyEffectRecA.bin,
 BattleRom_EnemyTechTarget,$CC:86C9,$CC:88CA,514,extracted,table/BattleRom_EnemyTechTarget.bin,
 BattleRom_UnkCC88CB,$CC:88CB,$CC:89C5,251,extracted,table/BattleRom_UnkCC88CB.bin,
 BattleRom_EnemyEffectRecB,$CC:89C6,$CC:8B07,322,extracted,table/BattleRom_EnemyEffectRecB.bin,
 BattleRom_AiScriptPtrs,$CC:8B08,$CC:CBC8,16577,extracted,battle_script/BattleRom_AiScriptPtrs.bin,
-BattleRom_ScriptMsgStrings,$CC:CBC9,$CC:DFFF,5175,extracted,text/BattleRom_ScriptMsgStrings.bin,
+BattleRom_ScriptMsgStrings,$CC:CBC9,$CC:DFFF,5175,text,text/EnemyScriptMessages.txt,strtable
 Table_CCF383,$CC:F383,$CC:F38B,9,extracted,table/Table_CCF383.bin,
 BattleRom_TechListBase,$CC:F38C,$CC:F394,9,extracted,table/BattleRom_TechListBase.bin,
 BattleRom_TechEntryBase,$CC:F395,$CC:F39A,6,extracted,table/BattleRom_TechEntryBase.bin,
@@ -497,7 +497,7 @@ BattleScript_CE8294,$CE:8294,$CE:886F,1500,extracted,battle_script/BattleScript_
 Table_CE8870,$CE:8870,$CE:D427,19384,extracted,table/Table_CE8870.bin,
 BattleScript_CED428,$CE:D428,$CE:DC19,2034,extracted,battle_script/BattleScript_CED428.bin,
 Padding_CEDC1A,$CE:DC1A,$CE:DFFF,998,fill,,$FF
-BattleRom_MsgStrings,$CE:EF11,$CE:EFDF,207,extracted,text/BattleRom_MsgStrings.bin,
+BattleRom_MsgStrings,$CE:EF11,$CE:EFDF,207,text,text/BattleMessages.txt,strtable
 BattleRom_DissolveRec,$CE:EFE0,$CE:EFE9,10,extracted,table/BattleRom_DissolveRec.bin,
 BattleRom_DissolvePhaseStep,$CE:EFEA,$CE:EFF1,8,extracted,table/BattleRom_DissolvePhaseStep.bin,
 BattleRom_FxTileVram,$CE:EFF2,$CE:EFF9,8,extracted,table/BattleRom_FxTileVram.bin,
@@ -795,9 +795,9 @@ SprTilesPack_245,$D8:C896,$D8:CB1C,647,packed,packed_lz/SprTilesPack_245.bin,lz1
 SprTilesPack_246,$D8:CB1D,$D8:CDDB,703,packed,packed_lz/SprTilesPack_246.bin,lz12 -> 864 B
 SprTilesPack_247,$D8:CDDC,$D8:CF67,396,packed,packed_lz/SprTilesPack_247.bin,lz12 -> 416 B
 Padding_D8CF68,$D8:CF68,$D8:CFFF,152,fill,,$00
-Text_D8D000,$D8:D000,$D8:DD26,3367,extracted,text/Text_D8D000.bin,
+MsgTable_D8D000,$D8:D000,$D8:DD26,3367,text,text/Messages_D8D000.txt,strtable
 Padding_D8DD27,$D8:DD27,$D8:DD7F,89,fill,,$00
-Text_D8DD80,$D8:DD80,$D8:FFBD,8766,extracted,text/Text_D8DD80.bin,
+MsgTable_D8DD80,$D8:DD80,$D8:FFBD,8766,text,text/Messages_D8DD80.txt,strtable
 Padding_D8FFBE,$D8:FFBE,$D8:FFFF,66,fill,,$00
 SprTilesPack_007,$D9:0000,$D9:0726,1831,packed,packed_lz/SprTilesPack_007.bin,lz12 -> 2464 B
 SprTilesPack_008,$D9:0727,$D9:0DE5,1727,packed,packed_lz/SprTilesPack_008.bin,lz12 -> 2336 B
@@ -979,15 +979,15 @@ Padding_DBC001,$DB:C001,$DB:FFFF,16383,fill,,$00
 SprLayout_DC0000,$DC:0000,$DC:FFFF,65536,extracted,sprite_layout/SprLayout_DC0000.bin,
 SprLayout_DD0000,$DD:0000,$DD:FFFF,65536,extracted,sprite_layout/SprLayout_DD0000.bin,
 SprLayout_DE0000,$DE:0000,$DE:BFFF,49152,extracted,sprite_layout/SprLayout_DE0000.bin,
-Text_DEC000,$DE:C000,$DE:E2B0,8881,extracted,text/Text_DEC000.bin,
+MsgTable_DEC000,$DE:C000,$DE:E2B0,8881,text,text/Messages_DEC000.txt,strtable
 Padding_DEE2B1,$DE:E2B1,$DE:E2FF,79,fill,,$00
-Text_DEE300,$DE:E300,$DE:F96C,5741,extracted,text/Text_DEE300.bin,
+MsgTable_DEE300,$DE:E300,$DE:F96C,5741,text,text/Messages_DEE300.txt,strtable
 Padding_DEF96D,$DE:F96D,$DE:F9FF,147,fill,,$00
-TextWin_DictPtrs,$DE:FA00,$DE:FAFD,254,extracted,text/TextWin_DictPtrs.bin,
-Table_DEFAFE,$DE:FAFE,$DE:FAFF,2,extracted,table/Table_DEFAFE.bin,
-Text_DEFB00,$DE:FB00,$DE:FD00,513,extracted,text/Text_DEFB00.bin,
+TextWin_DictPtrs,$DE:FA00,$DE:FAFD,254,text,text/Dictionary.txt,ptrs ptr
+Table_DEFAFE,$DE:FAFE,$DE:FAFF,2,text,text/Dictionary.txt,ptrs ptr128
+Text_DEFB00,$DE:FB00,$DE:FD00,513,text,text/Dictionary.txt,dict
 Padding_DEFD01,$DE:FD01,$DE:FEFF,511,fill,,$00
-Text_DEFF00,$DE:FF00,$DE:FF52,83,extracted,text/Text_DEFF00.bin,
+Text_DEFF00,$DE:FF00,$DE:FF52,83,text,text/TreasureMessages.txt,strtable
 Padding_DEFF53,$DE:FF53,$DE:FFFF,173,fill,,$00
 SprTilesPack_123,$DF:0000,$DF:2032,8243,packed,packed_lz/SprTilesPack_123.bin,lz12 -> 11392 B
 SprTilesPack_124,$DF:2033,$DF:2922,2288,packed,packed_lz/SprTilesPack_124.bin,lz12 -> 2944 B
@@ -1585,11 +1585,11 @@ EvtPack_004,$F6:92FC,$F6:98EF,1524,packed,packed_lz/EvtPack_004.bin,lz11 -> 2528
 EvtPack_005,$F6:98F0,$F6:9A7C,397,packed,packed_lz/EvtPack_005.bin,lz11 -> 841 B
 EvtPack_006,$F6:9A7D,$F6:9B85,265,packed,packed_lz/EvtPack_006.bin,lz11 -> 611 B
 EvtPack_007,$F6:9B86,$F6:9FE8,1123,packed,packed_lz/EvtPack_007.bin,lz11 -> 1571 B
-Text_F69FE9,$F6:9FE9,$F6:9FFF,23,extracted,text/Text_F69FE9.bin,
-Text_F6A000,$F6:A000,$F6:B222,4643,extracted,text/Text_F6A000.bin,
-Text_F6B223,$F6:B223,$F6:B22F,13,extracted,text/Text_F6B223.bin,
-Text_F6B230,$F6:B230,$F6:C813,5604,extracted,text/Text_F6B230.bin,
-Text_F6C814,$F6:C814,$F6:C82F,28,extracted,text/Text_F6C814.bin,
+Text_F69FE9,$F6:9FE9,$F6:9FFF,23,text,text/StaleText.txt,strings
+MsgTable_F6A000,$F6:A000,$F6:B222,4643,text,text/Messages_F6A000.txt,strtable
+Text_F6B223,$F6:B223,$F6:B22F,13,text,text/StaleText.txt,strings
+MsgTable_F6B230,$F6:B230,$F6:C813,5604,text,text/Messages_F6B230.txt,strtable
+Text_F6C814,$F6:C814,$F6:C82F,28,text,text/StaleText.txt,strings
 EvtPack_082,$F6:C830,$F6:CA54,549,packed,packed_lz/EvtPack_082.bin,lz11 -> 940 B
 EvtPack_083,$F6:CA55,$F6:CE5F,1035,packed,packed_lz/EvtPack_083.bin,lz11 -> 1584 B
 EvtPack_084,$F6:CE60,$F6:D48E,1583,packed,packed_lz/EvtPack_084.bin,lz11 -> 3225 B
@@ -1609,9 +1609,9 @@ EvtPack_099,$F6:FBBE,$F6:FC79,188,packed,packed_lz/EvtPack_099.bin,lz11 -> 311 B
 EvtPack_100,$F6:FC7A,$F6:FDE3,362,packed,packed_lz/EvtPack_100.bin,lz11 -> 536 B
 EvtPack_101,$F6:FDE4,$F6:FFFB,536,packed,packed_lz/EvtPack_101.bin,lz11 -> 848 B
 Unknown_F6FFFC,$F6:FFFC,$F6:FFFF,4,extracted,unknown/Unknown_F6FFFC.bin,
-Text_F70000,$F7:0000,$F7:48B7,18616,extracted,text/Text_F70000.bin,
-Text_F748B8,$F7:48B8,$F7:48FF,72,extracted,text/Text_F748B8.bin,
-Text_F74900,$F7:4900,$F7:F870,44913,extracted,text/Text_F74900.bin,
+MsgTable_F70000,$F7:0000,$F7:48B7,18616,text,text/Messages_F70000.txt,strtable
+Text_F748B8,$F7:48B8,$F7:48FF,72,text,text/StaleText.txt,strings
+MsgTable_F74900,$F7:4900,$F7:F870,44913,text,text/Messages_F74900.txt,strtable
 Padding_F7F871,$F7:F871,$F7:F97F,271,fill,,$00
 EvtPack_021,$F7:F980,$F7:FBE2,611,packed,packed_lz/EvtPack_021.bin,lz11 -> 1130 B
 EvtPack_022,$F7:FBE3,$F7:FFD0,1006,packed,packed_lz/EvtPack_022.bin,lz11 -> 1857 B
@@ -1651,7 +1651,7 @@ EvtPack_142,$F8:453A,$F8:458E,85,packed,packed_lz/EvtPack_142.bin,lz11 -> 298 B
 EvtPack_143,$F8:458F,$F8:45E3,85,packed,packed_lz/EvtPack_143.bin,lz11 -> 298 B
 EvtPack_144,$F8:45E4,$F8:4638,85,packed,packed_lz/EvtPack_144.bin,lz11 -> 298 B
 Padding_F84639,$F8:4639,$F8:464F,23,fill,,$00
-Text_F84650,$F8:4650,$F8:AAA6,25687,extracted,text/Text_F84650.bin,
+MsgTable_F84650,$F8:4650,$F8:AAA6,25687,text,text/Messages_F84650.txt,strtable
 Unknown_F8AAA7,$F8:AAA7,$F8:AB71,203,extracted,unknown/Unknown_F8AAA7.bin,
 Pack_F8AB72,$F8:AB72,$F8:AD82,529,packed,packed_lz/Pack_F8AB72.bin,lz11 -> 1311 B
 Pack_F8AD83,$F8:AD83,$F8:AF6E,492,packed,packed_lz/Pack_F8AD83.bin,lz11 -> 1049 B
@@ -1739,8 +1739,8 @@ EvtPack_225,$F9:A034,$F9:A126,243,packed,packed_lz/EvtPack_225.bin,lz11 -> 472 B
 EvtPack_226,$F9:A127,$F9:A23D,279,packed,packed_lz/EvtPack_226.bin,lz11 -> 565 B
 EvtPack_227,$F9:A23E,$F9:AFE8,3499,packed,packed_lz/EvtPack_227.bin,lz11 -> 4994 B
 Unknown_F9AFE9,$F9:AFE9,$F9:AFFF,23,extracted,unknown/Unknown_F9AFE9.bin,
-Text_F9B000,$F9:B000,$F9:FA75,19062,extracted,text/Text_F9B000.bin,
-Text_F9FA76,$F9:FA76,$F9:FFFF,1418,extracted,text/Text_F9FA76.bin,
+MsgTable_F9B000,$F9:B000,$F9:FA75,19062,text,text/Messages_F9B000.txt,strtable
+Text_F9FA76,$F9:FA76,$F9:FFFF,1418,text,text/StaleText.txt,strings
 EvtPack_236,$FA:0000,$FA:020A,523,packed,packed_lz/EvtPack_236.bin,lz11 -> 975 B
 EvtPack_237,$FA:020B,$FA:032E,292,packed,packed_lz/EvtPack_237.bin,lz11 -> 654 B
 EvtPack_238,$FA:032F,$FA:065E,816,packed,packed_lz/EvtPack_238.bin,lz11 -> 1555 B
@@ -2009,9 +2009,9 @@ EvtPack_508,$FC:B1E9,$FC:B398,432,packed,packed_lz/EvtPack_508.bin,lz11 -> 913 B
 EvtPack_509,$FC:B399,$FC:B47F,231,packed,packed_lz/EvtPack_509.bin,lz11 -> 485 B
 EvtPack_510,$FC:B480,$FC:B6EF,624,packed,packed_lz/EvtPack_510.bin,lz11 -> 928 B
 EvtPack_512,$FC:B6F0,$FC:B9E7,760,packed,packed_lz/EvtPack_512.bin,lz11 -> 1452 B
-Text_FCB9E8,$FC:B9E8,$FC:B9FF,24,extracted,text/Text_FCB9E8.bin,
-Text_FCBA00,$FC:BA00,$FC:F9CE,16335,extracted,text/Text_FCBA00.bin,
-Text_FCF9CF,$FC:F9CF,$FC:F9EF,33,extracted,text/Text_FCF9CF.bin,
+Text_FCB9E8,$FC:B9E8,$FC:B9FF,24,text,text/StaleText.txt,strings
+MsgTable_FCBA00,$FC:BA00,$FC:F9CE,16335,text,text/Messages_FCBA00.txt,strtable
+Text_FCF9CF,$FC:F9CF,$FC:F9EF,33,text,text/StaleText.txt,strings
 Evt_PackPtrs,$FC:F9F0,$FC:FFF2,1539,table,,dl x 513
 Padding_FCFFF3,$FC:FFF3,$FC:FFFF,13,fill,,$00
 C3Pack_058,$FD:0000,$FD:0235,566,packed,packed_lz/C3Pack_058.bin,lz11 -> 1024 B
@@ -2048,7 +2048,7 @@ EvtPack_018,$FD:9BA6,$FD:9CB4,271,packed,packed_lz/EvtPack_018.bin,lz11 -> 622 B
 EvtPack_019,$FD:9CB5,$FD:9F2B,631,packed,packed_lz/EvtPack_019.bin,lz11 -> 1030 B
 EvtPack_020,$FD:9F2C,$FD:9FEA,191,packed,packed_lz/EvtPack_020.bin,lz11 -> 545 B
 Unknown_FD9FEB,$FD:9FEB,$FD:9FFF,21,extracted,unknown/Unknown_FD9FEB.bin,
-Credits_Text,$FD:A000,$FD:A80A,2059,extracted,text/Credits_Text.bin,
+Credits_Text,$FD:A000,$FD:A80A,2059,text,text/Credits.txt,ascii
 BattleRom_PcStatBlock,$FD:A80B,$FD:A848,62,extracted,table/BattleRom_PcStatBlock.bin,
 BattleRom_CmdPtr,$FD:A849,$FD:A84E,6,extracted,table/BattleRom_CmdPtr.bin,
 BattleRom_TechEntryPtr,$FD:A84F,$FD:A89C,78,extracted,table/BattleRom_TechEntryPtr.bin,
@@ -2102,13 +2102,13 @@ Palette_FEF91E,$FE:F91E,$FE:FFFF,1762,extracted,palette/Palette_FEF91E.bin,
 Gfx_FF0000,$FF:0000,$FF:205F,8288,extracted,graphics/Gfx_FF0000.bin,
 Font_FF2060,$FF:2060,$FF:385F,6144,extracted,font/Font_FF2060.bin,
 TextWinRom_FontRight,$FF:3860,$FF:445F,3072,extracted,font/TextWinRom_FontRight.bin,
-Text_FF4460,$FF:4460,$FF:583C,5085,extracted,text/Text_FF4460.bin,
-Text_FF583D,$FF:583D,$FF:585F,35,extracted,text/Text_FF583D.bin,
-Text_FF5860,$FF:5860,$FF:6AB5,4694,extracted,text/Text_FF5860.bin,
-Text_FF6AB6,$FF:6AB6,$FF:6AFF,74,extracted,text/Text_FF6AB6.bin,
-Text_FF6B00,$FF:6B00,$FF:83C4,6341,extracted,text/Text_FF6B00.bin,
-Text_FF83C5,$FF:83C5,$FF:83FF,59,extracted,text/Text_FF83C5.bin,
-Text_FF8400,$FF:8400,$FF:8C02,2051,extracted,text/Text_FF8400.bin,
+MsgTable_FF4460,$FF:4460,$FF:583C,5085,text,text/Messages_FF4460.txt,strtable
+Text_FF583D,$FF:583D,$FF:585F,35,text,text/StaleText.txt,strings
+MsgTable_FF5860,$FF:5860,$FF:6AB5,4694,text,text/Messages_FF5860.txt,strtable
+Text_FF6AB6,$FF:6AB6,$FF:6AFF,74,text,text/StaleText.txt,strings
+MsgTable_FF6B00,$FF:6B00,$FF:83C4,6341,text,text/Messages_FF6B00.txt,strtable
+Text_FF83C5,$FF:83C5,$FF:83FF,59,text,text/StaleText.txt,strings
+MsgTable_FF8400,$FF:8400,$FF:8C02,2051,text,text/Messages_FF8400.txt,strtable
 Unknown_FF8C03,$FF:8C03,$FF:8C5F,93,extracted,unknown/Unknown_FF8C03.bin,
 BattleRom_InitGfxA,$FF:8C60,$FF:8E5F,512,extracted,graphics/BattleRom_InitGfxA.bin,
 MenuRom_Font2bpp,$FF:8E60,$FF:925F,1024,extracted,graphics/MenuRom_Font2bpp.bin,
@@ -2217,11 +2217,11 @@ MenuRom_StatItemStat,$FF:CF2B,$FF:CF2B,1,extracted,table/MenuRom_StatItemStat.bi
 MenuRom_StatOrder,$FF:CF2C,$FF:CF31,6,extracted,table/MenuRom_StatOrder.bin,
 MenuRom_StatItemCap,$FF:CF32,$FF:CF32,1,extracted,table/MenuRom_StatItemCap.bin,
 MenuRom_NumLimits,$FF:CF33,$FF:CF3A,8,extracted,table/MenuRom_NumLimits.bin,
-MenuRom_NameStrings,$FF:CF3B,$FF:D03D,259,extracted,text/MenuRom_NameStrings.bin,
-MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,extracted,text/MenuRom_SlotStrings.bin,
+MenuRom_NameStrings,$FF:CF3B,$FF:D03D,259,text,text/MenuNameTexts.txt,strtable
+MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,text,text/MenuSlotTexts.txt,strtable
 MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,extracted,table/MenuRom_SlotEraNibbles.bin,
-MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,extracted,text/MenuRom_SlotEraStrings.bin,
-MenuRom_CfgTextTable,$FF:D3FE,$FF:D553,342,extracted,text/MenuRom_CfgTextTable.bin,
+MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,text,text/MenuEraTexts.txt,strtable
+MenuRom_CfgTextTable,$FF:D3FE,$FF:D553,342,text,text/MenuSettingsTexts.txt,strtable
 MenuRom_ButtonLetters,$FF:D554,$FF:D561,14,extracted,table/MenuRom_ButtonLetters.bin,
 MenuRom_CfgIcons,$FF:D562,$FF:D579,24,extracted,table/MenuRom_CfgIcons.bin,
 MenuRom_XchgUnkD57A,$FF:D57A,$FF:D5E3,106,extracted,table/MenuRom_XchgUnkD57A.bin,

@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $F9:0000-$F9:0616 (1,559 B), packed_lz, confirmed: lz11 -> 2342 B: location event script
@@ -364,11 +365,11 @@ Unknown_F9AFE9:
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $F9B000
-Text_F9B000:
-    incbin "../../build/assets/text/Text_F9B000.bin"
+MsgTable_F9B000:
+    incbin "../../build/text/MsgTable_F9B000.bin"          ; text unit Messages_F9B000 (strtable)
 
 ; $F9:FA76-$F9:FFFF (1,418 B), text, probable: glyph and dictionary bytes as in the strings
 ; before it
 org $F9FA76
 Text_F9FA76:
-    incbin "../../build/assets/text/Text_F9FA76.bin"
+    incbin "../../build/text/Text_F9FA76.bin"          ; text unit StaleText (strings)

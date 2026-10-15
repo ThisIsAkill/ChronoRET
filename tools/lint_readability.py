@@ -29,8 +29,10 @@ asm/include/ and are exempt):
          and the ROM's bytes of its unmatched parts in module.inc's
          %C3ModRomBytes) and the data layer's assets: in
          asm/data/bankXX.asm only, a line that is exactly
-         `incbin "../../build/assets/<kind>/<label>.bin"` or
-         `incbin "../../build/packs/<label>.lz"` for a piece of bank $XX
+         `incbin "../../build/assets/<kind>/<label>.bin"`,
+         `incbin "../../build/packs/<label>.lz"` or
+         `incbin "../../build/text/<label>.bin"` (text tools/text.py
+         encodes) for a piece of bank $XX
          that the manifest symbols/data_assets.csv lists, once each; the
          manifest itself must be well formed and exactly what
          tools/extract_data.py makes from symbols/data_survey.csv (so no

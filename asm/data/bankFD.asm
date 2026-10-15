@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $FD:0000-$FD:0235 (566 B), packed_lz, confirmed: lz11 -> 1024 B: data for the $C3 module
@@ -249,7 +250,7 @@ Unknown_FD9FEB:
 ; Read by Evt_Op29_StartCredits, Field_ServiceUnk54.
 org $FDA000
 Credits_Text:
-    incbin "../../build/assets/text/Credits_Text.bin"
+    incbin "../../build/text/Credits_Text.bin"          ; text unit Credits (ascii)
 
 ; $FD:A80B-$FD:A848 (62 B), table, confirmed: 2 B per battler slot: stat block address
 ; Read by BattleAi_AddPcByByte, BattleAi_RunAddStatBytes, BattleAi_RunAddStatsTech,

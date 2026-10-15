@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $CC:0000-$CC:05CB (1,484 B), table, confirmed: character records for a new game ($280 B), then
@@ -82,14 +83,14 @@ BattleRom_ItemUseFlags:
 ; Read by TextWin_CodeItemName.
 org $CC0B5E
 TextWinRom_ItemNames:
-    incbin "../../build/assets/text/TextWinRom_ItemNames.bin"
+    incbin "../../build/text/TextWinRom_ItemNames.bin"          ; text unit ItemNames (records 11 $EF)
 
 ; $CC:15C4-$CC:1ACA (1,287 B), text, confirmed: 11-byte tech names
 ; Read by Menu_TechDrawName, TextWin_ExtTechName.
 org $CC15C4
 MenuRom_TechNames:
 TextWinRom_TechNames:
-    incbin "../../build/assets/text/MenuRom_TechNames.bin"
+    incbin "../../build/text/MenuRom_TechNames.bin"          ; text unit TechNames (records 11 $EF)
 
 ; $CC:1ACB-$CC:1BB4 (234 B), table, confirmed: 2 B per tech id: target mode, flags
 ; Read by BattleSys_UnkC1DD, BattleSys_UnkC96A, BattleSys_UnkCA1A, BattleSys_UnkCCCB,
@@ -278,7 +279,7 @@ BattleRom_UnkCC2E31:
 ; Read by Menu_DrawDescText.
 org $CC2EB1
 MenuRom_DescStrTable:
-    incbin "../../build/assets/text/MenuRom_DescStrTable.bin"
+    incbin "../../build/text/MenuRom_DescStrTable.bin"          ; text unit MenuDescriptions (strtable)
 
 ; $CC:3A09-$CC:43AE (2,470 B), text, confirmed: string table (u16 pointers, then TextWin
 ; strings)
@@ -286,7 +287,7 @@ MenuRom_DescStrTable:
 org $CC3A09
 BattleRom_TechInfoStrings:
 MenuRom_TechTextTable:
-    incbin "../../build/assets/text/BattleRom_TechInfoStrings.bin"
+    incbin "../../build/text/BattleRom_TechInfoStrings.bin"          ; text unit TechInfo (strtable)
 
 ; $CC:43AF-$CC:46FF (849 B), padding, probable: 849 x $FF
 org $CC43AF
@@ -313,7 +314,7 @@ Table_CC5E00:
 org $CC6500
 BattleRom_EnemyNames:
 TextWinRom_EnemyNames:
-    incbin "../../build/assets/text/BattleRom_EnemyNames.bin"
+    incbin "../../build/text/BattleRom_EnemyNames.bin"          ; text unit EnemyNames (records 11 $EF)
 
 ; $CC:6FCB-$CC:7AC8 (2,814 B), table, confirmed: 11 B per !Battle_UnkB18C: action records
 ; (TechRec layout from 2 B earlier)
@@ -358,7 +359,7 @@ BattleRom_AiScriptPtrs:
 ; Read by BattleCD_ShowScriptMessage.
 org $CCCBC9
 BattleRom_ScriptMsgStrings:
-    incbin "../../build/assets/text/BattleRom_ScriptMsgStrings.bin"
+    incbin "../../build/text/BattleRom_ScriptMsgStrings.bin"          ; text unit EnemyScriptMessages (strtable)
 
 ; $CC:F383-$CC:F38B (9 B), table, unknown: small byte values
 org $CCF383

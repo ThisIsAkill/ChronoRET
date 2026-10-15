@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $DE:0000-$DE:BFFF (49,152 B), sprite_layout, confirmed: per sprite set: frame records of
@@ -24,8 +25,8 @@ SprLayout_DE0000:
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $DEC000
-Text_DEC000:
-    incbin "../../build/assets/text/Text_DEC000.bin"
+MsgTable_DEC000:
+    incbin "../../build/text/MsgTable_DEC000.bin"          ; text unit Messages_DEC000 (strtable)
 
 ; $DE:E2B1-$DE:E2FF (79 B), padding, confirmed: 79 x $00
 org $DEE2B1
@@ -38,8 +39,8 @@ Padding_DEE2B1:
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $DEE300
-Text_DEE300:
-    incbin "../../build/assets/text/Text_DEE300.bin"
+MsgTable_DEE300:
+    incbin "../../build/text/MsgTable_DEE300.bin"          ; text unit Messages_DEE300 (strtable)
 
 ; $DE:F96D-$DE:F9FF (147 B), padding, confirmed: 147 x $00
 org $DEF96D
@@ -52,20 +53,20 @@ Padding_DEF96D:
 ; Read by TextWin_State0_Draw, TextWin_CodeExt.
 org $DEFA00
 TextWin_DictPtrs:
-    incbin "../../build/assets/text/TextWin_DictPtrs.bin"
+    incbin "../../build/text/TextWin_DictPtrs.bin"          ; text unit Dictionary (ptrs ptr)
 
 ; $DE:FAFE-$DE:FAFF (2 B), table, probable: 1 u16 (a 128th dictionary pointer)
 ; Read by TextWin_CodeExt (only).
 org $DEFAFE
 Table_DEFAFE:
-    incbin "../../build/assets/table/Table_DEFAFE.bin"
+    incbin "../../build/text/Table_DEFAFE.bin"          ; text unit Dictionary (ptrs ptr128)
 
 ; $DE:FB00-$DE:FD00 (513 B), text, confirmed: dictionary sub-strings: length byte, then glyph
 ; bytes
 ; Read by TextWin_State0_Draw, TextWin_State1.
 org $DEFB00
 Text_DEFB00:
-    incbin "../../build/assets/text/Text_DEFB00.bin"
+    incbin "../../build/text/Text_DEFB00.bin"          ; text unit Dictionary (dict)
 
 ; $DE:FD01-$DE:FEFF (511 B), padding, confirmed: 511 x $00
 org $DEFD01
@@ -78,7 +79,7 @@ Padding_DEFD01:
 ; Read by Field_Unk*: the treasure message (bankC0 TextWin setup), TextWin_State0.
 org $DEFF00
 Text_DEFF00:
-    incbin "../../build/assets/text/Text_DEFF00.bin"
+    incbin "../../build/text/Text_DEFF00.bin"          ; text unit TreasureMessages (strtable)
 
 ; $DE:FF53-$DE:FFFF (173 B), padding, confirmed: 173 x $00
 org $DEFF53

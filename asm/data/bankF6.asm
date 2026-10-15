@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $F6:0000-$F6:1BFF (7,168 B), table, confirmed: 512 x 14 B location records (LocRom struct)
@@ -611,9 +612,9 @@ LocGfx_PackPtrs:
     dl LocGfxPack_211                     ; 211
     dl LocGfxPack_211+$BC3                ; 212: inside the piece: not a stream start
     dl EvtPack_004+$3B8                   ; 213: inside the piece: not a stream start
-    dl Text_F6A000+$6C8                   ; 214: inside the piece: not a stream start
-    dl Text_F6B230+$4AC                   ; 215: inside the piece: not a stream start
-    dl Text_F6B230+$14C0                  ; 216: inside the piece: not a stream start
+    dl MsgTable_F6A000+$6C8               ; 214: inside the piece: not a stream start
+    dl MsgTable_F6B230+$4AC               ; 215: inside the piece: not a stream start
+    dl MsgTable_F6B230+$14C0              ; 216: inside the piece: not a stream start
     dl EvtPack_085+$275                   ; 217: inside the piece: not a stream start
     dl EvtPack_087+$903                   ; 218: inside the piece: not a stream start
     dl $000000                            ; 219: none
@@ -701,33 +702,33 @@ EvtPack_007:
 ; $F6:9FE9-$F6:9FFF (23 B), text, probable: bytes in the text encoding
 org $F69FE9
 Text_F69FE9:
-    incbin "../../build/assets/text/Text_F69FE9.bin"
+    incbin "../../build/text/Text_F69FE9.bin"          ; text unit StaleText (strings)
 
 ; $F6:A000-$F6:B222 (4,643 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $F6A000
-Text_F6A000:
-    incbin "../../build/assets/text/Text_F6A000.bin"
+MsgTable_F6A000:
+    incbin "../../build/text/MsgTable_F6A000.bin"          ; text unit Messages_F6A000 (strtable)
 
 ; $F6:B223-$F6:B22F (13 B), text, probable: bytes in the text encoding
 org $F6B223
 Text_F6B223:
-    incbin "../../build/assets/text/Text_F6B223.bin"
+    incbin "../../build/text/Text_F6B223.bin"          ; text unit StaleText (strings)
 
 ; $F6:B230-$F6:C813 (5,604 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $F6B230
-Text_F6B230:
-    incbin "../../build/assets/text/Text_F6B230.bin"
+MsgTable_F6B230:
+    incbin "../../build/text/MsgTable_F6B230.bin"          ; text unit Messages_F6B230 (strtable)
 
 ; $F6:C814-$F6:C82F (28 B), text, probable: bytes in the text encoding
 org $F6C814
 Text_F6C814:
-    incbin "../../build/assets/text/Text_F6C814.bin"
+    incbin "../../build/text/Text_F6C814.bin"          ; text unit StaleText (strings)
 
 ; $F6:C830-$F6:CA54 (549 B), packed_lz, confirmed: lz11 -> 940 B: location event script
 ; (Evt_Data)

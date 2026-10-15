@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $FC:0000-$FC:063C (1,597 B), packed_lz, confirmed: lz11 -> 2396 B: location event script
@@ -616,20 +617,20 @@ EvtPack_512:
 ; $FC:B9E8-$FC:B9FF (24 B), text, probable: bytes in the text encoding
 org $FCB9E8
 Text_FCB9E8:
-    incbin "../../build/assets/text/Text_FCB9E8.bin"
+    incbin "../../build/text/Text_FCB9E8.bin"          ; text unit StaleText (strings)
 
 ; $FC:BA00-$FC:F9CE (16,335 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $FCBA00
-Text_FCBA00:
-    incbin "../../build/assets/text/Text_FCBA00.bin"
+MsgTable_FCBA00:
+    incbin "../../build/text/MsgTable_FCBA00.bin"          ; text unit Messages_FCBA00 (strtable)
 
 ; $FC:F9CF-$FC:F9EF (33 B), text, probable: bytes in the text encoding
 org $FCF9CF
 Text_FCF9CF:
-    incbin "../../build/assets/text/Text_FCF9CF.bin"
+    incbin "../../build/text/Text_FCF9CF.bin"          ; text unit StaleText (strings)
 
 ; $FC:F9F0-$FC:FFF2 (1,539 B), table, confirmed: 513 x 3 B long pointers
 ; Read by LocLoad_Unk56D4.

@@ -6,9 +6,10 @@
 ; piece is a row of the survey (its kind, format, readers and
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
-; from your own ROM to build/assets/, or a pack tools/build_rom.py
-; makes from one in build/packs/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; from your own ROM to build/assets/, a pack tools/build_rom.py
+; makes from one in build/packs/, or text it encodes into
+; build/text/ (symbols/data_assets.csv lists them; nothing here
+; is ROM data).
 ; ============================================================
 
 ; $F7:0000-$F7:48B7 (18,616 B), text, confirmed: u16 string pointers (same bank), then strings:
@@ -16,21 +17,21 @@
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $F70000
-Text_F70000:
-    incbin "../../build/assets/text/Text_F70000.bin"
+MsgTable_F70000:
+    incbin "../../build/text/MsgTable_F70000.bin"          ; text unit Messages_F70000 (strtable)
 
 ; $F7:48B8-$F7:48FF (72 B), text, probable: bytes in the text encoding
 org $F748B8
 Text_F748B8:
-    incbin "../../build/assets/text/Text_F748B8.bin"
+    incbin "../../build/text/Text_F748B8.bin"          ; text unit StaleText (strings)
 
 ; $F7:4900-$F7:F870 (44,913 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends
 ; Read by Evt_OpB8_SetMsgPtr (table), Evt_OpBB_Msg / Evt_OpC0_MsgChoice ..., TextWin_Init,
 ; TextWin_State0 (decode).
 org $F74900
-Text_F74900:
-    incbin "../../build/assets/text/Text_F74900.bin"
+MsgTable_F74900:
+    incbin "../../build/text/MsgTable_F74900.bin"          ; text unit Messages_F74900 (strtable)
 
 ; $F7:F871-$F7:F97F (271 B), padding, confirmed: 271 x $00
 org $F7F871

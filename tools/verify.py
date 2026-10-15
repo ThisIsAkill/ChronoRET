@@ -19,7 +19,9 @@ assembled on its own too (code labels as label-only stubs), and may write
 no byte outside the manifest's pieces. Its figures: bytes
 written by source as fill or as pointer tables of labels, bytes extracted
 from the ROM, and bytes packed by the build from extracted assets; every
-ROM byte must be one of these or emitted by the code source.
+ROM byte must be one of these or emitted by the code source. Text pieces
+(tools/text.py) are encoded by the build from text extracted from the ROM:
+counted apart as well, never as source.
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -197,7 +199,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     want = bytearray(ROM_SIZE)          # 1 code or source data, 2 an incbin of the manifest or the module
     for i in emitted:
         want[i] = 1
-    figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0}
+    figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -221,14 +223,16 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     try:
         extract_data.extract()
         build_rom.build_packs()
+        build_rom.build_text()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
         return figures, problems
     for p in pieces:
-        if p['piece'] not in ('extracted', 'packed'):
+        if p['piece'] not in ('extracted', 'packed', 'text'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
-                else extract_data.PACKS / f'{p["label"]}.lz')
+                else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] == 'packed'
+                else extract_data.TEXT_OUT / f'{p["label"]}.bin')
         if path.read_bytes() != rom[p['offset']:p['stop']]:
             problems.append(f'{path} is not the ROM\'s bytes at {p["start"]}-{p["end"]}')
     return figures, problems
@@ -318,6 +322,8 @@ def main() -> int:
               f'(build/assets/, incbin)')
         print(f'  {"packed":<16} {data["packed_bytes"]:>9,} bytes packed by the build from extracted '
               f'assets (build/packs/, incbin)')
+        print(f'  {"text":<16} {data["text_bytes"]:>9,} bytes encoded by the build from text extracted '
+              f'from the ROM (build/assets/text/ -> build/text/, incbin)')
         whole = len(emitted) + packed_emitted + sum(data.values())
         print(f'  {"whole ROM":<16} {whole:>9,} of {ROM_SIZE:,} bytes accounted for')
         if args.ranges:
