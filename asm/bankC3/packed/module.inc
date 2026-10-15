@@ -52,9 +52,15 @@ endmacro
 !Audio_DriverCommand = $C70004           ; bankC7.asm: sends the Audio_Cmd* block (JSL)
 !C3_SprListSmall = $C30D0E              ; bankC3.asm: a list of small sprites (JSL)
 !FdVec_FFF7 = $FDFFF7                    ; bankFD.asm: JMP PalAnim_TickAll (JSL)
+!FdVec_FFEE = $FDFFEE                    ; bankFD.asm: JMP PalAnim_StopAll (JSL)
 !RandomTable = $C0FE00                   ; bankC0.asm: 256 random bytes
 !BankC3_Entry000E = $C3000E              ; bankC3.asm: BRA/JMP to the wipe, WinFx_StepWipe (JSL)
 !C3_BuildCopyCode = $C309E9              ; bankC3.asm: writes the bitmap-to-tiles copy code (JSL)
+!C3_MulSigned = $C3094C                  ; bankC3.asm: 16 x 8-bit signed multiply (JSL)
+!C3_FindDivisor = $C30E29                ; bankC3.asm: counts a divisor up (JSL)
+!C3_SprListLarge = $C30D5E              ; bankC3.asm: a list of large sprites (JSL)
+!C3_SprOneSmall = $C30DBC                ; bankC3.asm: one small sprite (JSL)
+!C3_ScaleBitmap = $C30307                ; bankC3.asm: scales a bitmap (JSL)
 
 ; ------------------------------------------------------------
 ; RAM the module uses (DB = $00 and DP = 0 unless a header says
@@ -154,6 +160,41 @@ endmacro
                                          ; down (C3Mod_SideMinusPads' entry for the view's angle)
 !C3_PadSidePlus = $00B8                  ; 16-bit: the one that steers it up (C3Mod_SidePlusPads)
 !C3_Prog9 = $44                          ; 8-bit, dp (DP=0): 1 when C3Mod_Prog0 runs as program 9
+; The race on the screen (dp words with DP=0 unless noted):
+!C3_BikeScrX = $46                       ; 16-bit: the bike's projected X, then its sprite's left
+                                         ; (C3Mod_ProjectBike, C3Mod_SizeBike)
+!C3_BikeScrY = $48                       ; 16-bit: its projected Y, then its sprite's top
+!C3_BikeWidth = $5B                      ; 16-bit: its sprite's width (C3Mod_SizeBike)
+!C3_BikeHeight = $5D                     ; 16-bit: ... height
+!C3_BikeRight = $5F                      ; 16-bit: ... right edge
+!C3_BikeBottom = $61                     ; 16-bit: ... bottom
+!C3_RivalScrX = $6B                      ; 16-bit: as C3_BikeScrX for the rival
+!C3_RivalScrY = $6D
+!C3_RivalWidth = $80
+!C3_RivalHeight = $82
+!C3_RivalRight = $84
+!C3_RivalBottom = $86
+!C3_ViewNegCos = $90                     ; 16-bit: -cos of the view's angle (C3Mod_ProjectTask)
+!C3_ViewNegSin = $92                     ; 16-bit: -sin
+!C3_ViewCos = $94                        ; 16-bit: cos
+!C3_ViewSin = $96                        ; 16-bit: sin
+!C3_BikeTilesReady = $AA                 ; 16-bit: the bike's new tiles are to be sent (C3Mod_TilesNmiTask)
+!C3_RivalTilesReady = $AC                ; 16-bit: ... the rival's
+!C3_DivisorStart = $B4                   ; 16-bit: where C3Mod_Perspective's divisor search starts
+!C3_TilesPending = $39                   ; 16-bit: set while tiles at $0C00 wait to be sent
+!C3_TmpFC = $FC                          ; 16-bit dp scratch (C3Mod_SizeBike)
+!C3_TmpFE = $FE                          ; 16-bit dp scratch (C3Mod_Perspective; the facing in
+                                         ; C3Mod_DrawTask)
+!C3_BikeDepth = $0B00                    ; 16-bit (page $0B00's var 0): the bike's depth, the
+                                         ; divider's quotient (C3Mod_SizeBike)
+!C3_RivalDepth = $0B0C                   ; 16-bit (page $0B00's var 6): the rival's
+!C3_BikeJob = $1400                      ; 14 bytes: the bike's picture job (C3Scale_Groups.. with
+                                         ; the state word at +2)
+!C3_RivalJob = $140E                     ; 14 bytes: the rival's
+!C3_ViewFacing = $18                     ; page $0A00's var 12: added to the bikes' facing (the
+                                         ; opening scripts set 1, -1, 0)
+!C3_AnimFrame = $14                      ; page $0A00's var 10: the bikes' animation count
+!C3_RaceGo = $1A                         ; page $0B00's var 13: set after the count-down
                                          ; (C3_EntryArg bits 0-3 not 0), else 0 (Init's clear)
 !C3_StartCount = $0397                   ; 16-bit: C3Mod_Prog0's C3_EntryArg bit 6 runs, counted
                                          ; (bit 0 picks C3Mod_Prog0WipeA or B)
@@ -173,8 +214,10 @@ endmacro
 !C3_ViewOffsetX = $1440                  ; 16-bit: -sin(angle) x distance / 256 (C3Mod_ViewOffsetTask)
 !C3_ViewOffsetY = $1442                  ; 16-bit: -cos(angle) x distance / 256
 !C3_Unk1444 = $1444                      ; 16-bit: C3Mod_Prog0Vars clears it, C3Mod_RaceTask steps it
-!C3_Unk1446 = $1446                      ; 256 bytes ($1446-$1545): cleared by C3Mod_ClearUnk1446
-!C3_Unk1446Bytes = $0100                 ; its size
+!C3_DivisorCache = $1446                 ; 256 bytes ($1446-$1545): C3Mod_Perspective's divisors + 1
+                                         ; by its bound's low byte (0: none yet); cleared by
+                                         ; C3Mod_ClearDivisorCache
+!C3_DivisorCacheBytes = $0100                 ; its size
 !C3_MirrorEnd = $0200                    ; 16-bit, in the source's bank ($7F:0200 at C3Mod_Prog0):
                                          ; C3Mod_MirrorRows' first byte, from Y
 !C3_MirrorLeft = $0202                   ; 8-bit, $7F:0202: C3Mod_Prog0's C3Mod_MirrorRows calls left
@@ -435,6 +478,51 @@ endmacro
 !C3_TmpF8 = $F8
 !C3_PadB = $8000                         ; JOY1 as a word: B
 !Op_RTS = $60                            ; 65816 opcode RTS
+!C3_JobGroups = 0                        ; a picture job's fields (C3_BikeJob, C3_RivalJob): to
+!C3_JobState = 2                         ; C3Scale_Groups; the state (1 waiting, 2 done);
+!C3_JobSrc = 4                           ; C3Scale_SrcBase; C3Scale_Rows; C3Scale_YStep;
+!C3_JobRows = 6                          ; (C3Scale_XStep, set by C3Mod_ScaleJob);
+!C3_JobYStep = 8                         ; C3Scale_SrcLimit
+!C3_JobLimit = 12
+!C3_JobBytes = 14
+!C3_JobWaiting = $0001
+!C3_JobDone = $0002
+!C3_DepthMask = $0FFF                    ; the depth's bits
+!C3_DepthMin = $0040                     ; the least depth / 2 used for a size
+!C3_DepthNear = $0080                    ; the least depth for the bike's job
+!C3_SizeHeight = $0C00                   ; C3Mod_SizeBike: the height is this / (depth / 2)
+!C3_SizeWidth = $1000                    ; ... the width this / (depth / 2)
+!C3_SizeDepthX = $8000                   ; ... the X scale (2 x this / depth)
+!C3_ScreenMidX = $0080                   ; the screen's middle column
+!C3_LinesShown = $00E0                   ; 224 lines
+!C3_FacingMask = $000E                   ; a facing as an even index (8 entries)
+!C3_BarBase = $00B8                      ; the HUD bar's right end ($D8 in program 9, written)
+!C3_BarLeft = $0021                      ; the bar's length = C3_BarBase - this - 1
+!C3_BarRight = $0006                     ; C3Mod_MarkerX's X = C3_BarBase + this - ... - 1
+!C3_MarkerTop = $00C0                    ; the markers' Y = the side / 8 + this
+!C3_StepMid = $0080                      ; y steps: from here up, 4 sprites ...
+!C3_StepFar = $0100                      ; ... from here up, 1
+!C3_Count1 = $0002                       ; sprite-list counts (sprites + 1)
+!C3_Count4 = $0005
+!C3_Count9 = $000A
+!C3_SecondFrame = $0010                  ; the second frame's offset in the picture tables
+!C3_BikeGroups = $0004                   ; C3Scale_Groups of the bike (64 pixels)
+!C3_RivalGroups = $0003                  ; ... of the rival (48)
+!C3_RivalLimit = $0600                   ; the rival's C3Scale_SrcLimit
+!C3_RivalRows = $0030                    ; the rival's C3Scale_Rows
+!C3_IconX = $00EA                        ; the boost icons' first X
+!C3_IconY = $00D0                        ; ... and Y
+!C3_HudOffset = $0018                    ; C3Mod_DrawHud's .offset at first
+!C3_HudMax = $03E8                       ; the largest distance shown (1000)
+!C3_HudNumberX = $0010                   ; the HUD numbers' X
+!C3_HudDistanceY = $000E                 ; the distance's Y
+!C3_HudScoreY = $0018                    ; the score's Y
+!C3_HudEvery = $40                       ; .offset goes down every 64 frames
+!C3_BikeTilesVram = $4000                ; VRAM word of the bike's tiles (sprite tile $00)
+!C3_RivalTilesVram = $4400               ; ... of the rival's (sprite tile $40)
+!C3_TilesBytes = $0800                   ; a picture's tiles
+!C3_TilesBuffer = $0C00                  ; $00:0C00: where the copy code puts them
+!C3_CopyCodeAddr = $B574                 ; C3_CopyCode in bank $7E (JSR)
 !C3_PadR = $0010                         ; JOY1 as a word (C3_Pad..): R
 !C3_PadL = $0020                         ; L
 !C3_PadX = $0040                         ; X
@@ -443,6 +531,142 @@ endmacro
 !C3_PadLeft = $0200                      ; Left
 !C3_PadDown = $0400                      ; Down
 !C3_PadUp = $0800                        ; Up
+; Program 4 (the mode-7 plane and the stars).
+!C3_Prog4TileList = $60                  ; the sprite tiles' list: 96 bytes (pack 21)
+!C3_Prog4SprVram = $4600                 ; VRAM word of pack 17's sprite tiles
+!C3_Prog4MapBytes = $0380                ; the mode-7 map bytes sent
+!C3_Prog4MapClear = $3C80                ; ... and cleared after them
+!C3_Prog4Colours = $20                   ; pack 20's bytes (pack 18: twice that)
+!C3_M7SelTransparent = $80               ; M7SEL: outside the map transparent
+!C3_Prog4Fade = $0606                    ; C3_FadeStep and C3_FadeTimer
+!C3_Prog4Tiles = $55                     ; BG12NBA and BG34NBA
+!C3_TileListLeft = $FFFE                 ; $7F:FFFE: C3Mod_TileListToVram's count
+!C3_TileWords = $0010                    ; a 4bpp tile's words
+!C3_StarSpeed = $00                      ; page $0B00's var 0: the stars' speed
+!C3_DriftX = $02                         ; var 1: their sideways drift
+!C3_DriftY = $04                         ; var 2: their up drift
+!C3_DriftAngle = $0A                     ; var 5: the drift angle
+!C3_PlaneScrollVarX = $02                ; page $0A00's var 1: the plane's scroll X
+!C3_PlaneScrollVarY = $04                ; var 2: its scroll Y
+!C3_PlaneCentreVarX = $06                ; var 3: its centre X
+!C3_PlaneCentreVarY = $08                ; var 4: its centre Y
+!C3_PlaneMatrix = $14                    ; page $0A00: the mode-7 matrix words A, B, C, D
+!C3_SpinStep = $16                       ; C3Mod_SpinTask: the angle step a frame
+!C3_PictureY = $70                       ; the large picture's Y
+!C3_Unk576ABytes = $20                   ; C3Mod_Unk576A's MVN count
+!C3_StarXY = $0C00                       ; the stars' X and Y bytes, by OAM offset
+!C3_StarDepth = $0E00                    ; their depths, by OAM offset
+!C3_StarDepthMask = $7F                  ; a star's depth
+!C3_StarBytes = $0200                    ; the OAM low table's end
+!C3_StarDivisor = $44                    ; dp: a star's divider (C3_Prog9's byte reused)
+!C3_StarDepthBase = $80                  ; the divider = depth + this
+!C3_HighByteMask = $FF00
+!C3_StarTile0 = $60                      ; the stars' first tile
+!C3_StarMidX = $80                       ; the stars' centre on the screen
+!C3_StarMidY = $70
+!C3_StarTileFar = $68                    ; tiles from this one: the far attribute
+!C3_StarAttrNear = $32                   ; palette 1, priority 3
+!C3_StarAttrFar = $02                    ; palette 1, priority 0
+!C3_AtanUp = $0300                       ; C3Mod_Atan's angle for X = 0, Y positive
+!C3_FullTurn = $0400                     ; a turn (C3Mod_Sine's 1024 steps)
+!C3_TanTableBytes = $0080                ; C3Mod_TanTable's size
+; Program 2 (the rocking mode-7 picture, then mode 2 with a wave).
+!C3_Prog2M7Tiles = $A0                   ; mode-7 characters made of pack 23's first tiles
+!C3_Prog2Bg1Map = $6400                  ; VRAM word of BG1's map in mode 2 (pack 26)
+!C3_Prog2Bg2Map = $6000                  ; ... BG2's (pack 25; the mode-7 map's source too)
+!C3_Prog2Bg3Map = $7000                  ; ... BG3's: mode 2's offset-per-tile table
+!C3_Prog2MapClear = $6480                ; VRAM word from which BG1's map is cleared ...
+!C3_Prog2MapClearBytes = $0F00           ; ... this many bytes
+!C3_Prog2Bg1Sc = $65                     ; BG1SC: map at $6400, 64x32
+!C3_Prog2Bg2Sc = $60                     ; BG2SC: map at $6000, 32x32
+!C3_Prog2Bg3Sc = $70                     ; BG3SC: map at $7000
+!C3_Prog2Tiles = $55                     ; BG12NBA: BG1 and BG2 tiles at VRAM word $5000
+!CGADSUB_AddBg1Backdrop = $21            ; colour math on BG1 and the backdrop, add, not halved
+!C3_Prog2M7X = $0020                     ; M7X
+!C3_Prog2M7Y = $FFC0                     ; M7Y (-$40)
+!C3_Prog2Bg2Hofs = $FF40                 ; BG2HOFS (-$C0)
+!C3_Prog2Fade = $0101                    ; C3_FadeStep and C3_FadeTimer
+!C3_SongProg2 = $30                      ; program 2's song (C3Mod_PlaySong)
+!C3_ColourWhite = $FFFF                  ; a colour word: white (bit 15 unused)
+!C3_Prog2WhiteOffset = $01E2             ; colour $F1's offset in a palette buffer
+!C3_M7MapCells = $20                     ; C3Mod_MapToM7: map cells a row, and rows
+!C3_M7MapRest = $60                      ; ... zero bytes after each row (a 128-wide map)
+!C3_M7MapClear = $1000                   ; ... bytes cleared after the 32 rows
+!C3_SlideX = $46                         ; dp (DP=0): 5 words, the slide groups' X x 16
+!C3_SlideStop = $50                      ; 5 words: where each stops
+!C3_SlideStart = $05A0                   ; their start (90 pixels)
+!C3_SlideStop0 = $0670                   ; the stops (103, 119, 134, 154, 169 pixels)
+!C3_SlideStop1 = $0770
+!C3_SlideStop2 = $0860
+!C3_SlideStop3 = $09A0
+!C3_SlideStop4 = $0A90
+!C3_SlideY = $0052                       ; the slide pictures' Y
+!C3_SlideBytes = $000A                   ; 5 words
+!C3_RockMatrix = $5A                     ; dp: 4 words, M7A, M7B, M7C, M7D (C3Mod_RockNmiTask)
+!C3_SwingX = $62                         ; dp: 16-bit, C3Mod_SwingDrawTask's X
+!C3_SwingY = $64                         ; ... and Y
+!C3_RockPhase = $66                      ; dp: 16-bit, C3Mod_RockTask's angle
+!C3_SwingAngle = $68                     ; dp: 16-bit, C3Mod_SwingTask's angle
+!C3_RockSwing = $6C                      ; dp: 16-bit, the rocking's size ($200 down to 1)
+!C3_Prog2Done = $6E                      ; dp: 16-bit, set (low byte 1) at the end: no skip
+!C3_Prog2Skip = $70                      ; dp: 16-bit, set (low byte 1) when skipped
+!C3_FirstPicTimer = $72                  ; dp: 16-bit, C3Mod_FirstPicTask's frames left
+!C3_FirstPicFrames = $006E               ; ... from 110
+!C3_Prog2Skipped = $7F0060               ; 8-bit: 1 when a button skipped program 2 without R or L
+!C3_SwingAngleStart = $00F8
+!C3_SwingXStart = $00D8
+!C3_SwingYStart = $0082
+!C3_RockPhaseStart = $14C8
+!C3_RockSwingStart = $0200
+!C3_RockScale = $00                      ; page $0A00's var 0 in program 2: the mode-7 scale
+!C3_Prog2ScrollX = $02                   ; var 1: BG1HOFS
+!C3_Prog2ScrollY = $04                   ; var 2: BG1VOFS
+!C3_WaveSize = $0C                       ; var 6: the wave's size (C3Mod_WaveTask)
+!C3_RockStep = $0007                     ; C3Mod_RockTask: the phase step a frame
+!C3_RockScrollBase = $0100               ; ... BG1VOFS = $10000 / the scale - this
+!C3_SwingStop = $0070                    ; C3Mod_SwingTask: the swing ends below this angle
+!C3_SwingEndX = $0038                    ; ... the pictures' place after it
+!C3_SwingEndY = $003A
+!C3_SwingRadiusX = $00D8                 ; ... the arc's sizes and offsets
+!C3_SwingOffsetX = $FFE0
+!C3_SwingRadiusY = $00C3
+!C3_SwingOffsetY = $FFC0
+!C3_SwingPicBGap = $0040                 ; C3Mod_SwingPicB's Y below C3Mod_SwingPicA's
+!C3_SidePicX = $003A
+!C3_SidePicY = $0064
+!C3_FirstPicX = $0090
+!C3_FirstPicY = $00B0
+!C3_SkipFrom = $003C                     ; C3_FirstPicTimer value that adds C3Mod_SkipTask
+!C3_BottomPicY = $00D0
+!C3_BottomPicAX = $0078
+!C3_BottomPicBX = $00B8
+!C3_WaveEvery = $001F                    ; C3Mod_WaveCountTask: every 32 frames
+!C3_BgMode2NoMosaic = $0002              ; BGMODE 2 (and MOSAIC 0: a 16-bit store)
+!C3_Prog2Mode2Y = $FFB9                  ; BG1VOFS in mode 2 (-$47)
+!C3_FadeAnimKind = $50                   ; FieldAnimB.Unk0: kind 5 (PalAnim_Fade)
+!C3_FadeAnimFirst = $C0                  ; ... its first colour
+!C3_FadeAnimCount = $10                  ; ... colours
+!C3_FadeAnimTarget = $FF                 ; ... its target level
+!C3_WhitenAnimKind = $40                 ; kind 4 (PalAnim_FadeWhite)
+!C3_WhitenAnimFirst = $B0
+!C3_WhitenAnimCount = $0B
+!C3_WhitenAnimLevel = $80
+!C3_TileRow = $3B                        ; dp: a tile row's plane bytes (4, or 8 at $3B-$42)
+!C3_TileRowsLeft = $3F                   ; dp: C3Mod_Tile4ToM7's row count
+!C3_Tile8RowsLeft = $31                  ; dp: C3Mod_Tile8ToM7's
+!C3_TilePlanes23 = $10                   ; a tile's planes 2-3 after planes 0-1
+!C3_TilePlanes45 = $20                   ; ... 4-5 (8bpp)
+!C3_TilePlanes67 = $30                   ; ... 6-7
+!C3_Tile4Skip = $0010                    ; C3Mod_TilesToM7: X + this after a tile's 16 row bytes
+!C3_WaveTable = $0C00                    ; mode 2's offset-per-tile table: 2 rows of 32 words
+!C3_WaveTableBytes = $0080
+!C3_WaveVRow = $40                       ; its second row (the vertical offsets)
+!C3_WaveShiftLast = $007C                ; C3Mod_WaveTask: the last word moved up ...
+!C3_WaveShiftEnd = $003E                 ; ... and where the loop ends
+!C3_WaveBase = $004A                     ; ... the offset taken off
+!C3_OffsetMask = $03FF                   ; an offset-per-tile entry's offset
+!C3_OffsetBg1 = $2000                    ; ... bit 13: it applies to BG1
+!C3_Prog2Bg3Hofs = $0044                 ; 16-bit: BG3HOFS (C3Mod_WaveNmiTask; C3_Prog9's byte)
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
@@ -507,4 +731,42 @@ macro C3ModDivZeroStep()                ; its last 8: a zero bit (ASL) in place 
     CLC
 ?fits:
     ROL.b !C3Math_Lo
+endmacro
+
+; ------------------------------------------------------------
+; One mode-7 pixel of C3Mod_Tile4ToM7 / Tile8ToM7: the top bits of the
+; row's plane bytes (the highest plane first) shifted into A, written
+; to VMDATAH (long: DB is the tiles' bank).
+; ------------------------------------------------------------
+macro C3ModPixel4()
+    TDC                                 ; A = DP's low byte (0)
+    ASL.b !C3_TileRow+3
+    ROL A
+    ASL.b !C3_TileRow+2
+    ROL A
+    ASL.b !C3_TileRow+1
+    ROL A
+    ASL.b !C3_TileRow
+    ROL A
+    STA.l VMDATAH
+endmacro
+
+macro C3ModPixel8()
+    ASL.b !C3_TileRow+7
+    ROL A
+    ASL.b !C3_TileRow+6
+    ROL A
+    ASL.b !C3_TileRow+5
+    ROL A
+    ASL.b !C3_TileRow+4
+    ROL A
+    ASL.b !C3_TileRow+3
+    ROL A
+    ASL.b !C3_TileRow+2
+    ROL A
+    ASL.b !C3_TileRow+1
+    ROL A
+    ASL.b !C3_TileRow
+    ROL A
+    STA.l VMDATAH
 endmacro

@@ -1869,7 +1869,7 @@ if !ram_engine_inc == 0
 !C3Scale_Pixels = $3B                    ; 8 bytes: the 8 source pixels being packed
 !C3_MulA = $F0                           ; C3_MulSigned: 16-bit signed multiplicand
 !C3_MulB = $F2                           ; 8-bit signed multiplier
-!C3_MulProduct = $F4                     ; 32-bit signed product
+!C3_MulProduct = $F4                     ; 32 bits, but only the low word is exact (C3_MulSigned)
 !C3_GenOrder = $F0                       ; C3_BuildCopyCode (DP=0): 16-bit C3_CopyCodeOrder entry
 !C3_GenI = $F2                           ; 16-bit: + 4 per i step
 !C3_GenJ = $F4                           ; 16-bit: + 2 per j step
