@@ -106,6 +106,16 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-15 (data layer): no ROM data, assets, compressed graphics or music are ever
+  committed (decided by the owner). The data the source does not emit is extracted from the
+  user's own ROM into the ignored `build/assets/` (`tools/extract_data.py`), and the build
+  assembles `asm/rom.asm` (the code source plus the generated, committed placement `asm/data/`)
+  onto a blank image, packing the packed streams back at build time. The lint's FILEREAD rule
+  allows, besides the module's two lines, only `asm/data/bankXX.asm` lines that are exactly an
+  incbin of a `build/assets/` or `build/packs/` path the manifest `symbols/data_assets.csv`
+  lists for that bank, once each, with the manifest checked to be the tool's output from the
+  survey. `tools/verify.py` reports the data layer apart (fill, pointer tables of labels,
+  extracted, packed from extracted); the 65816, SPC700 and module figures do not include it.
 - 2026-10-15 (packed $C3 module): the module is matched in unpacked form
   (`asm/bankC3/packed/module.asm`), assembled apart and packed back by `tools/c3pack.py`, whose
   packer (Okumura's LZSS, zeroed ring buffer) rebuilds all 60 packs of C3Rom_PackPtrs in the
