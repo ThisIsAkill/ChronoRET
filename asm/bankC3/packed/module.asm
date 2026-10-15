@@ -4133,7 +4133,9 @@ C3Mod_RestoreColumnTask:                ; header: see C3Mod_ClearColumnTask
 ;     (an NMI task: the map column put back);
 ;   - C3_PadHeld = 0;
 ;   - unless C3_RacePhase is 1, nothing more here. With it:
-;     C3_RivalControl = $8000 (the rival keeps going) in program 9,
+;     C3_RivalControl = $8000 (the rival keeps going) in program 9
+;     (C3_Prog9, read as a word: the byte $45 above it too, 0 from
+;     C3Mod_Init's clear),
 ;     else 0; program 9 (C3_EntryArg bits 0-3) moves C3_BikeSide to
 ;     $2000 and C3_RivalSide to $6000 (.bike_target / .rival_target,
 ;     swapped by C3Mod_RaceFinish when the bike was above) by $80 a
@@ -4442,78 +4444,117 @@ C3Mod_RaceFinish:
 
 ; $7E:485D — C3Mod_RaceStepTask (994 bytes with C3Mod_RaceStep, $485D–$4C3E)
 ; A task, from the end of the count-down (C3Mod_Prog0ScriptB): one
-; frame of the race. C3_RaceFrames + 1; when the bike's laps
-; (C3_BikeDist's high word) reach 8, JMP C3Mod_RaceFinish; when the
-; rival's do, the race is lost: C3_RaceResult = 2 (a word store, so
-; C3_RacePrize = 0 too, as it already is), C3Mod_SteerTask removed, an RTS
-; (Op_RTS) written over $510D, the shared end of the routines at $50F1
-; and $5100 (code not matched yet), which place the sprite lists at
-; $538D / $5391 with X from each bike's lap progress and Y = its
-; side's high byte / 8 + $C0 (the word at the side + 1), next to
-; $5116's boost icons: probably the HUD's progress markers, so they
-; are no longer drawn (not traced further); the view's
-; X speed = the two speeds' sum / 2048, C3Mod_SkyNmiTask (NMI) and
-; C3Mod_CountDownTask (the score counted down) added, page $0A00 on
-; C3Mod_Prog0Quit, and the task ends (C3Mod_TaskEnd). Else:
-;   - C3_ColumnCleared: the map column is put back
-;     (C3Mod_RestoreColumnTask) once the pack (C3_PackDist) is in lap
-;     0 at $1000-$8FFF (CMP #$1000 / BMI: the sign of the low word
-;     minus $1000), and cleared (C3Mod_ClearColumnTask) once it is in
-;     lap 7 at $F200 or more (SBC / BCC, unsigned);
-;   - C3_BikeHidden = C3_RivalHidden = 1 when the bike is ahead: the
-;     difference's high word not negative and its low word $1000-$8FFF
-;     (the same CMP / BMI), else 0; a lead of a whole lap with a low
-;     word outside that range does not count;
-; then C3Mod_RaceStep ($48FD, also C3Mod_RaceTask's tail):
-;   - both speeds - $80 (to at least 0), then + the accelerations
-;     (the rival's only while C3_RivalControl bit 15 is set); the
-;     accelerations reset to $100 (bike) and $F8 (rival), or 0 when the
-;     speed is above the speed cap;
-;   - racing (C3_RacePhase 0): the boost. While C3_BoostTimer runs it
-;     counts down, and every 8th frame (while boosts are left) the
-;     lamp's rows rotate (C3_LampLeftRows / C3_LampRightRows, bit
-;     plane 3 of rows 0 and 1 of its two tiles: SEC / ROR through both,
-;     a row of lit pixels filling in); else B (C3_PadHeld bit 15), pressed anew (C3_BoostHeld),
-;     uses a boost when one is left: C3_BoostsLeft - 1, C3_BoostTimer =
-;     $80, the lamp rows cleared, the bike's speed + $1700 (+ the carry
-;     of the CMP before; $7FFF at most);
+; frame of the race. Compares below are 16-bit; "BMI" ones branch on
+; bit 15 of the difference (signed, right while the values are within
+; $8000 of each other), "BCC" ones are unsigned.
+;   - C3_RaceFrames + 1. The bike's laps (C3_BikeDist's high word)
+;     equal to 8: JMP C3Mod_RaceFinish. Else the rival's equal to 8:
+;     the race is lost: C3_RaceResult = 2 (a word store, so
+;     C3_RacePrize = 0 too, as it already is), C3Mod_SteerTask removed,
+;     an RTS (Op_RTS) written over $510D, the shared end of the
+;     routines at $50F1 and $5100 (code not matched yet), which place
+;     the sprite lists at $538D / $5391 with X from each bike's lap
+;     progress and Y = its side's high byte / 8 + $C0 (the word at the
+;     side + 1), next to $5116's boost icons: probably the HUD's
+;     progress markers, so they are no longer drawn (not traced
+;     further); the view's X speed = (the two speeds + 1, the carry of
+;     the equal CMP) / 2048, C3Mod_SkyNmiTask (NMI) and
+;     C3Mod_CountDownTask (the score counted down) added, page $0A00 on
+;     C3Mod_Prog0Quit, and the task ends (C3Mod_TaskEnd).
+;   - Else the map column (C3_ColumnCleared): put back
+;     (C3Mod_RestoreColumnTask) when the pack's (C3_PackDist) high word
+;     is 0, its low word is $1000-$8FFF (CMP #$1000 / BMI) and the
+;     column is cleared; cleared (C3Mod_ClearColumnTask) when the high
+;     word is 7, the low word is $F200 or more (SBC #$F200 with C = 1
+;     from the equal CMP, then BCC: unsigned) and it is not cleared.
+;   - C3_BikeHidden = C3_RivalHidden = 1 when the 32-bit difference
+;     bike - rival has a high word with bit 15 clear (CMP #0 / BMI) and
+;     a low word of $1000-$8FFF (CMP #$1000 / BMI), else 0: a lead of a
+;     whole lap with a low word outside that range does not count.
+; Then C3Mod_RaceStep ($48FD, also C3Mod_RaceTask's tail):
+;   - each speed - $80 (SEC), set to 0 when the result has bit 15 set
+;     (BPL); then the bike's + C3_BikeAccel (CLC), and the rival's +
+;     C3_RivalAccel (CLC) when C3_RivalControl bit 15 is set (BIT);
+;   - the accelerations reset to $100 (bike) and $F8 (rival), each set
+;     to 0 when cap - speed has bit 15 set (CMP / BPL: the speed above
+;     the cap; equal keeps it);
+;   - racing (C3_RacePhase 0) only: the boost. C3_BoostTimer not 0:
+;     when C3_BoostsLeft is not 0 and C3_BoostTimer AND 7 is 0, the
+;     lamp's rows rotate (C3_LampLeftRows / C3_LampRightRows, bit plane
+;     3 of rows 0 and 1 of its two tiles: SEC / ROR, the second tile
+;     taking the first one's carry out, a row of lit pixels filling
+;     in); then C3_BoostTimer - 1. C3_BoostTimer 0: B (C3_PadHeld bit
+;     15) not held clears C3_BoostHeld; held while C3_BoostHeld is 0
+;     sets it and, when C3_BoostsLeft is not 0, uses a boost:
+;     C3_BoostsLeft - 1, C3_BoostTimer = $80, the lamp rows cleared,
+;     the bike's speed + $1700 + C (no CLC: C from the rival's cap CMP,
+;     1 when the rival's cap >= its speed, unsigned), and $7FFF when
+;     the sum has bit 15 set (BPL);
 ;   - the speed caps: the bike's C3_BikeTopSpeed, or C3_BikeTopBehind
-;     when C3_RaceGap is negative; the rival's C3_RivalTopSpeed, or
-;     C3_RivalTopAhead when it is not;
-;   - C3_PackDist = the two distances' mean (32-bit); the view's X =
-;     (its low word / 16 + $375) AND $3FF;
-;   - racing: C3_RivalControl = $8000 (accelerate) and, with the bike
-;     ahead (C3_RaceGap > 0), C3_Score + 2 and, within $20 on the side
-;     axis (the high bytes), the rival steers away from the bike's
-;     half (down when the bike is at $40 or more, else up); else
-;     C3_Score - 1 and the rival steers towards the bike (down when the
-;     bike is below it, else up);
-;   - C3_BikeSteer: 1 while C3_PadSidePlus is held (C3_BikeSideUp +
-;     $28, to $210 at most), 2 while C3_PadSideMinus is
-;     (C3_BikeSideDown + $28); both decay by $10 a frame (to 0); the
-;     rival's C3_RivalSideUp / Down + $18 by C3_RivalControl bits 9 /
-;     8, the same decay;
-;   - C3_RaceGap = (the bike's distance - the rival's) / 32 (the low
-;     words of the 32-bit values shifted right 5; no SEC, the carry is
-;     the last bit shifted out of the bike's);
-;   - racing, the bumps: C3_BumpNow = the bikes' relation along the
-;     track (low digit: 0 overlapping, 1 the bike ahead, 2 behind) and
-;     across ($10: the bike $1000 or more below, $20 above); while
-;     they are apart it goes to C3_BumpLast; when they overlap both
-;     ways, C3_BumpLast says how they came together: 1 the rival ran
-;     into the bike from behind (C3Mod_BumpFromBehind, C3_Score + 20),
-;     2 the bike into the rival (C3Mod_BumpFromAhead, C3_Score - 10),
-;     $10 / $20 from the side (C3Mod_BumpFromBelow / FromAbove), or a
-;     mix of them (both); then sound effect $98 (Audio_CmdPlaySfx,
-;     C3Mod_AudioSend) unless C3_SongBusy;
-;   - racing, after any bump sound: the engine sound: C3_SndSfxPitch
-;     with the bike's speed's high byte, written to APUIO1 and APUIO0
-;     straight (no echo wait, unlike C3Mod_AudioSend), unless
-;     C3_SongBusy;
-;   - the bikes move: each distance + its speed / 64 (bits 0-8), each
-;     side + its up speed (to $7000 at most) - its down speed (to 0).
-; The ADCs and SBCs that follow a CMP, BIT or the shifts take the carry
-; as left (no CLC / SEC), as noted at each.
+;     when C3_RaceGap has bit 15 set; the rival's C3_RivalTopSpeed, or
+;     C3_RivalTopAhead when it has not (a gap of 0 counts as ahead);
+;   - C3_PackDist = the two distances' sum / 2 (32-bit: CLC / ADC /
+;     ADC, then LSR / ROR); the view's X = (its low word / 16 + $374 +
+;     1, SEC / ADC) AND $3FF;
+;   - racing only: C3_RivalControl = $8000 (else 0). C3_RaceGap $0001-
+;     $7FFF (not 0, BEQ; bit 15 clear, BMI): C3_Score + 2, and when
+;     |the bike's side word at +1 - the rival's| is below $20 (SEC /
+;     SBC, BPL, else the reverse; then CMP #$20 / BMI: values $00-$1F
+;     with these small words; the words at C3_BikeSide+1 /
+;     C3_RivalSide+1 are the high bytes, with $50 / $75 above them,
+;     0 as far as program 0's traced code goes), the rival steers
+;     away: down when that word is $40 or more (CMP #$40 / BMI), else
+;     up. Otherwise (the gap 0 or bit 15 set): C3_Score - 1 and the
+;     rival steers down when C3_BikeSide - C3_RivalSide has bit 15 set
+;     (CMP / BMI: the bike below), else up (equal included);
+;   - C3_BikeSteer = 0, then 1 while C3_PadSidePlus is held (BIT:
+;     C3_BikeSideUp + $28 + C) and 2 while C3_PadSideMinus is
+;     (C3_BikeSideDown + $28 + C); the rival's C3_RivalSideUp / Down +
+;     $18 + C by C3_RivalControl bits 9 / 8. Each push is capped at
+;     $210 (CMP #$210 / BMI: $210 when the sum is $210 or more) and
+;     each of the four decays by $10, or $11 with C = 0 (SBC without
+;     SEC), set to 0 when the result has bit 15 set (BPL). The C of
+;     each push and decay is what the instruction before left: the
+;     push's CMP #$210 (1 when capped) for its own decay, else the
+;     decay before it (1 unless it borrowed; 0 after a set-to-0), and
+;     for the first, the compare that ended the steering part (or the
+;     view X's ADC, 0, when not racing);
+;   - C3_RaceGap = (the bike's distance / 32) - (the rival's / 32) -
+;     1 + C (the low words of the 32-bit values shifted right 5; no
+;     SEC: C is the bike's last bit shifted out, its distance's bit 4);
+;   - racing only, the bumps, on the distances' low words alone (the
+;     laps are not compared: a bike a whole lap ahead or behind at the
+;     same spot looks level). With the bike's front F = its distance +
+;     $100 + C (C from the gap's SBC) and the rival's R = its distance
+;     + $C0 + C (C from the ADC before, as is the next): along the
+;     track, 1 (the bike ahead) when R + $200 + C - F has bit 15 set
+;     (CMP / BMI), else 2 (behind) when R - $180 - (1 - C) - F has bit
+;     15 clear (C from that CMP; BMI not taken), else 0 (overlapping);
+;     across, $10 (the bike below) when C3_RivalSide - $1000 -
+;     C3_BikeSide has bit 15 clear (SEC / SBC, CMP / BPL: the bike at
+;     the rival's side - $1000 or lower, equal included), else $20 (the
+;     bike above) when C3_RivalSide + $1000 + C - C3_BikeSide has bit
+;     15 set (CMP / BEQ / BPL: the bike above the rival's side + $1000
+;     + C, with C = 1 when the rival's side is below $1000, from the
+;     CMP before; equal counts as overlapping), else 0. So the two
+;     sides differ: $10 at a gap of $1000, $20 only past $1000 + C.
+;     C3_BumpNow = across | along; when it is not 0 it goes to
+;     C3_BumpLast; when it is 0 (overlapping both ways), C3_BumpLast
+;     (equal compares) says how they came together: 1 the rival ran
+;     into the bike from behind (C3Mod_BumpFromBehind, C3_Score + 20,
+;     CLC), 2 the bike into the rival (C3Mod_BumpFromAhead, C3_Score -
+;     10, SEC), $10 / $20 from the side (C3Mod_BumpFromBelow /
+;     FromAbove), $11, $12, $21, $22 both; any other value no bump
+;     routine; then sound effect $98 (Audio_CmdPlaySfx, C3Mod_AudioSend)
+;     unless C3_SongBusy is not 0;
+;   - racing only, after any bump sound: the engine sound:
+;     C3_SndSfxPitch with the bike's speed's high byte, written to
+;     APUIO1 and APUIO0 straight (no echo wait, unlike
+;     C3Mod_AudioSend), unless C3_SongBusy is not 0;
+;   - the bikes move: each distance + (its speed / 64 AND $1FF) (CLC,
+;     32-bit); each side + its up speed (CLC), set to $7000 when the
+;     sum - $7000 has bit 15 clear (CMP / BMI: $7000 or more), then -
+;     its down speed (SEC), set to 0 when bit 15 is set (BPL).
 ; Sub-entry: C3Mod_RaceStep ($48FD).
 ; Callers note: a task added by script opcode $FA at $4047
 ;   (C3Mod_Prog0ScriptB). C3Mod_RaceStep: JMP from C3Mod_RaceTask
