@@ -43,18 +43,28 @@ jobs:
             exit 1
           fi
 
-      # The ROM comes from the ROM_B64 repository secret (the ROM, base64
-      # encoded). How to set it up: https://thisisakill.github.io/Kajar-site/CI_SETUP/
-      - name: Restore ROM from secret
+      # The ROM comes from the private repository ThisIsAkill/ct-rom, read
+      # with the ROM_TOKEN secret (a fine-grained token with read-only
+      # Contents access to that one repository). A GitHub secret cannot hold
+      # the ROM itself: secrets are capped at 48 KB. Pull requests from forks
+      # get no secrets, so there the check is skipped. How to set it up:
+      # https://thisisakill.github.io/Kajar-site/CI_SETUP/
+      - name: Fetch the ROM from the private repository
         env:
-          ROM_B64: ${{ secrets.ROM_B64 }}
+          ROM_TOKEN: ${{ secrets.ROM_TOKEN }}
+          ROM_URL: https://api.github.com/repos/ThisIsAkill/ct-rom/contents/Chrono%20Trigger%20(USA).sfc
         run: |
           mkdir -p roms
-          if [ -z "$ROM_B64" ]; then
-            echo "::warning::ROM_B64 secret not set — skipping byte-exact check."
+          if [ -z "$ROM_TOKEN" ]; then
+            echo "::warning::ROM_TOKEN secret not set — skipping byte-exact check."
             echo "SKIP_CHECK=1" >> "$GITHUB_ENV"
           else
-            echo "$ROM_B64" | base64 -d > roms/chrono_trigger.sfc
+            if ! curl -fsSL -H "Authorization: Bearer $ROM_TOKEN" \
+                 -H "Accept: application/vnd.github.raw" \
+                 -o roms/chrono_trigger.sfc "$ROM_URL"; then
+              echo "::error::Could not fetch the ROM from ThisIsAkill/ct-rom (check ROM_TOKEN's access)."
+              exit 1
+            fi
             if ! sha256sum --check --strict rom.sha256; then
               echo "::error::ROM checksum mismatch (got $(sha256sum roms/chrono_trigger.sfc | cut -d' ' -f1), expected $(cut -d' ' -f1 rom.sha256))"
               exit 1
