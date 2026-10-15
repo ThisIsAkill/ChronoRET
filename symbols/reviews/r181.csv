@@ -1,0 +1,6 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:31BF,C3Mod_Mul16,2026-10-09,rev181a,approved,3044d8124937,"Byte products, 16-bit ROL $F7 quirk (carry in = $F8 bit 7), X=0 need, DB/DP, A=high word, 15 JSR sites match trace. nit: the quirk is simply product + $100 (it can carry past bit 23)"
+$7E:3461,C3Mod_Cosine,2026-10-09,rev181a,approved,1cf62c674f3b,"r179 fix OK: Exit X now (angle+QuarterTurn) AND mask at Cosine, angle AND mask at Sine. Sign rule vs Rom_SineTable, long read, M/X=0, Y kept; 14+15 JSR sites match trace."
+$7E:3495,C3Mod_FadeOutTask,2026-10-09,rev181a,approved,52f54d946a71,"Timer/step/DEC Brightness, end at 0 via TaskEnd; ModuleFrame writes $80 for 0 (checked); A=FadeStep after a step; all 8 $FA sites (bytes FA 95 34) + LDX/JSR $395E at $63E8 match trace."
+$7E:350E,C3Mod_UnpackNibbles,2026-10-09,rev181a,approved,a6481f4f23b9,"PLA from $0C00 via S=$0BFF, low then high nibble to $7F:0200 by WMDATA, DP_PPU, S/DP restored, X=entry S-2, Y=0; interrupt note hedged; $53E1 only site. nit: Entry M any (SEP here)"
+$C3:02DD,C3_RandomByte,2026-10-09,rev181a,approved,f2e719e649cb,"r179 fix OK: flip-flops/STAT78 ($9AB3 only), H once/V twice at M=1, H1/V3 at M=0. Op order, 12 KernelRandom sites (7 M=1, 5 M=0 all AND). nit: at M=0 the SLHV CMP also reads $2138 (OAM addr+1)"

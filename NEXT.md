@@ -971,6 +971,9 @@ describing it in source, with totals, order of work and estimates, is [DATA_PLAN
    d >= 0 step), the wipe's mode-2 extra 1 and B = $03 after a clamp, the quad's leftward error
    start and its unbounded fill when the bottom is line $FF, the scaler's carry-ins, the stray
    `$DB` after the script opcode table and the unreachable APU loop in `C3_RunScript`.
+   For the next edit (round 181 nits): `C3_RandomByte` at M=0 also reads `$2138` in its CMP of
+   SLHV, advancing the OAM read address; `C3Mod_Mul16`'s quirk reads more simply as "the
+   product is $100 too big"; `C3Mod_UnpackNibbles`' Entry can say M any (it sets M=1 itself).
 
 7. Bank $CF: `$CF:E300`-`$CF:FFFF` is matched (the CF battle batch): all of the bank's code
    and the data around it, 7,424 bytes from source. `$CF:0000`-`$CF:E2FF` is data and stays as
