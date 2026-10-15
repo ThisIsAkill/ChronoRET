@@ -658,7 +658,7 @@ Spc_StepSongFades:
 ; !Spc_Unk5C | !Spc_Unk60. A pitch slide asked for (!Spc_Track150 low
 ; byte, semitones) moves the note ahead by that much and sets the step
 ; (!Spc_TrackF3C0 / !Spc_TrackF4E0, 24 bits) to (target - pitch) x 256 /
-; the slide's steps (!Spc_TrackF360 low byte; 0: the whole difference),
+; the slide's steps (!Spc_TrackF360 low byte; 0 acts as 256),
 ; signed, then clears the request and the pitch fraction.
 ; Callers note: CALL from Spc_StepTracks ($03AB) and Spc_StepSongOnly
 ;   ($0495). Spc_TrackLookAhead: JMP from $052C (a tie, inside).
@@ -1327,8 +1327,8 @@ Spc_QueueCommand:
     ret
 
 ; $08CD — Spc_RunQueue (54 bytes, $08CD–$0902; ROM $C7:2B92–$2BC7)
-; Runs the queued commands in order: for each !Spc_CmdQueue entry with a
-; nonzero id, copies it to !Spc_CmdId-!Spc_CmdArg2 and runs it through
+; Runs the queued commands in order: for each !Spc_CmdQueue entry up to
+; the first free one (id 0), copies it to !Spc_CmdId-!Spc_CmdArg2 and runs it through
 ; Spc_RunCommand (which writes the echo to CPUIO0 a second time for
 ; $00-$0F and $20-$FF; the 65816 had its echo from Spc_QueueCommand).
 ; Then frees the entries it ran (their id bytes = 0) and !Spc_QueueEnd = 0.
@@ -2643,7 +2643,7 @@ Spc_CmdStopSong:
 ; !Spc_KonShadow, !Spc_Unk25, !Spc_UnkD0 and !Spc_UnkD1; each of their
 ; tracks (15, 14) is pointed at Spc_TrackEndCmd with wait 2, so it ends
 ; on its next step (the byte there is sequence command $EB, which ends a
-; track, probably: its handler $1D4A runs into Spc_EndTrack).
+; track, probably: its handler Spc_SeqEndTrack runs into Spc_EndTrack).
 ; Callers note: Spc_StopSfxA: CALL from Spc_CmdStopAll ($0F11),
 ;   Spc_XferHeader ($104A) and Spc_StepGroupFades ($14F3, when the
 ;   group's fade-out reaches 0). Both: Spc_CmdTable80 entry 18. C3_ReadPad
@@ -3461,7 +3461,8 @@ Spc_CmdWriteDsp:
 ;   Spc_CmdSetEchoDelay ($1340, $1348).
 ; Entry: P=0; X = the address of the count (!Spc_Unk82 or
 ;        !Spc_EchoDelay)
-; Exit:  X = the address; A, Y clobbered
+; Exit:  A = 0; X = 0 after a wait (Spc_RunQueue), the address only when
+;        the byte at X is 0 (no wait); Y clobbered
 ; Callees: Spc_QueueCommand, Spc_RunQueue
 Spc_WaitTimer1:
     mov.b !Spc_QueueEnd,#$00
@@ -3989,7 +3990,8 @@ Spc_ShadowSources:
 ;     sets it at once.
 ; Callers note: reached only through Spc_SeqCmdTable ($F0, $F1).
 ; Entry: P=0; X = the track (!Spc_CurTrack), !Spc_VoiceBit its voice;
-;        A = the first operand
+;        A = the first operand, also in !Spc_TempA5 (t for Spc_SeqTempo,
+;        read again after the MUL; Spc_SeqTempoFade reads t itself)
 ; Exit:  A, Y clobbered; X = the track
 ; Callees: Spc_ReadSeqByte, Spc_FadeDelta
 ; Sub-entries: Spc_SeqTempoEnd, Spc_SeqTempoFade.
@@ -4179,10 +4181,11 @@ Spc_SeqPanFade:                         ; header: see Spc_SeqPan
     ret
 
 ; $17F2 — Spc_SeqPitchSlide (11 bytes, $17F2–$17FC; ROM $C7:3AB7–$3AC1)
-; Sequence command $C8 steps, n: the next note slides from the note
-; before it to n semitones on (signed) over steps + 1 passes
-; (!Spc_TrackF360 low byte = steps + 1, !Spc_Track150 low byte = n;
-; Spc_TrackLookAhead takes it).
+; Sequence command $C8 steps, n: a pitch slide of n semitones (signed)
+; over steps + 1 passes (!Spc_TrackF360 low byte = steps + 1, 0 acting
+; as 256; !Spc_Track150 low byte = n). Spc_TrackLookAhead takes it right
+; after the following note keys on, so that note slides from its own
+; pitch to n semitones past it; when a tie follows, the held note slides.
 ; Callers note: reached only through Spc_SeqCmdTable ($C8).
 ; Entry: P=0; X = the track (!Spc_CurTrack), !Spc_VoiceBit its voice;
 ;        A = the first operand
@@ -4265,7 +4268,7 @@ Spc_SeqFir:
     beq .set
 .fade:
     mov a,#$00
-    mov.b !Spc_SfxNoiseClock+x,a
+    mov.b !Spc_FirWord-2+x,a
     mov.b a,!Spc_FirWord-2+1+x
     eor a,#!Spc_SignBias
     mov.b !Spc_Temp9B,a
@@ -4373,12 +4376,13 @@ Spc_VibratoRestart:                     ; header: see Spc_SeqVibrato
 ; An LFO's base rate from its depth byte (A) and rate byte
 ; (!Spc_Temp9B): ((A & $3F) + 1) x 256 / rate, divided by 4 and at
 ; least 1, times 4 again (so a multiple of 4); rate 0 gives the
-; undivided size. In !Spc_Temp9B/9C.
+; undivided size. In !Spc_Temp9B/9C (the final value, after the x 4).
 ; Callers note: CALL from Spc_SeqVibrato ($188B) and Spc_SeqTremolo
 ;   ($1949).
 ; Entry: P=0; A = the depth byte; !Spc_Temp9B = the rate byte
-; Exit:  YA = !Spc_Temp9B/9C = the rate before the last x 4 (Y, A as
-;        MOVW left them); X = the rate byte
+; Exit:  !Spc_Temp9B/9C = the rate (x 4); YA = the value MOVW read,
+;        before the at-least-1 bump and the x 4 (0 when bumped); X = the
+;        rate byte
 Spc_LfoBaseRate:
     and a,#!Spc_LfoDepthMask
     inc a
@@ -4529,7 +4533,9 @@ Spc_SeqTremoloOff:
 ; (!Spc_TrackPanLfoTimer low) = period + 1 made even (at least 2; $FF
 ; gives 0 with the carry set, a long period), the counter half of it;
 ; depth: bit 7 the sign, the rest (inverted when negative) over the
-; half-period gives the step (!Spc_TrackPanLfoDelta, at least 1); the
+; half-period gives the step (!Spc_TrackPanLfoDelta, at least 1, except
+; on the period-$FF path, which skips the division and the minimum: the
+; step is the magnitude itself and can be 0); the
 ; depth byte also turns the LFO on (!Spc_Track170 high byte) and the
 ; value is cleared (Spc_SeqPanLfoOff, $CE: with A = 0, off).
 ; Callers note: reached only through Spc_SeqCmdTable ($CD, $CE).
@@ -5049,7 +5055,8 @@ Spc_SeqUnk60On:
 ; Callers note: reached only through Spc_SeqCmdTable ($E9, $EA).
 ; Entry: P=0; X = the track (!Spc_CurTrack), !Spc_VoiceBit its voice;
 ;        A = the first operand
-; Exit:  !Spc_TrackPtr+X = the pointer; A, Y = it; X unchanged
+; Exit:  !Spc_TrackPtr+X = the pointer; A = Y = its high byte; X
+;        unchanged. On a high byte of 0, as Spc_SeqEndTrack.
 ; Callees: Spc_SfxTrackPtr, Spc_SeqEndTrack (JMP)
 ; Sub-entries: Spc_SeqSfxTrack2, Spc_SeqSfxTrack.
 Spc_SeqSfxTrack1:
@@ -5231,7 +5238,8 @@ Spc_PeekLoopJump:
 
 ; $1C64 — Spc_SeqLoopStart (48 bytes, $1C64–$1C93; ROM $C7:3F29–$3F58)
 ; Sequence command $E2 n: opens a loop: the track's next slot
-; (!Spc_TrackUnk27, wrapping in its four), count = n + 1 (0: endless),
+; (!Spc_TrackUnk27, wrapping in its four), count = n + 1 (0, from n = 0
+; or n = $FF: endless),
 ; a song track's pass number 1, and the loop's start = the track pointer
 ; (after the operand).
 ; Callers note: reached only through Spc_SeqCmdTable ($E2).
@@ -5418,8 +5426,11 @@ Spc_SeqBranch:
     ret
 
 ; $1D2A — Spc_PeekBranch (32 bytes, $1D2A–$1D49; ROM $C7:3FEF–$400E)
-; The look-ahead handler of $FA: the same test (without !Spc_UnkD3), then
-; !Spc_Ptr93 jumps or skips the three operands.
+; The look-ahead handler of $FA: !Spc_SongCond >= v, then !Spc_Ptr93
+; jumps or skips the three operands; !Spc_UnkD3 is left alone.
+; Quirk of the original: v is compared unmasked (no `and a,#$0F` as in
+; Spc_SeqBranch), so a v of $10 or more never jumps here, though the $FA
+; handler may jump on it.
 ; Callers note: reached only through Spc_SeqCmdTable2 ($FA).
 ; Entry: P=0; !Spc_Ptr93 on the operands, Y = 0
 ; Exit:  !Spc_Ptr93 moved; A, Y clobbered; X unchanged
