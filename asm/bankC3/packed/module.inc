@@ -344,7 +344,9 @@ endmacro
 !C3_MathTop = $50                        ; CGADSUB: half colour math on the sprites (the bottom)
 !C3_MathSky = $42                        ; CGADSUB: half colour math on BG2 (the sky)
 !C3_MathFade = $91                       ; CGADSUB: subtract, on BG1 and the sprites (the fade)
-!C3_Prog9Unk53A0 = $D8                   ; what C3Mod_Prog0Vars writes over operands in program 9
+!C3_Prog9Unk53A0 = $D8                   ; what C3Mod_Prog0Vars writes in program 9: over the
+                                         ; operands at $4F74/$50DA and into the sprite-list data
+                                         ; at $53A0 (the others: sprite-list data only)
 !C3_Prog9Unk53A4 = $E8
 !C3_Prog9Unk5395 = $06
 !C3_Prog9Unk53AE = $01

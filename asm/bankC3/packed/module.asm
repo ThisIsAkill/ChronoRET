@@ -988,7 +988,8 @@ C3Mod_M7HdmaCDNext:
 ;   - the BRA at .cos_sign gets offset 0 (the quotient is negated) or 4
 ;     (it is not), by the cosine's sign;
 ;   - the two STA operands .store_b / .store_c get M7B's and M7C's
-;     columns in the order that puts the negated sine in M7C, by the
+;     columns in the order that puts the negated C3Mod_Sine value in
+;     M7C, by the
 ;     sine's sign;
 ;   - then the JSR at .setup calls the routine whose address the caller
 ;     wrote over its operand ($35FD; the assembled $0000 is
@@ -2372,8 +2373,10 @@ C3Mod_SprListMixed:
 ;     3 at $7F:8A00) as 96 rows to $AE00 (C3_MirrorLeft, $7F:0202,
 ;     counts the 12 calls);
 ;   - $7E:F000-$FFFF and $7E:0C00-$1DFF filled from MPYL by DMA (B to
-;     A), so zeroed if M7A x M7B is 0 (C3Mod_Init's C3Mod_HideSprites
-;     leaves M7A = 1, M7B = 0); C3Scale_PrevEnd = $0A00; the HDMA channels of
+;     A), zeroed: M7A x M7B is 0 (C3Mod_Init's PPU clear at
+;     $3148-$314E writes M7A = M7B = 0 after its C3Mod_HideSprites
+;     call; on the C3_BootIrqOn path, which returns before both, the
+;     direct-page clear left $0404 x 0); C3Scale_PrevEnd = $0A00; the HDMA channels of
 ;     C3Mod_Prog0Hdma (C3Mod_SetupHdma) and C3_HdmaEnable = channels
 ;     0-5; C3Mod_Prog0Vars;
 ;   - C3_EntryArg bit 6 clear: page $0A00 runs C3Mod_Prog0ScriptA and
@@ -3461,7 +3464,7 @@ C3Mod_PadDelayTask:
 ;        here, restored by C3Mod_RunTasks), DB=$00 (a task's: the STZ
 ;        before C3Mod_ClearUnk1446's MVN is absolute, so DB must map
 ;        low WRAM; C3Mod_BuildM7Tables sets its own).
-; Exit:  unchanged: RTS with A = the step mode; else as
+; Exit:  unchanged: RTS with A = the step mode, DP = $0A00; else as
 ;        C3Mod_BuildM7Tables leaves them (M=0, X=0, DP = DP_CPU, DB =
 ;        $7E).
 ; Calls: C3Mod_ClearUnk1446, C3Mod_BuildM7Tables (JMP).
@@ -3913,8 +3916,8 @@ C3Mod_ModeHdma:
 ; two lines from .fade + 34 on (one pair each, 30 lines), then one line
 ; from C3Mod_MathValues' first pair (held to the bottom), then the end.
 ; The HDMA record at $9008 (DMAP $41 to CGADSUB, in code not matched
-; yet) points here too (its address at $900A), and $9090 writes the
-; first count.
+; yet) points here too (its address at $900A), and $9090 and $90A2
+; write the first and second counts ($452B, $452E).
 C3Mod_MathHdma:
     db 0 : dw C3Mod_MathValues_sky
     db 0 : dw C3Mod_MathValues_sky
@@ -4442,8 +4445,8 @@ C3Mod_RaceFinish:
 ; race is lost: C3_RaceResult = 2, C3Mod_SteerTask removed, an RTS
 ; (Op_RTS) written over $510D, the shared end of the routines at $50F1
 ; and $5100 (code not matched yet), which place the sprite lists at
-; $538D / $5391 with X from each bike's lap progress and Y = its side /
-; 8 + $C0, next to $5116's boost icons: probably the HUD's progress
+; $538D / $5391 with X from each bike's lap progress and Y = its
+; side's high byte / 8 + $C0 (the word at the side + 1), next to $5116's boost icons: probably the HUD's progress
 ; markers, so they are no longer drawn (not traced further); the view's
 ; X speed = the two speeds' sum / 2048, C3Mod_SkyNmiTask (NMI) and
 ; C3Mod_CountDownTask (the score counted down) added, page $0A00 on
