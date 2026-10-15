@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:452B,C3Mod_MathHdma,2026-10-09,rev185a,approved,00f84ec98ba7,"Bytes match: 2 horizon entries at .sky, 15x2 lines .fade+34..+62 (COLDATA 14..0), 1 line first pair, end; $9008 record ($900A), $9090/$90A2 and $4506/$4515 count writes checked"
+$7E:4677,C3Mod_RaceTask,2026-10-09,rev185a,approved,8b02a217822d,"Checked A/quit, lap-8 >=$400 SBC/BCC, $1000-$8FFF CMP/BMI lead, moves' CMP/BMI carry (sides 0-$7000), FinishGap step, $4000 test, SongBusy exits, caller $4857. nit: 16-bit LDA C3_Prog9 reads $45"
+$7E:485D,C3Mod_RaceStepTask,2026-10-09,rev185a,changes,c3f8ee5b524f,"Across test is asymmetric: $10 = bike <= rival-$1000, but $20 only when bike > rival+$1000+C (C=1 if rival<$1000; BEQ/BPL: exactly $1000 above overlaps). Say 'more than $1000 above'"
