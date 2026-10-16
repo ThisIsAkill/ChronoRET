@@ -21,7 +21,9 @@ hirom
 ; Callers note: besides the RESET vector, three JMLs restart the game through
 ; here: $C2:8523 (when JOY1 reads $3030, i.e. L+R+Select+Start held),
 ; $C3:0AB5 (JML $00FF00, after forced blank and NMI/HDMA off) and
-; $CF:E702.
+; $CF:E702. The unpacked $C3 module's C3Mod_ResetTask also JMLs here
+; ($7E:63FA, JML $00FF00 with M=0, X=0, DB=$00 and the module's NMI
+; and V-count IRQ still enabled in NMITIMEN).
 ; Entry: emulation mode, I=1 (hardware reset state); or native mode with
 ;        the soft-reset caller's M/X/D/DB
 ; Exit:  native mode, I=1 — continues in MainInit, which sets M, X, S, DB

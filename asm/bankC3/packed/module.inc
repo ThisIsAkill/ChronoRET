@@ -110,7 +110,8 @@ endmacro
                                          ; bits 0-2 a special number (1-4), bits 5-7 1300/1500/2000
 !C3_ResultWord = $0382                   ; 16-bit: C3Mod_Prog0 clears it; the score at the finish
                                          ; (C3Mod_RaceFinish); the staff programs put the staff
-                                         ; text's address there ($86C2, $86D4)
+                                         ; text's address there ($86C2, $86D4); C3Mod_Prog1 counts
+                                         ; its credits pages (1-5) in the low byte
 ; The race (program 0), dp words with DP=0: the player's bike and the
 ; rival. Distances are 32-bit (the high word counts laps: 8 ends the
 ; race), the side is the position across the track (0-$7000, shown
@@ -667,6 +668,124 @@ endmacro
 !C3_OffsetMask = $03FF                   ; an offset-per-tile entry's offset
 !C3_OffsetBg1 = $2000                    ; ... bit 13: it applies to BG1
 !C3_Prog2Bg3Hofs = $0044                 ; 16-bit: BG3HOFS (C3Mod_WaveNmiTask; C3_Prog9's byte)
+; Programs 7 and 8 ("BUT... THE FUTURE REFUSED TO CHANGE.").
+!C3_Prog7FontTiles = $0080               ; pack 33's 2bpp tiles made 4bpp (C3Mod_Font2To4)
+!C3_Prog7Tiles2 = $4800                  ; VRAM word of pack 31
+!C3_Prog7FadeA = $B574                   ; $7E: pack 29's colours (a fade target)
+!C3_Prog7FadeB = $B774                   ; $7E: pack 30's
+!C3_Prog7BgMode = $03                    ; BGMODE 3
+!C3_Prog7Bg1Sc = $70                     ; BG1SC: map at $7000, 32x32
+!C3_Prog7Tiles = $05                     ; BG12NBA: BG1's tiles at $5000
+!C3_Prog7Bg1Hofs = $FFB8                 ; BG1HOFS (-$48)
+!C3_Prog7Bg1Vofs = $FFCC                 ; BG1VOFS (-$34)
+!CGADSUB_AddBg1 = $01                    ; colour math on BG1, add, not halved
+!C3_Prog7ExitFrames = $0080              ; C3_ExitTimer: frames from the button to the reset
+!C3_SongProg7 = $3A                      ; the song C3_SongReq gets in program 7
+!C3_TextColours = $F0                    ; the text's colours ($F0-$FF): FieldAnimB.Unk1
+!C3_SoftReset = $00FF00                  ; Reset (bank00.asm) through bank $00, as JML $00FF00
+!DP_C3PalFade = $0300                    ; C3Mod_PalFadeTask's direct page
+!C3_PalFadeSrc = $0360                   ; 16-bit: the target colours ($7E)
+!C3_PalFadeDest = $0362                  ; 16-bit: the colours that change ($7E)
+!C3_PalFadeCount = $0364                 ; 16-bit: how many
+!C3_PalFadeLeft = $0366                  ; 8-bit: steps left
+!C3_PalFadeWork = $03FE                  ; 16-bit: the colours left in a step
+!C3_PalFadeSteps = $0020
+!C3_PalFadeColours = $00C0
+!C3_PalFadeEvery = $0F                   ; C3_FrameCount mask: a step every 16 frames ...
+!C3_PalFadeSlow = $1F                    ; ... or 32
+!C3_ColourRed = $001F                    ; a colour word's channels and their units
+!C3_ColourGreen = $03E0
+!C3_ColourBlue = $7C00
+!C3_GreenUnit = $0020
+!C3_BlueUnit = $0400
+!C3_TextEnd = $40                        ; C3Mod_DrawText's codes: the end ...
+!C3_TextPlace = $00                      ; ... a place (X, Y follow) ...
+!C3_TextNewLine = $2F                    ; ... a new line ...
+!C3_TextSpace = $20                      ; ... a space
+!C3_TextLineGap = $10
+!C3_TextAttr = $3E                       ; the glyphs' attribute: palette 7, priority 3
+!C3_FontFirst = $41                      ; the first glyph code (C3Mod_FontWidths / FontTiles)
+!C3_GlyphLower = $10                     ; a narrow glyph's lower tile: + $10
+!C3_GlyphWide = 9                        ; widths from this up: a 16x16 glyph
+!C3_Sparks = $0C00                       ; 24 spark records of 8 bytes (C3Mod_SparksTask)
+!C3_SparksEnd = $0CC0
+!C3_SparkBytes = $0008
+!C3_SparkX = 0                           ; a record's X, Y, delay, life and tick bytes
+!C3_SparkY = 1
+!C3_SparkDelay = 2
+!C3_SparkLeft = 3
+!C3_SparkTick = 4
+!C3_SparkRange = $7F                     ; the random part of X and Y
+!C3_SparkLeft0 = $40
+!C3_SparkTop = $30
+!C3_SparkHidden = $E0                    ; Y off the screen
+!C3_SparkDelayMask = $3F
+!C3_SparkLife = $0A
+!C3_SparkTile0 = $80
+; Program 3 (the field's picture waved and wiped).
+!WinFx_StepWipe = $C301E4                ; bankC3.asm: one frame of the per-line wipe (JSL)
+!C3_OffsetTable = $0043                  ; 2 rows of 32 words: mode 2's offset-per-tile table
+!C3_OffsetTableBytes = $0080
+!C3_OffsetTableHalf = $0020              ; the first 16 words
+!C3_OffsetTableRow = $0040               ; a row (32 words)
+!C3_Prog3Bg3Hofs = $003D                 ; 16-bit: BG3HOFS (C3Mod_Prog3NmiTask)
+!C3_Prog3Bg2Vofs = $003F                 ; 16-bit: BG2VOFS from line 70 (HDMA channel 2)
+!C3_Unk3B = $3B                          ; dp: set, C3Mod_Unk783C sends $7E:1400-$1BFF to VRAM and clears it
+!C3_MosaicTimer = $C3                    ; dp, 8-bit: frames to the next mosaic step
+!C3_MosaicSize = $C4                     ; dp, 8-bit: the mosaic size left
+!C3_MosaicFrames = $14
+!C3_Prog3Wave = $00                      ; page $0B00's var 0 in program 3: the wave's size
+!C3_Prog3ScrollY = $02                   ; var 1: BG1VOFS
+!C3_Prog3Bg2Line = $04                   ; var 2: BG2VOFS x 4 (counts down)
+!C3_Prog3WaveMask = $0007
+!C3_Prog3Ones = $1400                    ; $7E:1400-$167F: words $0100
+!C3_Prog3OnesBytes = $0280
+!C3_Prog3MapSave = $6140                 ; VRAM word of the field's map copied ...
+!C3_Prog3MapCopy = $1680                 ; ... to $7E:1680
+!C3_Prog3MapBytes = $0580
+!C3_Prog3Tiles = $11                     ; BG12NBA: BG1 and BG2 tiles at VRAM word $1000
+!C3_Prog3Unk7442 = $1C                   ; written over C3Mod_Unk7441's operand
+!C3_Prog3Windows = $33                   ; W12SEL: window 1 on BG1 and BG2, inverted
+!C3_Prog3WindowsWipe = $FF               ; ... both windows on both, inverted
+!C3_WipeFadeStep1 = 6                    ; C3Mod_Prog3FadeTask1's step in the wipe run
+!C3_WipeFadeStep2 = 8                    ; ... Task2's and Task3's
+!C3_Prog3HdmaOn = $000E                  ; C3_HdmaEnable: channels 1-3
+!C3_Prog3HdmaWipe = $000F                ; ... and 0 (the window)
+!C3_Prog3BgMode = $02                    ; BGMODE 2
+!C3_Prog3Sub = $12                       ; TS: BG2 and the sprites
+!C3_Prog3Window1 = $F808                 ; WH0 = 8, WH1 = $F8
+!C3_Prog3Window2Right = $FF              ; WH3
+!C3_Prog3WipeTable = $F1C4                    ; $7E: WinFx_StepWipe's table (two buffers of WinFx_Lines)
+!C3_LineShift = $F000                    ; $7E: 224 BG1HOFS words (C3Mod_LineShiftTask)
+!C3_LineShiftBytes = $01C0
+!BBAD_BG2SC = $08                        ; B-bus address of BG2SC ($2108)
+!C3_Prog3Colours0 = $20                  ; C3Mod_Prog3PalAnims: record 0's first colour ...
+!C3_Prog3Colours1 = $50                  ; ... record 1's
+!C3_Prog3AnimColours = $20               ; ... and how many
+; Program 1 (a page of the staff credits).
+!C3_CreditsFontVram = $0100              ; VRAM word of the font made 4bpp
+!C3_CreditsFont = $0300                  ; $7F:0300: its 2bpp tiles (pack 58 after the first $100 bytes)
+!C3_CreditsFontTiles = $0036
+!C3_CreditsFontBytes = $0200             ; pack 58's bytes sent as they are
+!C3_CreditsMap = $0400                   ; VRAM word of BG1's map (BG1SC C3_CreditsBg1Sc)
+!C3_CreditsMapBytes = $0800
+!C3_CreditsBg1Sc = $04
+!C3_OamHighAddr = $0100                  ; OAMADD of the high table
+!C3_OamHighBytes = $0020
+!C3_CreditsPages = 5
+!C3_CreditsFrames = $005A                ; C3_FrameCount at which the page fades out
+!C3_M7MapHalf = $2000                    ; 64 rows of a 128-wide mode-7 map (C3Mod_SendM7Map)
+!C3_GreysColours = $21E2                 ; $7E: C3_PaletteWork's colour $F1 (C3Mod_SetGreys)
+!C3_PaletteWorkLow = $2000               ; $7E: C3_PaletteWork as a bank-$7E address
+!C3_CreditsPalA = $2200                  ; $7E: C3_PaletteBuf (colours 0-3) ...
+!C3_CreditsPalB = $2300                  ; ... and its colours $80-$83
+!C3_CreditsColour1 = $77BD               ; colours 1-3 (and $81-$83)
+!C3_CreditsColour2 = $4631
+!C3_CreditsColour3 = $1CE7
+!C3_CreditsEnd = $FF                     ; a record list's end
+!C3_CreditsTile0 = $40                   ; BG tile = character - this (a space made $40 first)
+!C3_CreditsSprTile0 = $21                ; sprite tile = character - this
+!C3_CreditsSprStep = 5                   ; pixels from one sprite character to the next
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the

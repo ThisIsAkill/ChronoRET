@@ -10627,8 +10627,9 @@ FdVec_FFEB:
 ; $FD:FFEE — FdVec_FFEE (3 bytes, $FFEE–$FFF0)
 ; JMP to PalAnim_StopAll.
 ; Callers note: no caller in ROM as such; the unpacked $C3 module JSLs
-;   it (from $7E:5AA1 in C3Mod_Prog2, M=1, and $7E:62FD, $7E:6808,
-;   $7E:7972, $7E:86F2 and $7E:8EC1, module code not matched yet). The
+;   it (from $7E:5AA1 in C3Mod_Prog2, $7E:62FD in C3Mod_Prog7 and
+;   $7E:6808 in C3Mod_Prog3, all with M=1, and $7E:7972, $7E:86F2 and
+;   $7E:8EC1, module code not matched yet). The
 ;   JSL $FD:FFEE bytes at $C3:4D46 are inside BankC3_PackedModule: a
 ;   literal of the packed stream ($7E:7972's call, with the JSR $38AF
 ;   before it), not code.
@@ -10662,6 +10663,9 @@ FdVec_FFF4:
 ;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793),
 ;   Evt_OpFF_Misc ($C0:3FC6), BattleCD_NmiMain ($CD:09BF), BattleCD_NmiSetup ($CD:0AD6) and
 ;   BattleFx_NmiAlt ($D1:F54D).
+; Callers note: the unpacked $C3 module JSLs it too, from $7E:3801
+;   (C3Mod_PalAnimTask) and $7E:682B (C3Mod_Prog3), both with M=1, X=0,
+;   DP=0 and DB=$00.
 ; Entry: M=1, X=0, DP=$0100, DB=$00 at the field callers (the callers in
 ;        banks $CD and $D1 not traced); PalAnim_TickAll needs X=0 and a
 ;        DP whose low byte is 0 (it becomes DB, and DB=$00 is needed)
