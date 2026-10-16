@@ -26,5 +26,3 @@ C3Mod_Unk73C6:
 C3Mod_Unk7441:
 %C3ModOrg($7E783C)
 C3Mod_Unk783C:
-%C3ModOrg($7E7841)
-C3Mod_Unk7841:

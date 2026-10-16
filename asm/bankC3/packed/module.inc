@@ -730,7 +730,7 @@ endmacro
 !C3_OffsetTableRow = $0040               ; a row (32 words)
 !C3_Prog3Bg3Hofs = $003D                 ; 16-bit: BG3HOFS (C3Mod_Prog3NmiTask)
 !C3_Prog3Bg2Vofs = $003F                 ; 16-bit: BG2VOFS from line 70 (HDMA channel 2)
-!C3_Unk3B = $3B                          ; dp: C3Mod_Prog3 adds 1 (read by code not matched yet)
+!C3_Unk3B = $3B                          ; dp: set, C3Mod_Unk783C sends $7E:1400-$1BFF to VRAM and clears it
 !C3_MosaicTimer = $C3                    ; dp, 8-bit: frames to the next mosaic step
 !C3_MosaicSize = $C4                     ; dp, 8-bit: the mosaic size left
 !C3_MosaicFrames = $14

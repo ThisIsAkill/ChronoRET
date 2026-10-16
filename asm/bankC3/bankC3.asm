@@ -464,7 +464,9 @@ WinFx_FillEmptyFrom:                    ; header: see WinFx_FillEmpty
 ; One frame of a per-line wipe, run while WinFx_C3EMode is nonzero
 ; (Field_HookWinC3E calls it once a frame through BankC3_Entry000E and
 ; uses the result as HDMA data for window 2, probably one window edge
-; per line). Works on a line array of WinFx_Lines bytes at
+; per line; C6Scene_WipeWinStep calls it the same way and sends the
+; result to window 1's right edge, WH1; the module's C3Mod_Prog3WipeTask
+; to WH2). Works on a line array of WinFx_Lines bytes at
 ; WinFx_C3ETablePtr + WinFx_WipeWorkOfs in bank WinFx_C3ETableBank, and
 ; writes it out each frame through WMDATA to one of two buffers: the
 ; table itself on odd frames, + WinFx_Lines on even ones.
