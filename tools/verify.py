@@ -250,6 +250,8 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
             text = (extract_data.ASSETS / p['asset']).read_text()
             st = events.stats(text)
             size = int(extract_data.PACK_PARAM.match(p['param']).group(2))
+            if size and events.is_raw(text):
+                problems.append(f'{p["label"]}: a non-empty event script kept as bytes, not disassembled')
             split['raw'] += st['raw']
             split['data'] += st['data']
             split['code'] += size - st['raw'] - st['data']

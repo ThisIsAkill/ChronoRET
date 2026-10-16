@@ -44,8 +44,8 @@ How each piece's bytes are made (the manifest's `piece` column):
   events     a location event script pack (a Decomp_ToWram stream reached
              through Evt_PackPtrs): build/assets/events/<label>.evt holds
              its disassembly (tools/events.py; checked to assemble back
-             when written; a pack the disassembler cannot follow is kept
-             there as bytes); the build assembles it to build/events/
+             when written; a non-empty pack it cannot follow fails the
+             extraction); the build assembles it to build/events/
              <label>.bin and packs that to build/packs/<label>.lz, which is
              incbin'd. param as for packed. Counted as "event scripts".
   records    a table or palette row with a layout in tools/records.py (a
@@ -794,9 +794,12 @@ def unpack_piece(rom: bytes, p: dict) -> tuple[bytes | None, str | None]:
 def extract_events(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = ROOT,
                    quiet: bool = True) -> list[str]:
     """Write the disassembly of every events piece (tools/events.py), each
-    checked to assemble back to the unpacked bytes; the problems. A pack's
-    disassembly is cached (build/events/cache/, by its bytes and the
-    tools), since following every handler takes minutes."""
+    checked to assemble back to the unpacked bytes, every opcode line
+    against its handler; the problems. A non-empty pack the disassembler
+    cannot follow is a problem, never kept as bytes. Each pack is
+    disassembled afresh; what the handlers do with given bytes is kept
+    between runs (build/events/traces.*, refused when changed by hand),
+    since tracing them all takes minutes."""
     import c3pack
     import events
     evp = [p for p in pieces if p['piece'] == 'events']
@@ -806,41 +809,35 @@ def extract_events(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = R
                     for p in pieces if p['piece'] == 'text']
     addrs = {n: a for n, a, _ in texts_pieces}
     names = events.opcode_names()
-    tools = hashlib.sha256()
-    for tool in ('events.py', 'absint.py', 'disasm.py'):
-        tools.update((ROOT / 'tools' / tool).read_bytes())
-    tools.update(events._asm_hash(Path(root)).encode())
-    cache = Path(root) / EVENTS_OUT / 'cache'
-    cache.mkdir(parents=True, exist_ok=True)
-    interp, problems, done = None, [], 0
-    for p in evp:
+    try:
+        interp = events.Interpreter(Path(root))
+        interp.load(Path(root))
+    except events.EventsError as e:
+        return [f'events: {e}']
+    problems = []
+    for k, p in enumerate(evp, 1):
         data, why = unpack_piece(rom, p)
         if data is None:
             problems.append(why)
             continue
-        key = hashlib.sha256(tools.digest() + p['label'].encode() + b'\0' + data).hexdigest()
-        hit = cache / f'{key}.evt'
-        text = hit.read_text() if hit.exists() else None
-        if text is not None:
-            try:
-                if events.assemble(text, names, addrs, p['label']) != data:
-                    text = None
-            except events.EventsError:
-                text = None
-        if text is None:
-            if interp is None:
-                interp = events.Interpreter(Path(root))
-            text = events.extract_pack(interp, names, data, p['label'], texts_pieces)
-            if events.assemble(text, names, addrs, p['label']) != data:
+        text = events.extract_pack(interp, names, data, p['label'], texts_pieces)
+        if data and events.is_raw(text):
+            problems.append(f'{p["label"]}: the event script cannot be disassembled: '
+                            f'{text.splitlines()[1][2:]}')
+            continue
+        try:
+            if events.assemble(text, names, addrs, p['label'], interp) != data:
                 problems.append(f'{p["label"]}: the event script does not assemble back')
                 continue
-            c3pack._write(hit, text.encode())
-            done += 1
-            if not quiet and done % 50 == 0:
-                print(f'extract_data: {done} event scripts disassembled')
+        except events.EventsError as e:
+            problems.append(str(e))
+            continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
         c3pack._write(dest, text.encode())
+        if not quiet and k % 100 == 0:
+            print(f'extract_data: {k} event scripts disassembled')
+    interp.save(Path(root))
     return problems
 
 

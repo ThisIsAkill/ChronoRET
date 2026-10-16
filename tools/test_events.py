@@ -100,6 +100,7 @@ class Interpreter(unittest.TestCase):
 
 
 NAMES = [f'Op{op:02X}' for op in range(256)]
+NAMES[0xB8] = 'OpB8_SetMsgPtr'          # the one opcode that takes a data label
 
 
 class Readable(unittest.TestCase):
@@ -110,7 +111,7 @@ class Readable(unittest.TestCase):
             '; a synthetic script', '@objects 1', '@jump Op10 1 + 1',
             *[f'@func 0 {f} L_0020' for f in range(16)],
             'L_0020:', '    Op12 $07 $00', '    @inner +1 L_0021 Op07 $00',
-            '    OpB8 Table_X+$10', '    Op10 ->L_end', 'L_end:', '@bytes 01 02 03']) + '\n'
+            '    OpB8_SetMsgPtr Table_X+$10', '    Op10 ->L_end', 'L_end:', '@bytes 01 02 03']) + '\n'
 
     def test_assemble(self):
         out = events.assemble(self.text(), NAMES, {'Table_X': 0xD80000})
@@ -126,7 +127,9 @@ class Readable(unittest.TestCase):
         base = self.text()
         cases = {
             'jump_out_of_reach': base.replace('->L_end', '->L_0020'),   # Op10 only jumps forward
-            'unknown_opcode': base.replace('OpB8', 'NoSuchOp'),
+            'unknown_opcode': base.replace('OpB8_SetMsgPtr', 'NoSuchOp'),
+            'label_operand_elsewhere': base.replace('Op12 $07 $00', 'Op12 Table_X'),
+            'label_and_bytes': base.replace('OpB8_SetMsgPtr Table_X+$10', 'OpB8_SetMsgPtr $00 Table_X'),
             'no_label': base.replace('->L_end', '->L_9999'),
             'no_func': base.replace('@func 0 3 L_0020\n', ''),
             'no_data_label': base.replace('Table_X', 'Table_Y'),
@@ -175,6 +178,60 @@ class WithRom(unittest.TestCase):
         cls.pieces = [p for p in ed.read_manifest() if p['piece'] == 'events']
         cls.texts = [(p['label'], 0xC00000 + p['offset'], 0xC00000 + p['stop'])
                      for p in ed.read_manifest() if p['piece'] == 'text']
+
+    def test_regrouped_operands_refused(self):
+        # An operand moved to a line of its own (the bytes stay the same):
+        # the handler's length refuses it.
+        addrs = {n: a for n, a, _ in self.texts}
+        for p in self.pieces:
+            data, _ = ed.unpack_piece(self.rom, p)
+            if not data:
+                continue
+            text = events.extract_pack(self.interp, self.names, data, p['label'], self.texts)
+            m = re.search(r'^    (Op8B_PlaceAtTile) (\$[0-9A-F]{2}) \$([0-9A-F]{2})$', text, re.M)
+            if not m:
+                continue
+            bad = text.replace(m.group(0), f'    {m.group(1)} {m.group(2)}\n    {self.names[int(m.group(3), 16)]}', 1)
+            self.assertEqual(events.assemble(bad, self.names, addrs), data)     # same bytes ...
+            with self.assertRaisesRegex(events.EventsError, 'takes 3 bytes'):
+                events.assemble(bad, self.names, addrs, interp=self.interp)    # ... refused
+            return
+        self.fail('no Op8B_PlaceAtTile line found')
+
+    def test_tampered_caches_refused(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / events.CODE_DIR).mkdir(parents=True)
+            interp = events.Interpreter()
+            interp.cache = {1: {(): {(): {'reads': [], 'outs': []}}}}
+            interp.specs = {0x10: (1, 1, 1)}
+            interp.dirty = True
+            interp.save(root)
+            interp.load(root)                                     # as written: accepted
+            data_f = root / events.CODE_DIR / 'traces.pickle'
+            data_f.write_bytes(data_f.read_bytes() + b'\0')      # poisoned
+            with self.assertRaisesRegex(events.EventsError, 'changed by hand'):
+                events.Interpreter().load(root)
+        # a cached code image changed by hand is assembled again
+        code = ed.ROOT / events.CODE_DIR / 'code.bin'
+        image = bytearray(code.read_bytes())
+        image[0x5D6E] ^= 0xFF                                    # inside Evt_OpcodeTable
+        code.write_bytes(bytes(image))
+        self.assertEqual(events.code_image()[0], self.interp.image)
+
+    def test_raw_packs_refused(self):
+        import build_rom
+        p = next(p for p in self.pieces if int(p['size']) > 64)
+        path = ed.ROOT / ed.ASSETS / p['asset']
+        kept = path.read_text()
+        data, _ = ed.unpack_piece(self.rom, p)
+        try:
+            path.write_text(events.render_raw(data, p['label'], 'test'))
+            with self.assertRaisesRegex(build_rom.BuildError, 'kept as bytes'):
+                build_rom.build_events()
+        finally:
+            path.write_text(kept)
 
     def test_sample_round_trips(self):
         addrs = {n: a for n, a, _ in self.texts}

@@ -45,11 +45,18 @@ The readable form, one file per pack (build/assets/events/<label>.evt):
   LABEL:                    a label (the opcode or data after it)
       Op12_IfVarByte $05 $01 $00 ->L_0040
                             an opcode by its handler's name and its
-                            operand bytes; ->LABEL for a jump operand
+                            operand bytes; ->LABEL for a jump operand;
+                            OpB8_SetMsgPtr alone takes a data label
+                            (LABEL or LABEL+$off) for its pointer. The
+                            assembler checks each line's length against
+                            the handler (see assemble())
   @bytes 01 02 ...          bytes no opcode reaches (data)
 
-    python3 tools/events.py check      disassemble every event pack and
-                                       assemble it back: byte-exact?
+    python3 tools/events.py check      disassemble every event pack afresh
+                                       and assemble it back, every opcode
+                                       line checked against its handler:
+                                       byte-exact, and no non-empty pack
+                                       left as bytes?
 """
 
 import argparse
@@ -97,9 +104,17 @@ def code_image(root: Path = ROOT) -> tuple[bytes, bytearray, dict[str, int]]:
     cache = root / CODE_DIR
     key = _asm_hash(root)
     files = [cache / n for n in ('code.bin', 'code.mask', 'code.sym', 'code.key')]
-    if all(f.exists() for f in files) and files[3].read_text() == key:
+
+    def stamp(image: bytes, mask: bytes, sym: str) -> str:
+        # the asm/ hash, then the sha256 of what was written: a cached image
+        # changed by hand no longer matches and is assembled again
+        return key + ' ' + hashlib.sha256(image + b'\0' + mask + b'\0' + sym.encode()).hexdigest()
+
+    cached = all(f.exists() for f in files)
+    if cached:
         image, mask, sym = files[0].read_bytes(), bytearray(files[1].read_bytes()), files[2].read_text()
-    else:
+        cached = files[3].read_text() == stamp(image, bytes(mask), sym)
+    if not cached:
         cwd = os.getcwd()
         os.chdir(root)
         try:
@@ -124,7 +139,7 @@ def code_image(root: Path = ROOT) -> tuple[bytes, bytearray, dict[str, int]]:
         files[0].write_bytes(image)
         files[1].write_bytes(bytes(mask))
         files[2].write_text(sym)
-        files[3].write_text(key)
+        files[3].write_text(stamp(image, bytes(mask), sym))
     labels, section = {}, None
     for line in sym.splitlines():
         if line.startswith('['):
@@ -141,6 +156,8 @@ class Interpreter:
 
     def __init__(self, root: Path = ROOT):
         self.image, self.mask, self.labels = code_image(root)
+        self.code_key = hashlib.sha256(self.image + bytes(self.mask)).hexdigest()
+        self.dirty = False
         names = {}
         for name, a in self.labels.items():
             names.setdefault(a, name)
@@ -153,7 +170,9 @@ class Interpreter:
             a = (table & 0xFF0000) | self.image[off + 2 * op] | self.image[off + 2 * op + 1] << 8
             self.handlers.append((a, names.get(a, f'Evt_Handler_{a:06X}')))
         self.machine = absint.Machine(self.image, self.mask, max_steps=400000)
-        self.cache: dict[int, list] = {}
+        # op -> the bytes that matter (pattern) -> their values -> result
+        self.cache: dict[int, dict[tuple, dict[tuple, dict]]] = {}
+        self.specs: dict[int, tuple[int, int, int]] = {}     # op -> its jump's encoding (jump_spec)
 
     def name(self, op: int) -> str:
         n = self.handlers[op][1]
@@ -163,10 +182,12 @@ class Interpreter:
         """What opcode data[y0 + 1] (an Evt_Data offset y0) does: {'reads':
         sorted operand offsets (relative), 'outs': [(kind, value)]}."""
         op = data[1 + y0]
-        for sig, out in self.cache.get(op, ()):
-            if all(0 <= p < len(data) and data[p] == v
-                   for p, v in ((1 + (k if absolute else y0 + k), v) for absolute, k, v in sig)):
-                return out
+        for pattern, by_values in self.cache.get(op, {}).items():
+            places = [1 + (k if absolute else y0 + k) for absolute, k in pattern]
+            if all(0 <= p < len(data) for p in places):
+                out = by_values.get(tuple(data[p] for p in places))
+                if out is not None:
+                    return out
         out = self._trace(data, y0)
         # The result holds for every opcode with the same bytes where the
         # handler let a script byte decide something (a branch, an index,
@@ -177,10 +198,46 @@ class Interpreter:
                 keys |= set(x[3])
         # (bytes of the opcode's own operands by their place after it, the
         # rest, such as Evt_ObjCount, by their place in the data)
-        sig = tuple((False, k, data[1 + y0 + k]) if 0 <= k < 64 else (True, y0 + k, data[1 + y0 + k])
-                    for k in sorted(keys))
-        self.cache.setdefault(op, []).append((sig, out))
+        pattern = tuple((False, k) if 0 <= k < 64 else (True, y0 + k) for k in sorted(keys))
+        values = tuple(data[1 + (k if absolute else y0 + k)] for absolute, k in pattern)
+        self.cache.setdefault(op, {}).setdefault(pattern, {})[values] = out
+        self.dirty = True
         return out
+
+    # The results are kept between runs (build/events/traces.*): by the
+    # tools' and the source's hash, with the sha256 of the results, so a
+    # changed file is refused, never used.
+    def _trace_files(self, root: Path) -> tuple[Path, Path, str]:
+        h = hashlib.sha256(self.code_key.encode())
+        for tool in ('events.py', 'absint.py', 'disasm.py'):
+            h.update((ROOT / 'tools' / tool).read_bytes())
+        return root / CODE_DIR / 'traces.pickle', root / CODE_DIR / 'traces.key', h.hexdigest()
+
+    def load(self, root: Path = ROOT) -> None:
+        import pickle
+        data_f, key_f, key = self._trace_files(Path(root))
+        if not (data_f.exists() and key_f.exists()):
+            return
+        want, _, digest = key_f.read_text().partition(' ')
+        if want != key:
+            return                                  # other tools or source: start afresh
+        raw = data_f.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != digest.strip():
+            raise EventsError(f'{data_f} is not what tools/events.py wrote (changed by hand?); '
+                              f'delete it and {key_f.name} to trace the handlers again')
+        self.cache, self.specs = pickle.loads(raw)
+        self.dirty = False
+
+    def save(self, root: Path = ROOT) -> None:
+        import pickle
+        if not self.dirty:
+            return
+        data_f, key_f, key = self._trace_files(Path(root))
+        raw = pickle.dumps((self.cache, self.specs))
+        data_f.parent.mkdir(parents=True, exist_ok=True)
+        data_f.write_bytes(raw)
+        key_f.write_text(f'{key} {hashlib.sha256(raw).hexdigest()}')
+        self.dirty = False
 
     def _trace(self, data: bytes, y0: int) -> dict:
         op = data[1 + y0]
@@ -267,6 +324,11 @@ def jump_spec(interp: Interpreter, data: bytes, o: Op) -> tuple[int, int, int]:
     byte the handler reads and watching the target move."""
     res = interp.run(data, o.off)
     base = sorted(o.jumps)
+    known = interp.specs.get(o.op)
+    if known is not None and len(base) == 1:
+        j, sign, c = known
+        if 0 < j < o.length and base[0] == o.off + c + sign * data[1 + o.off + j]:
+            return known                    # the encoding found before holds here too
     for j in res['reads']:
         moved = []
         for step in (1, 2):
@@ -280,7 +342,10 @@ def jump_spec(interp: Interpreter, data: bytes, o: Op) -> tuple[int, int, int]:
         b = data[1 + o.off + j]
         for sign in (1, -1):
             if all(t == base[0] + sign * ((b + step) & 0xFF) - sign * b for t, step in zip((m[0] for m in moved), (1, 2))):
-                return j, sign, base[0] - o.off - sign * b
+                spec = (j, sign, base[0] - o.off - sign * b)
+                interp.specs.setdefault(o.op, spec)
+                interp.dirty = True
+                return spec
     raise EventsError(f'${o.off:04X} opcode ${o.op:02X} ({interp.name(o.op)}): its jump is no function of one '
                       f'operand byte')
 
@@ -434,7 +499,8 @@ def render(d: dict, data: bytes, names: list[str], pieces: list[tuple[str, int, 
 
     out = [f'; {title}: a location event script, disassembled from your own ROM by tools/events.py',
            '; (never commit it). The build assembles it back into the bytes; the format is in',
-           '; tools/events.py.',
+           '; tools/events.py. This file is regenerated by extraction: an edit is lost when it',
+           '; runs again (any change to the extracted assets makes it run).',
            f'@objects {d["objects"]}']
     for op in sorted(d['specs']):
         i, sign, c = d['specs'][op]
@@ -466,9 +532,13 @@ def render(d: dict, data: bytes, names: list[str], pieces: list[tuple[str, int, 
     return '\n'.join(out) + '\n'
 
 
-def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<events>') -> bytes:
+def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<events>',
+             interp: 'Interpreter | None' = None) -> bytes:
     """The unpacked bytes of a readable file. `pieces`: {label: SNES
-    address} a text pointer may name."""
+    address} a text pointer may name. With `interp`, every opcode line is
+    checked against its handler: the bytes the line gives must be the
+    length the handler takes for them (classify(), as the disassembler
+    derives it), so operands cannot be moved from one line to another."""
     opcodes = {n: i for i, n in enumerate(names)}
     if re.search(r'^@raw\b', text, re.M):
         return bytes(int(t, 16) for line in text.split('\n') if line.startswith('@bytes ')
@@ -547,6 +617,9 @@ def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<
                     raise EventsError(f'{where}: {t} is not a byte')
                 out.append(v)
             else:
+                if names[op] not in TEXT_POINTER_OPS or len(w) != 2:
+                    raise EventsError(f'{where}: {t!r}: only {", ".join(sorted(TEXT_POINTER_OPS))} takes a '
+                                      f'data label (its one 3-byte operand); write operands as $XX bytes')
                 base, _, off = t.partition('+')
                 if base not in pieces:
                     raise EventsError(f'{where}: no data label {base}')
@@ -562,7 +635,7 @@ def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<
             t = target(funcs[(o, f)], name)
             k = 1 + o * 2 * FUNCS + 2 * f
             out[k:k + 2] = t.to_bytes(2, 'little')
-    checks = []
+    checks, lines_at = [], []
     last = None
     for where, w in body:
         if w[0].endswith(':') and len(w) == 1:
@@ -573,18 +646,28 @@ def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<
             checks.append((where, w[3:], last + int(w[1])))
         else:
             last = len(out) - 1
-            out += encode_op(w, last, where)
+            b = encode_op(w, last, where)
+            out += b
+            lines_at.append((where, w[0], last, len(b)))
     for where, w, at in checks:
         b = encode_op(w, at, where)
         if bytes(out[1 + at:1 + at + len(b)]) != b:
             raise EventsError(f'{where}: the @inner opcode is not the bytes it shares')
+        lines_at.append((where, w[0], at, len(b)))
+    if interp is not None:
+        for where, opname, at, n in lines_at:
+            o = classify(interp, bytes(out), at)
+            if o.length != n:
+                raise EventsError(f'{where}: {opname} takes {o.length} bytes here (its handler, as the '
+                                  f'disassembler derives it); the line gives {n}')
     return bytes(out)
 
 
 def render_raw(data: bytes, title: str, why: str) -> str:
     """A pack the disassembler cannot follow (or an empty one), as bytes."""
     out = [f'; {title}: a location event script, extracted from your own ROM by tools/events.py',
-           '; (never commit it), kept as bytes: ' + why, '@raw']
+           '; (never commit it), kept as bytes: ' + why,
+           '; This file is regenerated by extraction: an edit is lost when it runs again.', '@raw']
     for k in range(0, len(data), 16):
         out.append('@bytes ' + ' '.join(f'{b:02X}' for b in data[k:k + 16]))
     return '\n'.join(out) + '\n'
@@ -611,7 +694,7 @@ def extract_pack(interp: Interpreter, names: list[str], data: bytes, title: str,
     except EventsError as e:
         return render_raw(data, title, str(e))
     try:
-        back = assemble(text, names, {n: a for n, a, _ in pieces}, title)
+        back = assemble(text, names, {n: a for n, a, _ in pieces}, title, interp)
     except EventsError as e:
         return render_raw(data, title, f'the disassembly does not assemble: {e}')
     if back != data:
@@ -619,10 +702,63 @@ def extract_pack(interp: Interpreter, names: list[str], data: bytes, title: str,
     return text
 
 
+def is_raw(text: str) -> bool:
+    return bool(re.search(r'^@raw\b', text, re.M))
+
+
+def check(rom: bytes, root: Path = ROOT, quiet: bool = True) -> list[str]:
+    """Disassemble every events piece afresh and assemble it back, checked
+    against the handlers: the problems (a pack that is not byte-exact, a
+    non-empty pack left as bytes, an opcode line of the wrong length)."""
+    import extract_data
+    pieces = extract_data.read_manifest()
+    texts = [(p['label'], 0xC00000 + p['offset'], 0xC00000 + p['stop'])
+             for p in pieces if p['piece'] == 'text']
+    addrs = {n: a for n, a, _ in texts}
+    names = opcode_names()
+    interp = Interpreter(root)
+    interp.load(root)
+    problems, n = [], 0
+    for p in pieces:
+        if p['piece'] != 'events':
+            continue
+        data, why = extract_data.unpack_piece(rom, p)
+        if data is None:
+            problems.append(why)
+            continue
+        text = extract_pack(interp, names, data, p['label'], texts)
+        if data and is_raw(text):
+            problems.append(f'{p["label"]}: kept as bytes: {text.splitlines()[1][2:]}')
+            continue
+        try:
+            if assemble(text, names, addrs, p['label'], interp) != data:
+                problems.append(f'{p["label"]}: does not assemble back to its bytes')
+        except EventsError as e:
+            problems.append(str(e))
+        n += 1
+    interp.save(root)
+    if not quiet:
+        print(f'events: {n} packs disassembled and assembled back')
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('command', choices=('check',))
     ap.parse_args()
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import extract_data
+    try:
+        problems = check(extract_data.read_rom(), quiet=False)
+    except (EventsError, extract_data.DataError) as e:
+        print(f'events: {e}', file=sys.stderr)
+        return 1
+    for p in problems:
+        print(f'events: {p}', file=sys.stderr)
+    if problems:
+        return 1
+    print('OK: every event script disassembles and assembles back byte-exact, checked against its '
+          'handlers')
     return 0
 
 

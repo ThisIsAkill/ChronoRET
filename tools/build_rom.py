@@ -151,16 +151,23 @@ def build_events(root: Path = ROOT) -> int:
         return 0
     names = events.opcode_names()
     addrs = {p['label']: 0xC00000 + p['offset'] for p in pieces if p['piece'] == 'text'}
+    try:
+        interp = events.Interpreter(root)        # every opcode line is checked against its handler
+        interp.load(root)
+    except events.EventsError as e:
+        raise BuildError(f'events: {e}') from None
     out_dir = root / extract_data.EVENTS_OUT
     out_dir.mkdir(parents=True, exist_ok=True)
     written, wrong = 0, []
     for p in evp:
         text = (root / extract_data.ASSETS / p['asset']).read_text()
+        size = int(extract_data.PACK_PARAM.match(p['param']).group(2))
+        if size and events.is_raw(text):
+            raise BuildError(f'events: {p["label"]} is kept as bytes, not disassembled')
         try:
-            data = events.assemble(text, names, addrs, p['label'])
+            data = events.assemble(text, names, addrs, p['label'], interp)
         except events.EventsError as e:
             raise BuildError(f'events: {e}') from None
-        size = int(extract_data.PACK_PARAM.match(p['param']).group(2))
         if len(data) != size:
             wrong.append(f'{p["label"]}: {len(data)} B unpacked, its pack holds {size} B')
             continue
@@ -168,6 +175,7 @@ def build_events(root: Path = ROOT) -> int:
         if not path.exists() or path.read_bytes() != data:
             c3pack._write(path, data)
             written += 1
+    interp.save(root)
     if wrong:
         raise BuildError('event scripts that do not fit their place:\n  ' + '\n  '.join(wrong))
     return written
