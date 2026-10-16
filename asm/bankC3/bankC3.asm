@@ -209,7 +209,8 @@ C3_BootModule:
 ; Callers (1 JMP site): BankC3_Entry0008 ($C3:0008).
 ; Callers of WinFx_Exit (3 JMP sites): WinFx_StepWipe ($C3:023F, $C3:02AB, $C3:02DA).
 ; Callers note: the unpacked module JSLs here directly (from
-;   C3Mod_CircleTask, $7E:7338 and $7E:734F, and $7E:7FDE).
+;   C3Mod_CircleTask, $7E:7338 and $7E:734F, and C3Mod_Prog6CircleTask,
+;   $7E:7FDE).
 ; Entry: M, X any (P saved; REP #$30 here); DP any (saved; DP_WinFx
 ;        inside); DB any (saved; the table bank inside); A = the mode
 ;        (low byte; WinFx_Mode0/1/80 from the field hooks);
@@ -737,11 +738,12 @@ C3_RandomByte:
 ;     when the source ran out (C=1 from the CMP with C3Scale_SrcLimit);
 ;     with C=0 and a difference of 1 nothing is cleared.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
-;   $7E:520D, $7E:82A0 and $7E:897F), with M=0 and DB=$7F (PEA/PLB).
+;   C3Mod_ScaleJob, $7E:520D, C3Mod_Prog6ScaleIdle, $7E:82A0, and
+;   $7E:897F), with M=0 and DB=$7F (PEA/PLB).
 ; Entry: M=0, X=0 (16-bit throughout), DP = the module's (the
 ;        C3Scale_* direct-page bytes; 0 at $7E:520D, C3Mod_ScaleJob,
-;        run from C3Mod_Start's idle loop; the other two sites' not
-;        traced), DB = the bank of the source and the output ($7F at
+;        and $7E:82A0, C3Mod_Prog6ScaleIdle, both run from
+;        C3Mod_Start's idle loop; $7E:897F's not traced), DB = the bank of the source and the output ($7F at
 ;        all three sites: STA abs,Y and MVN $7F,$7F).
 ; Exit:  M=0, X=0, DB as on entry (the MVNs set it to $7F, the bank it
 ;        already is at the call sites); A, X, Y changed; C3Scale_Acc, Rows,
@@ -1925,7 +1927,7 @@ C3_CopyCodeOrder:
 ; turns the scaled image into tiles (inferred from the arithmetic; the
 ; module's use is not traced further).
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
-;   $7E:3CFB, $7E:799D and $7E:8569).
+;   $7E:3CFB, C3Mod_Prog6 at $7E:799D, and $7E:8569).
 ; Entry: M any (REP #$20 here), X=0; DP any and DB any (set to 0 here,
 ;        not restored); X = the destination (low byte 0), Y = the
 ;        source base; WMADDL/M/H = where the code goes.
@@ -2565,14 +2567,15 @@ C3_SprListSmall:
 ; a negative X keeps its low byte and gets bit 8 set. The high-table
 ; byte is always shifted right by 2 with size = 1 and X bit 8 put in.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
-;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
-;   $7E:88B4 and $7E:9A07).
+;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, C3Mod_Prog6Sprites
+;   at $7E:8245, $7E:88A0, $7E:88B4 and $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (0 at
-;        $7E:5042, $7E:50CE, $7E:514E, $7E:56F8 and $7E:5D3F, the others
-;        not traced), DB = a bank that maps the I/O registers and low
-;        WRAM ($00-$3F or $80-$BF: WMADDL/H, WMDATA and the OAM shadow
-;        are absolute; $00 at those five, under a task; the other
-;        sites' not traced); A = the list's address.
+;        $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F and $7E:8245,
+;        the others not traced), DB = a bank that maps the I/O
+;        registers and low WRAM ($00-$3F or $80-$BF: WMADDL/H, WMDATA
+;        and the OAM shadow are absolute; $00 at those six, under a task
+;        or C3Mod_Prog6; the other sites' not traced); A = the list's
+;        address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:
