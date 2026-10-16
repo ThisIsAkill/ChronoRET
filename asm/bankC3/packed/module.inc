@@ -1025,6 +1025,7 @@ endmacro
 !C3_Prog6SprY = $04                      ; var 2
 !C3_Prog6SprVar5 = $0A                   ; var 5: the horizon's copy
 !C3_Prog6CircleR = $0C                   ; var 6: window 1's circle radius
+!C3_Prog6SprSpeed = $14                  ; var 10: a step the script adds to var 1
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the

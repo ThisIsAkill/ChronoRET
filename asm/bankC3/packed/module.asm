@@ -443,9 +443,13 @@ C3Mod_Div16:
 ;   yet).
 ; Entry: M=0, X any, DP = the page of C3Math_A.. (0 at the five
 ;        C3Mod_Size* calls and at C3Mod_Prog6Sprites'; $896E's not
-;        traced); DB
-;        any; A = the dividend, C3Math_B = the divisor (not 0).
-; Exit:  A = the remainder, C3Math_Lo = the quotient; C3Math_A shifted
+;        traced); DB any; A = the dividend, C3Math_B = the divisor.
+;        A divisor of 0 (C3Mod_Prog6Sprites' first call, from
+;        C3Mod_Prog6, with page $0B00's var 0 still 0) makes every step
+;        fail: C3Math_Lo = 0, A = the dividend AND $FF00, C3Math_Q =
+;        $FFFF.
+; Exit:  A = the remainder (with a divisor of 0: see above),
+;        C3Math_Lo = the quotient; C3Math_A shifted
 ;        left by 8, with the entry carry in bit 7 (the first ROL takes
 ;        it in, the next seven take in zeros); C3Math_Q = the divisor -
 ;        1; X, Y unchanged.
@@ -885,7 +889,9 @@ C3Mod_SquareRoot:
 ; the $FF / $00 pair at $350A as WH0 / WH1 (window 1 shut:
 ; C3Mod_Prog6WindowA) and the $FF as COLDATA (white:
 ; C3Mod_Prog6ColourB), the $00 at $350B as CGADSUB (C3Mod_Prog6MathB)
-; and the one at $350C as COLDATA (no colour: C3Mod_Prog6ColourA).
+; and the one at $350C as COLDATA (no colour: C3Mod_Prog6ColourA);
+; C3Mod_Prog3Bg2Vofs reads the zero word at $350B as BG2VOFS. Nothing
+; reads the $FF at $350D.
 C3Mod_FillBytes:
     db $FF, $00, $00, $FF
 
@@ -1623,8 +1629,8 @@ C3Mod_CallW:
 ;        direct page), DB = $00 (the registers are absolute). The JSRs
 ;        from C3Mod_Prog6PalIn / PalOut come with DP = $0B00 and DB =
 ;        $7E: the save goes to $0BF0, and the two WRMPYA accesses are
-;        WRAM at $7E:4202 (harmless; PalAnim_TickAll's DB is then $0B,
-;        which maps what $00 does).
+;        WRAM at $7E:4202 (harmless; PalAnim_TickAll sets its DB from
+;        DP's low byte, TDC / PHA at M=1 / PLB: $00 there too).
 ; Exit:  M=1, X=0; A, Y as PalAnim_TickAll leaves them; X =
 ;        C3_ScratchF0.
 ; Calls: FdVec_FFF7 (JSL).
@@ -12402,9 +12408,10 @@ C3Mod_Prog5PalNmiTask:
 ; table of distances (C3Mod_Prog6StreamSetup) or in two halves built
 ; on alternate frames (C3Mod_Prog6HalfSetup), with a mode-1 strip
 ; under it; a scaled sprite picture (C3Mod_Prog6ScaleIdle,
-; C3Mod_Prog6Sprites), sprite groups drawn over the plane
-; (C3Mod_Prog6CloudTask, C3Mod_Prog6Clouds) and an animated sprite
-; (C3Mod_Prog6AnimTask). Page $0A00's variables steer the plane, page
+; C3Mod_Prog6Sprites), three sprite rows along the horizon
+; (C3Mod_Prog6HorizonTask with C3Mod_Prog6RowA, RowB and RowC) and an
+; animated sprite group (C3Mod_Prog6AnimTask). Page $0A00's variables
+; steer the plane, page
 ; $0B00's the sprites (see C3Mod_Prog6Script and C3Mod_Prog6ScriptB).
 
 ; $7E:78DD — C3Mod_Prog6 (283 bytes, $78DD–$79F7)
@@ -12424,8 +12431,10 @@ C3Mod_Prog5PalNmiTask:
 ;     around it); raw pack 37's 32 bytes to $7E:2180 (colours $C0-$CF;
 ;     C3Mod_CopyRawPack with C3_RowCount = $20 at DP = 0, M=0); colour
 ;     0 = $6F69; C3Mod_CommitPalette; FdVec_FFEE (PalAnim_StopAll);
-;   - C3Mod_Prog6Setup (the WRAM tables, the sprite and BG3 graphics,
-;     BG1's mode-1 map, $7F:0200-$09FF filled; it leaves DP =
+;   - C3Mod_Prog6Setup (the WRAM tables; pack 38, $1800 bytes, to
+;     VRAM word $4400, sprite tiles with OBSEL $02, and pack 41, $C00
+;     bytes, to $5000, BG1's mode-1 tiles with BG12NBA $04; BG1's
+;     mode-1 map; $7F:0200-$09FF filled; it leaves DP =
 ;     DP_DMA, which the calls up to C3_BuildCopyCode accept); pack 40
 ;     to $7F:0A00 (C3Mod_Prog6ScaleIdle's source bitmap);
 ;     C3_BuildCopyCode with WMADD = $7E:B574 (C3_CopyCode), X = $0C00,
@@ -12658,7 +12667,8 @@ C3Mod_Prog6HalfNmi:
 ; Program 6's tables and graphics:
 ;   - C3Scale_PrevEnd = $0A00 (16-bit, DP=0); WinFx_TablePtr = $E060,
 ;     WinFx_TableBank = $7E (bit 0 clear: bank $7E;
-;     C3Mod_Prog6CircleTask's circles go to $7E:E060); DP = 0 (PEA / PLD); C3_Prog6AnimTime = 1
+;     C3Mod_Prog6CircleTask's circles go to $7E:E060); DP = 0 (PEA /
+;     PLD); C3_Prog6AnimTime = 1
 ;     and C3_Prog6AnimPtr = C3Mod_Prog6Anims - 2 (C3Mod_Prog6AnimTask
 ;     starts on the first entry);
 ;   - the distance table: through WMDATA from $7E:E260, 224 bytes ($E0,
@@ -12684,8 +12694,9 @@ C3Mod_Prog6HalfNmi:
 ;     kept);
 ;   - DP = DP_DMA: DMA channel 7 B to A from MPYL ($34, one register,
 ;     DMAP $80) into $7F:0200-$09FF ($800 bytes): every byte the low
-;     byte of M7A x M7B, which is 0 after C3Mod_Init's PPU clear (M7A
-;     = M7B = 0; on its C3_BootIrqOn path the field's values).
+;     byte of M7A x M7B, which is 0: C3Mod_Init writes M7A = $0404
+;     and M7B = 0 on every path, before its C3_BootIrqOn test (and its
+;     PPU clear writes both 0 again on the other path).
 ; Callers note: C3Mod_Prog6 ($7976).
 ; Entry: M=1, X=0 (16-bit addresses and counts), DP=0 (the
 ;        C3Scale_PrevEnd store comes before the PEA / PLD; then set
@@ -12985,7 +12996,11 @@ C3Mod_Prog6ModeB:
 ; then one line from .strip: BG1HOFS = .strip's word, BG1VOFS =
 ; .strip + 2's (C3Mod_Prog6StripNmi writes $100 - page $0B00's var 1
 ; and $FF - C3_Prog6Horizon there), the mode-1 strip under the plane.
-; .strip's first byte is also the table's end ($00).
+; .strip's first byte is also the table's end: it is $00 only while
+; page $0B00's var 1 is 0 (C3Mod_Prog6StripNmi writes $100 - var 1
+; there), and var 1 is 0 whenever C3Mod_Prog6StripNmi runs (the
+; script sets it to 0 before each $F8 that adds it and changes it only
+; after the $F7 that removes it).
 C3Mod_Prog6ScrollB:
     db 84 : dw !C3_ScriptPageA+!C3_Prog6ScrollX
     db 83 : dw !C3_ScriptPageA+!C3_Prog6ScrollX
@@ -13108,11 +13123,13 @@ C3Mod_Prog6Dive:
 ; Page $0B00's script in program 6 (its vars: 0 the scaled picture's
 ; size C3_Prog6SprSize, 1 and 2 the sprites' position C3_Prog6SprX /
 ; SprY, 5 C3_Prog6SprVar5, 6 the circle's radius C3_Prog6CircleR, 10
-; a speed C3_Prog6SprSpeed). In order (a frame is one yield; a $9x
+; a step added to var 1, C3_Prog6SprSpeed). In order (a frame is one
+; yield; a $9x
 ; loop opcode yields on every pass, the last one too):
 ;   - var 5 = $A8 (not read in this program), var 1 = 0; the NMI task
-;     C3Mod_UploadPalette and C3Mod_Prog6PalIn (a white fade-in of
-;     colours $20-$3F); 60 frames; C3Mod_PalAnimTask for 300 frames
+;     C3Mod_UploadPalette and C3Mod_Prog6PalIn (a kind-4 palette
+;     animation of colours $20-$3F, level $FF to 0); 60 frames;
+;     C3Mod_PalAnimTask for 300 frames
 ;     (then removed, and C3Mod_UploadPalette with it);
 ;   - page $0A00 moved to C3Mod_Prog6Brake; var 1 = $E0, var 2 = $70,
 ;     var 0 = $61, var 6 = $0A; C3Mod_Prog6StripNmi removed;
@@ -13331,8 +13348,11 @@ C3Mod_Prog6TableA:
 ; (C3Mod_ClearTaskList), then C3Mod_Prog6TableA's 10 bytes copied
 ; over its first five entries (MVN in bank $7E at C3Mod_Prog6TasksB's
 ; .copy). The tasks of this frame run on (C3Mod_RunTasks runs the copy
-; C3_TaskRun); from the next frame only these run, the script tasks
-; among them.
+; C3_TaskRun); from the next frame these run, the script tasks among
+; them, with what the script adds or removes after the call
+; (C3Mod_Prog6RadiusTask and C3Mod_Prog6CircleTask after $7D26;
+; C3Mod_Prog6RiseTask and C3Mod_Prog6AnimTask added and
+; C3Mod_Prog6Sprites removed after $7DE6).
 ; Callers note: script opcode $F0 at $7D26 and $7DE6
 ;   (C3Mod_Prog6ScriptB).
 ; Entry: M=0, X=0 (16-bit MVN registers), DP any (the script's page),
@@ -13583,7 +13603,8 @@ C3Mod_Prog6RadiusTask:
 ;     right for r up to $3F;
 ;   - 16-bit: for the rows 0 to 2r + 1 ((r + 1) x 2 words, X + 2,
 ;     DEY / BNE; BEQ skips a count of 0, which var 6 never gives), the
-;     left edge (the table word's low byte) + var 1 (the ADC with no CLC takes the carry of
+;     left edge (the table word's low byte) + var 1 (the ADC with no CLC
+;     takes the carry of
 ;     the ASL before the loop, 0, then of the ADC of the row before:
 ;     set when var 1 is negative and the sum is not, so one more
 ;     there), 0 if negative (BPL), with right edge $FF (ORA $FF00), to
@@ -13738,8 +13759,8 @@ C3Mod_Prog6HalfSetup:
 ; Quirk: with DB = $7E C3_RandomByte's counter reads (SLHV $2137, OPHCT
 ; $213C, OPVCT $213D, absolute) read WRAM ($7E:2137-$213E: bytes of
 ; C3_PaletteWork's colours $9B-$9F) instead of the PPU's H and V
-; counters, so the bytes are random only through C3_RandSeed, X and
-; C3_FrameCount.
+; counters, so the bytes are random only through C3_RandSeed, X,
+; C3_FrameCount and C3_ScratchF0 / F2 / F4.
 ; Callers note: a task added by script opcode $FA at $7DD3 and $7E8D
 ;   (C3Mod_Prog6ScriptB).
 ; Entry: a task: M=0, X=0 (16-bit index; TAX at M=1 takes B too), DP=0
@@ -13848,9 +13869,12 @@ C3Mod_Prog6Parts:
 
 ; $7E:8109 — C3Mod_Prog6RowA (25 bytes, $8109–$8121)
 ; A C3Mod_SprListMixed list (n + 1, then n records of tile, attribute,
-; X, Y; X and Y signed from C3_SprBaseX / Y): 6 sprites above the
-; horizon (C3Mod_Prog6HorizonTask). C3Mod_Prog6ShuffleTask rewrites
-; records 0 and 1's tile and attribute words and records 2-5 whole.
+; X, Y; X and Y signed from C3_SprBaseX / Y): 6 sprites under the
+; horizon h: C3Mod_Prog6HorizonTask's base Y is h - $28 and the Y
+; bytes $38 / $40, so they sit at h + $10 and h + $18, in the mode-1
+; strip. C3Mod_Prog6ShuffleTask rewrites records 0 and 1's tile and
+; attribute words and records 2-5 whole (with the same Y bytes, from
+; C3Mod_Prog6Parts).
 C3Mod_Prog6RowA:
     db 7        ; 6 sprites
     db $46, $34, $A0, $38
@@ -13896,7 +13920,12 @@ C3Mod_Prog6RowB:
     db $8F, $64, $00, $20
 
 ; $7E:819B — C3Mod_Prog6RowC (41 bytes, $819B–$81C3)
-; Its list of 10 sprites under the horizon.
+; Its list of 10 sprites, on a base Y of h + $12 to h + $14
+; (C3Mod_Prog6HorizonTask: a random bit and C3Mod_KernelRandom's
+; carry): records 0-3 (large, Y byte $F8: -8) at h + $A to h + $C and
+; records 4-5 (small, $F0) at h + 2 to h + 4, under the horizon;
+; records 6-9 (large, $E8 and $E0: -$18 and -$20) at h - 6 to h - 4
+; and h - $E to h - $C, across the horizon line.
 C3Mod_Prog6RowC:
     db 11        ; 10 sprites
     db $70, $30, $E0, $F8
@@ -14172,8 +14201,8 @@ C3Mod_Prog6PlaneTask:
 ; second PLB); then one C3Mod_PalAnimTask run at once, with DB = $7E
 ; and DP = $0B00 (the script's): its WRMPYA "save" reads and writes
 ; WRAM at $7E:4202 instead of the ports, its C3_ScratchF0 is page
-; $0B00's $F0, and PalAnim_TickAll takes DB = $0B from the DP (a bank
-; that maps low WRAM and the registers as $00 does).
+; $0B00's $F0, and PalAnim_TickAll's DB is $00 (it takes DP's low
+; byte: TDC / PHA at M=1 / PLB).
 ; Callers note: script opcode $F0 at $7CFC (C3Mod_Prog6ScriptB).
 ; Entry: M=0 (8-bit set here), X=0, DP = $0B00, DB = $7E (as
 ;        C3_RunScript calls opcode 0's routines).
