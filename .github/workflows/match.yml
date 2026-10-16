@@ -34,6 +34,7 @@ jobs:
           python3 tools/test_text.py
           python3 tools/test_records.py
           python3 tools/test_events.py
+          python3 tools/test_battle.py
 
   match:
     name: Reassemble and diff
