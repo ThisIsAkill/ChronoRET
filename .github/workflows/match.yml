@@ -33,6 +33,7 @@ jobs:
           python3 tools/test_data_layer.py
           python3 tools/test_text.py
           python3 tools/test_records.py
+          python3 tools/test_events.py
 
   match:
     name: Reassemble and diff

@@ -7,9 +7,10 @@
 ; confidence are there) at its address. fill and pointer tables are
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
-; makes from one in build/packs/, or text or records it encodes
-; into build/text/ and build/records/ (symbols/data_assets.csv
-; lists them; nothing here is ROM data).
+; makes from one in build/packs/ (event scripts assembled from
+; their disassembly first), or text or records it encodes into
+; build/text/ and build/records/ (symbols/data_assets.csv lists
+; them; nothing here is ROM data).
 ; ============================================================
 
 ; $F7:0000-$F7:48B7 (18,616 B), text, confirmed: u16 string pointers (same bank), then strings:
@@ -44,14 +45,14 @@ Padding_F7F871:
 ; Read by LocLoad_Unk56D4.
 org $F7F980
 EvtPack_021:
-    incbin "../../build/packs/EvtPack_021.lz"          ; lz11 -> 1130 B
+    incbin "../../build/packs/EvtPack_021.lz"          ; lz11 -> 1130 B, event script
 
 ; $F7:FBE3-$F7:FFD0 (1,006 B), packed_lz, confirmed: lz11 -> 1857 B: location event script
 ; (Evt_Data)
 ; Read by LocLoad_Unk56D4.
 org $F7FBE3
 EvtPack_022:
-    incbin "../../build/packs/EvtPack_022.lz"          ; lz11 -> 1857 B
+    incbin "../../build/packs/EvtPack_022.lz"          ; lz11 -> 1857 B, event script
 
 ; $F7:FFD1-$F7:FFFF (47 B), padding, confirmed: 47 x $00
 org $F7FFD1

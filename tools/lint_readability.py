@@ -30,7 +30,8 @@ asm/include/ and are exempt):
          %C3ModRomBytes) and the data layer's assets: in
          asm/data/bankXX.asm only, a line that is exactly
          `incbin "../../build/assets/<kind>/<label>.bin"`,
-         `incbin "../../build/packs/<label>.lz"`,
+         `incbin "../../build/packs/<label>.lz"` (a pack, or an event script
+         tools/events.py assembles and the build packs),
          `incbin "../../build/text/<label>.bin"` (text tools/text.py
          encodes) or `incbin "../../build/records/<label>.bin"` (tables
          and palettes tools/records.py encodes) for a piece of bank $XX
