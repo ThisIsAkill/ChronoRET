@@ -11213,7 +11213,11 @@ C3Mod_RadiusStep:
 ; 224 lines, 50 bytes at $7E:F1C0-$F1F1 (below C3_Circle2Table at
 ; $F280; no lower fill, Yc + r being past line $DF). No program 5 code
 ; uses either range; what the field keeps at $7E:EFCE is not traced.
-; Circle 2 (radius 0 to 96) stays inside its table.
+; Circle 2 (radius 0 to 96) stays inside its table except at radius 0
+; (built on the first frame, as C3_CircleR2 starts at 1, and again
+; when the script sets var 0 back to 0): WinFx_BuildCircle's empty
+; path stores the first entry and copies $1C1 more bytes, $1C3 in all,
+; so it writes $7E:F280-$F442, 3 bytes past the 224 lines.
 ; Callers note: a task added by script opcode $FA at $715D
 ;   (C3Mod_Prog5Script).
 ; Entry: a task: M=0, X=0 (the 16-bit table address), DP=0 (C3_CircleR1
