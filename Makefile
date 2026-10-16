@@ -84,8 +84,9 @@ test-hooks:
 # trace and the lint's module rules (tools/c3module.py, tools/lint_c3module.py),
 # the data survey's coverage (tools/data_survey.py), the data layer's
 # manifest, lint and isolation (tools/test_data_layer.py), the text
-# encoder and its round trip (tools/test_text.py), and the tables and
-# palettes as records (tools/test_records.py).
+# encoder and its round trip (tools/test_text.py), the tables and
+# palettes as records (tools/test_records.py), and the event scripts'
+# disassembly and its interpreter (tools/test_events.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -100,6 +101,7 @@ test-tools:
 	python3 tools/test_data_layer.py
 	python3 tools/test_text.py
 	python3 tools/test_records.py
+	python3 tools/test_events.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]

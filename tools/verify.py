@@ -23,7 +23,8 @@ ROM byte must be one of these or emitted by the code source. Text pieces
 (tools/text.py) are encoded by the build from text extracted from the ROM:
 counted apart as well, never as source, and so are records pieces
 (tools/records.py): tables and palettes encoded from records extracted
-from the ROM.
+from the ROM; and events pieces (tools/events.py): event script packs
+assembled from their disassembly, then packed.
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -201,7 +202,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     want = bytearray(ROM_SIZE)          # 1 code or source data, 2 an incbin of the manifest or the module
     for i in emitted:
         want[i] = 1
-    figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0,
+    figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
@@ -225,6 +226,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     # The real assets and packs: what the build incbins must be the ROM's bytes.
     try:
         extract_data.extract()
+        build_rom.build_events()
         build_rom.build_packs()
         build_rom.build_text()
         build_rom.build_records()
@@ -232,14 +234,28 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         problems.append(str(e))
         return figures, problems
     for p in pieces:
-        if p['piece'] not in ('extracted', 'packed', 'text', 'records'):
+        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
-                else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] == 'packed'
+                else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] in ('packed', 'events')
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
                 else extract_data.RECORDS_OUT / f'{p["label"]}.bin')
         if path.read_bytes() != rom[p['offset']:p['stop']]:
             problems.append(f'{path} is not the ROM\'s bytes at {p["start"]}-{p["end"]}')
+    # How much of the event scripts is disassembled (unpacked bytes).
+    import events
+    split = {'code': 0, 'data': 0, 'raw': 0}
+    for p in pieces:
+        if p['piece'] == 'events':
+            text = (extract_data.ASSETS / p['asset']).read_text()
+            st = events.stats(text)
+            size = int(extract_data.PACK_PARAM.match(p['param']).group(2))
+            if size and events.is_raw(text):
+                problems.append(f'{p["label"]}: a non-empty event script kept as bytes, not disassembled')
+            split['raw'] += st['raw']
+            split['data'] += st['data']
+            split['code'] += size - st['raw'] - st['data']
+    figures['events_split'] = split
     return figures, problems
 
 
@@ -330,10 +346,15 @@ def main() -> int:
         print(f'  {"text":<16} {data["text_bytes"]:>9,} bytes of text (strings, their pointer tables, the '
               f'dictionary, names, credits) encoded by the build from text extracted from the ROM '
               f'(build/assets/text/ -> build/text/, incbin)')
+        sp = data['events_split']
+        print(f'  {"events":<16} {data["events_bytes"]:>9,} bytes of location event scripts packed by the build '
+              f'from scripts assembled from their disassembly (build/assets/events/ -> build/events/ -> '
+              f'build/packs/, incbin); unpacked: {sp["code"]:,} B disassembled as code and header, '
+              f'{sp["data"]:,} B no opcode reaches (data), {sp["raw"]:,} B in packs kept as bytes')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')
-        whole = len(emitted) + packed_emitted + sum(data.values())
+        whole = len(emitted) + packed_emitted + sum(v for k, v in data.items() if k.endswith('_bytes'))
         print(f'  {"whole ROM":<16} {whole:>9,} of {ROM_SIZE:,} bytes accounted for')
         if args.ranges:
             for s, e in to_ranges(emitted):

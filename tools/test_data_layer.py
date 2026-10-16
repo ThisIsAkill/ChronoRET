@@ -101,15 +101,20 @@ class Manifest(unittest.TestCase):
                 self.assertRegex(p['asset'], ed.TEXT_ASSET)
             if p['piece'] == 'records':
                 self.assertRegex(p['asset'], ed.RECORDS_ASSET)
+            if p['piece'] == 'events':
+                self.assertRegex(p['asset'], ed.EVENTS_ASSET)
 
     def test_hand_edits_refused(self):
         text = ed.MANIFEST.read_text()
         first = next(ln for ln in text.splitlines() if ',extracted,' in ln)
         words = next(ln for ln in text.splitlines() if ',text,' in ln)
         recs = next(ln for ln in text.splitlines() if ',records,' in ln and not ln.startswith("Table_F60000,"))
+        evts = next(ln for ln in text.splitlines() if ',events,' in ln)
         edits = {
             'text_path_out': text.replace(words, words.replace(words.split(',')[5], 'text/../../../roms/x.txt')),
             'text_unknown_unit': text.replace(words, words.replace(words.split(',')[5], 'text/NoSuchUnit.txt')),
+            'events_path_out': text.replace(evts, evts.replace(evts.split(',')[5], 'events/../../x.evt')),
+            'events_as_packed': text.replace(evts, evts.replace(',events,', ',packed,')),
             'records_path_out': text.replace(recs, recs.replace(recs.split(',')[5], 'records/../../x.tsv')),
             'records_other_label': text.replace(recs, recs.replace(recs.split(',')[5], 'records/Table_F60000.tsv')),
             'path_out': text.replace(first, first.replace(first.split(',')[5], '../../roms/chrono_trigger.sfc')),
@@ -216,6 +221,10 @@ class WithRom(unittest.TestCase):
         lz = ROOT / ed.PACKS / f'{packed["label"]}.lz'
         words = next(p for p in pieces if p['piece'] == 'text')
         table = next(p for p in pieces if p['piece'] == 'records')
+        script = next(p for p in pieces if p['piece'] == 'events' and int(p['size']) > 64)
+        readable_script = ROOT / ed.ASSETS / script['asset']
+        packed_script = ROOT / ed.PACKS / f'{script["label"]}.lz'
+        kept_script = readable_script.read_text()
         readable_table = ROOT / ed.ASSETS / table['asset']
         encoded_table = ROOT / ed.RECORDS_OUT / f'{table["label"]}.bin'
         build_rom.build_records()
@@ -230,11 +239,16 @@ class WithRom(unittest.TestCase):
             path.write_bytes(bytes(data))
         readable.write_text(kept.replace('@piece', '; @piece', 1), encoding='utf-8')
         readable_table.write_text(kept_table.replace('Index', 'Indx', 1), encoding='utf-8')
+        readable_script.write_text(kept_script.replace('@objects', '; @objects', 1))
         ed.extract()
         build_rom.build_packs()
         build_rom.build_text()
         build_rom.build_records()
+        build_rom.build_events()
+        build_rom.build_packs()
         self.assertEqual(asset.read_bytes(), rom[raw['offset']:raw['stop']])
+        self.assertEqual(readable_script.read_text(), kept_script)
+        self.assertEqual(packed_script.read_bytes(), rom[script['offset']:script['stop']])
         self.assertEqual(lz.read_bytes(), rom[packed['offset']:packed['stop']])
         self.assertEqual(readable.read_text(encoding='utf-8'), kept)
         self.assertEqual(encoded.read_bytes(), rom[words['offset']:words['stop']])
