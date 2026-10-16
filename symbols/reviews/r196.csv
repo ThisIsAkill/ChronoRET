@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:7325,C3Mod_CircleTask,2026-10-09,rev196a,approved,93769faa8544,"Fix holds: radius 0 (R2=$0001 after Init's DP clear and Prog5's 1, vs var 0 = 0; and the -3 loop's 0) takes FillEmpty: entry + MVN $1C1 bytes = $F280-$F442; circle 1 ranges, CMP/BEQ, exits re-checked."

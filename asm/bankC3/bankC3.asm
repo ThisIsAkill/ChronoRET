@@ -208,8 +208,8 @@ C3_BootModule:
 ;     d < 0 step 4y + 6 is exact.
 ; Callers (1 JMP site): BankC3_Entry0008 ($C3:0008).
 ; Callers of WinFx_Exit (3 JMP sites): WinFx_StepWipe ($C3:023F, $C3:02AB, $C3:02DA).
-; Callers note: the unpacked module JSLs here directly (from $7E:7338,
-;   $7E:734F and $7E:7FDE).
+; Callers note: the unpacked module JSLs here directly (from
+;   C3Mod_CircleTask, $7E:7338 and $7E:734F, and $7E:7FDE).
 ; Entry: M, X any (P saved; REP #$30 here); DP any (saved; DP_WinFx
 ;        inside); DB any (saved; the table bank inside); A = the mode
 ;        (low byte; WinFx_Mode0/1/80 from the field hooks);
