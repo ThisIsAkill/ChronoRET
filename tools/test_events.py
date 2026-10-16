@@ -111,7 +111,7 @@ class Readable(unittest.TestCase):
             '; a synthetic script', '@objects 1', '@jump Op10 1 + 1',
             *[f'@func 0 {f} L_0020' for f in range(16)],
             'L_0020:', '    Op12 $07 $00', '    @inner +1 L_0021 Op07 $00',
-            '    OpB8_SetMsgPtr Table_X+$10', '    Op10 ->L_end', 'L_end:', '@bytes 01 02 03']) + '\n'
+            '    OpB8_SetMsgPtr Table_X+$10', '    Op10 ->L_end', 'L_end:', '    Op00', '@bytes 01 02 03']) + '\n'
 
     def test_assemble(self):
         out = events.assemble(self.text(), NAMES, {'Table_X': 0xD80000})
@@ -120,7 +120,7 @@ class Readable(unittest.TestCase):
         self.assertEqual(body[:3], bytes([0x12, 0x07, 0x00]))
         self.assertEqual(body[3:7], bytes([0xB8, 0x10, 0x00, 0xD8]))
         self.assertEqual(body[7:9], bytes([0x10, 1]))          # $29 = $27 + 1 + 1
-        self.assertEqual(body[9:], bytes([1, 2, 3]))
+        self.assertEqual(body[9:], bytes([0, 1, 2, 3]))
         self.assertEqual(events.stats(self.text())['data'], 3)
 
     def test_refusals(self):
@@ -146,6 +146,85 @@ class Readable(unittest.TestCase):
         text = events.render_raw(data, 'T', 'why')
         self.assertEqual(events.assemble(text, NAMES, {}), data)
         self.assertEqual(events.stats(text), {'code': 0, 'data': 0, 'raw': 40})
+
+
+class Stub:
+    """An interpreter stand-in for the synthetic scripts: Op00 ends, Op10
+    jumps (1 + its operand), Op07 / Op12 / Op8B / OpB8 take 2 / 3 / 3 / 4 bytes, every
+    other opcode is 1 byte and goes on."""
+
+    LENGTHS = {0x07: 2, 0x12: 3, 0x8B: 3, 0xB8: 4}
+
+    def name(self, op):
+        return NAMES[op]
+
+    def run(self, data, y0):
+        op = data[1 + y0]
+        if op == 0x00:
+            return {'reads': [], 'control': (), 'outs': [('end', None)]}
+        if op == 0x10:
+            return {'reads': [1], 'control': (), 'outs': [('pos', 1 + data[2 + y0], True, (1,))]}
+        n = self.LENGTHS.get(op, 1)
+        return {'reads': list(range(1, n)), 'control': (), 'outs': [('pos', n, False, ())]}
+
+
+class Structure(unittest.TestCase):
+    """What the assembler checks beyond the bytes (no ROM needed)."""
+
+    def text(self):
+        return Readable().text()
+
+    def test_good_script_passes(self):
+        events.assemble(self.text(), NAMES, {'Table_X': 0xD80000}, interp=Stub())
+
+    def test_all_bytes_forgery_refused(self):
+        # the same bytes as one data run: the entries no longer land on opcodes
+        good = events.assemble(self.text(), NAMES, {'Table_X': 0xD80000})
+        body = good[1 + 32:]
+        forged = '\n'.join(['@objects 1', '@jump Op10 1 + 1', *[f'@func 0 {f} L_0020' for f in range(16)],
+                            'L_0020:', '@bytes ' + ' '.join(f'{b:02X}' for b in body)]) + '\n'
+        for f in (forged, forged.replace('L_0020', '$0020')):
+            with self.assertRaisesRegex(events.EventsError, 'not an opcode line'):
+                events.assemble(f, NAMES, {})
+
+    def test_jump_into_bytes_refused(self):
+        text = self.text().replace("L_end:\n    Op00\n", "    Op00\nL_end:\n")
+        with self.assertRaisesRegex(events.EventsError, 'does not land on an opcode line'):
+            events.assemble(text, NAMES, {'Table_X': 0xD80000})
+
+    def test_bytes_after_an_opcode_that_goes_on_refused(self):
+        text = self.text().replace('    Op00\n@bytes', '    Op05\n@bytes')
+        events.assemble(text, NAMES, {'Table_X': 0xD80000})                   # the bytes alone pass
+        with self.assertRaisesRegex(events.EventsError, 'those bytes are reached'):
+            events.assemble(text, NAMES, {'Table_X': 0xD80000}, interp=Stub())
+
+    def test_regrouped_operands_refused(self):
+        text = self.text().replace('    Op12 $07 $00\n    @inner +1 L_0021 Op07 $00\n',
+                                   '    Op12 $07\n    @inner +1 L_0021 Op07\n    Op00\n')
+        events.assemble(text, NAMES, {'Table_X': 0xD80000})                   # the same bytes
+        with self.assertRaisesRegex(events.EventsError, 'takes 3 bytes'):
+            events.assemble(text, NAMES, {'Table_X': 0xD80000}, interp=Stub())
+
+    def test_tampered_trace_file_refused(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            interp = events.Interpreter.__new__(events.Interpreter)
+            interp.code_key = 'test'
+            interp.cache = {1: {((False, 1),): {(5,): {'reads': [1], 'control': (1,), 'opaque': [],
+                                                        'outs': [('pos', 2, False, ()), ('end', None)]}}}}
+            interp.specs = {0x10: (1, 1, 1)}
+            interp.dirty = True
+            interp.save(root)
+            back = events.Interpreter.__new__(events.Interpreter)
+            back.code_key = 'test'
+            back.cache, back.specs = {}, {}
+            back.load(root)                                       # as written: accepted
+            self.assertEqual((back.cache, back.specs), (interp.cache, interp.specs))
+            data_f = root / events.CODE_DIR / 'traces.json'
+            data_f.write_text(data_f.read_text().replace('[5]', '[6]'))
+            with self.assertRaisesRegex(events.EventsError, 'changed by hand'):
+                back.load(root)
 
 
 class Source(unittest.TestCase):
@@ -198,27 +277,16 @@ class WithRom(unittest.TestCase):
             return
         self.fail('no Op8B_PlaceAtTile line found')
 
-    def test_tampered_caches_refused(self):
+    def test_tampered_code_image_reassembled(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / events.CODE_DIR).mkdir(parents=True)
-            interp = events.Interpreter()
-            interp.cache = {1: {(): {(): {'reads': [], 'outs': []}}}}
-            interp.specs = {0x10: (1, 1, 1)}
-            interp.dirty = True
-            interp.save(root)
-            interp.load(root)                                     # as written: accepted
-            data_f = root / events.CODE_DIR / 'traces.pickle'
-            data_f.write_bytes(data_f.read_bytes() + b'\0')      # poisoned
-            with self.assertRaisesRegex(events.EventsError, 'changed by hand'):
-                events.Interpreter().load(root)
-        # a cached code image changed by hand is assembled again
-        code = ed.ROOT / events.CODE_DIR / 'code.bin'
-        image = bytearray(code.read_bytes())
-        image[0x5D6E] ^= 0xFF                                    # inside Evt_OpcodeTable
-        code.write_bytes(bytes(image))
-        self.assertEqual(events.code_image()[0], self.interp.image)
+            cache = Path(tmp)
+            image = events.code_image(cache_dir=cache)[0]
+            code = cache / 'code.bin'
+            changed = bytearray(code.read_bytes())
+            changed[0x5D6E] ^= 0xFF                                # inside Evt_OpcodeTable
+            code.write_bytes(bytes(changed))
+            self.assertEqual(events.code_image(cache_dir=cache)[0], image)
 
     def test_raw_packs_refused(self):
         import build_rom

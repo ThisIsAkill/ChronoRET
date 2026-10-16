@@ -61,6 +61,7 @@ The readable form, one file per pack (build/assets/events/<label>.evt):
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -95,13 +96,13 @@ def _asm_hash(root: Path) -> str:
     return h.hexdigest()
 
 
-def code_image(root: Path = ROOT) -> tuple[bytes, bytearray, dict[str, int]]:
+def code_image(root: Path = ROOT, cache_dir: Path | None = None) -> tuple[bytes, bytearray, dict[str, int]]:
     """(image, emitted mask, {label: SNES address}) of asm/main.asm
     assembled onto blank images (cached in build/events/ by a hash of
     asm/)."""
     import c3pack
     root = Path(root)
-    cache = root / CODE_DIR
+    cache = Path(cache_dir) if cache_dir is not None else root / CODE_DIR
     key = _asm_hash(root)
     files = [cache / n for n in ('code.bin', 'code.mask', 'code.sym', 'code.key')]
 
@@ -204,17 +205,42 @@ class Interpreter:
         self.dirty = True
         return out
 
-    # The results are kept between runs (build/events/traces.*): by the
-    # tools' and the source's hash, with the sha256 of the results, so a
-    # changed file is refused, never used.
+    # The results are kept between runs in build/events/traces.json (plain
+    # JSON: loading it runs no code), keyed by the tools' and the source's
+    # hash, with the file's sha256 in traces.key. The sha is tamper-evident,
+    # not tamper-proof: it catches a file changed by hand, not one forged
+    # together with its key. CI never has the file (a fresh runner traces
+    # every handler), and every pack still has to assemble back to its ROM
+    # bytes, which verify checks.
     def _trace_files(self, root: Path) -> tuple[Path, Path, str]:
         h = hashlib.sha256(self.code_key.encode())
         for tool in ('events.py', 'absint.py', 'disasm.py'):
             h.update((ROOT / 'tools' / tool).read_bytes())
-        return root / CODE_DIR / 'traces.pickle', root / CODE_DIR / 'traces.key', h.hexdigest()
+        return root / CODE_DIR / 'traces.json', root / CODE_DIR / 'traces.key', h.hexdigest()
+
+    @staticmethod
+    def _to_json(cache: dict, specs: dict) -> str:
+        def out(o):
+            return {'reads': list(o['reads']), 'control': list(o.get('control', ())),
+                    'outs': [[x[0], x[1], x[2], list(x[3])] if x[0] == 'pos' else list(x) for x in o['outs']],
+                    'opaque': [list(x) for x in o.get('opaque', ())]}
+        return json.dumps({
+            'cache': [[op, [[[list(k) for k in pattern], [[list(values), out(o)] for values, o in by.items()]]
+                            for pattern, by in pats.items()]] for op, pats in cache.items()],
+            'specs': [[op, list(spec)] for op, spec in specs.items()]}, separators=(',', ':'))
+
+    @staticmethod
+    def _from_json(text: str) -> tuple[dict, dict]:
+        def out(o):
+            return {'reads': o['reads'], 'control': tuple(o['control']),
+                    'outs': [(x[0], x[1], x[2], tuple(x[3])) if x[0] == 'pos' else tuple(x) for x in o['outs']],
+                    'opaque': [tuple(x) for x in o['opaque']]}
+        j = json.loads(text)
+        cache = {op: {tuple(tuple(k) for k in pattern): {tuple(values): out(o) for values, o in by}
+                      for pattern, by in pats} for op, pats in j['cache']}
+        return cache, {op: tuple(spec) for op, spec in j['specs']}
 
     def load(self, root: Path = ROOT) -> None:
-        import pickle
         data_f, key_f, key = self._trace_files(Path(root))
         if not (data_f.exists() and key_f.exists()):
             return
@@ -225,15 +251,17 @@ class Interpreter:
         if hashlib.sha256(raw).hexdigest() != digest.strip():
             raise EventsError(f'{data_f} is not what tools/events.py wrote (changed by hand?); '
                               f'delete it and {key_f.name} to trace the handlers again')
-        self.cache, self.specs = pickle.loads(raw)
+        try:
+            self.cache, self.specs = self._from_json(raw.decode())
+        except (ValueError, KeyError, TypeError, IndexError) as e:
+            raise EventsError(f'{data_f}: not a trace file ({e}); delete it to trace the handlers again') from None
         self.dirty = False
 
     def save(self, root: Path = ROOT) -> None:
-        import pickle
         if not self.dirty:
             return
         data_f, key_f, key = self._trace_files(Path(root))
-        raw = pickle.dumps((self.cache, self.specs))
+        raw = self._to_json(self.cache, self.specs).encode()
         data_f.parent.mkdir(parents=True, exist_ok=True)
         data_f.write_bytes(raw)
         key_f.write_text(f'{key} {hashlib.sha256(raw).hexdigest()}')
@@ -607,6 +635,7 @@ def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<
                 if op not in specs or specs[op][0] != len(out):
                     raise EventsError(f'{where}: {w[0]} has no jump operand there (@jump)')
                 _, sign, c = specs[op]
+                jumped.append((where, t[2:]))
                 v = (target(t[2:], where) - at - c) * sign
                 if not 0 <= v < 256:
                     raise EventsError(f'{where}: {t[2:]} is out of the jump\'s reach')
@@ -635,12 +664,16 @@ def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<
             t = target(funcs[(o, f)], name)
             k = 1 + o * 2 * FUNCS + 2 * f
             out[k:k + 2] = t.to_bytes(2, 'little')
-    checks, lines_at = [], []
+    checks, lines_at, jumped, after_op = [], [], [], []
     last = None
+    prev_op = False
     for where, w in body:
         if w[0].endswith(':') and len(w) == 1:
             continue
         if w[0] == '@bytes':
+            if prev_op:
+                after_op.append((where, last))      # a data run right after an opcode
+            prev_op = False
             out += bytes(int(t, 16) for t in w[1:])
         elif w[0] == '@inner':
             checks.append((where, w[3:], last + int(w[1])))
@@ -649,17 +682,35 @@ def assemble(text: str, names: list[str], pieces: dict[str, int], name: str = '<
             b = encode_op(w, last, where)
             out += b
             lines_at.append((where, w[0], last, len(b)))
+            prev_op = True
     for where, w, at in checks:
         b = encode_op(w, at, where)
         if bytes(out[1 + at:1 + at + len(b)]) != b:
             raise EventsError(f'{where}: the @inner opcode is not the bytes it shares')
         lines_at.append((where, w[0], at, len(b)))
+    # Every function entry and jump lands on an opcode (the scripts are what
+    # those reach, as the disassembler decides).
+    starts = {at for _, _, at, _ in lines_at}
+    size = len(out) - 1
+    for (o, f), t in sorted(funcs.items()):
+        at = target(t, name)
+        if head <= at < size and at not in starts:
+            raise EventsError(f'{name}: @func {o} {f} -> {t} is not an opcode line')
+    for where, t in jumped:
+        if target(t, where) not in starts:
+            raise EventsError(f'{where}: the jump to {t} does not land on an opcode line')
     if interp is not None:
         for where, opname, at, n in lines_at:
             o = classify(interp, bytes(out), at)
             if o.length != n:
                 raise EventsError(f'{where}: {opname} takes {o.length} bytes here (its handler, as the '
                                   f'disassembler derives it); the line gives {n}')
+        # bytes no opcode reaches follow only an opcode that does not go on
+        for where, at in after_op:
+            o = classify(interp, bytes(out), at)
+            if o.next:
+                raise EventsError(f'{where}: @bytes after {names[o.op]}, which goes on to the next '
+                                  f'opcode: those bytes are reached')
     return bytes(out)
 
 
