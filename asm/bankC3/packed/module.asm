@@ -43,8 +43,8 @@ incsrc "module.inc"
 ; through ReentryVectors entry [0], the warm restart into
 ; GameLoop_Main.
 ; The idle call at $3023 is self-modifying: programs write another
-; routine's address over its operand ($3024: C3Mod_ScaleIdle at $3CE4, $7441 at
-; $70D7, $8278 at $79B7, $8930 at $8794 and $87D0, and back to
+; routine's address over its operand ($3024: C3Mod_ScaleIdle at $3CE4,
+; C3Mod_RotateMap at $70D7, $8278 at $79B7, $8930 at $8794 and $87D0, and back to
 ; C3Mod_Return at $96FE), so the loop runs that routine once per pass
 ; between frames; C3Mod_Return, the default, does nothing (an RTS).
 ; Callers note: reached only by C3_BootModule's JML !C3Mod_Code
@@ -309,7 +309,7 @@ C3Mod_SoundReset:
 ; $7E:31B0 — C3Mod_WaitVblank (15 bytes, $31B0–$31BE)
 ; Waits for the start of a vertical blank: first for HVBJOY bit 7 to
 ; clear (out of any blank already under way), then for it to set.
-; Callers note: C3Mod_Start ($3010) and $710F (code not matched yet).
+; Callers note: C3Mod_Start ($3010) and C3Mod_Prog5 ($710F).
 ; Entry: M=1, X any, DP any, DB=$00 (HVBJOY is absolute).
 ; Exit:  M=1; A = HVBJOY; X, Y, DP and DB unchanged.
 C3Mod_WaitVblank:
@@ -623,8 +623,8 @@ C3Mod_DivSigned16:
 ; The kernel's random byte (C3_RandomByte) for code in the module (a JSR
 ; target for the JSL).
 ; Callers note: C3Mod_InitStars ($577A, $5780, $5786), C3Mod_StarsTask
-;   ($57B3, $57B9) and $7397, $7F85, $7FA0, $80A6, $80D3, $98E3 and
-;   $98EE (code not matched yet).
+;   ($57B3, $57B9), C3Mod_Prog5MosaicTask ($7397) and $7F85, $7FA0, $80A6,
+;   $80D3, $98E3 and $98EE (code not matched yet).
 ; Entry: M, X, DP and DB as C3_RandomByte needs; X=0 at the calls, M=1
 ;        at $577A, $5780, $5786, $57B3, $57B9, $7397 and $80A6, M=0 at
 ;        $7F85, $7FA0, $80D3, $98E3 and $98EE (there C3_RandomByte's adds
@@ -642,10 +642,11 @@ C3Mod_KernelRandom:
 ; 256; the AND #$FF after the INC changes nothing) and indexes the
 ; table. B is set to DP's low byte first (TDC / XBA), so that the TAX
 ; makes a 16-bit index of the byte: right only with DP on a page
-; boundary ($0A00 at C3Mod_PickRun's call, the script's page; 0 at
-; C3Mod_NewSpark's; the others' not traced).
+; boundary ($0A00 at C3Mod_PickRun's and C3Mod_PickDrift's calls, the
+; scripts' page; 0 at C3Mod_NewSpark's; the others' not traced).
 ; Callers note: C3Mod_PickRun ($3F59, a script routine), C3Mod_NewSpark
-;   ($65AE, $65BF, $65C9) and $728E and $9BE1 (code not matched yet).
+;   ($65AE, $65BF, $65C9), C3Mod_PickDrift ($728E, a script routine) and
+;   $9BE1 (code not matched yet).
 ; Entry: M any (saved; 8-bit here), X any (saved; with X=1 the TAX
 ;        takes the byte alone), DP = a page boundary, DB any (the reads
 ;        and the store are long).
@@ -676,13 +677,15 @@ C3Mod_TableRandom:
 ; Callers note: C3Mod_BuildM7Tables ($357F), C3Mod_ViewOffsetTask
 ;   ($444F), C3Mod_ProjectTask ($4D19), C3Mod_SpinTask ($56B6),
 ;   C3Mod_StarDriftTask ($5867), C3Mod_RockTask ($5BD7, $5BFB),
-;   C3Mod_SwingTask ($5CBC) and $73C9, $76DB,
-;   $994A, $9990, $99DB and $9B01 (code not matched yet). C3Mod_Sine:
-;   C3Mod_BuildM7Tables ($35B7), C3Mod_ViewOffsetTask ($4462),
-;   C3Mod_ProjectTask ($4D26), C3Mod_SpinTask ($56C2),
-;   C3Mod_StarDriftTask ($585B), C3Mod_RockTask ($5C11),
-;   C3Mod_SwingTask ($5CE0), C3Mod_WaveTask ($6014) and $73BD, $73FD,
-;   $76FE, $9930, $9983, $99BB and $9B14 (code not matched yet).
+;   C3Mod_SwingTask ($5CBC), C3Mod_RotateMatrixTask ($73C9),
+;   C3Mod_CharSpin ($76DB) and $994A, $9990, $99DB and $9B01 (code not
+;   matched yet). C3Mod_Sine: C3Mod_BuildM7Tables ($35B7),
+;   C3Mod_ViewOffsetTask ($4462), C3Mod_ProjectTask ($4D26),
+;   C3Mod_SpinTask ($56C2), C3Mod_StarDriftTask ($585B), C3Mod_RockTask
+;   ($5C11), C3Mod_SwingTask ($5CE0), C3Mod_WaveTask ($6014),
+;   C3Mod_Bg3WaveTask ($73BD), C3Mod_RotateMatrixTask ($73FD),
+;   C3Mod_CharSpin ($76FE) and $9930, $9983, $99BB and $9B14 (code not
+;   matched yet).
 ; Entry: M=0, X=0 (16-bit index), DP any, DB any (the read is long); A
 ;        = the angle (only bits 0-9 count).
 ; Exit:  A = the signed value; X = the angle AND C3_AngleMask entered
@@ -813,11 +816,11 @@ C3Mod_FadeOutStopTask:
 ; A task: fades out as C3Mod_FadeOutTask; at 0 it sets C3_ExitFlag (the
 ; module leaves) and ends itself.
 ; Callers note: a task added by script opcode $FA at $562F
-;   (C3Mod_Prog4End), $6978 (C3Mod_Prog3ScriptB), $727F, $7EC1, $931F and
-;   $95FE, by LDX #C3Mod_FadeOutExitTask / JSR $395E at $4684
-;   (C3Mod_RaceTask), and by LDX #C3Mod_FadeOutExitTask / JMP
-;   C3Mod_TaskReplace at $6BF3 (C3Mod_CreditsTask; the others: code and
-;   scripts not matched yet).
+;   (C3Mod_Prog4End), $6978 (C3Mod_Prog3ScriptB), $727F
+;   (C3Mod_Prog5ScriptB), $7EC1, $931F and $95FE, by LDX
+;   #C3Mod_FadeOutExitTask / JSR $395E at $4684 (C3Mod_RaceTask), and by
+;   LDX #C3Mod_FadeOutExitTask / JMP C3Mod_TaskReplace at $6BF3
+;   (C3Mod_CreditsTask; the others: code and scripts not matched yet).
 ; Entry: a task: M=0 (8-bit set here), X=0, DP=0, DB = $00.
 ; Exit:  RTS with M=1; at the end JMP C3Mod_TaskEnd.
 C3Mod_FadeOutExitTask:
@@ -845,7 +848,7 @@ C3Mod_FadeOutExitTask:
 ; more, and the result is round(sqrt(A)) (checked for every 16-bit A);
 ; with it set, round(sqrt(A + 1)). Its caller enters with the carry of
 ; an ADC (clear unless the sum overflowed).
-; Callers note: $7699 (code not matched yet).
+; Callers note: C3Mod_CharPolar ($7699).
 ; Entry: M=0, X any, DP = the page of C3_SqrtRoot (0 at the call); DB
 ;        any; A = the value; C as above.
 ; Exit:  C3_SqrtRoot = the root; A = A minus the sum taken, including
@@ -1284,9 +1287,9 @@ C3Mod_CopyRawPack:
 ; itself. The bank is set with PEA $007E / PLB, which leaves a $00 on the
 ; stack that the final PLB takes back: DB is $00 at the exit, whatever
 ; it was.
-; Callers note: C3Mod_Prog0 ($3C49), C3Mod_Prog3 ($67AD) and $70E0,
-;   $7A2A, $7A5D, $8714, $8ACD, $8B12, $8DAF, $8E7D and $8F7D (code not
-;   matched yet).
+; Callers note: C3Mod_Prog0 ($3C49), C3Mod_Prog3 ($67AD), C3Mod_Prog5
+;   ($70E0) and $7A2A, $7A5D, $8714, $8ACD, $8B12, $8DAF, $8E7D and $8F7D
+;   (code not matched yet).
 ; Entry: M=1 (M=0 set here), X=0, DP any (saved), DB any; Y = the list.
 ; Exit:  M=1, X=0, DP restored, DB = $00; A = $00FF (the end record's
 ;        first byte, ANDed with $FF before the CMP); X = 16 x the
@@ -1377,13 +1380,13 @@ C3Mod_HdmaAlternate:
 ; A task, and a subroutine: runs the script of page $0A00 (DP = $0A00,
 ; DB = $7E, C3_RunScript) until it yields.
 ; Callers note: JSR from C3Mod_Prog0 ($3CD8), C3Mod_Prog4 ($54B4),
-;   C3Mod_Prog2 ($5A0A), C3Mod_Prog7 ($62F0), C3Mod_Prog3 ($6792) and
-;   $70CE, $79AA, $86E6 and $8F94 (code not matched yet); a task: the
-;   tables at $7EC7 and $7EDC (C3_TaskList), and the scripts' opcode $FA
-;   at $3F1A (C3Mod_Prog0ScriptA), $4130 (C3Mod_Prog0Start), $5540
-;   (C3Mod_Prog4ScriptA), $5B05 (C3Mod_Prog2Script), $6393
-;   (C3Mod_Prog7Start), $6984 (C3Mod_Prog3Start), $7157, $931C, $932E and
-;   $93E3.
+;   C3Mod_Prog2 ($5A0A), C3Mod_Prog7 ($62F0), C3Mod_Prog3 ($6792),
+;   C3Mod_Prog5 ($70CE) and $79AA, $86E6 and $8F94 (code not matched yet);
+;   a task: the tables at $7EC7 and $7EDC (C3_TaskList), and the scripts'
+;   opcode $FA at $3F1A (C3Mod_Prog0ScriptA), $4130 (C3Mod_Prog0Start),
+;   $5540 (C3Mod_Prog4ScriptA), $5B05 (C3Mod_Prog2Script), $6393
+;   (C3Mod_Prog7Start), $6984 (C3Mod_Prog3Start), $7157
+;   (C3Mod_Prog5Script), $931C, $932E and $93E3.
 ; Entry: M=0, X=0 (C3_RunScript's), DP any, DB any (both set here and
 ;        not restored: a task's are restored by C3Mod_RunTasks).
 ; Exit:  M=0, X=0, DP = $0A00, DB = $7E; A, X, Y as C3_RunScript leaves
@@ -1399,10 +1402,11 @@ C3Mod_ScriptTaskA:
 
 ; $7E:3754 — C3Mod_ScriptTaskB (11 bytes, $3754–$375E)
 ; As C3Mod_ScriptTaskA, for the script of page $0B00.
-; Callers note: JSR from $70D1 (code not matched yet); a task: the
-;   tables at $7EC7 and $7EDC, and the scripts' opcode $FA at $3F1D
+; Callers note: JSR from C3Mod_Prog5 ($70D1); a task: the tables at
+;   $7EC7 and $7EDC, and the scripts' opcode $FA at $3F1D
 ;   (C3Mod_Prog0ScriptA), $4133 (C3Mod_Prog0Start), $5543
-;   (C3Mod_Prog4ScriptA), $6987 (C3Mod_Prog3Start), $715A and $9331.
+;   (C3Mod_Prog4ScriptA), $6987 (C3Mod_Prog3Start), $715A
+;   (C3Mod_Prog5Script) and $9331.
 ; Entry: M=0, X=0, DP any, DB any (set here, not restored).
 ; Exit:  M=0, X=0, DP = $0B00, DB = $7E; A, X, Y as C3_RunScript leaves
 ;        them.
@@ -1620,8 +1624,8 @@ C3Mod_PalAnimTask:
 ; Callers note: an NMI task added by the scripts' opcode $F8 at $3F2F
 ;   (C3Mod_Prog0ScriptA), $4145 (C3Mod_Prog0Start), $554F
 ;   (C3Mod_Prog4ScriptA), $5B20 (C3Mod_Prog2Script), $639C
-;   (C3Mod_Prog7Start), $699C (C3Mod_Prog3Start), $7181, $7C73, $9325 and
-;   $93EC.
+;   (C3Mod_Prog7Start), $699C (C3Mod_Prog3Start), $7181
+;   (C3Mod_Prog5Script), $7C73, $9325 and $93EC.
 ; Entry: an NMI task (C3Mod_RunNmiTasks): M=1, X=0, DP=0 (C3_OamPos..
 ;        are direct page), DB = $00.
 ; Exit:  M=1, X=0; A = C3_OamRotate, X = Oam_HighTable.
@@ -1662,8 +1666,9 @@ C3Mod_OamUploadTask:
 ; Callers note: C3Mod_Init ($30F6); an NMI task (C3Mod_RunNmiTasks, once
 ;   a frame in vblank) added by script opcode $F8 at $3F32
 ;   (C3Mod_Prog0ScriptA), $4148 (C3Mod_Prog0Start), $5B23
-;   (C3Mod_Prog2Script), $639F (C3Mod_Prog7Start), $7184, $7C76, $9328 and
-;   $93EF (the others: scripts not matched yet).
+;   (C3Mod_Prog2Script), $639F (C3Mod_Prog7Start), $7184
+;   (C3Mod_Prog5Script), $7C76, $9328 and $93EF (the others: scripts not
+;   matched yet).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute register stores).
 ; Exit:  M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X =
 ;        C3_OamLowBytes; Y unchanged; DMA channel 7's registers set.
@@ -1730,9 +1735,9 @@ C3Mod_FinishOamHigh:
 ; Callers note: C3Mod_Start ($300D) and $8AC7, $8C97 (code not matched
 ;   yet); an NMI task (C3Mod_RunNmiTasks, once a frame in vblank) added by
 ;   script opcode $F8 at $5B1D (C3Mod_Prog2Script), $63A2
-;   (C3Mod_Prog7Start), $6999 (C3Mod_Prog3Start), $717E, $7CF9, $7EB6,
-;   $932B and $93F5, and removed by $F7 at $7D0F (scripts not matched
-;   yet).
+;   (C3Mod_Prog7Start), $6999 (C3Mod_Prog3Start), $717E
+;   (C3Mod_Prog5Script), $7CF9, $7EB6, $932B and $93F5, and removed by $F7
+;   at $7D0F (scripts not matched yet).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute register stores).
 ; Exit:  M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X =
 ;        C3_PaletteBytes; Y unchanged; DMA channel 7's registers set.
@@ -2102,9 +2107,9 @@ C3Mod_NmiTaskNext:                      ; header: see C3Mod_RunNmiTasks
 ; its entry of C3_NmiTaskList and goes on with the next NMI task
 ; (C3Mod_NmiTaskNext).
 ; Callers note: JMP from NMI tasks (the trace follows them):
-;   C3Mod_ClearColumnTask ($4674), and $7A32, $7A65, $8DF0, $8E85,
-;   $9D22, $9F56 and $9F87 (code not matched yet); also a JMP byte
-;   pattern at $78A8, right after the RTS at $78A7, which no trace
+;   C3Mod_ClearColumnTask ($4674), and $7A32, $7A65, $8DF0, $8E85, $9D22,
+;   $9F56 and $9F87 (code not matched yet); also C3Mod_CharTilesDeadEnd
+;   ($78A8), right after C3Mod_CharTilesNmiTask's RTS, which no trace
 ;   reaches (probably dead).
 ; Entry: JMP from a task run by C3Mod_RunNmiTasks, with the stack as
 ;        the task found it (C3Mod_RunNmiTasks' JSR return address on
@@ -7308,9 +7313,9 @@ C3Mod_StarDriftTask:
 ;   - by the signs (EOR / BEQ, AND / BNE, LDX / BNE): both positive 4k
 ;     + $200 (CLC), both negative 4k, X negative and Y not $400 - 4k,
 ;     Y negative and X not $200 - 4k.
-; Callers note: $7662 (code not matched yet).
+; Callers note: C3Mod_CharPolar ($7662).
 ; Entry: M any (REP #$20 here), X=0 (16-bit X and Y), DP = a page whose
-;        C3_TmpF0/F2 the routine may use (the caller's, not traced), DB
+;        C3_TmpF0/F2 the routine may use (0 at C3Mod_CharPolar's), DB
 ;        = a bank with the CPU registers ($00-$3F, $80-$BF: the divider
 ;        is absolute; set to $7E with PHK / PLB for the table and back);
 ;        X, Y = the vector.
@@ -9530,16 +9535,16 @@ C3Mod_Prog3NmiTask:
 ;     C3Mod_Prog3ScriptB, or C3Mod_Prog3WipeA / WipeB when C3_EntryArg
 ;     bit 6 is set (16-bit BIT / BEQ); page $0A00's script once
 ;     (C3Mod_ScriptTaskA), and 0 written over the VRAM address of
-;     C3Mod_Unk783C's LDX #$6000 at $7840 (a 16-bit STZ at $7841 with
-;     C3Mod_ScriptTaskA's DB = $7E, before the PLB; code not matched
-;     yet);
-;   - DP = 0: C3_Unk3B = 1 (INC from C3Mod_Init's 0) and C3Mod_Unk783C,
-;     which, with C3_Unk3B set, sends $7E:1400-$1BFF ($800 bytes, two
-;     registers) to VRAM from that address, now word 0, and clears
-;     C3_Unk3B: BG1's map (BG1SC = 0) is the field's map at $6000
-;     with its first 10 rows made tile $100 (the $0100 words); $1C
-;     written over C3Mod_Unk7441's operand (code not matched yet); the
-;     HDMA channels
+;     C3Mod_MapNmiTask's LDX #$6000 (.vram, at $7840; a 16-bit STZ at
+;     $7841 with C3Mod_ScriptTaskA's DB = $7E, before the PLB);
+;   - DP = 0: C3_MapReady = 1 (INC from C3Mod_Init's 0) and
+;     C3Mod_MapNmiTask (JSR), which, with C3_MapReady set, sends
+;     $00:1400-$1BFF ($800 bytes, two registers) to VRAM from that
+;     address, now word 0, and clears C3_MapReady: BG1's map (BG1SC =
+;     0) is the field's map at $6000 with its first 10 rows made tile
+;     $100 (the $0100 words); $1C (C3_Prog3TurnRows) written over
+;     C3Mod_RotateMap's .rows operand, which is dead: program 3 never
+;     installs C3Mod_RotateMap as the idle routine; the HDMA channels
 ;     of C3Mod_Prog3Hdma (C3Mod_SetupHdma: 0 window 2's left edge, 1
 ;     BG1HOFS, 2 BG2VOFS, 3 BG2SC); W12SEL = $33;
 ;   - C3_EntryArg bit 6 (8-bit BIT / BEQ): W12SEL = $FF, the fade steps
@@ -9561,7 +9566,7 @@ C3Mod_Prog3NmiTask:
 ; Entry: M=1, X=0, DP=0, DB=$00 (as C3Mod_Start calls the programs).
 ; Exit:  M=1, X=0, DP=0, DB=$00 (C3Mod_SetupHdma's); A = 1, X =
 ;        WinFx_C3ETablePtr's value, Y = $0090 (PalAnim_TickAll's).
-; Calls: C3Mod_ScriptTaskA, C3Mod_Unk783C, C3Mod_SetupHdma, FdVec_FFEE
+; Calls: C3Mod_ScriptTaskA, C3Mod_MapNmiTask, C3Mod_SetupHdma, FdVec_FFEE
 ;   (JSL), C3Mod_Prog3PalAnims, FdVec_FFF7 (JSL).
 C3Mod_Prog3:
     LDA.b #1
@@ -9608,15 +9613,15 @@ C3Mod_Prog3:
     STY.w !C3_ScriptPageB+!C3Script_Ptr
     PHB
     JSR C3Mod_ScriptTaskA
-    STZ.w C3Mod_Unk783C+5               ; LDX #$6000's operand at $7841; DB = $7E here
+    STZ.w C3Mod_MapNmiTask_vram+1       ; LDX #$6000's operand at $7841; DB = $7E here
     PLB
     LDA.w #0
     TCD
     SEP #$20
-    INC.b !C3_Unk3B
-    JSR C3Mod_Unk783C
-    LDA.b #!C3_Prog3Unk7442
-    STA.l C3Mod_Unk7441+1
+    INC.b !C3_MapReady
+    JSR C3Mod_MapNmiTask
+    LDA.b #!C3_Prog3TurnRows
+    STA.l C3Mod_RotateMap_rows+1
     LDY.w #C3Mod_Prog3Hdma
     JSR C3Mod_SetupHdma
     LDA.b #!C3_Prog3Windows
@@ -9897,8 +9902,9 @@ C3Mod_Prog3ScriptB:
 
 ; $7E:6984 — C3Mod_Prog3Start (43 bytes, $6984–$69AE)
 ; A script subroutine (opcode $F3) of both page $0A00 scripts: the
-; tasks C3Mod_ScriptTaskA, C3Mod_ScriptTaskB, C3Mod_Unk73C6 (code not
-; matched yet), C3Mod_LineShiftTask, C3Mod_Prog3OffsetTask,
+; tasks C3Mod_ScriptTaskA, C3Mod_ScriptTaskB, C3Mod_RotateMatrixTask
+; (its C3_Turn* words, $1F-$2E, are read by nothing in program 3:
+; C3Mod_RotateMap does not run there), C3Mod_LineShiftTask, C3Mod_Prog3OffsetTask,
 ; C3Mod_PalAnimTask and C3Mod_Prog3FadeTask1; the NMI tasks
 ; C3Mod_UploadPalette, C3Mod_OamUploadTask and C3Mod_Prog3NmiTask; page
 ; $0A00's var 0 = $20, var 1 = $10, var 2 = -$F, var 5 = $200; then it
@@ -9906,7 +9912,7 @@ C3Mod_Prog3ScriptB:
 C3Mod_Prog3Start:
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskB
-    db !C3Op_TaskAdd : dw C3Mod_Unk73C6
+    db !C3Op_TaskAdd : dw C3Mod_RotateMatrixTask
     db !C3Op_TaskAdd : dw C3Mod_LineShiftTask
     db !C3Op_TaskAdd : dw C3Mod_Prog3OffsetTask
     db !C3Op_TaskAdd : dw C3Mod_PalAnimTask
@@ -9931,8 +9937,8 @@ C3Mod_Prog3Start:
 ; 8-bit: C3_MosaicTimer - 1; at 0 (BNE), unless C3_MosaicSize is 0
 ; (BEQ), the size - 1 and MOSAIC = it x 16 + 1 (BG1 only; three ASLs,
 ; SEC / ROL), C3_MosaicTimer = 20. No other write to C3_MosaicSize was
-; found in the traced module (C3Mod_Unk783C and C3Mod_Unk73C6 do not
-; touch it), and this one runs only when it is not 0, so it stays 0
+; found in the traced module (C3Mod_MapNmiTask and
+; C3Mod_RotateMatrixTask do not touch it), and this one runs only when it is not 0, so it stays 0
 ; from C3Mod_Init's clear and the mosaic steps never run; the timer
 ; counts from 0, a check every 256 frames.
 ; Callers note: a task added by script opcode $FA at $6990
@@ -10538,8 +10544,1806 @@ C3Mod_Credits5Roles:
     db !C3_CreditsEnd
 
 %C3ModOrg($7E6E42)
-C3Mod_Rest6E42:
-    %C3ModRomBytes($7E6E42, $7E8752)
+; ============================================================
+; Program 5: the party whirled into a gate ($6E42–$78DC)
+; ============================================================
+; Program 5 works on the field it was entered from: its BG1 map turned
+; in software (C3Mod_RotateMap), two circular windows, a waving BG3 and
+; the party's four sprites (three PCs and the field's first other
+; object) spun round the screen's centre and drawn with the battle
+; sprite sets of bank $E4. A sprite record is 22 bytes at
+; C3_CharRecs ($51, DP=0) + 0, $16, $2C or $42 (the C3_Char* offsets).
+
+; $7E:6E42 — C3Mod_LoadCharTiles (92 bytes, $6E42–$6E9D)
+; A battle sprite frame's 16 tiles to $7E:1C00: with X = the sprite set
+; x 3 and A = the frame x 40, C3_CharFramePtr (a long pointer at
+; $1B-$1D) = C3_SprFramesPtr[set] + A (CLC; its bank byte from the table too),
+; and the set's tile pointer C3_SprTilesPtr[set] written over
+; C3Mod_CopyCharTile's operands (self-modifying: the low word over
+; .base / .flip_base, the bank over the MVN's source bank .bank and
+; the PEA .flip_bank); WMADDH = 0 (bank $7E), WMADDL/M = Y; then
+; C3Mod_CopyCharTile 16 times (15 JSRs, then it falls in).
+; Callers note: C3Mod_CharsTask ($774D).
+; Entry: M=0 (8-bit set for the bank bytes), X=0 (16-bit X and Y), DP=0
+;        (C3_CharFramePtr is direct page), DB any (the table reads and
+;        the patches are long); X = the set x 3, A = the frame x 40, Y = the
+;        tiles' address ($1C00).
+; Exit:  as the last C3Mod_CopyCharTile: M=0, X=0, DP=0, DB=$00; Y past
+;        the 16 tiles ($1E00).
+; Calls: C3Mod_CopyCharTile.
+C3Mod_LoadCharTiles:
+    CLC
+    ADC.l !C3_SprFramesPtr,X
+    STA.b !C3_CharFramePtr
+    LDA.l !C3_SprTilesPtr,X
+    STA.l C3Mod_CopyCharTile_base+1
+    STA.l C3Mod_CopyCharTile_flip_base+1
+    SEP #$20
+    LDA.l !C3_SprFramesPtr+2,X
+    STA.b !C3_CharFramePtr+2
+    LDA.l !C3_SprTilesPtr+2,X
+    STA.l C3Mod_CopyCharTile_bank+2
+    STA.l C3Mod_CopyCharTile_flip_bank+1
+    STZ.w WMADDH
+    REP #$20
+    STY.w WMADDL                        ; and WMADDM
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile
+    JSR C3Mod_CopyCharTile             ; and it falls into the 16th
+
+; $7E:6E9E — C3Mod_CopyCharTile (384 bytes, $6E9E–$701D)
+; One tile of the frame: the next word e of C3_CharFramePtr (+ 2). Bit
+; 14 (the second ASL's carry: BCS) flips it; e's low 11 bits x 32 + the
+; tiles' base (.base's or .flip_base's operand) is the 32-byte tile, the
+; ADC taking bit 11 of e as its carry (five ASLs, no CLC: a quirk, + 1
+; byte when bit 11 is set).
+;   - unflipped: MVN from the tiles' bank (.bank's operand) to bank $00
+;     at Y (32 bytes; Y + 32; DB = $00 after);
+;   - flipped: WMADDL/M = Y (kept in C3_TmpF0), DB = the tiles' bank
+;     (PEA .flip_bank / PLB; the second PLB takes the $00), DP = DP_PPU;
+;     each of the 32 bytes through BitReverseTable to WMDATA (the
+;     pixels of each row reversed: a horizontal flip; XBA after the
+;     LDA #$2100 makes B = 0 for the TAX); then DP = 0 and WMADD = Y =
+;     the saved Y + $20 (REP #$21: C = 0).
+; Callers note: C3Mod_LoadCharTiles ($6E71, $6E74, $6E77, $6E7A, $6E7D,
+;   $6E80, $6E83, $6E86, $6E89, $6E8C, $6E8F, $6E92, $6E95, $6E98, $6E9B;
+;   the 16th falls in).
+; Entry: M=0, X=0, DP=0 (C3_CharFramePtr), DB any; Y = the destination
+;        ($00 bank), WMADD = Y (bank $7E); the operands patched.
+; Exit:  M=0, X=0, DP=0, DB=$00; Y = WMADD = the destination + 32; A, X
+;        changed (unflipped: A = $FFFF, X past the source; flipped: A =
+;        Y, X = the last byte read).
+C3Mod_CopyCharTile:
+    LDA.b [!C3_CharFramePtr]
+    INC.b !C3_CharFramePtr
+    INC.b !C3_CharFramePtr
+    ASL A
+    ASL A
+    BCS .flip
+    ASL A
+    ASL A
+    ASL A
+.base:
+    ADC.w #0                            ; the tiles' address (C3Mod_LoadCharTiles); C = bit 11 of e
+    TAX
+    LDA.w #!C3_TileBytes-1
+.bank:
+    MVN !Bank00,!Bank00                 ; lint-ok: MVN operands are bank bytes (the source written by C3Mod_LoadCharTiles)
+    RTS
+.flip:
+    ASL A
+    ASL A
+    ASL A
+.flip_base:
+    ADC.w #0                            ; the tiles' address; C = bit 11 of e
+    STY.w WMADDL                        ; and WMADDM
+    STY.b !C3_TmpF0
+    TAY
+.flip_bank:
+    PEA.w 0                             ; the tiles' bank written here; PLB takes it, the $00 stays
+    PLB
+    LDA.w #!DP_PPU
+    TCD
+    XBA                                 ; B = 0 for the TAX
+    SEP #$20
+    %C3ModFlipByte($00)
+    %C3ModFlipByte($01)
+    %C3ModFlipByte($02)
+    %C3ModFlipByte($03)
+    %C3ModFlipByte($04)
+    %C3ModFlipByte($05)
+    %C3ModFlipByte($06)
+    %C3ModFlipByte($07)
+    %C3ModFlipByte($08)
+    %C3ModFlipByte($09)
+    %C3ModFlipByte($0A)
+    %C3ModFlipByte($0B)
+    %C3ModFlipByte($0C)
+    %C3ModFlipByte($0D)
+    %C3ModFlipByte($0E)
+    %C3ModFlipByte($0F)
+    %C3ModFlipByte($10)
+    %C3ModFlipByte($11)
+    %C3ModFlipByte($12)
+    %C3ModFlipByte($13)
+    %C3ModFlipByte($14)
+    %C3ModFlipByte($15)
+    %C3ModFlipByte($16)
+    %C3ModFlipByte($17)
+    %C3ModFlipByte($18)
+    %C3ModFlipByte($19)
+    %C3ModFlipByte($1A)
+    %C3ModFlipByte($1B)
+    %C3ModFlipByte($1C)
+    %C3ModFlipByte($1D)
+    %C3ModFlipByte($1E)
+    %C3ModFlipByte($1F)
+    PLB
+    REP #$21
+    LDA.w #0
+    TCD
+    LDA.b !C3_TmpF0
+    ADC.w #!C3_TileBytes
+    STA.w WMADDL                        ; and WMADDM
+    TAY
+    RTS
+
+; $7E:701E — C3Mod_CharSprites (116 bytes, $701E–$7091)
+; Four 16x16 sprites of a battle sprite frame at C3_SprBaseX/Y, from
+; C3_OamPos on: with X = the set x 3 and A = the frame x 40,
+; C3_CharFramePtr = C3_SprFramesPtr[set] + A + $20 (CLC both: past the
+; frame's 16 tile words, to its four X / Y byte pairs; the bank word
+; from the table, a 16-bit store over $1D-$1E). The tiles are .tiles'
+; operand (C3Mod_DrawChar writes the record's tile and attribute word
+; there), + 2, 4 and 6 (16-bit stores of tile and attribute). For each
+; sprite: X = its byte + C3_SprBaseX (16-bit, CLC), then CMP #$100:
+; BMI (below $100 as a difference) or BCS ($100 or more, unsigned)
+; both keep it, so the LDA #$9801 after them is never reached (a
+; quirk); the word stored at the record (its high byte overwritten
+; next); the high-table pair from the top of the byte at C3_OamHiPtr:
+; ASL puts X's bit 15 in C, ROR moves it in, SEC / ROR adds the size
+; bit, so X bit 8 is the sign of X, not its bit 8 (an X from $100 up
+; shows at X - $100: a quirk); Y = its byte + C3_SprBaseY (8-bit,
+; CLC). C3_OamHiPtr + 1 after every 4 sprites (offset AND $F = 0).
+; Callers note: C3Mod_DrawChar ($77A9).
+; Entry: M=0, X=0 (16-bit indexes), DP=0 (C3_CharFramePtr, C3_OamPos..,
+;        C3_TmpF0), DB=$00 (the OAM shadow is absolute); X = the set x
+;        3, A = the frame x 40; .tiles' operand written.
+; Exit:  M=0, X=0; C3_OamPos advanced (X = it), C3_OamHiPtr as it
+;        moved; Y = 8; A changed; C3_TmpF0 = 0.
+C3Mod_CharSprites:
+    CLC
+    ADC.l !C3_SprFramesPtr,X
+    CLC
+    ADC.w #!C3_FrameTileBytes
+    STA.b !C3_CharFramePtr
+    LDA.l !C3_SprFramesPtr+2,X
+    STA.b !C3_CharFramePtr+2               ; and the byte after it
+    LDX.b !C3_OamPos
+    LDY.w #0
+.tiles:
+    LDA.w #0                            ; C3Mod_DrawChar writes the tile and attribute word here
+    STA.w !Oam_LowTable+2,X
+    INC A
+    INC A
+    STA.w !Oam_LowTable+6,X
+    INC A
+    INC A
+    STA.w !Oam_LowTable+10,X
+    INC A
+    INC A
+    STA.w !Oam_LowTable+14,X
+    SEP #$20
+    LDA.b #4
+    STA.b !C3_TmpF0
+.sprite:
+    LDA.b [!C3_CharFramePtr],Y
+    INY
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.b !C3_SprBaseX
+    CMP.w #!C3_CharRightEdge
+    BMI .x
+    BCS .x
+    LDA.w #!C3_CharHidden               ; never reached
+.x:
+    STA.w !Oam_LowTable,X
+    ASL A                               ; X's bit 15 to C
+    SEP #$20
+    LDA.b (!C3_OamHiPtr)
+    ROR A
+    SEC                                 ; the size bit: 16x16
+    ROR A
+    STA.b (!C3_OamHiPtr)
+    LDA.b [!C3_CharFramePtr],Y
+    INY
+    CLC
+    ADC.b !C3_SprBaseY
+    STA.w !Oam_LowTable+1,X
+    INX
+    INX
+    INX
+    INX
+    TXA
+    AND.b #!C3_OamGroupMask
+    BNE .count
+    REP #$20
+    INC.b !C3_OamHiPtr
+    SEP #$20
+.count:
+    DEC.b !C3_TmpF0
+    BNE .sprite
+    REP #$20
+    STX.b !C3_OamPos
+    RTS
+
+; $7E:7092 — C3Mod_Prog5 (197 bytes, $7092–$7156)
+; The program of C3Mod_ProgramTable entry 5:
+;   - the circles' centre WinFx_ArgX / ArgY = $80, $70 and their table
+;     bank WinFx_TableBank = $7E (bit 0 clear: bank $7E);
+;   - the field's map buffer Map_BufC800 ($7E:C800, $800 bytes) copied
+;     to $00:0C00 (C3_MapSource, C3Mod_RotateMap's source) and $00:1400
+;     (C3_MapTurned) by two MVNs (bank $7E to $00);
+;   - C3_FadeStep = C3_FadeTimer = 2; page $0A00 runs C3Mod_Prog5Script
+;     and $0B00 C3Mod_Prog5ScriptB, each once now (C3Mod_ScriptTaskA,
+;     C3Mod_ScriptTaskB; DB kept around them); C3Mod_RotateMap written
+;     over C3Mod_Start's idle call (.wait_exit + 1: it runs between
+;     frames);
+;   - the HDMA channels of C3Mod_Prog5Hdma (C3Mod_SetupHdma), C3_Brightness
+;     = full, the sprites' records (C3Mod_InitChars);
+;   - DP = DP_PPU: $0C00's $800 bytes to VRAM word $6800 (DMA channel 7,
+;     two registers from VMDATAL, VMAIN = $80; started after
+;     C3Mod_WaitVblank, in a vertical blank: the screen is on); BG3SC =
+;     $70, BG1SC = $60, CGWSEL = add the sub screen, CGADSUB = $42 (half
+;     colour math on BG2), W12SEL = $8B, W34SEL = $0C, WOBJSEL = 0,
+;     BG1HOFS / BG1VOFS / BG2HOFS / BG2VOFS = 0 (each written twice),
+;     BGMODE = 1; C3_CircleR1 and C3_CircleR2's low bytes = 1 (so the
+;     first C3Mod_CircleTask builds both circles), C3_HdmaEnable =
+;     channels 0-3, TM = BG2, BG3 and the sprites, TS = BG1, TMW = BG1,
+;     BG2, BG3 and the sprites, TSW = BG1.
+; Callers note: C3Mod_ProgramTable entry 5 (C3Mod_Start's JSR (table,X)
+;   at $300A).
+; Entry: M=1, X=0, DP=0, DB=$00 (as C3Mod_Start calls the programs).
+; Exit:  M=1, X=0, DP = DP_PPU (not restored: C3Mod_Start's next calls
+;        take any DP and C3_ModuleFrame sets 0), DB=$00; A =
+;        C3_Prog5HdmaOn, X = C3_Prog5Windows; Y as C3Mod_InitChars and
+;        C3Mod_WaitVblank leave it.
+; Calls: C3Mod_ScriptTaskA, C3Mod_ScriptTaskB, C3Mod_SetupHdma,
+;   C3Mod_InitChars, C3Mod_WaitVblank.
+C3Mod_Prog5:
+    LDA.b #!C3_Prog5CentreX
+    STA.w !WinFx_ArgX
+    LDA.b #!C3_Prog5CentreY
+    STA.w !WinFx_ArgY
+    LDA.b #!Bank7E
+    STA.w !WinFx_TableBank
+    REP #$20
+    LDX.w #!Map_BufC800&$FFFF
+    LDY.w #!C3_MapSource
+    LDA.w #!C3_MapBytes-1
+    MVN !Bank00,!Bank7E                 ; lint-ok: MVN operands are bank bytes ($7E:C800 to $00:0C00)
+    LDX.w #!Map_BufC800&$FFFF
+    LDY.w #!C3_MapTurned
+    LDA.w #!C3_MapBytes-1
+    MVN !Bank00,!Bank7E                 ; lint-ok: MVN operands are bank bytes ($7E:C800 to $00:1400)
+    LDX.w #!C3_Prog5Fade
+    STX.w !C3_FadeStep                  ; and C3_FadeTimer
+    LDA.w #C3Mod_Prog5ScriptB
+    STA.w !C3_ScriptPageB+!C3Script_Ptr
+    LDA.w #C3Mod_Prog5Script
+    STA.w !C3_ScriptPageA+!C3Script_Ptr
+    PHB
+    JSR C3Mod_ScriptTaskA
+    JSR C3Mod_ScriptTaskB
+    LDA.w #C3Mod_RotateMap
+    STA.w C3Mod_Start_wait_exit+1
+    PLB
+    SEP #$20
+    LDY.w #C3Mod_Prog5Hdma
+    JSR C3Mod_SetupHdma
+    LDA.b #!C3_BrightnessFull
+    STA.w !C3_Brightness
+    JSR C3Mod_InitChars
+    PEA.w !DP_PPU
+    PLD
+    LDX.w #!BBAD_VMDATAL<<8|!DMAP_TwoRegs
+    STX.w DMAP7                         ; and BBAD7
+    LDX.w #!C3_MapSource
+    STX.w A1T7L
+    LDX.w #!C3_Prog5Bg2Map
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STZ.w A1B7
+    LDX.w #!C3_MapBytes
+    STX.w DAS7L
+    JSR C3Mod_WaitVblank
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDA.b #!C3_Prog2Bg3Sc
+    STA.b BG3SC-!DP_PPU
+    LDA.b #!C3_Prog5Bg1Sc
+    STA.b BG1SC-!DP_PPU
+    LDX.w #!CGWSEL_AddSubscreen|(!C3_Prog5Math<<8)
+    STX.b CGWSEL-!DP_PPU                ; and CGADSUB
+    LDX.w #!C3_Prog5W12Sel|(!C3_Prog5W34Sel<<8)
+    STX.b W12SEL-!DP_PPU                ; and W34SEL
+    LDA.b #0
+    STA.b WOBJSEL-!DP_PPU
+    STA.b BG1HOFS-!DP_PPU
+    STA.b BG1HOFS-!DP_PPU
+    STA.b BG1VOFS-!DP_PPU
+    STA.b BG1VOFS-!DP_PPU
+    STA.b BG2HOFS-!DP_PPU
+    STA.b BG2HOFS-!DP_PPU
+    STA.b BG2VOFS-!DP_PPU
+    STA.b BG2VOFS-!DP_PPU
+    LDA.b #!C3_BgMode1
+    STA.b BGMODE-!DP_PPU
+    STA.w !C3_CircleR1
+    STA.w !C3_CircleR2
+    LDA.b #!C3_Prog5HdmaOn
+    STA.w !C3_HdmaEnable
+    LDX.w #!C3_Prog5Screens
+    STX.b TM-!DP_PPU                    ; and TS
+    LDX.w #!C3_Prog5Windows
+    STX.b TMW-!DP_PPU                   ; and TSW
+    RTS
+
+; $7E:7157 — C3Mod_Prog5Script (54 bytes, $7157–$718C)
+; Page $0A00's script in program 5 (its vars: 0 the turn's scale
+; C3_TurnScale, 5 its angle C3_TurnAngle, 1 and 2 its centre
+; C3_TurnX / C3_TurnY): the tasks C3Mod_ScriptTaskA, ScriptTaskB,
+; C3Mod_CircleTask, C3Mod_CharSpinTask, C3Mod_CharsTask,
+; C3Mod_RotateMatrixTask and C3Mod_Bg3WaveTask; var 0 = $20, var 5 =
+; $200, var 1 = var 2 = -$10, var 6 = 1 (not read in this program);
+; the NMI tasks C3Mod_MapNmiTask, C3Mod_UploadPalette,
+; C3Mod_OamUploadTask, C3Mod_HideSprites, C3Mod_CharTilesNmiTask and
+; C3Mod_Prog5PalNmiTask; then C3Mod_Prog5Drift.
+C3Mod_Prog5Script:
+    db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
+    db !C3Op_TaskAdd : dw C3Mod_ScriptTaskB
+    db !C3Op_TaskAdd : dw C3Mod_CircleTask
+    db !C3Op_TaskAdd : dw C3Mod_CharSpinTask
+    db !C3Op_TaskAdd : dw C3Mod_CharsTask
+    db !C3Op_TaskAdd : dw C3Mod_RotateMatrixTask
+    db !C3Op_TaskAdd : dw C3Mod_Bg3WaveTask
+    db !C3Op_Set|0 : dw $0020
+    db !C3Op_Set|5 : dw $0200
+    db !C3Op_Set|1 : dw -$10
+    db !C3Op_Set|2 : dw -$10
+    db !C3Op_Set|6 : dw $0001
+    db !C3Op_NmiAdd : dw C3Mod_MapNmiTask
+    db !C3Op_NmiAdd : dw C3Mod_UploadPalette
+    db !C3Op_NmiAdd : dw C3Mod_OamUploadTask
+    db !C3Op_NmiAdd : dw C3Mod_HideSprites
+    db !C3Op_NmiAdd : dw C3Mod_CharTilesNmiTask
+    db !C3Op_NmiAdd : dw C3Mod_Prog5PalNmiTask
+
+; $7E:718D — C3Mod_Prog5Drift (6 bytes, $718D–$7192)
+; Each frame C3Mod_PickDrift (which may move the script on to a drift
+; script), then a jump to itself that yields; the drift scripts jump
+; back here.
+C3Mod_Prog5Drift:
+    db !C3Op_CallW : dw C3Mod_PickDrift
+    db !C3Op_JumpYield : dw C3Mod_Prog5Drift
+
+; $7E:7193 — C3Mod_MosaicTimerTask (18 bytes, $7193–$71A4)
+; A task: C3_MosaicDelay - 1 (8-bit); at 0 (BNE) it is reloaded from
+; C3_MosaicEvery and C3_MosaicStep = (it + 1) AND 7 (the mosaic size
+; C3Mod_Prog5MosaicTask shows).
+; Callers note: a task added by script opcode $FA at $71AE
+;   (C3Mod_Prog5ScriptB), removed by $F9 at $71DC.
+; Entry: a task: M=0 (8-bit set here), X any, DP=0 (the bytes are
+;        direct page), DB any.
+; Exit:  M=1; A = the new step, or the delay's value from the DEC (not
+;        0: A as on entry); X, Y unchanged.
+C3Mod_MosaicTimerTask:
+    SEP #$20
+    DEC.b !C3_MosaicDelay
+    BNE .done
+    LDA.b !C3_MosaicEvery
+    STA.b !C3_MosaicDelay
+    LDA.b !C3_MosaicStep
+    INC A
+    AND.b #!C3_MosaicStepMask
+    STA.b !C3_MosaicStep
+.done:
+    RTS
+
+; $7E:71A5 — C3Mod_Prog5ScriptB (225 bytes, $71A5–$7285)
+; Page $0B00's script in program 5 (its vars: 0 the second circle's
+; radius C3_Circle2, 6 the first's C3_Circle1, 2 the spin's speed
+; C3_SpinSpeed, 8 the BG3 wave's step C3_WaveStep): var 0 = 0, var 6
+; = $88, var 8 = 4; C3Mod_MosaicTimerTask and C3Mod_Prog5MosaicTask;
+; the mosaic steps every 20 frames (C3_MosaicDelay = C3_MosaicEvery =
+; 20), then every 10, 8 and 4 frames, 60 frames each; C3Mod_MosaicTimerTask
+; removed; a frame later C3_MosaicStep = $FF (random sizes) and
+; C3_DriftOn = 1 (C3Mod_PickDrift starts drift scripts); 120 frames
+; later 32 times: 10 frames, then var 0 + 1 and var 2 - 1 (the inner
+; $92 loop yields 10 times, the outer $80 loop does not yield); 16
+; times: 4 frames, var 0 + 1; C3_SongReq = $3A; 48 times: 4 frames, var
+; 0 + 1 (the second circle grows to 96); 40 frames later
+; C3Mod_RadiusTask; 20 frames later WOBJSEL = $0C and C3_DriftOn = 0;
+; var 0 - 3 a frame for 32 frames (to 0), then var 0 = var 2 = 0; the
+; mosaic size 6, 5, 4, 3, 2, 1 and 0 for 6, 8, 10, 16, 20, 20 and 20
+; frames; C3Mod_Prog5MosaicTask removed and C3Mod_FadeOutExitTask
+; added; then it waits for good (the C3Op_End after it is never
+; reached). A $9x loop opcode yields on every pass, the last one too.
+C3Mod_Prog5ScriptB:
+    db !C3Op_Set|0 : dw $0000
+    db !C3Op_Set|6 : dw $0088
+    db !C3Op_Set|8 : dw $0004
+    db !C3Op_TaskAdd : dw C3Mod_MosaicTimerTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog5MosaicTask
+    db !C3Op_Poke8 : dw !C3_MosaicDelay : db 20
+    db !C3Op_Poke8 : dw !C3_MosaicEvery : db 20
+.l71BC:
+    db !C3Op_LoopYield|1 : dw $003B, .l71BC             ; 60 passes
+    db !C3Op_Poke8 : dw !C3_MosaicEvery : db 10
+.l71C5:
+    db !C3Op_LoopYield|1 : dw $003B, .l71C5             ; 60 passes
+    db !C3Op_Poke8 : dw !C3_MosaicEvery : db 8
+.l71CE:
+    db !C3Op_LoopYield|1 : dw $003B, .l71CE             ; 60 passes
+    db !C3Op_Poke8 : dw !C3_MosaicEvery : db 4
+.l71D7:
+    db !C3Op_LoopYield|1 : dw $003B, .l71D7             ; 60 passes
+    db !C3Op_TaskRemove : dw C3Mod_MosaicTimerTask
+    db !C3Op_Yield
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db !C3_MosaicRandom
+    db !C3Op_Poke8 : dw !C3_DriftOn : db 1
+.l71E8:
+    db !C3Op_LoopYield|1 : dw $0077, .l71E8             ; 120 passes
+.l71ED:
+    db !C3Op_LoopYield|2 : dw $0009, .l71ED             ; 10 passes
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|2 : dw -$1
+    db !C3Op_Loop|0 : dw $001F, .l71ED                  ; 32 passes
+.l71FD:
+    db !C3Op_LoopYield|2 : dw $0003, .l71FD             ; 4 passes
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Loop|0 : dw $000F, .l71FD                  ; 16 passes
+    db !C3Op_Poke8 : dw !C3_SongReq : db !C3_SongProg7
+.l720E:
+    db !C3Op_LoopYield|2 : dw $0003, .l720E             ; 4 passes
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Loop|0 : dw $002F, .l720E                  ; 48 passes
+.l721B:
+    db !C3Op_LoopYield|1 : dw $0027, .l721B             ; 40 passes
+    db !C3Op_TaskAdd : dw C3Mod_RadiusTask
+.l7223:
+    db !C3Op_LoopYield|1 : dw $0013, .l7223             ; 20 passes
+    db !C3Op_Ppu, !C3_Prog5ObjWindows, WOBJSEL-!DP_PPU
+    db !C3Op_Poke8 : dw !C3_DriftOn : db 0
+.l722F:
+    db !C3Op_Add|0 : dw -$3
+    db !C3Op_LoopYield|0 : dw $001F, .l722F             ; 32 passes
+    db !C3Op_Set|0 : dw $0000
+    db !C3Op_Set|2 : dw $0000
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 6
+.l7241:
+    db !C3Op_LoopYield|1 : dw $0005, .l7241             ; 6 passes
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 5
+.l724A:
+    db !C3Op_LoopYield|1 : dw $0007, .l724A             ; 8 passes
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 4
+.l7253:
+    db !C3Op_LoopYield|1 : dw $0009, .l7253             ; 10 passes
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 3
+.l725C:
+    db !C3Op_LoopYield|1 : dw $000F, .l725C             ; 16 passes
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 2
+.l7265:
+    db !C3Op_LoopYield|1 : dw $0013, .l7265             ; 20 passes
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 1
+.l726E:
+    db !C3Op_LoopYield|1 : dw $0013, .l726E             ; 20 passes
+    db !C3Op_Poke8 : dw !C3_MosaicStep : db 0
+.l7277:
+    db !C3Op_LoopYield|1 : dw $0013, .l7277             ; 20 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog5MosaicTask
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
+.l7282:
+    db !C3Op_JumpYield : dw .l7282
+    db !C3Op_End
+
+; $7E:7286 — C3Mod_PickDrift (22 bytes, $7286–$729B)
+; A script routine (opcode $x0, C3Mod_CallW): while C3_DriftOn's byte
+; is 0 (16-bit read AND $FF / BEQ) nothing; else page $0A00's script
+; goes on in one of C3Mod_DriftScripts' four, by bits 1-2 of a random
+; byte (C3Mod_TableRandom AND 6: B = DP's low byte, 0 with DP =
+; $0A00): C3Script_Ptr = the entry, 2 bytes before the script (C3_RunScript
+; adds 2 after the call).
+; Callers note: script opcode $F0 at $718D (C3Mod_Prog5Drift).
+; Entry: M=0, X=0 (the 16-bit index), DP = $0A00 (C3Mod_TableRandom's
+;        page boundary), DB = $7E (the table read and the store are
+;        absolute; C3_RunScript's).
+; Exit:  M=0, X=0; A = the entry (X = 0-6), or 0 with X unchanged; Y
+;        unchanged.
+; Calls: C3Mod_TableRandom.
+C3Mod_PickDrift:
+    LDA.w !C3_DriftOn
+    AND.w #!Eng_LowByteMask
+    BEQ .done
+    JSR C3Mod_TableRandom
+    AND.w #!C3_DriftPickMask
+    TAX
+    LDA.w C3Mod_DriftScripts,X
+    STA.w !C3_ScriptPageA+!C3Script_Ptr
+.done:
+    RTS
+
+; $7E:729C — C3Mod_DriftScripts (8 bytes, $729C–$72A3)
+; C3Mod_PickDrift's four scripts, each entry 2 before it.
+C3Mod_DriftScripts:
+    dw C3Mod_Drift0-2, C3Mod_Drift1-2, C3Mod_Drift2-2, C3Mod_Drift3-2
+
+; $7E:72A4 — C3Mod_Drift0 (31 bytes, $72A4–$72C2)
+; Page $0A00's var 0 (the turn's scale) + 1 every 3 frames 8 times, - 1
+; every 2 frames 20 times, + 1 every 2 frames 12 times; then back to
+; C3Mod_Prog5Drift.
+C3Mod_Drift0:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $0007, C3Mod_Drift0       ; 8 passes
+.l72AE:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $0013, .l72AE             ; 20 passes
+.l72B7:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $000B, .l72B7             ; 12 passes
+    db !C3Op_Jump : dw C3Mod_Prog5Drift
+
+; $7E:72C3 — C3Mod_Drift1 (33 bytes, $72C3–$72E3)
+; Var 5 (the angle) + $10 and var 0 + 2 a frame for 32 frames, var 5 +
+; 8 a frame for 48, var 5 + 4 and var 0 - 2 a frame for 32; then back.
+C3Mod_Drift1:
+    db !C3Op_Add|5 : dw $0010
+    db !C3Op_Add|0 : dw $0002
+    db !C3Op_LoopYield|0 : dw $001F, C3Mod_Drift1       ; 32 passes
+.l72CE:
+    db !C3Op_Add|5 : dw $0008
+    db !C3Op_LoopYield|0 : dw $002F, .l72CE             ; 48 passes
+.l72D6:
+    db !C3Op_Add|5 : dw $0004
+    db !C3Op_Add|0 : dw -$2
+    db !C3Op_LoopYield|0 : dw $001F, .l72D6             ; 32 passes
+    db !C3Op_Jump : dw C3Mod_Prog5Drift
+
+; $7E:72E4 — C3Mod_Drift2 (24 bytes, $72E4–$72FB)
+; Var 5 - $20 a frame for 16 frames, - $10 for 24, - 8 for 16; then on
+; into C3Mod_Drift3 (back).
+C3Mod_Drift2:
+    db !C3Op_Add|5 : dw -$20
+    db !C3Op_LoopYield|0 : dw $000F, C3Mod_Drift2       ; 16 passes
+.l72EC:
+    db !C3Op_Add|5 : dw -$10
+    db !C3Op_LoopYield|0 : dw $0017, .l72EC             ; 24 passes
+.l72F4:
+    db !C3Op_Add|5 : dw -$8
+    db !C3Op_LoopYield|0 : dw $000F, .l72F4             ; 16 passes
+
+; $7E:72FC — C3Mod_Drift3 (3 bytes, $72FC–$72FE)
+; No drift: straight back to C3Mod_Prog5Drift.
+C3Mod_Drift3:
+    db !C3Op_Jump : dw C3Mod_Prog5Drift
+
+; $7E:72FF — C3Mod_RadiusTask (23 bytes, $72FF–$7315)
+; A task: C3Mod_RadiusStep for the four sprite records (X = 0, $16 and
+; $2C by JSR, then $42 falling in).
+; Callers note: a task added by script opcode $FA at $7220
+;   (C3Mod_Prog5ScriptB).
+; Entry: a task: M=0 (8-bit set here), X=0, DP=0 (the records), DB any.
+; Exit:  as C3Mod_RadiusStep (falling in): M=1, X = $42.
+; Calls: C3Mod_RadiusStep (and falls into it).
+C3Mod_RadiusTask:
+    SEP #$20
+    LDX.w #!C3_Char0
+    JSR C3Mod_RadiusStep
+    LDX.w #!C3_Char1
+    JSR C3Mod_RadiusStep
+    LDX.w #!C3_Char2
+    JSR C3Mod_RadiusStep
+    LDX.w #!C3_Char3
+
+; $7E:7316 — C3Mod_RadiusStep (15 bytes, $7316–$7324)
+; One record's C3_CharRadius steps away from $80 (8-bit CMP #$80:
+; equal kept, BEQ): r - $80 with bit 7 set, so r from $00 to $7F, goes
+; down by one (BMI / DEC), else, $81-$FF, up (INC). A radius below $80
+; shrinks to 0, then turns $FF, which the next step takes back to 0
+; (wrapping): the sprite stays within a pixel of the centre (the
+; signed multiply of C3Mod_CharSpin reads $FF as -1); one above $80
+; grows to $FF, then 0, $FF, ...
+; Callers note: C3Mod_RadiusTask ($7304, $730A, $7310; the fourth call
+;   falls in).
+; Entry: M=1, X=0 (16-bit index), DP=0, DB any; X = the record.
+; Exit:  M=1; A = the new radius; X, Y unchanged.
+C3Mod_RadiusStep:
+    LDA.b !C3_CharRadius,X
+    CMP.b #!C3_CharRadiusMid
+    BEQ .store
+    BMI .down
+    INC A
+    BRA .store
+.down:
+    DEC A
+.store:
+    STA.b !C3_CharRadius,X
+    RTS
+
+; $7E:7325 — C3Mod_CircleTask (47 bytes, $7325–$7353)
+; A task: the two window circles, each rebuilt only when its radius
+; changed (16-bit CMP / BEQ: equal keeps the table). Page $0B00's
+; var 6 (C3_Circle1) against C3_CircleR1: when it differs, it is kept
+; there and WinFx_BuildCircle (mode 0: TDC with DP = 0, a full circle,
+; the rest of the table emptied) draws it at WinFx_ArgX / ArgY
+; ($80, $70) into C3_Circle1Table ($7E:F000; WinFx_ArgSize from a
+; 16-bit store, so WinFx_ArgSizeHi = the radius's high byte); then var
+; 0 (C3_Circle2) against C3_CircleR2 the same way, into
+; C3_Circle2Table ($7E:F280).
+; Callers note: a task added by script opcode $FA at $715D
+;   (C3Mod_Prog5Script).
+; Entry: a task: M=0, X=0 (the 16-bit table address), DP=0 (C3_CircleR1
+;        / R2 are direct page; TDC gives mode 0), DB=$00 (page $0B00 and
+;        the WinFx_* block are absolute).
+; Exit:  M=0, X=0; A = 0 after a build, else the radius; X as stored or
+;        unchanged; Y unchanged.
+; Calls: WinFx_BuildCircle (JSL).
+C3Mod_CircleTask:
+    LDA.w !C3_ScriptPageB+!C3_Circle1
+    CMP.b !C3_CircleR1
+    BEQ .second
+    STA.b !C3_CircleR1
+    STA.w !WinFx_ArgSize                ; and WinFx_ArgSizeHi
+    LDX.w #!C3_Circle1Table
+    STX.w !WinFx_TablePtr
+    TDC                                 ; mode 0 (DP = 0)
+    JSL !WinFx_BuildCircle
+.second:
+    LDA.w !C3_ScriptPageB+!C3_Circle2
+    CMP.b !C3_CircleR2
+    BEQ .done
+    STA.b !C3_CircleR2
+    STA.w !WinFx_ArgSize
+    LDX.w #!C3_Circle2Table
+    STX.w !WinFx_TablePtr
+    TDC
+    JSL !WinFx_BuildCircle
+.done:
+    RTS
+
+; $7E:7354 — C3Mod_Prog5Hdma (21 bytes, $7354–$7368)
+; Program 5's HDMA channels (C3Mod_SetupHdma's records): 0 indirect, two
+; registers, to WH0 / WH1 (window 1: C3Mod_Prog5Window1), 1 the same to
+; WH2 / WH3 (window 2: C3Mod_Prog5Window2), 2 indirect, one register
+; twice, to BG3HOFS and 3 to BG3VOFS, both from C3Mod_Prog5Bg3Wave; the
+; end.
+C3Mod_Prog5Hdma:
+    db !DMAP_HdmaIndirect|!DMAP_TwoRegs, !BBAD_WH0 : dw C3Mod_Prog5Window1 : db !Bank7E
+    db !DMAP_HdmaIndirect|!DMAP_TwoRegs, !BBAD_WH2 : dw C3Mod_Prog5Window2 : db !Bank7E
+    db !DMAP_HdmaIndirect|!DMAP_OneRegTwice, !BBAD_BG3HOFS : dw C3Mod_Prog5Bg3Wave : db !Bank7E
+    db !DMAP_HdmaIndirect|!DMAP_OneRegTwice, !BBAD_BG3VOFS : dw C3Mod_Prog5Bg3Wave : db !Bank7E
+    db !C3_HdmaListEnd
+
+; $7E:7369 — C3Mod_Prog5Window1 (7 bytes, $7369–$736F)
+; Channel 0's indirect table: 112 lines (repeat) from C3_Circle1Table,
+; 112 from 224 bytes on (two bytes a line); the end.
+C3Mod_Prog5Window1:
+    db $F0 : dw !C3_Circle1Table
+    db $F0 : dw !C3_Circle1Table+$E0
+    db 0
+
+; $7E:7370 — C3Mod_Prog5Window2 (7 bytes, $7370–$7376)
+; Channel 1's, from C3_Circle2Table.
+C3Mod_Prog5Window2:
+    db $F0 : dw !C3_Circle2Table
+    db $F0 : dw !C3_Circle2Table+$E0
+    db 0
+
+; $7E:7377 — C3Mod_Prog5Bg3Wave (7 bytes, $7377–$737D)
+; Channels 2 and 3's: the same 224 words of C3_Bg3Wave ($7E:F500) for
+; BG3HOFS and BG3VOFS; the end.
+C3Mod_Prog5Bg3Wave:
+    db $F0 : dw !C3_Bg3Wave
+    db $F0 : dw !C3_Bg3Wave+$E0
+    db 0
+
+; $7E:737E — C3Mod_Prog5MosaicTask (44 bytes, $737E–$73A9)
+; A task: BG1's mosaic. While C3_MosaicStep is not $FF (8-bit CMP /
+; BEQ: equality), MOSAIC = the step x 16 + 1 (four ASLs, ORA #1: BG1
+; only). At $FF, every 4 frames (C3_FrameCount AND 3 = 0; BNE skips the
+; others) a random size: (C3Mod_KernelRandom AND $30) + $20 + C (no CLC:
+; C as C3_RandomByte's last SBC left it), drawn again while it equals
+; C3_MosaicLast (CMP / BEQ), kept there, and MOSAIC = it OR 1 (sizes
+; 2-5). Quirk: the + C lands in bit 0, which the ORA sets anyway, but
+; the CMP sees it, so the "new" size can be the last one again.
+; Callers note: a task added by script opcode $FA at $71B1
+;   (C3Mod_Prog5ScriptB), removed by $F9 at $727C.
+; Entry: a task: M=0 (8-bit set here), X=0 (C3Mod_KernelRandom's), DP=0
+;        (the bytes and C3_FrameCount are direct page), DB=$00 (MOSAIC
+;        and C3_RandomByte's registers are absolute).
+; Exit:  M=1; A = the MOSAIC value, or C3_FrameCount AND 3 (not 0); X,
+;        Y unchanged; C3_RandSeed changed after a draw.
+; Calls: C3Mod_KernelRandom.
+C3Mod_Prog5MosaicTask:
+    SEP #$20
+    LDA.b !C3_MosaicStep
+    CMP.b #!C3_MosaicRandom
+    BEQ .random
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.b #!C3_MosaicBg1
+    STA.w MOSAIC
+    BRA .done
+.random:
+    LDA.b !C3_FrameCount
+    AND.b #!C3_MosaicRandomEvery
+    BNE .done
+.pick:
+    JSR C3Mod_KernelRandom
+    AND.b #!C3_MosaicRandomMask
+    ADC.b #!C3_MosaicRandomBase         ; C as C3_RandomByte left it
+    CMP.b !C3_MosaicLast
+    BEQ .pick
+    STA.b !C3_MosaicLast
+    ORA.b #!C3_MosaicBg1
+    STA.w MOSAIC
+.done:
+    RTS
+
+; $7E:73AA — C3Mod_Bg3WaveTask (28 bytes, $73AA–$73C5)
+; A task: BG3's wave (C3_Bg3Wave, 224 words at $7E:F500, both BG3HOFS
+; and BG3VOFS per line): the words move down one (MVN in bank $7E,
+; $1BF bytes from $F502 to $F500; DB = $7E after), C3_Bg3WavePhase +
+; page $0B00's var 8 (C3_WaveStep; no CLC: the carry as the task is
+; entered, 0 from C3Mod_TaskNext's CPX unless it is the list's first
+; task: its only entry), and the last word = C3Mod_Sine(the phase)
+; (-sin) / 4 (two LSRs: for a negative value $3Fxx, the same modulo
+; $400, the scroll registers' 10 bits).
+; Callers note: a task added by script opcode $FA at $7169
+;   (C3Mod_Prog5Script).
+; Entry: a task: M=0, X=0 (the MVN's 16-bit X and Y), DP=0
+;        (C3_Bg3WavePhase), DB any (set to $7E by the MVN; restored by
+;        C3Mod_RunTasks).
+; Exit:  M=0, X=0, DB = $7E; A = the new word, X = the phase AND
+;        C3_AngleMask (C3Mod_Sine's), Y = $F6BF (past the MVN).
+; Calls: C3Mod_Sine.
+C3Mod_Bg3WaveTask:
+    LDA.w #!C3_Bg3WaveMove
+    LDX.w #!C3_Bg3Wave+2
+    LDY.w #!C3_Bg3Wave
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes (WRAM bank $7E)
+    LDA.w !C3_ScriptPageB+!C3_WaveStep
+    ADC.b !C3_Bg3WavePhase              ; C as the task is entered
+    STA.b !C3_Bg3WavePhase
+    JSR C3Mod_Sine
+    LSR A
+    LSR A
+    STA.w !C3_Bg3WaveLast
+    RTS
+
+; $7E:73C6 — C3Mod_RotateMatrixTask (123 bytes, $73C6–$7440)
+; A task: the coefficients C3Mod_RotateMap turns the map with, from
+; page $0A00's var 5 (the angle, C3_TurnAngle) and var 0 (the scale,
+; C3_TurnScale), by the PPU's signed multiplier (M7A 16-bit signed x
+; the last byte written to M7B, 8-bit signed; MPYL / MPYM read as a
+; word: the product's bits 0-15):
+;   - c = C3Mod_Cosine(angle) (-cos), kept with PHP; M7A = |c| (low
+;     byte, then high: 0-$FF, positive), M7B = the scale's low byte / 4
+;     (two 8-bit LSRs, 0-$3F: positive; written twice, the second
+;     counts); C3_TurnCos = C3_TurnCos2 = the product / 8 (three LSRs)
+;     with c's sign put back (PLP / BPL: bit 15 of c; EOR / INC);
+;   - the same with C3Mod_Sine (-sin): C3_TurnSin, and C3_TurnNegSin =
+;     -C3_TurnSin;
+;   - C3_TurnX = C3_TurnX2 = var 1, C3_TurnY = C3_TurnY2 = var 2 (the
+;     second copies are not read in this program).
+; Program 3 adds it too (C3Mod_Prog3Start), where nothing reads what
+; it writes.
+; Callers note: a task added by script opcode $FA at $698A
+;   (C3Mod_Prog3Start) and $7166 (C3Mod_Prog5Script).
+; Entry: a task: M=0 (8-bit set for the multiplier, then 16-bit), X=0
+;        (C3Mod_Sine's TAX), DP=0 (the C3_Turn* words are direct page),
+;        DB=$00 (page $0A00 and the registers are absolute).
+; Exit:  M=0, X=0; A = var 2, X = the angle AND C3_AngleMask
+;        (C3Mod_Sine's); Y unchanged; M7A / M7B as last written.
+; Calls: C3Mod_Cosine, C3Mod_Sine.
+C3Mod_RotateMatrixTask:
+    LDA.w !C3_ScriptPageA+!C3_TurnAngle
+    JSR C3Mod_Cosine
+    PHP
+    BPL .cos_positive
+    EOR.w #!Eng_Invert16
+    INC A
+.cos_positive:
+    SEP #$20
+    STA.w M7A
+    XBA
+    STA.w M7A
+    LDA.w !C3_ScriptPageA+!C3_TurnScale
+    LSR A
+    LSR A
+    STA.w M7B
+    STA.w M7B
+    REP #$20
+    LDA.w MPYL                          ; and MPYM
+    LSR A
+    LSR A
+    LSR A
+    PLP
+    BPL .cos_sign
+    EOR.w #!Eng_Invert16
+    INC A
+.cos_sign:
+    STA.b !C3_TurnCos
+    STA.b !C3_TurnCos2
+    LDA.w !C3_ScriptPageA+!C3_TurnAngle
+    JSR C3Mod_Sine
+    PHP
+    BPL .sin_positive
+    EOR.w #!Eng_Invert16
+    INC A
+.sin_positive:
+    SEP #$20
+    STA.w M7A
+    XBA
+    STA.w M7A
+    LDA.w !C3_ScriptPageA+!C3_TurnScale
+    LSR A
+    LSR A
+    STA.w M7B
+    STA.w M7B
+    REP #$20
+    LDA.w MPYL
+    LSR A
+    LSR A
+    LSR A
+    PLP
+    BPL .sin_sign
+    EOR.w #!Eng_Invert16
+    INC A
+.sin_sign:
+    STA.b !C3_TurnSin
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C3_TurnNegSin
+    LDA.w !C3_ScriptPageA+!C3_TurnX
+    STA.b !C3_TurnX2
+    STA.b !C3_TurnXUse
+    LDA.w !C3_ScriptPageA+!C3_TurnY
+    STA.b !C3_TurnY2
+    STA.b !C3_TurnYUse
+    RTS
+
+; $7E:7441 — C3Mod_RotateMap (156 bytes, $7441–$74DC)
+; The idle routine C3Mod_Prog5 writes over C3Mod_Start's idle call: it
+; turns the field's BG1 map in software. With a = C3_TurnCos, b =
+; C3_TurnSin, -b = C3_TurnNegSin, cx = C3_TurnXUse, cy = C3_TurnYUse
+; (16-bit, 8.8-ish fixed point: the high bytes are map positions):
+;   - its own operands written first (self-modifying): .col_x = 2a,
+;     .row_x = 2b, .row_y = a, .col_y = -b;
+;   - x0 = -((16cx + a + 1 + b) x 32) (SEC / ADC, SEC / SBC of -b, five
+;     ASLs, EOR / INC) to C3_TurnRowX; y0 = -((16cy - b + a + 1) x 16)
+;     (CLC / ADC of -b, SEC / ADC) to C3_TurnRowY;
+;   - WRMPYA = $40 (a 16-bit store: WRMPYB = 0 too, a product started);
+;     for each of .rows' operand rows ($1B = 27; C3Mod_Prog3 writes $1C
+;     there, but never runs this routine): y0 + a, x0 + 2b, then 32
+;     columns: y + -b, x + 2a; the entry at C3_MapSource + ((y's high
+;     byte x $40: WRMPYB from a 16-bit store, which also writes WRDIVL)
+;     + x's high byte + C) AND $7FE (even: words) goes to the next word
+;     of C3_MapTurned ($1400 on, Y + 2);
+;   - C3_MapReady + 1 (16-bit INC): C3Mod_MapNmiTask sends the map.
+; Quirk: no CLC before any of the six ADCs; each takes the carry out of
+; the add before it (the row's first from the last ASL of y0 or, after
+; the first row, the last column's map add), so a coordinate can be
+; one more. The rows after the 27th keep Map_BufC800's copy.
+; Callers note: the patched JSR at $3023 (C3Mod_Start's idle call,
+;   written by C3Mod_Prog5 at $70D7).
+; Entry: M=0, X=0 (16-bit indexes), DP=0 (the C3_Turn* words), DB=$00
+;        (the map, the multiplier and its own operands are absolute), as
+;        C3Mod_Start's loop runs (C3_ModuleFrame's DP and DB, REP #$20).
+; Exit:  M=0, X=0; A = the last entry, X its offset, Y = C3_MapTurned +
+;        the rows x $40; C3_TurnRow*, C3_TurnCol* and C3_TurnLeft/Rows
+;        changed.
+C3Mod_RotateMap:
+.rows:
+    LDA.w #!C3_TurnRowsDefault          ; C3Mod_Prog3 writes $1C here
+    STA.b !C3_TurnRowsLeft
+    LDA.b !C3_TurnCos
+    ASL A
+    STA.l .col_x+1
+    LDA.b !C3_TurnSin
+    ASL A
+    STA.l .row_x+1
+    LDA.b !C3_TurnCos2
+    STA.l .row_y+1
+    LDA.b !C3_TurnNegSin
+    STA.l .col_y+1
+    LDA.b !C3_TurnXUse
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    ADC.b !C3_TurnCos
+    SEC
+    SBC.b !C3_TurnNegSin
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C3_TurnRowX
+    LDA.b !C3_TurnYUse
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !C3_TurnNegSin
+    SEC
+    ADC.b !C3_TurnCos
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C3_TurnRowY
+    LDA.w #!C3_MapRowBytes
+    STA.w WRMPYA                        ; and WRMPYB = 0
+    LDY.w #!C3_MapTurned
+.row:
+    LDA.w #!C3_MapRowWords
+    STA.b !C3_TurnColsLeft
+    LDA.b !C3_TurnRowY
+.row_y:
+    ADC.w #0                            ; a, written above
+    STA.b !C3_TurnRowY
+    STA.b !C3_TurnColY
+    LDA.b !C3_TurnRowX
+.row_x:
+    ADC.w #0                            ; 2b
+    STA.b !C3_TurnRowX
+    STA.b !C3_TurnColX
+.column:
+    LDA.b !C3_TurnColY
+.col_y:
+    ADC.w #0                            ; -b
+    STA.b !C3_TurnColY
+    XBA
+    STA.w WRMPYB                        ; the row; WRDIVL = y's low byte
+    LDA.b !C3_TurnColX
+.col_x:
+    ADC.w #0                            ; 2a
+    STA.b !C3_TurnColX
+    XBA
+    AND.w #!Eng_LowByteMask
+    ADC.w RDMPYL                        ; the row x $40
+    AND.w #!C3_MapEntryMask
+    TAX
+    LDA.w !C3_MapSource,X
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    DEC.b !C3_TurnColsLeft
+    BNE .column
+    DEC.b !C3_TurnRowsLeft
+    BNE .row
+    INC.b !C3_MapReady
+    RTS
+
+; $7E:74DD — C3Mod_Times40 (14 bytes, $74DD–$74EA)
+; A = (A AND $FF) x 40 (x 8 to C3_TmpF0, x 32 + it, CLC): a battle
+; sprite frame's offset.
+; Callers note: C3Mod_CharsTask ($7746) and C3Mod_DrawChar ($779E).
+; Entry: M=0, X any, DP=0 (C3_TmpF0), DB any; A's low byte = the frame.
+; Exit:  M=0; A = the frame x 40, C3_TmpF0 = x 8; X, Y unchanged.
+C3Mod_Times40:
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    STA.b !C3_TmpF0
+    ASL A
+    ASL A
+    CLC
+    ADC.b !C3_TmpF0
+    RTS
+
+; $7E:74EB — C3Mod_Times3 (10 bytes, $74EB–$74F4)
+; A = (A AND $FF) x 3 (CLC): a sprite set's offset in the 3-byte
+; pointer tables.
+; Callers note: C3Mod_CharsTask ($7740) and C3Mod_DrawChar ($77A4).
+; Entry: M=0, X any, DP=0 (C3_TmpF0), DB any; A's low byte = the set.
+; Exit:  M=0; A = the set x 3, C3_TmpF0 = the set; X, Y unchanged.
+C3Mod_Times3:
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_TmpF0
+    ASL A
+    CLC
+    ADC.b !C3_TmpF0
+    RTS
+
+; $7E:74F5 — C3Mod_InitChars (313 bytes, $74F5–$762D)
+; The four sprite records, with DP = 0 (PEA / PLD): records 0-2 the
+; party's three members from the field's hand-off block (FieldBtlPc
+; k), record 3 the field's first other object (FieldBtlObj 0). Each:
+;   - C3_CharFrame = C3_CharShown = the record's .Frame (8-bit);
+;   - C3_CharSet = the member's Party_Members word (16-bit: its high
+;     byte, the next member's id, lands in the unused byte after it);
+;     record 3 takes set 6. C3Mod_CharAnimSet picks the animation from
+;     it;
+;   - C3_CharVram = the tiles' VRAM word $0080, $0200, $0280 or $1880
+;     and C3_CharTiles = the OAM tile and attribute word $3A08, $3C20,
+;     $3E28 or $3388 (tiles $008, $020, $028 and $188: the same VRAM
+;     words, x 16; palettes 5, 6, 7 and 1, priority 3);
+;     C3_CharAnimPtr = $3000 (C3_CharAnimInit; overwritten by the
+;     first C3Mod_CharAnimStep's restart before any read);
+;   - C3_CharX = .TileX x 16 OR .SubX, C3_CharY = .TileY x 16 OR .SubY
+;     (8-bit: four ASLs, ORA; a tile from 16 up loses its high bits);
+;   - C3Mod_CharPolar: its angle and distance from the centre.
+; The records are C3_CharRecBytes apart (TXA / CLC / ADC / TAX).
+; Callers note: C3Mod_Prog5 ($70E8).
+; Entry: M=1, X=0 (16-bit index), DP any (set to 0 here), DB=$00 (as
+;        C3Mod_Prog5 runs: C3Mod_Atan's divider is absolute).
+; Exit:  M=1, X=0, DP=0, DB=$00; X = C3_Char3; A = record 3's root, Y
+;        its dy x dy word (as C3Mod_CharPolar leaves them).
+; Calls: C3Mod_CharAnimSet, C3Mod_CharPolar.
+C3Mod_InitChars:
+    PEA.w 0
+    PLD
+    REP #$20
+    LDX.w #!C3_Char0
+    SEP #$20
+    LDA.l FieldBtlPc[0].Frame
+    STA.b !C3_CharFrame,X
+    STA.b !C3_CharShown,X
+    REP #$20
+    LDA.l !Party_Members
+    STA.b !C3_CharSet,X
+    JSR C3Mod_CharAnimSet
+    LDA.w #!C3_Char0Vram
+    STA.b !C3_CharVram,X
+    LDA.w #!C3_CharAnimInit
+    STA.b !C3_CharAnimPtr,X
+    LDA.w #!C3_Char0Tiles
+    STA.b !C3_CharTiles,X
+    SEP #$20
+    LDA.l FieldBtlPc[0].TileX
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlPc[0].SubX
+    STA.b !C3_CharX,X
+    LDA.l FieldBtlPc[0].TileY
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlPc[0].SubY
+    STA.b !C3_CharY,X
+    REP #$20
+    JSR C3Mod_CharPolar
+    TXA
+    CLC
+    ADC.w #!C3_CharRecBytes
+    TAX
+    SEP #$20
+    LDA.l FieldBtlPc[1].Frame
+    STA.b !C3_CharFrame,X
+    STA.b !C3_CharShown,X
+    REP #$20
+    LDA.l !Party_Members+1
+    STA.b !C3_CharSet,X
+    JSR C3Mod_CharAnimSet
+    LDA.w #!C3_Char1Vram
+    STA.b !C3_CharVram,X
+    LDA.w #!C3_CharAnimInit
+    STA.b !C3_CharAnimPtr,X
+    LDA.w #!C3_Char1Tiles
+    STA.b !C3_CharTiles,X
+    SEP #$20
+    LDA.l FieldBtlPc[1].TileX
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlPc[1].SubX
+    STA.b !C3_CharX,X
+    LDA.l FieldBtlPc[1].TileY
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlPc[1].SubY
+    STA.b !C3_CharY,X
+    REP #$20
+    JSR C3Mod_CharPolar
+    TXA
+    CLC
+    ADC.w #!C3_CharRecBytes
+    TAX
+    SEP #$20
+    LDA.l FieldBtlPc[2].Frame
+    STA.b !C3_CharFrame,X
+    STA.b !C3_CharShown,X
+    REP #$20
+    LDA.l !Party_Members+2
+    STA.b !C3_CharSet,X
+    JSR C3Mod_CharAnimSet
+    LDA.w #!C3_Char2Vram
+    STA.b !C3_CharVram,X
+    LDA.w #!C3_CharAnimInit
+    STA.b !C3_CharAnimPtr,X
+    LDA.w #!C3_Char2Tiles
+    STA.b !C3_CharTiles,X
+    SEP #$20
+    LDA.l FieldBtlPc[2].TileX
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlPc[2].SubX
+    STA.b !C3_CharX,X
+    LDA.l FieldBtlPc[2].TileY
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlPc[2].SubY
+    STA.b !C3_CharY,X
+    REP #$20
+    JSR C3Mod_CharPolar
+    TXA
+    CLC
+    ADC.w #!C3_CharRecBytes
+    TAX
+    SEP #$20
+    LDA.l FieldBtlObj[0].Frame
+    STA.b !C3_CharFrame,X
+    STA.b !C3_CharShown,X
+    REP #$20
+    LDA.w #!C3_CharObjSet
+    STA.b !C3_CharSet,X
+    JSR C3Mod_CharAnimSet
+    LDA.w #!C3_Char3Vram
+    STA.b !C3_CharVram,X
+    LDA.w #!C3_CharAnimInit
+    STA.b !C3_CharAnimPtr,X
+    LDA.w #!C3_Char3Tiles
+    STA.b !C3_CharTiles,X
+    SEP #$20
+    LDA.l FieldBtlObj[0].TileX
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlObj[0].SubX
+    STA.b !C3_CharX,X
+    LDA.l FieldBtlObj[0].TileY
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ORA.l FieldBtlObj[0].SubY
+    STA.b !C3_CharY,X
+    REP #$20
+    JSR C3Mod_CharPolar
+    SEP #$20
+    RTS
+
+; $7E:762E — C3Mod_CharAnimSet (20 bytes, $762E–$7641)
+; C3_CharAnim = C3Mod_CharAnimSets[A AND 7] and C3_CharAnimNow = it +
+; 1 (8-bit INC), so that the record's first C3Mod_CharAnimStep
+; restarts its animation. An empty party slot (Party_Members $80)
+; reads entry 0; A AND 7 = 7 (no character has it) would read the
+; code byte after the table.
+; Callers note: C3Mod_InitChars ($7510, $755D, $75AA, $75F6).
+; Entry: M=0, X=0 (the record's 16-bit offset), DP=0 (the records),
+;        DB any (the table read is long); A = the sprite set (its low
+;        3 bits count).
+; Exit:  M=0, X as on entry; A = the animation + 1 (B = 0 from the
+;        AND); Y unchanged.
+C3Mod_CharAnimSet:
+    PHX
+    AND.w #!C3_CharSetMask
+    SEP #$20
+    TAX
+    LDA.l C3Mod_CharAnimSets,X
+    PLX
+    STA.b !C3_CharAnim,X
+    INC A
+    STA.b !C3_CharAnimNow,X
+    REP #$20
+    RTS
+
+; $7E:7642 — C3Mod_CharAnimSets (7 bytes, $7642–$7648)
+; The animation C3Mod_CharAnimSet gives each sprite set 0-6 (the
+; characters' ids; set 6, record 3's, too).
+C3Mod_CharAnimSets:
+    db $41, $35, $22, $34, $03, $00, $3C
+
+; $7E:7649 — C3Mod_CharPolar (92 bytes, $7649–$76A4)
+; A record's position as an angle and a distance from the screen's
+; centre ($80, $70):
+;   - dy = (C3_CharY AND $FF) - $70 to C3_TmpF4 and Y, dx = (C3_CharX
+;     AND $FF) - $80 to C3_TmpF6 and X (16-bit, SEC); C3Mod_Atan's
+;     angle to C3_CharAngle (a word);
+;   - the distance: for dy, then dx, d = the low byte, negated when
+;     its bit 7 is set (8-bit BPL; so dy from $80 up, C3_CharY $F0 on,
+;     gives $100 - dy, and dx = -$80, C3_CharX 0, gives $80); the PPU
+;     multiplier: M7A = d (low byte, then STZ: a 16-bit positive
+;     value), M7B = d (8-bit signed, written twice: the second byte
+;     counts), so the product is d x d, or -$4000 when d = $80; the
+;     first product's MPYL/MPYM word to Y (LDY, 16-bit), the second
+;     added (REP #$21: C = 0; ADC MPYL/MPYM) and C3Mod_SquareRoot
+;     entered with that ADC's carry (set only when a -$4000 term takes
+;     the sum to $10000 or more): C3_CharRadius = the root's low byte
+;     (from C3_SqrtRoot).
+; The writes to M7A / M7B set mode 7's matrix A and B as well (no
+; effect in program 5's mode 1).
+; Callers note: C3Mod_InitChars ($7542, $758F, $75DC, $7628).
+; Entry: M=0, X=0 (the record's 16-bit offset), DP=0 (the records and
+;        the C3_Tmp* words), DB=$00 (the PPU multiplier and
+;        C3Mod_Atan's divider are absolute).
+; Exit:  M=0, X as on entry; A = the root (16-bit), Y = the dy x dy
+;        word; C3_TmpF2 = C3Mod_Atan's sign flag, C3_SqrtRoot (C3_TmpF0)
+;        = the root; C clear (C3Mod_SquareRoot's).
+; Calls: C3Mod_Atan, C3Mod_SquareRoot.
+C3Mod_CharPolar:
+    PHX
+    LDA.b !C3_CharY,X
+    AND.w #!Eng_LowByteMask
+    SEC
+    SBC.w #!C3_Prog5CentreY
+    STA.b !C3_TmpF4
+    TAY
+    LDA.b !C3_CharX,X
+    AND.w #!Eng_LowByteMask
+    SEC
+    SBC.w #!C3_Prog5CentreX
+    STA.b !C3_TmpF6
+    TAX
+    JSR C3Mod_Atan
+    PLX
+    STA.b !C3_CharAngle,X
+    SEP #$20
+    LDA.b !C3_TmpF4
+    BPL .dy
+    EOR.b #!Eng_Invert8
+    INC A
+.dy:
+    STA.w M7A
+    STZ.w M7A
+    STA.w M7B
+    STA.w M7B
+    LDY.w MPYL                          ; and MPYM
+    LDA.b !C3_TmpF6
+    BPL .dx
+    EOR.b #!Eng_Invert8
+    INC A
+.dx:
+    STA.w M7A
+    STZ.w M7A
+    STA.w M7B
+    STA.w M7B
+    REP #$21
+    TYA
+    ADC.w MPYL                          ; and MPYM
+    JSR C3Mod_SquareRoot
+    LDA.b !C3_SqrtRoot
+    SEP #$20
+    STA.b !C3_CharRadius,X
+    REP #$20
+    RTS
+
+; $7E:76A5 — C3Mod_CharSpinTask (23 bytes, $76A5–$76BB)
+; A task: the spin. C3_SpinAngle + page $0B00's var 2 (C3_SpinSpeed;
+; CLC), then C3Mod_CharSpin for records 0, 1 and 2 (the third falls
+; in): only the party spins; record 3 keeps its place.
+; Callers note: a task added by script opcode $FA at $7160
+;   (C3Mod_Prog5Script).
+; Entry: a task: M=0, X=0 (16-bit offsets), DP=0 (C3_SpinAngle and the
+;        records), DB=$00 (page $0B00 and the PPU multiplier are
+;        absolute).
+; Exit:  as C3Mod_CharSpin's, with X = C3_Char2.
+; Calls: C3Mod_CharSpin.
+C3Mod_CharSpinTask:
+    LDA.b !C3_SpinAngle
+    CLC
+    ADC.w !C3_ScriptPageB+!C3_SpinSpeed
+    STA.b !C3_SpinAngle
+    LDX.w #!C3_Char0
+    JSR C3Mod_CharSpin
+    LDX.w #!C3_Char1
+    JSR C3Mod_CharSpin
+    LDX.w #!C3_Char2                    ; and it falls into C3Mod_CharSpin
+
+; $7E:76BC — C3Mod_CharSpin (97 bytes, $76BC–$771C)
+; One record placed on its circle: a = C3_SpinAngle + C3_CharAngle
+; (16-bit, CLC; 1,024 steps per turn in C3Mod_Sine);
+;   - C3_CharFacing = C3Mod_CharFacings[((a + $80) >> 8) AND 3] AND 3
+;     (CLC; XBA / AND: the quarter turn a is nearest to);
+;   - x: M7A = C3Mod_Cosine(a) (-cos: a signed 16-bit value, -$FF to
+;     $FF; low byte, then high), M7B = C3_CharRadius (8-bit signed,
+;     written twice: a radius from $80 up counts as negative, the
+;     sprite on the other side); C3_CharX = MPYM (bits 8-15 of the
+;     signed product: floor(-cos x r / 256)'s low byte) + $80 + C,
+;     where C is C3Mod_Cosine's carry (from its CPX #$200: set when
+;     (a + $100) AND $3FF is $200 or more, the value 0 or positive);
+;   - y: the same with C3Mod_Sine(a) (-sin; a again, REP #$21: C = 0)
+;     and $70: C3_CharY = MPYM + $70 + C3Mod_Sine's carry (a AND $3FF
+;     from $200 up).
+; The writes to M7A / M7B set mode 7's matrix A and B as well (no
+; effect in mode 1).
+; Callers note: C3Mod_CharSpinTask ($76B0, $76B6; the third falls in).
+; Entry: M=0, X=0 (the record's 16-bit offset; C3Mod_Sine's 16-bit
+;        index), DP=0 (C3_SpinAngle and the records), DB=$00 (the PPU
+;        multiplier is absolute).
+; Exit:  M=0, X as on entry; A = C3Mod_Sine's low byte x 256 + the new
+;        C3_CharY; Y unchanged.
+; Calls: C3Mod_Cosine, C3Mod_Sine.
+C3Mod_CharSpin:
+    LDA.b !C3_SpinAngle
+    CLC
+    ADC.b !C3_CharAngle,X
+    PHA
+    PHX
+    CLC
+    ADC.w #!C3_FacingRound
+    XBA
+    AND.w #!C3_CharFacingMask
+    TAX
+    SEP #$20
+    LDA.l C3Mod_CharFacings,X
+    AND.b #!C3_CharFacingMask
+    PLX
+    STA.b !C3_CharFacing,X
+    REP #$20
+    PLA
+    PHX
+    JSR C3Mod_Cosine
+    PLX
+    SEP #$20
+    STA.w M7A
+    XBA
+    STA.w M7A
+    LDA.b !C3_CharRadius,X
+    STA.w M7B
+    STA.w M7B
+    LDA.w MPYM
+    ADC.b #!C3_Prog5CentreX             ; + C3Mod_Cosine's carry
+    STA.b !C3_CharX,X
+    REP #$21
+    LDA.b !C3_SpinAngle
+    ADC.b !C3_CharAngle,X
+    PHX
+    JSR C3Mod_Sine
+    PLX
+    SEP #$20
+    STA.w M7A
+    XBA
+    STA.w M7A
+    LDA.b !C3_CharRadius,X
+    STA.w M7B
+    STA.w M7B
+    LDA.w MPYM
+    ADC.b #!C3_Prog5CentreY             ; + C3Mod_Sine's carry
+    STA.b !C3_CharY,X
+    REP #$20
+    RTS
+
+; $7E:771D — C3Mod_CharFacings (4 bytes, $771D–$7720)
+; The facing (the battle sprites' direction, 0-3) for each quarter
+; turn of C3Mod_CharSpin's angle.
+C3Mod_CharFacings:
+    db 3, 1, 2, 0
+
+; $7E:7721 — C3Mod_CharsTask (83 bytes, $7721–$7773)
+; A task: the four sprites.
+;   - C3_CharTilesVram = $FFFF (C3_CharNoTiles: no upload); from the
+;     record C3_CharNext names, at most 4 tries (C3_CharTries, 16-bit
+;     DEC / BNE): the first record whose C3_CharFrame differs from
+;     C3_CharShown (8-bit CMP / BEQ: equal tries the next) gets its
+;     frame's tiles: C3_CharShown = it, C3_CharTilesVram =
+;     C3_CharVram, C3Mod_LoadCharTiles with X = C3_CharSet x 3, A =
+;     the frame x 40 and Y = $1C00 (C3_CharTileBuf; sent by
+;     C3Mod_CharTilesNmiTask); C3Mod_NextChar after each record tried,
+;     so the search goes on from the next one in the next frame;
+;   - then, for records 0-3 (16-bit CPX #$58 / BNE), C3Mod_DrawChar
+;     and C3Mod_CharAnimStep: a frame the animation picks now is
+;     loaded and drawn from the next frame on.
+; Callers note: a task added by script opcode $FA at $7163
+;   (C3Mod_Prog5Script).
+; Entry: a task: M=0, X=0 (16-bit offsets), DP=0 (the records and
+;        C3_Char* words), DB=$00 (the OAM shadow and WMADD are
+;        absolute).
+; Exit:  M=0, X=0, DB=$00 (C3Mod_CharAnimStep's PLB); X = C3_CharEnd;
+;        A = X; Y = record 3's facing when its animation restarted,
+;        else 8 (C3Mod_DrawChar's).
+; Calls: C3Mod_Times3, C3Mod_Times40, C3Mod_LoadCharTiles,
+;   C3Mod_NextChar, C3Mod_DrawChar, C3Mod_CharAnimStep.
+C3Mod_CharsTask:
+    LDA.w #!C3_CharNoTiles
+    STA.b !C3_CharTilesVram
+    LDA.w #!C3_CharTriesAll
+    STA.b !C3_CharTries
+    LDX.b !C3_CharNext
+.try:
+    SEP #$20
+    LDA.b !C3_CharFrame,X
+    CMP.b !C3_CharShown,X
+    BEQ .same
+    STA.b !C3_CharShown,X
+    REP #$20
+    PHX
+    LDA.b !C3_CharVram,X
+    STA.b !C3_CharTilesVram
+    LDA.b !C3_CharSet,X
+    JSR C3Mod_Times3
+    TAY
+    LDA.b !C3_CharFrame,X
+    JSR C3Mod_Times40
+    TYX
+    LDY.w #!C3_CharTileBuf
+    JSR C3Mod_LoadCharTiles
+    PLX
+    JSR C3Mod_NextChar
+    BRA .draw
+.same:
+    REP #$20
+    JSR C3Mod_NextChar
+    DEC.b !C3_CharTries
+    BNE .try
+.draw:
+    LDX.w #!C3_Char0
+.record:
+    JSR C3Mod_DrawChar
+    JSR C3Mod_CharAnimStep
+    TXA
+    CLC
+    ADC.w #!C3_CharRecBytes
+    TAX
+    CPX.w #!C3_CharEnd
+    BNE .record
+    RTS
+
+; $7E:7774 — C3Mod_NextChar (19 bytes, $7774–$7786)
+; X = the next record (X + C3_CharRecBytes, CLC; 0 after record 3: a
+; 16-bit CMP #$58 / BNE), kept in C3_CharNext.
+; Callers note: C3Mod_CharsTask ($7751, $7758).
+; Entry: M=0, X=0 (16-bit offsets), DP=0 (C3_CharNext), DB any; X = a
+;        record's offset.
+; Exit:  M=0, X = C3_CharNext = the next record's offset; A, Y
+;        unchanged (PHA / PLA).
+C3Mod_NextChar:
+    PHA
+    TXA
+    CLC
+    ADC.w #!C3_CharRecBytes
+    TAX
+    CMP.w #!C3_CharEnd
+    BNE .keep
+    LDX.w #!C3_Char0
+.keep:
+    STX.b !C3_CharNext
+    PLA
+    RTS
+
+; $7E:7787 — C3Mod_DrawChar (39 bytes, $7787–$77AD)
+; One record's four sprites: C3_CharTiles written over
+; C3Mod_CharSprites' .tiles operand (self-modifying, a long 16-bit
+; store), C3_SprBaseX / Y = C3_CharX / C3_CharY (AND $FF), then
+; C3Mod_CharSprites with A = C3_CharShown x 40 and X = C3_CharSet x 3
+; (the frame whose tiles are in VRAM, or on their way there in this
+; frame's vertical blank).
+; Callers note: C3Mod_CharsTask ($7762).
+; Entry: M=0, X=0 (the record's 16-bit offset), DP=0 (the records,
+;        C3_SprBase*), DB=$00 (C3Mod_CharSprites' OAM shadow).
+; Exit:  M=0, X as on entry; A, Y as C3Mod_CharSprites leaves them (Y
+;        = 8).
+; Calls: C3Mod_Times40, C3Mod_Times3, C3Mod_CharSprites.
+C3Mod_DrawChar:
+    PHX
+    LDA.b !C3_CharTiles,X
+    STA.l C3Mod_CharSprites_tiles+1
+    LDA.b !C3_CharX,X
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_SprBaseX
+    LDA.b !C3_CharY,X
+    AND.w #!Eng_LowByteMask
+    STA.b !C3_SprBaseY
+    LDA.b !C3_CharShown,X
+    JSR C3Mod_Times40
+    PHA
+    LDA.b !C3_CharSet,X
+    JSR C3Mod_Times3
+    TAX
+    PLA
+    JSR C3Mod_CharSprites
+    PLX
+    RTS
+
+; $7E:77AE — C3Mod_CharAnimStep (57 bytes, $77AE–$77E6)
+; One record's animation, 8-bit, with DB = $E4 (PEA $00E4 / PLB; the
+; PLB at the end takes the $00 back):
+;   - C3_CharAnim not C3_CharAnimNow (CMP / BNE): restart;
+;   - else C3_CharFacing not C3_CharFacingNow (BNE): the next entry at
+;     once, without the wait (the facing is taken only at a restart, so
+;     the old facing's list runs to its $FF a frame an entry: a quirk);
+;   - else C3_CharAnimTime - 1; not 0 (BNE): nothing more;
+;   - the next entry: the byte at C3_CharAnimPtr (bank $E4); $FF
+;     (8-bit CMP / BNE) restarts;
+;   - restart: C3_CharFacingNow = C3_CharFacing, C3_CharAnimNow =
+;     C3_CharAnim, C3Mod_CharAnimStart (the list pointers), and its
+;     first byte read (not checked for $FF);
+;   - then C3_CharFrame = the byte, C3_CharAnimTime = the byte at
+;     C3_CharAnimDurPtr (a time of 0 waits 256 frames), and both
+;     pointers + 1 (16-bit INC).
+; Callers note: C3Mod_CharsTask ($7765).
+; Entry: M=0, X=0 (the record's 16-bit offset), DP=0 (the records; the
+;        (dp,X) pointers are direct page), DB any (set here).
+; Exit:  M=0, X as on entry, DB=$00 (the PEA's high byte); A = the new
+;        C3_CharAnimTime in A's low byte, or C3_CharFacing's when the
+;        wait goes on; Y = the facing after a restart, else unchanged.
+; Calls: C3Mod_CharAnimStart.
+C3Mod_CharAnimStep:
+    SEP #$20
+    PEA.w !BankE4
+    PLB
+    LDA.b !C3_CharAnim,X
+    CMP.b !C3_CharAnimNow,X
+    BNE .restart
+    LDA.b !C3_CharFacing,X
+    CMP.b !C3_CharFacingNow,X
+    BNE .next
+    DEC.b !C3_CharAnimTime,X
+    BNE .done
+.next:
+    LDA.b (!C3_CharAnimPtr,X)
+    CMP.b #!C3_AnimListEnd
+    BNE .frame
+.restart:
+    LDA.b !C3_CharFacing,X
+    STA.b !C3_CharFacingNow,X
+    LDA.b !C3_CharAnim,X
+    STA.b !C3_CharAnimNow,X
+    JSR C3Mod_CharAnimStart
+    LDA.b (!C3_CharAnimPtr,X)
+.frame:
+    STA.b !C3_CharFrame,X
+    LDA.b (!C3_CharAnimDurPtr,X)
+    STA.b !C3_CharAnimTime,X
+    REP #$20
+    INC.b !C3_CharAnimPtr,X
+    INC.b !C3_CharAnimDurPtr,X
+.done:
+    PLB
+    REP #$20
+    RTS
+
+; $7E:77E7 — C3Mod_CharAnimStart (85 bytes, $77E7–$783B)
+; A record's animation lists in bank $E4 (DB = $E4, absolute reads),
+; with s = C3_CharSet's low byte x 2 and n = C3_CharAnim x 4 (16-bit):
+;   - f = C3_SprAnimFrames[s] (BattleRom_SprAnimFrames, $E4:2600) to
+;     C3_TmpF6, n to C3_TmpF2;
+;   - C3_CharAnimDurPtr = C3_TmpF4 = n + C3_SprAnimDurs[s] ($E4:2800;
+;     CLC): the times;
+;   - q = (the next set's entry ($2602 + s) - f) / 2 to C3_TmpFA (SEC;
+;     LSR), q / 2 to C3_TmpF8: the set's frame lists are four facings'
+;     equal parts, q / 2 bytes each;
+;   - C3_CharAnimPtr = f + the facing's part + n (each add CLC): facing
+;     0 adds 0, 1 adds q / 2, 2 adds q, 3 adds q + q / 2 (16-bit CPY #0,
+;     #1, #2 / BEQ; else both).
+; Callers note: C3Mod_CharAnimStep ($77D2).
+; Entry: M=1 (REP #$20 here), X=0 (the record's 16-bit offset; Y as
+;        16-bit index), DP=0 (the records and C3_Tmp* words), DB=$E4.
+; Exit:  M=1, X as on entry, DB=$E4; A's low byte = C3_CharAnimPtr's;
+;        Y = the facing; C3_TmpF2-FA as above.
+C3Mod_CharAnimStart:
+    REP #$20
+    LDA.b !C3_CharSet,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAY
+    LDA.w !C3_SprAnimFrames,Y
+    STA.b !C3_TmpF6
+    LDA.b !C3_CharAnim,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    STA.b !C3_TmpF2
+    CLC
+    ADC.w !C3_SprAnimDurs,Y
+    STA.b !C3_CharAnimDurPtr,X
+    STA.b !C3_TmpF4
+    LDA.w !C3_SprAnimFrames+2,Y
+    SEC
+    SBC.b !C3_TmpF6
+    LSR A
+    STA.b !C3_TmpFA
+    LSR A
+    STA.b !C3_TmpF8
+    LDA.b !C3_CharFacing,X
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b !C3_TmpF6
+    CPY.w #0
+    BEQ .anim
+    CPY.w #1
+    BEQ .quarter
+    CPY.w #2
+    BEQ .half
+    CLC
+    ADC.b !C3_TmpFA
+.quarter:
+    CLC
+    ADC.b !C3_TmpF8
+    BRA .anim
+.half:
+    CLC
+    ADC.b !C3_TmpFA
+.anim:
+    CLC
+    ADC.b !C3_TmpF2
+    STA.b !C3_CharAnimPtr,X
+    SEP #$20
+    RTS
+
+; $7E:783C — C3Mod_MapNmiTask (44 bytes, $783C–$7867)
+; An NMI task, and a routine C3Mod_Prog3 calls once: when C3_MapReady
+; is set (8-bit LDA / BEQ), the map C3Mod_RotateMap built,
+; $00:1400-$1BFF (C3_MapTurned, C3_MapBytes; A1B7 = 0), to VRAM from
+; .vram's operand ($6000, program 5's BG1 map; C3Mod_Prog3 writes 0
+; over it first) by DMA channel 7 (two registers from VMDATAL, VMAIN =
+; $80), then C3_MapReady = 0.
+; Callers note: C3Mod_Prog3 ($67A1); an NMI task added by script
+;   opcode $F8 at $717B (C3Mod_Prog5Script).
+; Entry: M=1, X=0 (the 16-bit register stores), DP=0 (C3_MapReady),
+;        DB=$00 (the registers are absolute): an NMI task
+;        (C3Mod_RunNmiTasks), or C3Mod_Prog3 at DP = 0 after its TCD,
+;        M=1.
+; Exit:  M=1, X=0; sent: A = MDMAEN_Ch7, X = C3_MapBytes, Y = $1801
+;        (DMAP7 / BBAD7's word); else A = 0, X and Y unchanged.
+C3Mod_MapNmiTask:
+    LDA.b !C3_MapReady
+    BEQ .done
+.vram:
+    LDX.w #!C3_Prog5Bg1Map              ; C3Mod_Prog3 writes 0 here
+    STX.w VMADDL                        ; and VMADDH
+    LDY.w #!BBAD_VMDATAL<<8|!DMAP_TwoRegs
+    LDX.w #!C3_MapTurned
+    STY.w DMAP7                         ; and BBAD7
+    STX.w A1T7L
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STZ.w A1B7
+    LDX.w #!C3_MapBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    STZ.b !C3_MapReady
+.done:
+    RTS
+
+; $7E:7868 — C3Mod_CharTilesNmiTask (64 bytes, $7868–$78A7)
+; An NMI task: when C3_CharTilesVram is not $FFFF (16-bit CPX / BEQ),
+; the 16 tiles at $00:1C00 (C3_CharTileBuf; A1B7 = 0) in two parts of
+; $100 bytes by DMA channel 7 (two registers from VMDATAL, VMAIN =
+; $80): the first 8 to VRAM word C3_CharTilesVram, the next 8 (A1T7
+; has moved on to $1D00) to C3_CharTilesVram + $100 (CLC; 16-bit
+; store), the row of tiles below in the sprite table.
+; Callers note: an NMI task added by script opcode $F8 at $7187
+;   (C3Mod_Prog5Script).
+; Entry: an NMI task (C3Mod_RunNmiTasks): M=1, X=0 (the 16-bit
+;        address), DP=0 (C3_CharTilesVram), DB=$00 (the registers).
+; Exit:  M=1, X=0; sent: A = MDMAEN_Ch7, X = $0100, Y = $1801; else X =
+;        $FFFF, A and Y unchanged.
+C3Mod_CharTilesNmiTask:
+    LDX.b !C3_CharTilesVram
+    CPX.w #!C3_CharNoTiles
+    BEQ .done
+    STX.w VMADDL                        ; and VMADDH
+    LDY.w #!BBAD_VMDATAL<<8|!DMAP_TwoRegs
+    STY.w DMAP7                         ; and BBAD7
+    LDX.w #!C3_CharTileBuf
+    STX.w A1T7L
+    STZ.w A1B7
+    LDX.w #!C3_CharTileHalf
+    STX.w DAS7L
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STA.w MDMAEN                        ; MDMAEN_Ch7, the same value
+    REP #$20
+    LDA.b !C3_CharTilesVram
+    CLC
+    ADC.w #!C3_CharTileRow
+    STA.w VMADDL                        ; and VMADDH
+    SEP #$20
+    LDX.w #!C3_CharTileHalf
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+.done:
+    RTS
+
+; $7E:78A8 — C3Mod_CharTilesDeadEnd (3 bytes, $78A8–$78AA)
+; JMP C3Mod_NmiTaskEnd right after C3Mod_CharTilesNmiTask's RTS: no
+; code, table or script names $78A8 and no trace reaches it (probably
+; dead, a leftover ending of that task).
+; Callers note: none found (no JMP, JSR or script word names $78A8).
+; Entry: never reached; it would need C3Mod_NmiTaskEnd's: an NMI task
+;        with C3Mod_RunNmiTasks' return address on the stack, X=0, M
+;        any, DP and DB any (C3Mod_RunNmiTasks restores them).
+; Exit:  into C3Mod_NmiTaskEnd.
+C3Mod_CharTilesDeadEnd:
+    JMP C3Mod_NmiTaskEnd
+
+; $7E:78AB — C3Mod_Prog5PalNmiTask (50 bytes, $78AB–$78DC)
+; An NMI task: every 8 frames (C3_FrameCount AND 7 = 0: BNE skips),
+; colours $15-$17 cycled: CGADD = $15 and the 6 bytes at $7E:222A
+; (C3_PaletteBuf's colours $15-$17, C3_Prog5Cycle) to CGDATA (X to 6:
+; CPX / BNE); then DB = $7E (PHK / PLB: the module's bank; restored by
+; C3Mod_RunNmiTasks) and the three words turned: $222A = $222C, $222C
+; = $222E, $222E = the old $222A. C3Mod_UploadPalette (an NMI task
+; ahead of this one) has sent the same colours already this frame; the
+; turned ones go with it in the next.
+; Callers note: an NMI task added by script opcode $F8 at $718A
+;   (C3Mod_Prog5Script).
+; Entry: an NMI task (C3Mod_RunNmiTasks): M=1, X=0 (the 16-bit words),
+;        DP=0 (C3_FrameCount), DB=$00 (the registers).
+; Exit:  cycled: M=0, X=0, DB=$7E; A = the old $222E, X = the old $222A.
+;        Skipped: M=1, A = the count AND 7, X unchanged. Y unchanged.
+C3Mod_Prog5PalNmiTask:
+    LDA.b !C3_FrameCount
+    AND.b #!C3_Prog5CycleEvery
+    BNE .done
+    LDA.b #!C3_Prog5CycleColour
+    STA.w CGADD
+    LDX.w #0
+.colour:
+    LDA.l !C3_PaletteBuf+!C3_Prog5CycleOfs,X
+    STA.w CGDATA
+    INX
+    CPX.w #!C3_Prog5CycleBytes
+    BNE .colour
+    REP #$20
+    PHK
+    PLB
+    LDX.w !C3_Prog5Cycle
+    LDA.w !C3_Prog5Cycle+2
+    STA.w !C3_Prog5Cycle
+    LDA.w !C3_Prog5Cycle+4
+    STA.w !C3_Prog5Cycle+2
+    STX.w !C3_Prog5Cycle+4
+.done:
+    RTS
+
+%C3ModOrg($7E78DD)
+C3Mod_Rest78DD:
+    %C3ModRomBytes($7E78DD, $7E8752)
 
 %C3ModOrg($7E8752)
 ; ============================================================

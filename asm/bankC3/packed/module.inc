@@ -730,7 +730,6 @@ endmacro
 !C3_OffsetTableRow = $0040               ; a row (32 words)
 !C3_Prog3Bg3Hofs = $003D                 ; 16-bit: BG3HOFS (C3Mod_Prog3NmiTask)
 !C3_Prog3Bg2Vofs = $003F                 ; 16-bit: BG2VOFS from line 70 (HDMA channel 2)
-!C3_Unk3B = $3B                          ; dp: set, C3Mod_Unk783C sends $7E:1400-$1BFF to VRAM and clears it
 !C3_MosaicTimer = $C3                    ; dp, 8-bit: frames to the next mosaic step
 !C3_MosaicSize = $C4                     ; dp, 8-bit: the mosaic size left
 !C3_MosaicFrames = $14
@@ -744,7 +743,7 @@ endmacro
 !C3_Prog3MapCopy = $1680                 ; ... to $7E:1680
 !C3_Prog3MapBytes = $0580
 !C3_Prog3Tiles = $11                     ; BG12NBA: BG1 and BG2 tiles at VRAM word $1000
-!C3_Prog3Unk7442 = $1C                   ; written over C3Mod_Unk7441's operand
+!C3_Prog3TurnRows = $1C                  ; written over C3Mod_RotateMap's .rows operand (never run in program 3)
 !C3_Prog3Windows = $33                   ; W12SEL: window 1 on BG1 and BG2, inverted
 !C3_Prog3WindowsWipe = $FF               ; ... both windows on both, inverted
 !C3_WipeFadeStep1 = 6                    ; C3Mod_Prog3FadeTask1's step in the wipe run
@@ -786,6 +785,138 @@ endmacro
 !C3_CreditsTile0 = $40                   ; BG tile = character - this (a space made $40 first)
 !C3_CreditsSprTile0 = $21                ; sprite tile = character - this
 !C3_CreditsSprStep = 5                   ; pixels from one sprite character to the next
+; Program 5 (the party whirled into a gate).
+!C3_SprTilesPtr = $E42000                ; 3 B per battle sprite set: long pointer to its tiles
+!C3_SprFramesPtr = $E42300               ; 3 B per set: long pointer to its frames (40 B each)
+!C3_SprAnimFrames = $2600                ; $E4 (DB): 2 B per set: offset of its frame lists ...
+!C3_SprAnimDurs = $2800                  ; ... and of its time lists
+!C3_AnimListEnd = $FF                    ; a frame list's end (restart)
+!WinFx_BuildCircle = $C30077             ; bankC3.asm: a circle's window table (JSL)
+!BitReverseTable = $C0FD00               ; bankC0.asm: each byte's bits reversed (256 B)
+!C3_CharFramePtr = $1B                   ; dp, 3 B: the frame being copied or drawn
+!C3_TileBytes = $0020                    ; a 4bpp tile
+!C3_FrameTileBytes = $0020               ; a frame's 16 tile words, before its X / Y pairs
+!C3_CharRightEdge = $0100                ; C3Mod_CharSprites' CMP (both branches keep X)
+!C3_CharHidden = $9801                   ; ... the X it never reaches
+!C3_CharTileBuf = $1C00                  ; $00: a frame's 16 tiles (C3Mod_LoadCharTiles)
+!C3_CharTileHalf = $0100                 ; 8 tiles' bytes (one DMA)
+!C3_CharTileRow = $0100                  ; VRAM words to the sprite tile row below
+!C3_CharTilesVram = $41                  ; dp, 16-bit: VRAM word of the tiles to send ($FFFF none)
+!C3_CharNoTiles = $FFFF
+!C3_SpinAngle = $A9                      ; dp, 16-bit: the spin's angle
+!C3_CharTries = $AB                      ; dp, 16-bit: records left to try (C3Mod_CharsTask)
+!C3_CharTriesAll = 4
+!C3_CharNext = $AD                       ; dp, 16-bit: the record to try first
+; The four sprite records: 22 bytes each from $51 (dp), these fields
+; indexed by the record's offset (C3_Char0-3).
+!C3_CharRecBytes = $0016
+!C3_Char0 = $0000                        ; party member 1
+!C3_Char1 = $0016                        ; member 2
+!C3_Char2 = $002C                        ; member 3
+!C3_Char3 = $0042                        ; the field's first other object
+!C3_CharEnd = $0058
+!C3_CharFrame = $51                      ; 8-bit: the frame to show
+!C3_CharSet = $52                        ; the battle sprite set (low byte)
+!C3_CharX = $54                          ; 8-bit: screen X
+!C3_CharY = $55                          ; 8-bit: screen Y
+!C3_CharVram = $56                       ; 16-bit: VRAM word of its tiles
+!C3_CharTiles = $58                      ; 16-bit: OAM tile and attribute word
+!C3_CharShown = $5A                      ; 8-bit: the frame whose tiles are loaded
+!C3_CharAngle = $5B                      ; 16-bit: the angle from the centre
+!C3_CharRadius = $5D                     ; 8-bit: the distance from the centre
+!C3_CharAnim = $5E                       ; 8-bit: the animation wanted
+!C3_CharAnimNow = $5F                    ; 8-bit: the animation running
+!C3_CharAnimPtr = $60                    ; 16-bit: $E4 address of the next frame byte
+!C3_CharAnimTime = $62                   ; 8-bit: frames left on this one
+!C3_CharAnimDurPtr = $63                 ; 16-bit: $E4 address of the next time byte
+!C3_CharFacing = $65                     ; 8-bit: the facing wanted (0-3)
+!C3_CharFacingNow = $66                  ; 8-bit: the facing of the running lists
+!C3_CharRadiusMid = $80                  ; C3Mod_RadiusStep moves radii away from it
+!C3_Char0Vram = $0080
+!C3_Char1Vram = $0200
+!C3_Char2Vram = $0280
+!C3_Char3Vram = $1880
+!C3_Char0Tiles = $3A08                   ; tile $008, palette 5, priority 3
+!C3_Char1Tiles = $3C20                   ; tile $020, palette 6
+!C3_Char2Tiles = $3E28                   ; tile $028, palette 7
+!C3_Char3Tiles = $3388                   ; tile $188, palette 1
+!C3_CharAnimInit = $3000                 ; C3_CharAnimPtr before the first restart
+!C3_CharObjSet = $0006                   ; record 3's sprite set
+!C3_CharSetMask = $0007                  ; C3Mod_CharAnimSet's table index
+!C3_FacingRound = $0080                  ; half a quarter turn
+!C3_CharFacingMask = 3
+; The map turned in software (C3Mod_RotateMap).
+!C3_MapSource = $0C00                    ; $00: the field's map copy read
+!C3_MapTurned = $1400                    ; $00: the turned map sent (C3Mod_MapNmiTask)
+!C3_MapBytes = $0800
+!C3_MapReady = $3B                       ; dp: set, C3Mod_MapNmiTask sends C3_MapTurned and clears it
+!C3_MapRowBytes = $0040
+!C3_MapRowWords = $0020
+!C3_MapEntryMask = $07FE
+!C3_Prog5Bg1Map = $6000                  ; VRAM word of BG1's map (BG1SC C3_Prog5Bg1Sc)
+!C3_Prog5Bg2Map = $6800                  ; VRAM word C3_MapSource is sent to first
+!C3_Prog5Bg1Sc = $60
+!C3_TurnRowsDefault = $001B              ; rows turned (C3Mod_RotateMap's .rows)
+!C3_TurnCos = $1F                        ; dp words of the turn (C3Mod_RotateMatrixTask) ...
+!C3_TurnSin = $21
+!C3_TurnNegSin = $23
+!C3_TurnCos2 = $25
+!C3_TurnXUse = $27
+!C3_TurnYUse = $29
+!C3_TurnX2 = $2B
+!C3_TurnY2 = $2D
+!C3_TurnRowY = $2F                       ; ... and of C3Mod_RotateMap's walk
+!C3_TurnRowX = $31
+!C3_TurnColsLeft = $33
+!C3_TurnRowsLeft = $35
+!C3_TurnColX = $37
+!C3_TurnColY = $39
+!C3_TurnScale = $00                      ; page $0A00's vars in program 5: 0 the scale ...
+!C3_TurnX = $02                          ; ... 1 the centre X
+!C3_TurnY = $04                          ; ... 2 the centre Y
+!C3_TurnAngle = $0A                      ; ... 5 the angle
+!C3_Circle2 = $00                        ; page $0B00's vars in program 5: 0 circle 2's radius
+!C3_SpinSpeed = $04                      ; ... 2 the spin's speed
+!C3_Circle1 = $0C                        ; ... 6 circle 1's radius
+!C3_WaveStep = $10                       ; ... 8 the BG3 wave's step
+!C3_CircleR1 = $3D                       ; dp, 16-bit: the radius circle 1 was built with
+!C3_CircleR2 = $3F                       ; ... circle 2's
+!C3_Circle1Table = $F000                 ; $7E: window 1's table (WinFx_BuildCircle)
+!C3_Circle2Table = $F280                 ; $7E: window 2's
+!C3_Bg3Wave = $F500                      ; $7E: 224 BG3 offset words
+!C3_Bg3WaveMove = $01BE
+!C3_Bg3WaveLast = $F6BE
+!C3_Bg3WavePhase = $4F                   ; dp, 16-bit
+!C3_MosaicEvery = $49                    ; dp, 8-bit: frames between mosaic steps
+!C3_MosaicDelay = $4A                    ; dp, 8-bit: frames to the next
+!C3_DriftOn = $004B                      ; 8-bit: C3Mod_PickDrift starts drift scripts
+!C3_MosaicStep = $4C                     ; dp, 8-bit: the mosaic size ($FF random)
+!C3_MosaicLast = $4D                     ; dp, 8-bit
+!C3_MosaicStepMask = 7
+!C3_MosaicRandom = $FF
+!C3_MosaicBg1 = 1
+!C3_MosaicRandomEvery = 3
+!C3_MosaicRandomMask = $30
+!C3_MosaicRandomBase = $20
+!C3_DriftPickMask = $0006
+!C3_Prog5CentreX = $80                   ; the circles' and the spin's centre
+!C3_Prog5CentreY = $70
+!C3_Prog5Fade = $0202                    ; C3_FadeStep and C3_FadeTimer
+!C3_Prog5Math = $42                      ; CGADSUB: half colour math on BG2
+!C3_Prog5W12Sel = $8B
+!C3_Prog5W34Sel = $0C
+!C3_Prog5ObjWindows = $0C                ; WOBJSEL late in the script
+!C3_Prog5HdmaOn = $0F                    ; C3_HdmaEnable: channels 0-3
+!C3_Prog5Screens = $0116                 ; TM BG2, BG3, sprites; TS BG1
+!C3_Prog5Windows = $0117                 ; TMW BG1-3, sprites; TSW BG1
+!C3_Prog5Cycle = $222A                   ; $7E: C3_PaletteBuf's colours $15-$17
+!C3_Prog5CycleOfs = $002A
+!C3_Prog5CycleColour = $15
+!C3_Prog5CycleBytes = $0006
+!C3_Prog5CycleEvery = 7                  ; C3_FrameCount mask: every 8 frames
+!C3_TmpF4 = $F4                          ; 16-bit dp scratch
+!C3_TmpFA = $FA                          ; 16-bit dp scratch
+!BBAD_BG3VOFS = $12                      ; B-bus address of BG3VOFS ($2112)
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
@@ -819,6 +950,13 @@ endmacro
 ; divisor off when it fits (the carry is the quotient bit) and shifts
 ; that bit into C3Math_Lo.
 ; ------------------------------------------------------------
+macro C3ModFlipByte(n)                  ; C3Mod_CopyCharTile: one byte, its pixels reversed
+    LDA.w !Eng_PtrBase+<n>,Y
+    TAX
+    LDA.l !BitReverseTable,X
+    STA.b WMDATA-!DP_PPU
+endmacro
+
 macro C3ModDivStep()                    ; C3Mod_Div16: SEC, then the divisor
     ROL.b !C3Math_A
     ROL A
