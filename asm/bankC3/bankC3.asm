@@ -464,7 +464,9 @@ WinFx_FillEmptyFrom:                    ; header: see WinFx_FillEmpty
 ; One frame of a per-line wipe, run while WinFx_C3EMode is nonzero
 ; (Field_HookWinC3E calls it once a frame through BankC3_Entry000E and
 ; uses the result as HDMA data for window 2, probably one window edge
-; per line). Works on a line array of WinFx_Lines bytes at
+; per line; C6Scene_WipeWinStep calls it the same way and sends the
+; result to window 1's right edge, WH1; the module's C3Mod_Prog3WipeTask
+; to WH2). Works on a line array of WinFx_Lines bytes at
 ; WinFx_C3ETablePtr + WinFx_WipeWorkOfs in bank WinFx_C3ETableBank, and
 ; writes it out each frame through WMDATA to one of two buffers: the
 ; table itself on odd frames, + WinFx_Lines on even ones.
@@ -492,7 +494,8 @@ WinFx_FillEmptyFrom:                    ; header: see WinFx_FillEmpty
 ; ($7E/$7F: STA.l + MVN), the steps read and write with DB =
 ; WinFx_C3ETableBank and WMADDH = it (so it must be $7E or $7F).
 ; Callers (1 JMP site): BankC3_Entry000E ($C3:000E).
-; Callers note: the unpacked module JSLs here directly (from $7E:6844).
+; Callers note: the unpacked module JSLs here directly (from $7E:6844,
+;   C3Mod_Prog3WipeTask, a task: M=0, DB=$00).
 ; Entry: M, X any (P saved; REP #$30 here); DP any and DB any (saved;
 ;        DP_WinFx inside); WinFx_C3EMode, WinFx_C3ETablePtr/TableBank
 ;        set; C3_RandomByte needs DB=$00 or another bank that maps the
@@ -2630,9 +2633,8 @@ C3_SprListLarge:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5111, $7E:5137 and $7E:6629).
 ; Entry: M=0 (the tile and attribute are moved as a word), X=0, DP =
-;        the module's (0 at $7E:5111 and $7E:5137, under a task;
-;        $7E:6629's not traced), DB = $00 or $7E ($00 at those two); X
-;        = the record.
+;        the module's (0 at all three, under a task), DB = $00 or $7E
+;        ($00 at all three); X = the record.
 ; Exit:  P restored; A changed; Y = the new C3_OamPos; X unchanged.
 C3_SprOneSmall:
     PHP
