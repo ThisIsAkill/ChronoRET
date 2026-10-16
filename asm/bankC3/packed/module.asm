@@ -10565,9 +10565,10 @@ C3Mod_Credits5Roles:
 ; C3Mod_CopyCharTile 16 times (15 JSRs, then it falls in).
 ; Callers note: C3Mod_CharsTask ($774D).
 ; Entry: M=0 (8-bit set for the bank bytes), X=0 (16-bit X and Y), DP=0
-;        (C3_CharFramePtr is direct page), DB any (the table reads and
-;        the patches are long); X = the set x 3, A = the frame x 40, Y = the
-;        tiles' address ($1C00).
+;        (C3_CharFramePtr is direct page), DB=$00 (the STZ to WMADDH
+;        and STY to WMADDL are absolute; C3Mod_CharsTask's DB; the table
+;        reads and the patches are long); X = the set x 3, A = the frame
+;        x 40, Y = the tiles' address ($1C00).
 ; Exit:  as the last C3Mod_CopyCharTile: M=0, X=0, DP=0, DB=$00; Y past
 ;        the 16 tiles ($1E00).
 ; Calls: C3Mod_CopyCharTile.
@@ -10620,11 +10621,16 @@ C3Mod_LoadCharTiles:
 ; Callers note: C3Mod_LoadCharTiles ($6E71, $6E74, $6E77, $6E7A, $6E7D,
 ;   $6E80, $6E83, $6E86, $6E89, $6E8C, $6E8F, $6E92, $6E95, $6E98, $6E9B;
 ;   the 16th falls in).
-; Entry: M=0, X=0, DP=0 (C3_CharFramePtr), DB any; Y = the destination
-;        ($00 bank), WMADD = Y (bank $7E); the operands patched.
-; Exit:  M=0, X=0, DP=0, DB=$00; Y = WMADD = the destination + 32; A, X
-;        changed (unflipped: A = $FFFF, X past the source; flipped: A =
-;        Y, X = the last byte read).
+; Entry: M=0, X=0, DP=0 (C3_CharFramePtr), DB=$00 (the flipped path's
+;        STY to WMADDL is absolute; C3Mod_LoadCharTiles' DB, and $00
+;        after each tile); Y = the destination ($00 bank); WMADDH = 0
+;        (bank $7E); the operands patched. WMADDL/M need not hold Y:
+;        only the flipped path uses WMADD, and it sets it from Y first.
+; Exit:  M=0, X=0, DP=0, DB=$00; Y = the destination + 32; WMADD = Y
+;        after a flipped tile, but left where it was after an unflipped
+;        one (the MVN moves Y only; harmless, as above); A, X changed
+;        (unflipped: A = $FFFF, X past the source; flipped: A = Y, X =
+;        the last byte read).
 C3Mod_CopyCharTile:
     LDA.b [!C3_CharFramePtr]
     INC.b !C3_CharFramePtr
@@ -10949,8 +10955,8 @@ C3Mod_Prog5Drift:
 ;   (C3Mod_Prog5ScriptB), removed by $F9 at $71DC.
 ; Entry: a task: M=0 (8-bit set here), X any, DP=0 (the bytes are
 ;        direct page), DB any.
-; Exit:  M=1; A = the new step, or the delay's value from the DEC (not
-;        0: A as on entry); X, Y unchanged.
+; Exit:  M=1; A = the new step when the delay reached 0, else A as on
+;        entry (the DEC is on memory); X, Y unchanged.
 C3Mod_MosaicTimerTask:
     SEP #$20
     DEC.b !C3_MosaicDelay
@@ -11195,9 +11201,19 @@ C3Mod_RadiusStep:
 ; there and WinFx_BuildCircle (mode 0: TDC with DP = 0, a full circle,
 ; the rest of the table emptied) draws it at WinFx_ArgX / ArgY
 ; ($80, $70) into C3_Circle1Table ($7E:F000; WinFx_ArgSize from a
-; 16-bit store, so WinFx_ArgSizeHi = the radius's high byte); then var
-; 0 (C3_Circle2) against C3_CircleR2 the same way, into
-; C3_Circle2Table ($7E:F280).
+; 16-bit store, which also writes the radius's high byte to
+; WinFx_ArgSizeHi; WinFx_BuildCircle zeroes that byte at once, so only
+; the low byte counts); then var 0 (C3_Circle2) against C3_CircleR2
+; the same way, into C3_Circle2Table ($7E:F280).
+; Circle 1 overruns its table: C3Mod_Prog5ScriptB sets its radius to
+; $88 around line $70, and WinFx_BuildCircle does not limit its rows,
+; so (even table address: the top row is Yc - r - 1) rows -25 to -1
+; are written before the table, 50 bytes at $7E:EFCE-$EFFF, and the
+; mirror (mode 0, r + 1 rows from $70) writes rows $E0-$F8 past its
+; 224 lines, 50 bytes at $7E:F1C0-$F1F1 (below C3_Circle2Table at
+; $F280; no lower fill, Yc + r being past line $DF). No program 5 code
+; uses either range; what the field keeps at $7E:EFCE is not traced.
+; Circle 2 (radius 0 to 96) stays inside its table.
 ; Callers note: a task added by script opcode $FA at $715D
 ;   (C3Mod_Prog5Script).
 ; Entry: a task: M=0, X=0 (the 16-bit table address), DP=0 (C3_CircleR1
@@ -11354,8 +11370,10 @@ C3Mod_Bg3WaveTask:
 ;     with c's sign put back (PLP / BPL: bit 15 of c; EOR / INC);
 ;   - the same with C3Mod_Sine (-sin): C3_TurnSin, and C3_TurnNegSin =
 ;     -C3_TurnSin;
-;   - C3_TurnX = C3_TurnX2 = var 1, C3_TurnY = C3_TurnY2 = var 2 (the
-;     second copies are not read in this program).
+;   - C3_TurnXUse = C3_TurnX2 = var 1 (C3_TurnX, the offset read),
+;     C3_TurnYUse = C3_TurnY2 = var 2 (C3_TurnY); C3Mod_RotateMap reads
+;     the *Use words, and nothing in this program reads C3_TurnX2 /
+;     C3_TurnY2.
 ; Program 3 adds it too (C3Mod_Prog3Start), where nothing reads what
 ; it writes.
 ; Callers note: a task added by script opcode $FA at $698A
@@ -11451,14 +11469,16 @@ C3Mod_RotateMatrixTask:
 ;     + x's high byte + C) AND $7FE (even: words) goes to the next word
 ;     of C3_MapTurned ($1400 on, Y + 2);
 ;   - C3_MapReady + 1 (16-bit INC): C3Mod_MapNmiTask sends the map.
-; Quirk: no CLC before any of the six ADCs; each takes the carry out of
-; the add before it (the row's first from the last ASL of y0 or, after
-; the first row, the last column's map add), so a coordinate can be
-; one more. The rows after the 27th keep Map_BufC800's copy.
+; Quirk: no CLC before five ADCs (.row_y $749D, .row_x $74A6, .col_y
+; $74AF, .col_x $74BA and the ADC of RDMPYL at $74C3); each takes the
+; carry out of the add before it (the row's first from the last ASL of
+; y0 or, after the first row, the last column's map add), so a
+; coordinate or map offset can be one more. The rows after the 27th keep Map_BufC800's copy.
 ; Callers note: the patched JSR at $3023 (C3Mod_Start's idle call,
 ;   written by C3Mod_Prog5 at $70D7).
 ; Entry: M=0, X=0 (16-bit indexes), DP=0 (the C3_Turn* words), DB=$00
-;        (the map, the multiplier and its own operands are absolute), as
+;        (the map and the multiplier are absolute; the operand patches
+;        are long STA.l), as
 ;        C3Mod_Start's loop runs (C3_ModuleFrame's DP and DB, REP #$20).
 ; Exit:  M=0, X=0; A = the last entry, X its offset, Y = C3_MapTurned +
 ;        the rows x $40; C3_TurnRow*, C3_TurnCol* and C3_TurnLeft/Rows
