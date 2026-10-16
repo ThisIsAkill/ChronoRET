@@ -953,8 +953,8 @@ endmacro
 !C3_Prog6Ramp = $E000                    ; $7E: 32 COLDATA bytes $E0-$FF
 !C3_Prog6RampDown = $E030                ; $7E: 32 COLDATA bytes $00, $FF-$E1
 !C3_Prog6RampBytes = $0020
-!C3_Prog6SprTiles = $4400                ; VRAM word of pack 38 (sprite tiles)
-!C3_Prog6Bg1Tiles = $5000                ; VRAM word of pack 41
+!C3_Prog6SprTiles = $4400                ; VRAM word of pack 38: sprite tiles $40-$8F, BG1's $90-$FF
+!C3_Prog6SprPage2 = $5000                ; VRAM word of pack 41: the sprites' second tile page
 !C3_Prog6Bg1Map = $6000                  ; VRAM word of BG1's map
 !C3_Prog6MapRows = $0007
 !C3_Prog6MapHalf = $10                   ; tiles a half row (16)

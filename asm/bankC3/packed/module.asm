@@ -890,7 +890,9 @@ C3Mod_SquareRoot:
 ; C3Mod_Prog6WindowA) and the $FF as COLDATA (white:
 ; C3Mod_Prog6ColourB), the $00 at $350B as CGADSUB (C3Mod_Prog6MathB)
 ; and the one at $350C as COLDATA (no colour: C3Mod_Prog6ColourA);
-; C3Mod_Prog3Bg2Vofs reads the zero word at $350B as BG2VOFS. Nothing
+; C3Mod_Prog3Bg2Vofs reads the zero word at $350B as BG2VOFS, and the
+; HDMA table entry at $905D (1 line from $350B; code not matched yet)
+; names it too. Nothing
 ; reads the $FF at $350D.
 C3Mod_FillBytes:
     db $FF, $00, $00, $FF
@@ -1623,8 +1625,8 @@ C3Mod_CallW:
 ; Callers note: JSR from C3Mod_Prog6PalIn ($8319) and C3Mod_Prog6PalOut
 ;   ($8355); a task added by the scripts' opcode $FA at $5B0B
 ;   (C3Mod_Prog2Script), $6396 (C3Mod_Prog7Start), $6993
-;   (C3Mod_Prog3Start), $7D04 and $7EB3 (C3Mod_Prog6ScriptB), $9334 and
-;   $93E9 (removed again by $F9 at $7D0C, C3Mod_Prog6ScriptB).
+;   (C3Mod_Prog3Start), $7D04 and $7EB3 (C3Mod_Prog6ScriptB; the first
+;   removed again by $F9 at $7D0C), $9334 and $93E9.
 ; Entry: a task: M=0 (8-bit set here), X=0, DP=0 (C3_ScratchF0 is
 ;        direct page), DB = $00 (the registers are absolute). The JSRs
 ;        from C3Mod_Prog6PalIn / PalOut come with DP = $0B00 and DB =
@@ -12432,8 +12434,12 @@ C3Mod_Prog5PalNmiTask:
 ;     C3Mod_CopyRawPack with C3_RowCount = $20 at DP = 0, M=0); colour
 ;     0 = $6F69; C3Mod_CommitPalette; FdVec_FFEE (PalAnim_StopAll);
 ;   - C3Mod_Prog6Setup (the WRAM tables; pack 38, $1800 bytes, to
-;     VRAM word $4400, sprite tiles with OBSEL $02, and pack 41, $C00
-;     bytes, to $5000, BG1's mode-1 tiles with BG12NBA $04; BG1's
+;     VRAM word $4400 ($4400-$4FFF: sprite tiles $40-$8F with OBSEL
+;     $02, and BG1's tiles $90-$FF, at $4900-$4FFF with BG12NBA $04:
+;     pack 39's attribute bytes all have bits 0-1 clear, so the map
+;     uses only those), and pack 41, $C00 bytes, to $5000 (the sprites'
+;     second tile page, which C3Mod_Prog6Frames' attribute $29 uses);
+;     BG1's
 ;     mode-1 map; $7F:0200-$09FF filled; it leaves DP =
 ;     DP_DMA, which the calls up to C3_BuildCopyCode accept); pack 40
 ;     to $7F:0A00 (C3Mod_Prog6ScaleIdle's source bitmap);
@@ -12681,8 +12687,10 @@ C3Mod_Prog6HalfNmi:
 ;     (COLDATA values: $E0-$FF all three colours at 0-31; $00 selects
 ;     no colour and changes nothing);
 ;   - DP = 0: C3Mod_DestBitmapSrc; VMAIN = $80; pack 38 to VRAM word
-;     $4400 and pack 41 to $5000 (C3Mod_DmaUnpacked with C3_DmaMode =
-;     1, two registers, C3_DmaBbad = VMDATAL); pack 39 to $7F:0200,
+;     $4400 (C3_Prog6SprTiles: sprite tiles $40-$8F and BG1's tiles
+;     $90-$FF) and pack 41 to $5000 (C3_Prog6SprPage2: the sprites'
+;     second tile page with OBSEL $02) (C3Mod_DmaUnpacked with
+;     C3_DmaMode = 1, two registers, C3_DmaBbad = VMDATAL); pack 39 to $7F:0200,
 ;     then BG1's map from VRAM word $6000: 7 rows of 32 words, each a
 ;     tile number from C3_TmpF0 (8-bit: $90 at first) and the next byte
 ;     of pack 39 (WMDATA from $7F:0200; WMADDH = 1 since the unpack)
@@ -12776,7 +12784,7 @@ C3Mod_Prog6Setup:
     JSL C3Mod_DmaUnpacked
     LDX.w #41*!C3_PackPtrBytes
     JSR C3Mod_UnpackPack
-    LDX.w #!C3_Prog6Bg1Tiles
+    LDX.w #!C3_Prog6SprPage2
     STX.w VMADDL
     JSL C3Mod_DmaUnpacked
     LDX.w #39*!C3_PackPtrBytes
@@ -12998,9 +13006,15 @@ C3Mod_Prog6ModeB:
 ; and $FF - C3_Prog6Horizon there), the mode-1 strip under the plane.
 ; .strip's first byte is also the table's end: it is $00 only while
 ; page $0B00's var 1 is 0 (C3Mod_Prog6StripNmi writes $100 - var 1
-; there), and var 1 is 0 whenever C3Mod_Prog6StripNmi runs (the
-; script sets it to 0 before each $F8 that adds it and changes it only
-; after the $F7 that removes it).
+; there), and var 1 is 0 whenever C3Mod_Prog6StripNmi runs: the first
+; $F8 ($7C85) is in page $0A00's script, run before page $0B00's, so
+; var 1 is still C3Mod_Init's 0 (C3Mod_Prog6ScriptB's own var 1 = 0 at
+; $7CF6 comes after); C3Mod_Prog6ScriptB sets var 1 = $E0 at $7D17,
+; but removes the task ($F7 at $7D23) in the same run, with no yield
+; between, so no NMI comes between; it sets var 1 = 0 at $7DCD and
+; $7E87 before the next two $F8 ($7DD9, $7E93; no yield between
+; either), and changes it again only after the $F7 at $7DEC ($7DFD;
+; nothing after $7E93).
 C3Mod_Prog6ScrollB:
     db 84 : dw !C3_ScriptPageA+!C3_Prog6ScrollX
     db 83 : dw !C3_ScriptPageA+!C3_Prog6ScrollX
