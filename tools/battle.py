@@ -28,7 +28,11 @@ the subscript table (BattleRom_ActSubscripts) that point into them:
       stay   the pointer unchanged (a wait, or the end of the thread);
       call   the pointer set from the subscript table by an operand, with
              the place after the operands kept as the return address;
-      end    the pointer taken from RAM no script byte sets (a return).
+      end    the pointer taken from RAM no script byte sets (a return);
+      stale  the pointer moved by a count from RAM this opcode did not leave
+             ($98/$99 in the target-set thread, $18 in the target-set and
+             object threads): not followed, no return.
+    Opcode $80 with a count of 0 (256 bytes copied, advance 1) is refused.
     A handler that waits (the pointer unchanged) is run for a second frame
     from the state the first left (the movers $10-$18 and $98-$9D keep
     their length in RAM):
@@ -210,7 +214,22 @@ def ai_names(root: Path = ROOT) -> tuple[list[str], list[str]]:
 # ── The action interpreter, from the source ────────────────────────────────
 
 class Op:
-    __slots__ = ('off', 'op', 'length', 'fixed', 'next', 'stay', 'end', 'call', 'halt', 'inside')
+    __slots__ = ('off', 'op', 'length', 'fixed', 'next', 'stay', 'end', 'stale', 'call', 'halt', 'inside')
+
+
+STALE = 0x1000000      # a mark kept in a path's memory (no address): it advanced by an unknown count
+
+
+class _Machine(absint.Machine):
+    """absint's machine, marking a path that enters BattleAct_AdvanceScript
+    with an unknown count (A, 16-bit there): the pointer moves by a length
+    from RAM, which is not a return."""
+    advance: int | None = None
+
+    def step(self, s, base_depth):
+        if s.pc == self.advance and (s.a is None or s.b is None):
+            s.mem[STALE] = 1
+        return super().step(s, base_depth)
 
 
 class ActInterp:
@@ -231,7 +250,8 @@ class ActInterp:
         self.ram = {k: 0x7E0000 | d[k] for k in ('Battle_ActScriptPtr', 'Battle_ActNextOp', 'Battle_ActOpcode',
                                                  'Battle_ActThread', 'Battle_ActThreadOfs', 'Battle_ActObjThread')}
         self.first_obj = d['Battle_ActFirstObjThread']
-        self.machine = absint.Machine(self.image, self.mask, max_steps=5000000, callee_steps=200000)
+        self.machine = _Machine(self.image, self.mask, max_steps=5000000, callee_steps=200000)
+        self.machine.advance = self.labels.get('BattleAct_AdvanceScript')
         self.cache: dict[int, dict[tuple, dict[tuple, dict]]] = {}
         self.dirty = False
 
@@ -245,6 +265,7 @@ class ActInterp:
         s.sp, s.spt = [], []
         s.mem = dict(mem) if mem is not None else {}
         s.memt = dict(memt) if memt is not None else {}
+        s.mem.pop(STALE, None)
         p = self.ram['Battle_ActScriptPtr']
         # $E9 is only the high byte of AdvanceScript's 16-bit add to the bank
         # byte: the pointer's three bytes do not depend on it
@@ -331,7 +352,7 @@ class ActInterp:
                         continue
                     new, t = pointer(st)
                     if new is None:
-                        outs.add(('unknown', frame, bool(m.opaque)))
+                        outs.add(('unknown', frame, bool(m.opaque), STALE in st.mem))
                         continue
                     d = new - ptr
                     # (a call's target is kept as an address: it comes from the
@@ -340,7 +361,7 @@ class ActInterp:
                     outs.add(('pos', d, bool(t), tuple(sorted(a - ptr for a in t)), frame, ret,
                               new if ret is not None else None))
                     if d == 0 and not t and frame == 1:
-                        key = hash(tuple(sorted(st.mem.items())))
+                        key = hash(tuple(sorted((k, v) for k, v in st.mem.items() if k != STALE)))
                         if key not in seen:
                             seen.add(key)
                             stays.append(self._entry(op, ptr, thread, st.mem, st.memt))
@@ -414,7 +435,7 @@ def classify(interp: ActInterp, known: dict[int, int], ptr: int, kind: str) -> O
     docstring); raises BattleError when the handler cannot be followed."""
     o = Op()
     o.off, o.op = ptr, known[ptr]
-    o.next = o.stay = o.end = o.halt = False
+    o.next = o.stay = o.end = o.stale = o.halt = False
     o.call, o.inside = None, []
     if o.op >= interp.count:
         o.length, o.halt, o.fixed = 1, True, True
@@ -456,7 +477,13 @@ def classify(interp: ActInterp, known: dict[int, int], ptr: int, kind: str) -> O
     o.call = calls[0][0] if calls else None
     # a pointer from RAM no script byte set: a return (when no second
     # frame showed it to be the resume of a wait)
-    o.end = any(x[0] == 'unknown' for x in res['outs']) and not any(x[4] == 2 for x in poss)
+    # (a pointer moved by a count from RAM that this opcode did not leave, as
+    # the movers do in the target-set thread with the length of an earlier
+    # one, is 'stale': no return either)
+    unknown = [x for x in res['outs'] if x[0] == 'unknown']
+    resumed = any(x[4] == 2 for x in poss)
+    o.end = any(not (len(x) > 3 and x[3]) for x in unknown) and not resumed
+    o.stale = any(len(x) > 3 and x[3] for x in unknown) and not resumed
     return o
 
 
@@ -522,8 +549,8 @@ def disassemble_actions(interp: ActInterp, pieces: list[Piece], banks: dict[str,
         entries[p.label] = es
     # A table entry is a script when what it points at reads as a header
     # whose thread offsets all lie in the scripts; an entry that does not
-    # (unused numbers, which point at code or past the scripts) is kept as
-    # its word, and nothing is decoded from it.
+    # (unused numbers: past every script region, or at thread code other
+    # headers share) is kept as its word, and nothing is decoded from it.
     not_headers = set()
     for h in sorted(headers):
         threads = None
@@ -593,7 +620,7 @@ def disassemble_actions(interp: ActInterp, pieces: list[Piece], banks: dict[str,
                 m = ops[a]
                 if o.fixed and not m.fixed:
                     m.length, m.fixed = o.length, True
-                m.stay, m.end = m.stay or o.stay, m.end or o.end
+                m.stay, m.end, m.stale = m.stay or o.stay, m.end or o.end, m.stale or o.stale
                 if o.call is None:
                     m.next = m.next or o.next
                 elif m.call is None:

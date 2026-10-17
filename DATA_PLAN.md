@@ -439,13 +439,18 @@ counts them as "battle", never as source.
   598 B no opcode reaches. Behaviour scripts: 256 entries, 2,924 records and delimiters; 50 B are
   kept as bytes (below).
 - **Not pinned down:** 77 table entries name no script: `BattleRom_EnemyTechScripts` 194-255 point
-  at `$CD:EE23`, past the scripts (the palette-step records), and `BattleRom_EnemyAttackScripts`
-  145-159 at `$CD:95C4`, code inside another script; they stay words. Enemy 127's script
+  at `$CD:EE23`, past every script region (the palette-step records), and
+  `BattleRom_EnemyAttackScripts` 145-159 at `$CD:95C4`, which is thread code other scripts'
+  headers share, not a header; they stay words. Enemy 127's script
   (`$CC:A3E0`, 50 B) is kept as bytes: its main part's blocks run past the first `$FF`, where
   `BattleAi_FindReactPart` starts the reaction part, so the two readers split it differently.
   One PC tech thread runs on, after its last subscript returns, into the next script's header
-  (`$CE:30A3`); it is not followed there. In the target-set thread the movers advance by a length
-  an earlier opcode left in RAM: there they count as an end. Opcode `$26` in an object thread
+  (`$CE:30A3`); it is not followed there. The arcs `$98`/`$99` in the target-set thread and the
+  path move `$18` in the target-set and object threads advance by a stale length an earlier
+  opcode left in RAM (`!Battle_ActThreadOpLen`, `!Battle_ActThreadPathLen`; the handlers'
+  headers say so): classed "stale", not followed and not counted as returns.
+  Opcode `$80` with a count of 0 (it copies 256 bytes and advances 1) is not modelled: the
+  interpreter refuses it; no script has one. Opcode `$26` in an object thread
   runs its third byte as the next opcode (two `@inner` lines). The table extents are the survey's
   (several inferred); every entry in them decodes as a header, `$FFFF` or one of the words above.
   The layer-effect channel scripts (`BattleRom_FxScriptPtrs`, `$D1:646C`, 15,815 B) are a third

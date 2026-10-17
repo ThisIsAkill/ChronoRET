@@ -176,6 +176,43 @@ class Actions(unittest.TestCase):
     def test_size_kept(self):
         self.refused('@bytes 11 22 33 44 55', '@bytes 11 22 33 44', 'is not 32 bytes')
 
+    def test_unreached_opcode_line_refused(self):
+        self.refused('@bytes 11 22 33 44 55 00', '    Op11_Stub $22 $33 $44 $55\n@bytes 00',
+                     'no thread reaches this Op11_Stub')
+
+    def test_header_no_entry_names_refused(self):
+        self.refused('@bytes 11 22 33 44 55 00', '    @threads $0000 $0000\n@bytes 55 00',
+                     'must be the header a table entry names')
+
+    def test_thread_in_another_bank_refused(self):
+        self.refused('L_CD1008 L_CD1012', 'L_CD1008 L_CE0400', 'in another bank')
+
+    # (@bytes right after an opcode that goes on: the opcode after it is
+    # reached and not a line, which is refused first, as
+    # test_bytes_after_an_opcode_that_goes_on_refused shows)
+
+    def test_count_zero_refused(self):
+        # opcode $80 with a count of 0 copies 256 bytes and advances 1
+        # (BattleAct_OpRunVecCD001B's quirk): not in the data, and refused
+        class Zero(Stub):
+            def run(self, known, ptr, kind):
+                if known[ptr] == 0x80 and known[ptr + 1] & 0x0F == 0:
+                    return {'reads': list(range(1, 257)), 'control': [1], 'opaque': [],
+                            'outs': [('pos', 1, True, (1,), 1, None, None)]}
+                return super().run(known, ptr, kind)
+        known = {0xCD1000: 0x80, 0xCD1001: 0x00}
+        with self.assertRaisesRegex(battle.BattleError, 'neither past its operands'):
+            battle.classify(Zero(), known, 0xCD1000, 'battler')
+
+    def test_stale_length_is_not_a_return(self):
+        class Movers(Stub):
+            def run(self, known, ptr, kind):
+                stale = known[ptr] == 0x99
+                return {'reads': [], 'control': [], 'opaque': [], 'outs': [('unknown', 1, False, stale)]}
+        for op, end, stale in ((0x99, False, True), (0x1F, True, False)):
+            o = battle.classify(Movers(), {0xCD1000: op}, 0xCD1000, 'set')
+            self.assertEqual((o.end, o.stale, o.next), (end, stale, False))
+
     def test_trace_file_tampered_refused(self):
         interp = battle.ActInterp.__new__(battle.ActInterp)
         interp.code_key = 'test'
@@ -272,6 +309,9 @@ class Behaviour(unittest.TestCase):
     def test_unreached_line_refused(self):
         # the data after the stop code written as a record: no reader reads it
         self.refused('@bytes 80 12 34', '@bytes 80\n    act Act0E $34', 'no script reaches')
+
+    def test_entry_without_label_refused(self):
+        self.refused('@enemy 3 A_8D08', '@enemy 3 A_NONE', 'no label A_NONE')
 
     def test_operand_delimiter_refused(self):
         # a $FE in a test's operands: the readers' scan stops there
