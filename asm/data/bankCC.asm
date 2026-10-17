@@ -8,9 +8,10 @@
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
-; their disassembly first), or text or records it encodes into
-; build/text/ and build/records/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; their disassembly first), text or records it encodes into
+; build/text/ and build/records/, or battle scripts it assembles
+; into build/battle/ (symbols/data_assets.csv lists them; nothing
+; here is ROM data).
 ; ============================================================
 
 ; $CC:0000-$CC:05CB (1,484 B), table, confirmed: character records for a new game ($280 B), then
@@ -406,7 +407,7 @@ BattleRom_EnemyEffectRecB:
 ; Read by BattleAi_FindReactPart, BattleAi_RunMainPart.
 org $CC8B08
 BattleRom_AiScriptPtrs:
-    incbin "../../build/assets/battle_script/BattleRom_AiScriptPtrs.bin"
+    incbin "../../build/battle/BattleRom_AiScriptPtrs.bin"          ; battle scripts: enemy/enemy
 
 ; $CC:CBC9-$CC:CD8E (454 B), text, confirmed: 227 u16 string pointers (bank $CC) to the strings
 ; at $CC:CD90

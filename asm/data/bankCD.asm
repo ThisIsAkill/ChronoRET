@@ -8,9 +8,10 @@
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
-; their disassembly first), or text or records it encodes into
-; build/text/ and build/records/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; their disassembly first), text or records it encodes into
+; build/text/ and build/records/, or battle scripts it assembles
+; into build/battle/ (symbols/data_assets.csv lists them; nothing
+; here is ROM data).
 ; ============================================================
 
 ; $CD:4000-$CD:4014 (21 B), table, confirmed: 21 B: PC attack script header
@@ -86,35 +87,35 @@ Padding_CD5E02:
 ; Read by BattleAct_LoadAttack.
 org $CD5EC6
 BattleRom_PcAttackScripts:
-    incbin "../../build/assets/battle_script/BattleRom_PcAttackScripts.bin"
+    incbin "../../build/battle/BattleRom_PcAttackScripts.bin"          ; battle scripts: actions/table
 
 ; $CD:5EF0-$CD:5FEF (256 B), battle_script, confirmed: u16 per script number: offset in bank $CE
 ; ($FFFF none)
 ; Read by BattleAct_LoadTech.
 org $CD5EF0
 BattleRom_PcTechScripts:
-    incbin "../../build/assets/battle_script/BattleRom_PcTechScripts.bin"
+    incbin "../../build/battle/BattleRom_PcTechScripts.bin"          ; battle scripts: actions/table
 
 ; $CD:5FF0-$CD:61EF (512 B), battle_script, confirmed: u16 per script number (256): offset in
 ; bank $CD ($FFFF none)
 ; Read by BattleAct_LoadAttack.
 org $CD5FF0
 BattleRom_EnemyAttackScripts:
-    incbin "../../build/assets/battle_script/BattleRom_EnemyAttackScripts.bin"
+    incbin "../../build/battle/BattleRom_EnemyAttackScripts.bin"          ; battle scripts: actions/table
 
 ; $CD:61F0-$CD:63EF (512 B), battle_script, confirmed: u16 per script number: offset in bank $CD
 ; ($FFFF none)
 ; Read by BattleAct_LoadTech.
 org $CD61F0
 BattleRom_EnemyTechScripts:
-    incbin "../../build/assets/battle_script/BattleRom_EnemyTechScripts.bin"
+    incbin "../../build/battle/BattleRom_EnemyTechScripts.bin"          ; battle scripts: actions/table
 
 ; $CD:63F0-$CD:64AF (192 B), battle_script, confirmed: u16 per script number (96): offset in
 ; bank $CE ($FFFF none)
 ; Read by BattleAct_LoadKind3.
 org $CD63F0
 BattleRom_Kind3Scripts:
-    incbin "../../build/assets/battle_script/BattleRom_Kind3Scripts.bin"
+    incbin "../../build/battle/BattleRom_Kind3Scripts.bin"          ; battle scripts: actions/table
 
 ; $CD:64B0-$CD:656D (190 B), table, confirmed: u16 per !Battle_ActObjIdx: object-record offset
 ; in bank $CE
@@ -190,13 +191,13 @@ BattleRom_PcAttackSfxB:
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
 org $CD6E0C
 BattleScript_CD6E0C:
-    incbin "../../build/assets/battle_script/BattleScript_CD6E0C.bin"
+    incbin "../../build/battle/BattleScript_CD6E0C.bin"          ; battle scripts: actions/scripts
 
 ; $CD:96FA-$CD:EE22 (22,313 B), battle_script, confirmed: action scripts
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
 org $CD96FA
 BattleScript_CD96FA:
-    incbin "../../build/assets/battle_script/BattleScript_CD96FA.bin"
+    incbin "../../build/battle/BattleScript_CD96FA.bin"          ; battle scripts: actions/scripts
 
 ; $CD:EE23-$CD:F187 (869 B), table, confirmed: palette-step records
 ; Read by BattleAct_LoadAttack, BattleAct_LoadTech, BattleAct_LoadKind3.

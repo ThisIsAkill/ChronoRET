@@ -195,7 +195,7 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$CC:FBC8': (_f('SlotA', 'SlotB'), PC_SLOTS),             # BattleRom_PcPartners: per PC slot
     '$CC:FC1E': (_f('Offset', t='u16'), 7),                   # BattleRom_CharRecOffset: character ids 0-6
     '$CD:6A2C': (_f('PalStep', t='ptr16:CD'), 256),           # BattleRom_EnemyActPals: 256 palette indexes
-    '$CE:0000': (_f('Subscript', t='ptr16:CE'), 128),         # BattleRom_ActSubscripts: 128 subscripts
+    # ($CE:0000, BattleRom_ActSubscripts, is in tools/battle.py's actions unit)
     '$CE:EFEA': (_f('Step'), 8),                              # BattleRom_DissolvePhaseStep: patterns 0-7
     '$CE:EFF2': (_f('Vram', t='u16'), 4),                     # BattleRom_FxTileVram: tile sets 0-3
     '$CE:EFFA': (_f('Byte0'), 2),                             # BattleRom_FxRecByte0: colour-math cases 0/1
