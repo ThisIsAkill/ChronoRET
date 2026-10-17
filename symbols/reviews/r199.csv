@@ -1,0 +1,6 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:350A,C3Mod_FillBytes,2026-10-09,rev199a,approved,2083778bc500,"New $905D note checked: bytes 01 0B 35 there are a 1-line HDMA entry from $350B; no reference to $350D; rest as approved in r198."
+$7E:37FA,C3Mod_PalAnimTask,2026-10-09,rev199a,approved,fa7eaca9d8ab,"Callers note now ties the $F9 at $7D0C to the $7D04 add; all 10 refs ($5B0B..$93E9, JSRs $8319/$8355) rechecked; DB $00 claim true."
+$7E:78DD,C3Mod_Prog6,2026-10-09,rev199a,approved,b9dbc7c9fa50,"Unpacked packs 38 ($1800), 39, 41 ($C00): pack 39 attrs bits 0-1 clear, so BG1 tiles $90-$FF at $4900-$4FFF in pack 38; OBSEL $02 page 2 at $5000 holds Frames tiles (attr $29)."
+$7E:7A68,C3Mod_Prog6Setup,2026-10-09,rev199a,approved,a2bdf8ab07cd,"LDX #!C3_Prog6SprPage2 ($5000) for pack 41 and the header text now match the VRAM layout (OBSEL $02, BG12NBA $04, map attrs); old define gone; MPYL note as approved."
+$7E:7C4C,C3Mod_Prog6ScrollB,2026-10-09,rev199a,approved,c54331ab0f79,"Opcodes at $7C85/$7DD9/$7E93 (F8 58 7F), $7D23/$7DEC (F7), var 1 sets at $7CF6, $7D17, $7DCD, $7E87, $7DFD checked in module bytes; no yield in each cited span."

@@ -7,8 +7,6 @@
 
 ; The programs of C3Mod_ProgramTable, by entry number (what each one is
 ; has not been traced).
-%C3ModOrg($7E78DD)
-C3Mod_Prog6:
 %C3ModOrg($7E8538)
 C3Mod_Prog10:
 %C3ModOrg($7E8E95)
