@@ -10628,8 +10628,8 @@ FdVec_FFEB:
 ; JMP to PalAnim_StopAll.
 ; Callers note: no caller in ROM as such; the unpacked $C3 module JSLs
 ;   it (from $7E:5AA1 in C3Mod_Prog2, $7E:62FD in C3Mod_Prog7,
-;   $7E:6808 in C3Mod_Prog3 and $7E:7972 in C3Mod_Prog6, all with M=1,
-;   and $7E:86F2 and $7E:8EC1, module code not matched yet). The
+;   $7E:6808 in C3Mod_Prog3, $7E:7972 in C3Mod_Prog6, $7E:86F2 in
+;   C3Mod_Prog10 and $7E:8EC1 in C3Mod_Prog13, all with M=1). The
 ;   JSL $FD:FFEE bytes at $C3:4D46 are inside BankC3_PackedModule: a
 ;   literal of the packed stream ($7E:7972's call, with the JSR $38AF
 ;   before it), not code.
