@@ -30,6 +30,8 @@ assets, with no copy of the original.
      in build/scene/ (step 3 packs them), every `fx` piece from
      build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
      tools/scripts.py, every line checked against the handlers.
+  6c. The graphics: every `graphics` piece is encoded from its PNG and
+     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/.
   6b. The battle scripts: every unit of `battle` pieces is assembled from
      its readable file (build/assets/battle/<unit>.bscr) with
      tools/battle.py, every line checked against the readers, to
@@ -234,6 +236,32 @@ def build_scripts(root: Path = ROOT) -> int:
     return written
 
 
+def build_graphics(root: Path = ROOT) -> int:
+    """Encode every `graphics` piece from its PNG and sidecar
+    (build/assets/gfx/, tools/graphics.py) to build/gfx/<label>.bin;
+    returns how many files were written. A PNG that is not what the
+    format can hold fails the build."""
+    import graphics
+    root = Path(root)
+    written = 0
+    for p in extract_data.read_manifest():
+        if p['piece'] != 'graphics':
+            continue
+        src = root / extract_data.ASSETS / p['asset']
+        side = root / extract_data.ASSETS / graphics.sidecar_path(p['asset'])
+        try:
+            data = graphics.encode_piece(p, src.read_bytes(), side.read_text())
+        except (OSError, graphics.GraphicsError) as e:
+            raise BuildError(f'graphics: {e}') from None
+        out_dir = root / extract_data.GFX_OUT
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f'{p["label"]}.bin'
+        if not path.exists() or path.read_bytes() != data:
+            c3pack._write(path, data)
+            written += 1
+    return written
+
+
 def build_battle(root: Path = ROOT) -> int:
     """Assemble every battle script unit (see the docstring); returns how
     many files were written."""
@@ -337,6 +365,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_text(root)
     build_records(root)
     build_battle(root)
+    build_graphics(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp:

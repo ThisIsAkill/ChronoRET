@@ -28,7 +28,8 @@ assembled from their disassembly, then packed; battle pieces
 (tools/battle.py): battle scripts and their tables assembled from their
 readable form; and scene and fx pieces (tools/scripts.py): the scene
 script packs and the layer-effect scripts, assembled the same way (the
-scene packs then packed).
+scene packs then packed); and graphics pieces (tools/graphics.py): tile
+graphics encoded from indexed images.
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -207,7 +208,8 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     for i in emitted:
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
-               'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0}
+               'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
+               'graphics_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -236,15 +238,18 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         build_rom.build_text()
         build_rom.build_records()
         build_rom.build_battle()
+        build_rom.build_graphics()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
         return figures, problems
     for p in pieces:
-        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx'):
+        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
+                              'graphics'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] in ('packed', 'events', 'scene')
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
+                else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
                 else extract_data.BATTLE_OUT / f'{p["label"]}.bin' if p['piece'] == 'battle'
                 else extract_data.RECORDS_OUT / f'{p["label"]}.bin')
@@ -281,6 +286,16 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
             if p['piece'] == 'scene':
                 ssplit['scene_unpacked'] += int(extract_data.PACK_PARAM.match(p['param']).group(2))
     figures['scripts_split'] = ssplit
+    # The graphics: bytes in tiles, and tail bytes kept as they are.
+    import graphics
+    gsplit = {'tiles': 0, 'tail': 0, 'regions': 0}
+    for p in pieces:
+        if p['piece'] == 'graphics':
+            fmt, tiles, tail = graphics.parse_param(p['param'])
+            gsplit['tiles'] += tiles * graphics.TILE_BYTES[fmt]
+            gsplit['tail'] += tail
+            gsplit['regions'] += 1
+    figures['graphics_split'] = gsplit
     return figures, problems
 
 
@@ -391,6 +406,11 @@ def main() -> int:
               f'assembled by the build from their disassembly (build/assets/fx/ -> build/fx/, incbin): '
               f'{data["fx_bytes"] - ss["fx"]:,} B read as scripts and table, {ss["fx"]:,} B nothing reaches '
               f'(data)')
+        gs = data['graphics_split']
+        print(f'  {"graphics":<16} {data["graphics_bytes"]:>9,} bytes of tile graphics in {gs["regions"]} regions '
+              f'encoded by the build from indexed images extracted from the ROM (build/assets/gfx/ -> '
+              f'build/gfx/, incbin): {gs["tiles"]:,} B in tiles, {gs["tail"]:,} B past the last tile kept '
+              f'as bytes')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')
