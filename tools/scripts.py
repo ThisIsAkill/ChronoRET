@@ -40,11 +40,15 @@ interpreters read them, and takes even that from the matched source:
               not a return.
     The scene's opcodes $09/$43 hand an operand address to
     C2Scene_TaskSpawnScript(Low): those are script entry points too.
+    A routine the interpreter cannot follow is refused, unless it is one
+    of TRUST, each with its reason (see there; check() asserts the list).
   * A scene pack's entries are its start and the script addresses of the
     scene's lists (C2Scene_ListD: C2Scene_GetListBScript) that lie in the
     pack; the scene is the one whose header (C2SceneRom_HeaderTable)
-    names the pack. An fx script's entry is its table entry + 1: what
-    BattleCD_StartFxChannel stores (the first byte is the period).
+    names the pack. The build takes them from its own inputs and the
+    @entry lines must name exactly them. An fx script's entry is its
+    table entry + 1: what BattleCD_StartFxChannel stores (the first byte
+    is the period); a table word inside the scripts names a @head label.
   * After a call the script goes on only when the called part can return.
     Bytes no opcode reaches are data.
 
@@ -98,6 +102,19 @@ class ScriptsError(Exception):
     pass
 
 
+def _int(t: str, where: str) -> int:
+    if not re.fullmatch(r'-?[0-9]+', t):
+        raise ScriptsError(f'{where}: {t!r} is not a number')
+    return int(t)
+
+
+def _byte(t: str, where: str) -> int:
+    try:
+        return battle._byte(t, where)
+    except battle.BattleError as e:
+        raise ScriptsError(str(e)) from None
+
+
 # ── The interpreters, from the source ─────────────────────────────────────
 
 class _Machine(absint.Machine):
@@ -122,7 +139,7 @@ class Lang:
         self.image, self.mask, self.labels = events.code_image(root, root / CACHE_DIR)
         self.code_key = hashlib.sha256(self.image + bytes(self.mask)).hexdigest()
         self.d = battle.defines(root)
-        self.machine = _Machine(self.image, self.mask, max_steps=3000000, callee_steps=100000)
+        self.machine = _Machine(self.image, self.mask, max_steps=6000000, callee_steps=2000000)
         self.machine.spawns = set()
         self.cache: dict = {}
         self.specs: dict = {}
@@ -163,14 +180,21 @@ class Lang:
         reads |= {a - ptr for a in m.reads}
         control |= {a - ptr for a in m.control}
         opaque |= m.opaque
+        self.chains |= m.opaque_chains
         return ends, None
 
     @staticmethod
-    def _saved_return(st, ptr, avoid):
+    def _saved_return(st, ptr, avoid, entry):
+        """Where a handler that moves the pointer by its operands saved a
+        return: a word it stored that is the opcode's address + k. A word
+        that was in memory from the start (the task's address, say) is
+        not one, whatever it happens to equal."""
         for k in range(1, 16):
             r = ptr + k
             for a, v in st.mem.items():
                 if a in avoid or a >= 0x1000000 or v != (r & 0xFF):
+                    continue
+                if (entry.get(a), entry.get(a + 1)) == (v, st.mem.get(a + 1)):
                     continue
                 if st.mem.get(a + 1) == (r >> 8 & 0xFF) and a + 1 not in avoid:
                     return k
@@ -184,7 +208,7 @@ class Lang:
         h = hashlib.sha256(self.code_key.encode())
         me = (ROOT / 'tools' / 'scripts.py').read_text()
         h.update(me[me.index('# ── The interpreters'):me.index('\ndef classify(')].encode())
-        for tool in ('events.py', 'absint.py', 'disasm.py'):
+        for tool in ('events.py', 'battle.py', 'absint.py', 'disasm.py'):
             h.update((ROOT / 'tools' / tool).read_bytes())
         return root / CACHE_DIR / f'{self.name}.json', root / CACHE_DIR / f'{self.name}.key', h.hexdigest()
 
@@ -256,6 +280,7 @@ class SceneLang(Lang):
     def _trace(self, known: dict, ptr: int) -> dict:
         op = known[ptr]
         reads, control, opaque, outs = set(), set(), set(), set()
+        self.chains = set()
         if op >= self.count:
             return {'reads': [], 'control': [], 'outs': [('bad', f'opcode ${op:02X} has no handler')], 'opaque': []}
         s = self._state()
@@ -269,6 +294,7 @@ class SceneLang(Lang):
                       0x7E0000 | t + 7: ptr & 0xFF, 0x7E0000 | t + 8: ptr >> 8 & 0xFF, 0x7E0000 | t + 9: ptr >> 16,
                       0x7E0000 | self.ret_slot: SENTINEL & 0xFF, 0x7E0000 | self.ret_slot + 1: SENTINEL >> 8})
         s.mem = {absint._wram(k if k > 0xFFFF else 0x7E0000 | k): v for k, v in s.mem.items()}
+        entry = dict(s.mem)
         ends, err = self._run(s, known, ptr, reads, control, opaque)
         if ends is None:
             return {'reads': [], 'control': [], 'outs': [('bad', err)], 'opaque': []}
@@ -304,11 +330,11 @@ class SceneLang(Lang):
                 outs.add(('return',))
                 continue
             new |= ptr & 0xFF0000
-            ret = self._saved_return(st, ptr, {pw, pw + 1, pw + 2}) if taint else None
+            ret = self._saved_return(st, ptr, {pw, pw + 1, pw + 2}, entry) if taint else None
             outs.add(('pos', new - ptr, bool(taint), tuple(sorted(a - ptr for a in taint)), ret,
                       new if taint else None))
         return {'reads': sorted(k for k in reads if k > 0), 'control': sorted(control),
-                'outs': sorted(outs, key=str), 'opaque': sorted(opaque)}
+                'outs': sorted(outs, key=str), 'opaque': sorted(opaque), 'chains': sorted(self.chains)}
 
 
 class FxLang(Lang):
@@ -334,6 +360,7 @@ class FxLang(Lang):
     def _trace(self, known: dict, ptr: int) -> dict:
         op = known[ptr]
         reads, control, opaque, outs = set(), set(), set(), set()
+        self.chains = set()
         s = self._state()
         s.d, s.db, s.m, s.xf = 0, 0x7E, True, False
         s.x, s.y = 0, None                                   # channel 0
@@ -364,6 +391,7 @@ class FxLang(Lang):
             s.a, s.b = op, 0
             s.mem.update({self.ptr: ptr & 0xFF, self.ptr + 1: ptr >> 8 & 0xFF, self.ptr + 2: ptr >> 16,
                           self.ret_slot: SENTINEL & 0xFF, self.ret_slot + 1: SENTINEL >> 8})
+            entry = dict(s.mem)
             ends, err = self._run(s, known, ptr, reads, control, opaque)
             if ends is None:
                 return {'reads': [], 'control': [], 'outs': [('bad', err)], 'opaque': []}
@@ -383,11 +411,11 @@ class FxLang(Lang):
                     outs.add(('return',))
                     continue
                 new = (ptr & 0xFF0000) | (w + 1) & 0xFFFF
-                ret = self._saved_return(st, ptr, {self.ptr, self.ptr + 1, self.ptr + 2}) if taint else None
+                ret = self._saved_return(st, ptr, {self.ptr, self.ptr + 1, self.ptr + 2}, entry) if taint else None
                 outs.add(('pos', new - ptr, bool(taint), tuple(sorted(a - ptr for a in taint)),
                           None if ret is None else ret + self.ret_bias, new if taint else None))
         return {'reads': sorted(k for k in reads if k > 0), 'control': sorted(control),
-                'outs': sorted(outs, key=str), 'opaque': sorted(opaque)}
+                'outs': sorted(outs, key=str), 'opaque': sorted(opaque), 'chains': sorted(self.chains)}
 
     def head(self) -> int:
         """The bytes before a script's first step: where
@@ -411,6 +439,7 @@ class FxLang(Lang):
 
 def _out_to(o: dict) -> dict:
     return {'reads': list(o['reads']), 'control': list(o['control']), 'opaque': [list(x) for x in o['opaque']],
+            'chains': [list(x) for x in o.get('chains', ())],
             'outs': [[x[0], x[1], x[2], list(x[3]), x[4], x[5]] if x[0] == 'pos'
                      else [x[0], x[1], x[2], list(x[3]), list(x[4]), list(x[5])] if x[0] == 'spawn' else list(x)
                      for x in o['outs']]}
@@ -418,6 +447,7 @@ def _out_to(o: dict) -> dict:
 
 def _out_from(o: dict) -> dict:
     return {'reads': o['reads'], 'control': o['control'], 'opaque': [tuple(x) for x in o['opaque']],
+            'chains': [tuple(x) for x in o['chains']],
             'outs': [(x[0], x[1], x[2], tuple(x[3]), x[4], x[5]) if x[0] == 'pos'
                      else (x[0], x[1], x[2], tuple(x[3]), tuple(x[4]), tuple(x[5])) if x[0] == 'spawn' else tuple(x)
                      for x in o['outs']]}
@@ -432,6 +462,14 @@ def classify(lang: Lang, known: dict, ptr: int) -> 'Op':
     bad = [x for x in res['outs'] if x[0] == 'bad']
     if bad:
         raise ScriptsError(f'{where}: {bad[0][1]}')
+    o.trusted = set()
+    for chain in res.get('chains', ()):
+        t = trusted_by(lang, chain, known, ptr)
+        if t is None:
+            why = sorted({r for c, r in res['opaque'] if c == chain[-1]}) or ['?']
+            raise ScriptsError(f'{where}: it calls ${chain[-1]:06X}, which the interpreter cannot follow '
+                               f'({why[0]}), and no reason in TRUST says it leaves the script alone')
+        o.trusted.add(t)
     if any(x[0] == 'ram' and x[1] for x in res['outs']):
         raise ScriptsError(f'{where}: where it goes on depends on a callee the interpreter cannot follow '
                            f'({res["opaque"][0][1] if res["opaque"] else "?"})')
@@ -502,7 +540,7 @@ def op_name(lang: Lang, op: int) -> str:
 
 class Op:
     __slots__ = ('off', 'op', 'length', 'fixed', 'next', 'stay', 'done', 'ret', 'ram', 'call', 'jumps', 'spec',
-                 'spawns', 'spawn_spec', 'inside')
+                 'spawns', 'spawn_spec', 'inside', 'trusted')
 
 
 def spawn_spec(x) -> tuple[int, int] | None:
@@ -762,11 +800,11 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
         if w[0] == '@jump':
             if len(w) != 6 or w[1] not in names or w[2] not in ('word', 'byte'):
                 raise ScriptsError(f'{where}: @jump NAME word|byte J A C')
-            specs[names[w[1]]] = (w[2], int(w[3]), w[4], int(w[5]))
+            specs[names[w[1]]] = (w[2], _int(w[3], where), w[4], _int(w[5], where))
         elif w[0] == '@spawn':
             if len(w) != 4 or w[1] not in names:
                 raise ScriptsError(f'{where}: @spawn NAME J B')
-            spawns[names[w[1]]] = (int(w[2]), int(w[3]))
+            spawns[names[w[1]]] = (_int(w[2], where), _int(w[3], where))
     labels, kinds, cur, pos, last = {}, {}, None, None, None
     body = []
     for where, w in lines:
@@ -787,8 +825,12 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
         if w[0] == '@inner':
             if last is None or len(w) < 4:
                 raise ScriptsError(f'{where}: @inner +K LABEL OPCODE ...')
-            labels[w[2]] = last + int(w[1][1:])
-            body.append(('inner', w[3:], where, last + int(w[1][1:])))
+            if not w[1].startswith('+'):
+                raise ScriptsError(f'{where}: @inner +K LABEL OPCODE ...')
+            if w[2] in labels:
+                raise ScriptsError(f'{where}: label {w[2]} twice')
+            labels[w[2]] = last + _int(w[1][1:], where)
+            body.append(('inner', w[3:], where, last + _int(w[1][1:], where)))
             continue
         if w[0] == '@bytes':
             size = len(w) - 1
@@ -812,19 +854,23 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
         return labels[t]
 
     def encode(w, at, where):
+        """(the line's bytes, the operands written as ->LABEL)"""
         if w[0] == 'Page':
-            v = battle._byte(w[1], where) if len(w) == 2 else -1
+            v = _byte(w[1], where) if len(w) == 2 else -1
             if not 0 <= v < lang.no_page:
                 raise ScriptsError(f'{where}: Page $XX takes a page byte below ${lang.no_page:02X}')
-            return bytes([v])
+            return bytes([v]), set()
         if w[0] in ('NoPage', 'End'):
-            return bytes([lang.no_page if w[0] == 'NoPage' else lang.end])
+            if len(w) != 1:
+                raise ScriptsError(f'{where}: {w[0]} takes no operand')
+            return bytes([lang.no_page if w[0] == 'NoPage' else lang.end]), set()
         if w[0] not in names:
             raise ScriptsError(f'{where}: unknown opcode {w[0]}')
         op = names[w[0]]
-        out = bytearray([op])
+        out, refd = bytearray([op]), set()
         for t in w[1:]:
             if t.startswith('->'):
+                refd.add(len(out))
                 a = target(t[2:], where)
                 if op in spawns:
                     if len(out) != spawns[op][0]:
@@ -847,8 +893,8 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
                         raise ScriptsError(f'{where}: {t[2:]} is out of the jump\'s reach')
                     out.append(v & 0xFF)
             else:
-                out.append(battle._byte(t, where))
-        return bytes(out)
+                out.append(_byte(t, where))
+        return bytes(out), refd
     for kind, w, where, at in body:
         if kind == 'inner':
             continue
@@ -857,27 +903,26 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
                 raise ScriptsError(f'{where}: @bytes takes XX bytes')
             b = bytes(int(t, 16) for t in w[1:])
         elif kind == 'head':
-            b = bytes(battle._byte(t, where) for t in w[1:])
+            b = bytes(_byte(t, where) for t in w[1:])
         else:
-            b = encode(w, at, where)
-            op_lines.append((where, w[0], at, len(b)))
-        for i, v in enumerate(b):
-            if at + i in image:
-                raise ScriptsError(f'{where}: overlaps the line before')
+            b, refd = encode(w, at, where)
+            op_lines.append((where, w[0], at, len(b), refd))
+        for i, v in enumerate(b):              # (each line's size is its encoding's: no overlap)
             image[at + i] = v
     for kind, w, where, at in body:
         if kind == 'inner':
-            b = encode(w, at, where)
+            b, refd = encode(w, at, where)
             if any(image.get(at + i) != v for i, v in enumerate(b)):
                 raise ScriptsError(f'{where}: the @inner opcode is not the bytes it shares')
-            op_lines.append((where, w[0], at, len(b)))
+            op_lines.append((where, w[0], at, len(b), refd))
     return image, labels, kinds, op_lines, (specs, spawns)
 
 
 def check_structure(lang: Lang, d: dict, op_lines: list, kinds: dict, specs: tuple, name: str) -> None:
     """The lines must be what the disassembler derives from the bytes."""
     specs, spawns = specs
-    lines_at = {at: (where, opname, n) for where, opname, at, n in op_lines}
+    lines_at = {at: (where, opname, n) for where, opname, at, n, _ in op_lines}
+    refs = {at: refd for _, _, at, _, refd in op_lines}
     for at, o in sorted(d['ops'].items()):
         if o.spec is not None and specs.get(o.op) != o.spec:
             raise ScriptsError(f'{lines_at.get(at, (name,))[0]}: {op_name(lang, o.op)}\'s @jump line is not its '
@@ -892,12 +937,17 @@ def check_structure(lang: Lang, d: dict, op_lines: list, kinds: dict, specs: tup
     for at, o in sorted(d['ops'].items()):
         if at not in lines_at:
             raise ScriptsError(f'{name}: the byte at ${at:06X} ({op_name(lang, o.op)}) is reached: it is no data')
-        if o.spec is not None and specs.get(o.op) != o.spec:
-            raise ScriptsError(f'{lines_at[at][0]}: {op_name(lang, o.op)}\'s @jump line is not its encoding '
-                               f'{o.spec}')
         if o.spawns and spawns.get(o.op) != o.spawn_spec:
             raise ScriptsError(f'{lines_at[at][0]}: {op_name(lang, o.op)}\'s @spawn line is not where its '
                                f'script address is {o.spawn_spec}')
+        # a target in the scripts is written as its label, so that it
+        # follows an edit (a plain word would keep pointing where it did)
+        if o.spec is not None and o.spec[1] not in refs[at]:
+            raise ScriptsError(f'{lines_at[at][0]}: {op_name(lang, o.op)}\'s target is written as bytes: '
+                               f'write ->LABEL')
+        if o.spawns and o.spawns[0] in d['ops'] and o.spawn_spec[0] not in refs[at]:
+            raise ScriptsError(f'{lines_at[at][0]}: {op_name(lang, o.op)}\'s script address is written as '
+                               f'bytes: write ->LABEL')
 
 
 # ── Scene packs ───────────────────────────────────────────────────────────
@@ -935,7 +985,11 @@ def render_scene(lang: SceneLang, label: str, data: bytes, entries: set[int]) ->
     return '\n'.join(out + body) + '\n'
 
 
-def assemble_scene(lang: SceneLang, text: str, label: str, size: int, name: str = '<scene>') -> bytes:
+def assemble_scene(lang: SceneLang, text: str, label: str, size: int, entries_want: set[int],
+                   name: str = '<scene>') -> bytes:
+    """The pack's bytes from its text. entries_want: where the scene's
+    lists start scripts in it (scene_entries), which the @entry lines must
+    name exactly."""
     lines = [(f'{name}:{no}', w) for no, w in battle._lines(text)]
     if not lines or lines[0][1] != ['@scene', label, f'${SCENE_BUF:06X}']:
         raise ScriptsError(f'{name}: the first line is @scene {label} ${SCENE_BUF:06X}')
@@ -949,6 +1003,13 @@ def assemble_scene(lang: SceneLang, text: str, label: str, size: int, name: str 
             if len(w) != 2 or w[1] not in labels:
                 raise ScriptsError(f'{where}: @entry LABEL, a label of the pack')
             entries.add(labels[w[1]])
+    if entries != entries_want:
+        names = {a: n for n, a in labels.items()}
+        miss = [names.get(a, f'${a:06X}') for a in sorted(entries_want - entries)]
+        extra = [names.get(a, f'${a:06X}') for a in sorted(entries - entries_want)]
+        raise ScriptsError(f'{name}: the @entry lines must name where the scene\'s lists start scripts'
+                           + (f'; missing {", ".join(miss)}' if miss else '')
+                           + (f'; not one: {", ".join(extra)}' if extra else ''))
     known = {SCENE_BUF + i: b for i, b in enumerate(data)}
     d = disassemble(lang, known, [(SCENE_BUF, SCENE_BUF + size)], entries)
     check_structure(lang, d, op_lines, kinds, specs, name)
@@ -997,13 +1058,14 @@ def assemble_fx(lang: FxLang, text: str, label: str, start: int, size: int, name
     table = bytearray()
     heads = {}
     for i, (where, w) in enumerate(entries):
-        if len(w) != 3 or int(w[1]) != i:
+        if len(w) != 3 or w[1] != str(i):
             raise ScriptsError(f'{where}: @entry I TARGET, in order')
         t = w[2]
         if re.fullmatch(r'\$[0-9A-Fa-f]{4}', t):
             a = (start & 0xFF0000) | int(t[1:], 16)
-            if kinds.get(a) == 'head':
-                raise ScriptsError(f'{where}: {t} is a script: name its label')
+            if rstart <= a < start + size:
+                raise ScriptsError(f'{where}: {t} is inside the scripts: an entry there must name a script\'s '
+                                   f'label (a @head line)')
         else:
             if t not in labels:
                 raise ScriptsError(f'{where}: no label {t}')
@@ -1032,26 +1094,88 @@ def stats(text: str) -> dict:
     return {'data': data, 'lines': ops}
 
 
-def scene_pairs(rom: bytes, root: Path = ROOT) -> dict[int, bytes]:
+def _pairs(headers: bytes, base: int, list_pack, root: Path) -> dict[int, bytes]:
     """{script pack index: the unpacked list pack of the scene whose header
-    names it} from the scene headers (C2SceneRom_HeaderTable, by
-    C2Scene_HdrLists / C2Scene_HdrScript; scenes $01F0 + 0-15, as
-    C2Scene_GetHeaderPtr indexes it)."""
+    names it}, from the bytes of C2SceneRom_HeaderTable (at `base`): its
+    words, as C2Scene_GetHeaderPtr reads them, up to the first header one
+    points at (the words after that are header bytes, though
+    C2Scene_LocIdMask lets 16 scenes be asked for), and each header's
+    C2Scene_HdrLists / C2Scene_HdrScript bytes. list_pack(i): the
+    unpacked list pack i of C2SceneRom_ListPacks, or None."""
+    d = battle.defines(root)
+    n, first, out = 0, None, {}
+    while first is None or base + 2 * n < first:
+        if 2 * n + 1 >= len(headers):
+            raise ScriptsError('C2SceneRom_HeaderTable: no header inside the table piece')
+        w = (base & 0xFF0000) | headers[2 * n] | headers[2 * n + 1] << 8
+        first = w if first is None else min(first, w)
+        n += 1
+    for i in range(n):
+        h = (base & 0xFF0000) | headers[2 * i] | headers[2 * i + 1] << 8
+        off = h - base
+        if not 0 <= off <= len(headers) - 1 - max(d['C2Scene_HdrLists'], d['C2Scene_HdrScript']):
+            raise ScriptsError(f'C2SceneRom_HeaderTable: scene {i}\'s header ${h:06X} is not in the table piece')
+        li, si = headers[off + d['C2Scene_HdrLists']], headers[off + d['C2Scene_HdrScript']]
+        if li & 0x80 or si & 0x80:
+            continue                                # bit 7: no pack
+        data = list_pack(li)
+        if data is not None:
+            out.setdefault(si, data)
+    return out
+
+
+def scene_pairs(rom: bytes, root: Path = ROOT) -> dict[int, bytes]:
+    """_pairs from the ROM (the list packs unpacked from it)."""
     import c3pack
     d = battle.defines(root)
     F = lambda a: a - 0xC00000      # noqa: E731
     tab, lp = d['C2SceneRom_HeaderTable'], d['C2SceneRom_ListPacks']
-    nscenes = (d['C2Scene_LocIdMask'] - d['Loc_FirstBankC2'] + 1) & 0xFFFF
-    out = {}
-    for i in range(nscenes):
-        h = (tab & 0xFF0000) | rom[F(tab) + 2 * i] | rom[F(tab) + 2 * i + 1] << 8
-        li, si = rom[F(h) + d['C2Scene_HdrLists']], rom[F(h) + d['C2Scene_HdrScript']]
-        if li & 0x80 or si & 0x80 or li >= 8 or si >= 8:
-            continue                                # (no pack: bit 7; beyond the 8 packs)
-        p = rom[F(lp) + 3 * li] | rom[F(lp) + 3 * li + 1] << 8 | rom[F(lp) + 3 * li + 2] << 16
-        data, _, _ = c3pack.unpack(rom, F(p))
-        out.setdefault(si, data)
-    return out
+
+    import extract_data
+    pieces = {p['label']: p for p in extract_data.read_manifest()}
+
+    def list_pack(i):
+        if i >= int(pieces['C2SceneRom_ListPacks']['size']) // 3:
+            return None
+        p = rom[F(lp) + 3 * i] | rom[F(lp) + 3 * i + 1] << 8 | rom[F(lp) + 3 * i + 2] << 16
+        return c3pack.unpack(rom, F(p))[0] if p else None
+    piece = pieces['C2SceneRom_HeaderTable']
+    return _pairs(rom[piece['offset']:piece['stop']], tab, list_pack, root)
+
+
+def scene_pairs_built(root: Path = ROOT) -> dict[int, bytes]:
+    """_pairs from the build's own inputs, no ROM: the header table's
+    asset, C2SceneRom_ListPacks as the source names its packs, and those
+    packs' unpacked assets."""
+    import extract_data
+    root = Path(root)
+    pieces = {p['label']: p for p in extract_data.read_manifest()}
+    hp = pieces['C2SceneRom_HeaderTable']
+    lp = pieces['C2SceneRom_ListPacks']
+    try:
+        src = (root / 'asm' / 'data' / f'bank{int(lp["start"][1:3], 16):02X}.asm').read_text()
+    except OSError as e:
+        raise ScriptsError(f'C2SceneRom_ListPacks: {e}') from None
+    m = re.search(r'^C2SceneRom_ListPacks:\n((?:\s+dl .*\n)+)', src, re.M)
+    if not m:
+        raise ScriptsError('asm/data: no C2SceneRom_ListPacks table')
+    names = [ln.split()[1] for ln in m.group(1).splitlines()]
+
+    def list_pack(i):
+        if i >= len(names) or names[i].startswith('$'):
+            return None
+        p = pieces.get(names[i])
+        if p is None or p['piece'] != 'packed':
+            raise ScriptsError(f'C2SceneRom_ListPacks entry {i}: {names[i]} is not a packed piece')
+        try:
+            return (root / extract_data.ASSETS / p['asset']).read_bytes()
+        except OSError as e:
+            raise ScriptsError(f'{names[i]}: {e}') from None
+    try:
+        headers = (root / extract_data.ASSETS / hp['asset']).read_bytes()
+    except OSError as e:
+        raise ScriptsError(f'C2SceneRom_HeaderTable: {e}') from None
+    return _pairs(headers, int(hp['start'][1:3], 16) << 16 | int(hp['start'][4:], 16), list_pack, root)
 
 
 FX_ROWS = {'$D1:646C'}          # BattleRom_FxScriptPtrs and the scripts after it (one piece)
@@ -1062,6 +1186,155 @@ FX_ROWS = {'$D1:646C'}          # BattleRom_FxScriptPtrs and the scripts after i
 # handlers, and check() reports it.
 EXITS = {'scene': {'ret': {0x37}, 'ram': set(), 'done': {0x52}},
          'fx': {'ret': {0x92}, 'ram': {0x84, 0x86, 0xD0}, 'done': {0xFF}}}
+
+
+# Callees the interpreter cannot follow (an indirect jump through RAM or a
+# table it is not given, a block move of unknown size, a wait on the APU).
+# Where it goes on after one is the place after the call, with memory as it
+# was at the call: an outcome taken that way is only right if the callee
+# leaves alone what the outcome is read from (the script pointer, the
+# return slot, the member words) and starts no script. classify() refuses
+# every such callee but these, each trusted on the reason given, from its
+# code; check() asserts that the real scripts need exactly these (for the
+# opcodes listed), and, in each one's code followed statically from it
+# (the tables named included; any other indirect jump fails), that no
+# store names those bytes directly and no spawn routine is called. The
+# reasons cover the indexed stores, which no static look can place.
+# {lang: {routine: (opcodes, ((table or entry, entries or 0, M=1?), ...),
+#                   RAM vectors its indirect jumps go through, reason)}}
+TRUST = {
+    'scene': {
+        'C2Anim_Run': ({0x31, 0x39, 0x3F, 0x40}, (('C2Anim_OpTable', 8, False),), (),
+                       'it runs the task\'s animation script through C2Anim_OpTable, by the animation opcode (other '
+                       'data). The eight handlers write the task record through C2Scene_TaskCur (timer, sprite and '
+                       'position words; ops 0-2 the record byte their operand names, which an animation script could '
+                       'aim at the record\'s script pointer: not checked), C2Anim_Ptr (DP $52-$54), '
+                       'C2Scene_SprFramePtr (DP $55-$57), the sprite list (C2Scene_SprAdd) and the VRAM queue (DP '
+                       '$5E-$6x, by its end); none writes C2Script_Ptr (DP $58-$5A) or starts a script. Each of '
+                       'the four opcodes then returns TDC/CLC itself: stay.'),
+        **{n: ({op}, (), (),
+               'it sets Decomp_Src/Dest and jumps to Decomp_ToWram, which runs with DP = DP_Decomp ($0300, '
+               'restored) and writes only its DP block, WMADD and its output (WMDATA from Decomp_Dest on, and '
+               'MVNs inside it). The destinations the traces show are $7E:C600 and $7F:8C00-$7F:F000 (one '
+               'with its high byte from RAM), clear of DP $58-$5A, the task records, C2Scene_MemberWords '
+               'and the script buffer at $7F:0400, as long as the pack fits before the bank\'s end (not '
+               'checked). It starts no script.')
+           for n, op in (('C2Scene_LoadBgGfx', 0x34), ('C2Scene_LoadExtraObjPack', 0x34),
+                         ('C2Scene_LoadUnkC600', 0x34), ('C2Scene_UnpackBg3MapPack', 0x34),
+                         ('C2Scene_UnpackBgPack', 0x34), ('C6Scene_UnpackObjPackA', 0x4E),
+                         ('C6Scene_UnpackObjPackB', 0x4E), ('C6Scene_UnpackPalPackA', 0x4E),
+                         ('C6Scene_UnpackPalPackB', 0x4E))},
+        **{n: ({op}, (), (),
+               'it builds a window table with the $C3 window routines (DP = DP_WinFx inside, restored): the '
+               'table at WinFx_TablePtr/Bank ($7E:8B56, $8DF6, $9176 or $9416 in the traces) filled with MVNs '
+               'inside that bank, the '
+               'WinFx DP block, $7E:8A21-$8A27 (the HDMA table pointers) and the task\'s window state; none of '
+               'DP $58-$5A, the return slot, the member words or the script buffer. It starts no script.')
+           for n, op in (('C2Scene_Win1Step', 0x34), ('C2Scene_Win2Step', 0x34),
+                         ('C6Scene_Win1EllipseStep', 0x4E), ('C6Scene_Win2EllipseStep', 0x4E),
+                         ('C6Scene_Win1CapsuleStep', 0x4E), ('C6Scene_Win2CapsuleStep', 0x4E))},
+        'C2Scene_ZoneSoundAtEntry': ({0x34}, (('Audio_SongCmdTable', 8, True),), (),
+                                     'it picks the zone\'s song (C2Scene_GetSoundZone) and sends it through '
+                                     'Audio_DriverCommand, which waits on the APU ports (not followed) and runs '
+                                     'with DP = $1E00 (the command block, restored): it writes that block, the '
+                                     'APU ports, the multiplier and $02AE; nothing of the scene task, its script '
+                                     'or the buffer. It starts no script.'),
+    },
+    'fx': {
+        'BattleCD_FxOpDrawShape': ({0x8B}, (('BattleCD_FxShapeTable', 6, True),
+                                            ('BattleCE_CopyWordsToLines', 0, False)), ('BattleCE_CopyEntry',),
+                                   'it reads its operand (the shape slot) and goes on in BattleCD_FxDrawShape, '
+                                   'which jumps through BattleCD_FxShapeTable by the slot\'s kind (RAM). The '
+                                   'shape builders and copies write DP $45-$52, !Battle_FxShapeSlot, the line '
+                                   'buffers at $7E:B800-$B9FF, the two window tables and WMADD/WMDATA, as their '
+                                   'Exits say; never DP $40-$42 (the pointer) or the return slot. So it is one '
+                                   'operand byte, as its header says.'),
+        'BattleCE_RunCopyWords': ({0xB5}, (('BattleCE_CopyWordsToLines', 0, False),), ('BattleCE_CopyEntry',),
+                                  'BattleCD_FxCopyLines puts an entry of the unrolled BattleCE_CopyWordsToLines '
+                                  'in BattleCE_CopyEntry (DP $4B) and calls this, whose JMP through it is not '
+                                  'followed; the copy stores only the window table words at DB:X + 4n.'),
+    },
+}
+CALL_VIA = {'C2Script_CallNear_call': 2, 'C2Script_CallLong_call': 3}   # target: the operand's 2 or 3 bytes
+
+
+def trusted_by(lang: 'Lang', chain: tuple, known: dict, ptr: int) -> str | None:
+    """The TRUST routine a callee not followed is inside, or None."""
+    trust = {lang.labels[n]: n for n in TRUST[lang.name] if n in lang.labels}
+    via = {lang.labels[n]: k for n, k in CALL_VIA.items() if n in lang.labels}
+    if chain and chain[0] in via:
+        b = [known.get(ptr + 1 + i) for i in range(via[chain[0]])]
+        if None in b:
+            return None
+        return trust.get((b[2] if len(b) == 3 else 0xC2) << 16 | b[0] | b[1] << 8)
+    for f in chain:
+        if f in trust:
+            return trust[f]
+    return None
+
+
+def _code_closure(lang: 'Lang', seeds: list[tuple[int, bool]]) -> list[tuple[int, str, str, int]]:
+    """Every instruction reached from the seeds (address, M=1?) by direct
+    flow, calls into other banks included: (address, mnemonic, mode,
+    operand)."""
+    import disasm
+    ds: dict[int, disasm.Disassembler] = {}
+    work, done = list(seeds), set()
+    while work:
+        a, m = work.pop()
+        if (a, m) in done:
+            continue
+        done.add((a, m))
+        d = ds.get(a >> 16)
+        if d is None:
+            d = ds[a >> 16] = disasm.Disassembler(lang.image, a >> 16)
+        d.trace([a & 0xFFFF], disasm.CPUState(m=m, x=False, e=False))
+        for at, (raw, mn, _, _) in list(d.insns.items()):
+            if mn in ('JSL', 'JML') and len(raw) == 4:
+                t = raw[1] | raw[2] << 8 | raw[3] << 16
+                if t >> 16 != a >> 16:
+                    work.append((t, d.visited[at].m))
+    out = []
+    for bank, d in ds.items():
+        for at, (raw, mn, _, _) in d.insns.items():
+            mode = disasm._OPCODES[raw[0]][1]
+            out.append((bank << 16 | at, mn, mode, int.from_bytes(raw[1:], 'little')))
+    return out
+
+
+STORES = {'STA', 'STX', 'STY', 'STZ', 'INC', 'DEC', 'ASL', 'LSR', 'ROL', 'ROR', 'TSB', 'TRB'}
+
+
+def trust_check(lang: 'Lang') -> list[str]:
+    """The machine-checkable part of each TRUST reason (see there)."""
+    out = []
+    if lang.name == 'scene':
+        guard = {lang.ptr + i & 0xFFFF for i in range(3)} | {a & 0xFFFF for s in lang.slots for a in (s, s + 1)}
+        never = {lang.labels['C2Scene_TaskSpawnScript'], lang.labels['C2Scene_TaskSpawnScriptLow']}
+    else:
+        guard = ({lang.ptr + i & 0xFFFF for i in range(3)} | {lang.ret_slot & 0xFFFF, lang.ret_slot + 1 & 0xFFFF}
+                 | {lang.chan + i & 0xFFFF for i in (0, 3, 4, 5)})
+        never = set()
+    for name, (_, tables, vectors, _) in TRUST[lang.name].items():
+        seeds = [(lang.labels[name], True)]
+        through = set()
+        for t, n, m in tables:
+            seeds += [(x, m) for x in (lang.table(t, n) if n else [lang.labels[t]])]
+            if n:
+                through.add(lang.labels[t] & 0xFFFF)
+        vec = {lang.d[v] & 0xFFFF for v in vectors}
+        for at, mn, mode, op in _code_closure(lang, seeds):
+            where = f'{name}: ${at:06X} {mn}'
+            if mode in ('abs_ind', 'abs_x_ind', 'abs_ind_long') and op not in through | vec:
+                out.append(f'{where}: an indirect jump through ${op:04X}, not a table or vector its reason names')
+            if (mn in STORES and mode in ('dp', 'abs') and op in guard
+                    or mn in STORES and mode == 'long' and absint._wram(op) & 0xFFFF in guard
+                    and absint._wram(op) >> 16 == 0x7E):
+                out.append(f'{where} ${op:04X}: a store to the bytes it is trusted to leave alone')
+            if mn in ('JSR', 'JSL', 'JMP', 'JML') and mode in ('abs', 'long') and (
+                    (op if mode == 'long' else at & 0xFF0000 | op) in never):
+                out.append(f'{where}: it can start a script')
+    return out
 
 
 def langs(root: Path = ROOT) -> tuple[SceneLang, FxLang]:
@@ -1108,7 +1381,8 @@ def extract_all(rom: bytes, pieces: list[dict], root: Path = ROOT, problems: lis
                         continue
                     text = render_scene(scene, p['label'], data, scene_entries(pairs, piece_index(p['label']),
                                                                                len(data)))
-                    back = assemble_scene(scene, text, p['label'], len(data), p['label'])
+                    back = assemble_scene(scene, text, p['label'], len(data),
+                                          scene_entries(pairs, piece_index(p['label']), len(data)), p['label'])
                 else:
                     data = rom[p['offset']:p['stop']]
                     text = render_fx(fx, p['label'], 0xC00000 + p['offset'], data)
@@ -1125,11 +1399,16 @@ def extract_all(rom: bytes, pieces: list[dict], root: Path = ROOT, problems: lis
         fx.save(root)
 
 
-def assemble_piece(lang: Lang, text: str, p: dict) -> bytes:
+def assemble_piece(lang: Lang, text: str, p: dict, pairs: dict[int, bytes] | None = None) -> bytes:
+    """A piece's bytes from its text; a scene's entries from `pairs`
+    (scene_pairs_built when not given)."""
     import extract_data
     if p['piece'] == 'scene':
         size = int(extract_data.PACK_PARAM.match(p['param']).group(2))
-        return assemble_scene(lang, text, p['label'], size, p['label'])
+        if pairs is None:
+            pairs = scene_pairs_built(lang.root)
+        return assemble_scene(lang, text, p['label'], size, scene_entries(pairs, piece_index(p['label']), size),
+                              p['label'])
     return assemble_fx(lang, text, p['label'], 0xC00000 + p['offset'], int(p['size']), p['label'])
 
 
@@ -1138,6 +1417,7 @@ def exits_check(rom: bytes, pieces: list[dict], root: Path = ROOT) -> list[str]:
     scene, fx = langs(root)
     pairs = scene_pairs(rom, root)
     got = {'scene': {k: set() for k in EXITS['scene']}, 'fx': {k: set() for k in EXITS['fx']}}
+    trusted = {'scene': {}, 'fx': {}}
     for p in pieces:
         if p['piece'] == 'scene':
             data, _ = extract_data.unpack_piece(rom, p)
@@ -1154,7 +1434,16 @@ def exits_check(rom: bytes, pieces: list[dict], root: Path = ROOT) -> list[str]:
             for k in got[lang]:
                 if getattr(o, k):
                     got[lang][k].add(o.op)
+            for t in o.trusted:
+                trusted[lang].setdefault(t, set()).add(o.op)
     out = []
+    for lang, want in TRUST.items():
+        w = {n: v[0] for n, v in want.items()}
+        if trusted[lang] != w:
+            out.append(f'{lang}: the routines trusted (TRUST) are '
+                       f'{ {n: sorted(map(hex, v)) for n, v in sorted(trusted[lang].items())} }, '
+                       f'not { {n: sorted(map(hex, v)) for n, v in sorted(w.items())} }')
+    out += trust_check(scene) + trust_check(fx)
     for lang, want in EXITS.items():
         for k, v in want.items():
             if got[lang][k] != v:

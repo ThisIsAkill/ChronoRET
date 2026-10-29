@@ -206,6 +206,7 @@ def build_scripts(root: Path = ROOT) -> int:
         return 0
     try:
         scene, fx = scripts.langs(root)
+        pairs = scripts.scene_pairs_built(root)
     except scripts.ScriptsError as e:
         raise BuildError(f'scripts: {e}') from None
     written, wrong = 0, []
@@ -213,7 +214,7 @@ def build_scripts(root: Path = ROOT) -> int:
         for p in pieces:
             text_ = (root / extract_data.ASSETS / p['asset']).read_text()
             try:
-                data = scripts.assemble_piece(scene if p['piece'] == 'scene' else fx, text_, p)
+                data = scripts.assemble_piece(scene if p['piece'] == 'scene' else fx, text_, p, pairs)
             except scripts.ScriptsError as e:
                 raise BuildError(f'scripts: {e}') from None
             size = (int(extract_data.PACK_PARAM.match(p['param']).group(2)) if p['piece'] == 'scene'

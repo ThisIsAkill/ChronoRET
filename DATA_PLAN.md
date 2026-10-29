@@ -480,7 +480,15 @@ source.
   - ram: a position from other RAM.
 
   After a call the script goes on only when the part it calls can return. Bytes nothing reaches
-  are data. The assembler re-derives the structure from its bytes and refuses any line that
+  are data. A routine absint cannot follow (an indirect jump through RAM or a table it is not
+  given, a block move of unknown size, a wait on the APU) is not taken as returning untouched:
+  the opcode is refused unless the routine is one in `TRUST` (`tools/scripts.py`), each with the
+  reason, from its code, that it leaves the script pointer, the return slot and the member words
+  alone and starts no script. `check` asserts that the real scripts need exactly those routines
+  for exactly the opcodes listed, and that in each one's code, followed statically from it with
+  the tables its reason names, no store names those bytes directly and no spawn routine is
+  called (its indexed stores are covered by the reason only). The routines and opcodes are under
+  "Not pinned down". The assembler re-derives the structure from its bytes and refuses any line that
   differs: an opcode of another length, an opcode nothing reaches, reached bytes written as data,
   or an `@jump`/`@spawn` line that is not the operand's encoding. `tools/scripts.py check` also
   asserts which opcodes are classed return (scene `$37`, fx `$92`), done (`$52`, `$FF`) and ram
@@ -491,7 +499,11 @@ source.
   - **Entries:**
     - the pack's start;
     - the `C2Scene_ListD` script addresses of the scene whose header (`C2SceneRom_HeaderTable`)
-      names the pack (3 in all; `C2Scene_GetListBScript`);
+      names the pack (3 in all; `C2Scene_GetListBScript`). The table has 8 words: it ends where
+      the first header starts (the 8 words after it, which `C2Scene_LocIdMask` would let scenes
+      8-15 read, are header bytes). The build takes these from its own inputs (the header
+      table's asset, `C2SceneRom_ListPacks` as `asm/data` names the packs, and their unpacked
+      assets), and the `@entry` lines must name exactly them;
     - the addresses opcodes `$09`/`$43` hand to `C2Scene_TaskSpawnScript(Low)`;
     - the words opcode `$08` stores in `C2Scene_MemberWords`, the leader's and members' scripts
       (`C2Scene_LeaderScriptStart`, `C2Scene_MemberScriptStart`).
@@ -507,7 +519,9 @@ source.
     DP `$40` + 1. A script starts one byte after its table entry (the period byte: traced in
     `BattleCD_StartFxChannel`). `$91`/`$92` call and return, `$CA`/`$CB` jump, and the waits go
     back by a byte (`$A9`, `$BF`, `$F1`, `$F6`).
-  - **Results:** 142 scripts; 6,086 steps and opcodes (4,618 opcodes of 106 different ones, 854
+  - **Entries:** the table's words. A word inside the scripts must be written as a script's label
+    (a `@head` line); only a word outside them is written as `$XXXX`.
+  - **Results:** 142 scripts; 6,062 steps and opcodes (4,618 opcodes of 106 different ones, 830
     pages, 485 `$7F`, 129 ends) in 15,401 B read as scripts and table, and 414 B nothing reaches.
 - **Not pinned down:**
   - Scene packs 1-4 and 6 hold 1,089 B no known entry reaches (one block in pack 4 spawns
@@ -517,9 +531,26 @@ source.
     not followed.
   - Fx opcodes `$84`/`$86` go back to their loop's start from RAM (the loop body is reached from
     `$83`/`$85` anyway).
-  - The switch `$D0` at `$D1:82CE` (and `$D1`) jumps through a list after its operand, indexed by
-    a variable. The list's length is not bounded by the handler, so the list and what only it
-    reaches are data.
+  - The switch `$D0` at `$D1:82CE` (and `$D1`) jumps through a list after its operand: word n of
+    it, n a nibble of a variable (`Battle_ActVars`), so at most 16 words. Which values the
+    variable takes is not in the handler, and only the first 9 words of this list (up to its
+    lowest target) point into the scripts; words 10-16 are the bytes after it and point
+    elsewhere in the bank. So the list and what only it reaches stay data (271 B, `$D1:82D0`-
+    `$D1:83DF`), although its 9 targets, `$D1:82E2`-`$D1:8347`, read as scripts when started there
+    (32 opcodes, ending in a `$D1` switch with its own list).
+  - Two runs read as whole scripts with no table entry: `$D1:7830` (2 B, `01 FF`: a period byte
+    and End, after a return) and `$D1:9BF7` (141 B after an End: a period byte and 57 opcodes to
+    an End). No word in the ROM is `$9BF7`, and the only `$7830` words are inside bank `$CD`'s
+    action data, so they are kept as data: probably scripts no longer used.
+  - The routines trusted without being followed (`TRUST`), with the opcodes that call them:
+    `C2Anim_Run` (scene `$31`, `$39`, `$3F`, `$40`: the animation script's handlers, by an
+    opcode in other data; ops 0-2 can write any task record byte their operand names, which an
+    animation script could aim at the script pointer's record copy: not checked); through
+    `$34`/`$4E`, the scene routines that unpack with `Decomp_ToWram` (its destination given and
+    length the pack's: a pack longer than the room to the bank's end is not ruled out), that build
+    window tables with the `$C3` window routines, and `C2Scene_ZoneSoundAtEntry` (the audio
+    driver's wait on the APU); fx `$8B` (`BattleCD_FxOpDrawShape`, the shape handler from RAM)
+    and `$B5` (`BattleCE_RunCopyWords`, the copy entry from DP `$4B`).
   - The fx opcodes with no handler (`$FA`-`$FE`) and scene opcodes above `$52` would jump through
     the code after their tables. None is reached; the interpreter refuses them.
 
