@@ -15702,8 +15702,9 @@ C3Mod_Prog10Greys:
 ;     X = 0, 4, 8, $C (CPX #$10 / BNE): 8 times (the byte at $00F2) the
 ;     four map words X, X + 1, X + 2, X + 3 (TXA: X's low byte) with
 ;     attribute Y's high byte, 0 (each STA WMDATA, then a 16-bit STY to
-;     $217F: Y's low byte to $217F, which is no register, its high byte
-;     to WMDATA): a 32 x 32 map at $7F:1000-$17FF of tiles 0-15 in
+;     $217F: Y's low byte, 0, to $217F, which mirrors APU port 3
+;     (APUIO3, $2143), so the loop's 1024 STYs each write 0 to that
+;     port; its high byte to WMDATA): a 32 x 32 map at $7F:1000-$17FF of tiles 0-15 in
 ;     4 x 4 blocks, repeated; .exit.
 ; Callers note: script opcode $F0 at $92BB (a script not matched yet).
 ; Entry: as C3Mod_Prog10Fill's (only C3Mod_ClearTaskList called).
