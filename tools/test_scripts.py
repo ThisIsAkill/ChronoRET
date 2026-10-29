@@ -496,6 +496,64 @@ class Fx(unittest.TestCase):
         self.refused('@bytes 99', '    Page $19', 'nothing reaches')
 
 
+class AnimStub(scripts.AnimLang):
+    """$00 n: next 2 (writes the record byte n); $07: stay."""
+
+    def __init__(self):
+        self.name, self.count, self.timer = 'anim', 8, 0x0E
+        self.names = [f'Op{op:02X}_Stub' for op in range(8)]
+        self.cache, self.specs, self.dirty = {}, {}, False
+        self.labels = {}
+
+    def _trace(self, known, ptr):
+        op = known[ptr]
+        if op == 0x00:
+            return {'reads': [1], 'control': [], 'outs': [('pos', 2, False, (), None, None)], 'opaque': []}
+        if op == 0x07:
+            return {'reads': [], 'control': [], 'outs': [('pos', 0, False, (), None, None)], 'opaque': []}
+        return {'reads': [], 'control': [], 'outs': [('bad', 'not in the stub')], 'opaque': []}
+
+
+class Locks(unittest.TestCase):
+    """The checks behind TRUST's reasons: the static scan at every width,
+    the animation ops' record bytes, the unpackers' room."""
+
+    def test_closure_scans_each_width(self):
+        class Image:
+            image = bytearray(0x400000)
+        lang = Image()
+        lang.image[0x8000:0x800B] = bytes([0xC2, 0x20, 0x20, 0x10, 0x80, 0xE2, 0x20, 0x20, 0x10, 0x80, 0x60])
+        lang.image[0x8010:0x8015] = bytes([0xA9, 0x00, 0x85, 0x58, 0x60])  # M=1: LDA #0, STA $58; M=0: LDA #$8500, CLI
+        got = scripts._code_closure(lang, [(0xC08000, True)])
+        self.assertIn((0xC08010, 'LDA', 'imm_m', 0x8500), got)
+        self.assertIn((0xC08010, 'LDA', 'imm_m', 0x00), got)
+        self.assertIn((0xC08012, 'STA', 'dp', 0x58), got)
+
+    def test_anim_op_naming_a_guarded_byte_refused(self):
+        lang = AnimStub()
+        guard = {5, 6, 7, 8, 9, 0x0E}
+        bad = [('S', {B: 0x00, B + 1: 0x06, B + 2: 0x07}, (B, B + 3), {B})]
+        self.assertEqual(scripts.anim_lock(lang, bad, {0x00}, guard),
+                         ['anim: S $7F0400: Op00_Stub writes task record byte $06'])
+        good = [('S', {B: 0x00, B + 1: 0x26, B + 2: 0x07}, (B, B + 3), {B})]
+        self.assertEqual(scripts.anim_lock(lang, good, {0x00}, guard), [])
+
+    def test_anim_ops_found_by_their_writes(self):
+        writes = {0: lambda v: {v}, 4: lambda v: {0x0E}, 5: lambda v: {7}}
+        named, out = scripts.anim_named_ops(AnimStub(), lambda op, v: writes.get(op, lambda v: set())(v),
+                                            {5, 6, 7, 8, 9, 0x0E})
+        self.assertEqual(named, {0})
+        self.assertEqual(out, ['anim: Op05_Stub writes task record byte(s) [7] whatever its operand'])
+
+    def test_unpack_must_fit(self):
+        keep = [(B, 0x100, 'the script buffer')]
+        self.assertEqual(scripts.unpack_fit('R', {0xC40000: 4096}, {0x7FF000}, keep), [])
+        self.assertEqual(scripts.unpack_fit('R', {0xC40000: 4097}, {0x7FF000}, keep),
+                         ['unpack: R: the pack at $C40000 (4097 B) runs past the end of bank $7F from $7FF000'])
+        self.assertEqual(scripts.unpack_fit('R', {0xC40000: 0x200}, {0x7F0300}, keep),
+                         ['unpack: R: the pack at $C40000 unpacked at $7F0300 covers the script buffer'])
+
+
 class Source(unittest.TestCase):
 
     def test_manifest_pieces(self):

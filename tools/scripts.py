@@ -208,6 +208,7 @@ class Lang:
         h = hashlib.sha256(self.code_key.encode())
         me = (ROOT / 'tools' / 'scripts.py').read_text()
         h.update(me[me.index('# ── The interpreters'):me.index('\ndef classify(')].encode())
+        h.update(me[me.index('\ndef jump_spec('):me.index('\n# ── Disassembly')].encode())   # its specs are kept
         for tool in ('events.py', 'battle.py', 'absint.py', 'disasm.py'):
             h.update((ROOT / 'tools' / tool).read_bytes())
         return root / CACHE_DIR / f'{self.name}.json', root / CACHE_DIR / f'{self.name}.key', h.hexdigest()
@@ -437,6 +438,110 @@ class FxLang(Lang):
         return got.pop()
 
 
+def struct_offsets(root: Path, name: str) -> dict[str, int]:
+    """{field: offset} of a struct of asm/include/ (labels without a skip
+    share the next field's offset)."""
+    for path in sorted((Path(root) / 'asm' / 'include').glob('*.inc')):
+        lines = path.read_text(errors='replace').splitlines()
+        for i, line in enumerate(lines):
+            if re.match(rf'^struct\s+{name}\s', line):
+                out, off = {}, 0
+                for body in lines[i + 1:]:
+                    if body.strip().startswith('endstruct'):
+                        return out
+                    m = re.match(r'^\s*\.([A-Za-z_][A-Za-z0-9_]*):\s*(?:skip\s+(\d+))?', body)
+                    if m:
+                        out[m.group(1)] = off
+                        off += int(m.group(2) or 0)
+    raise ScriptsError(f'no struct {name} in asm/include/')
+
+
+class AnimLang(Lang):
+    """C2Anim_Run, the animation scripts of the scene tasks: the handler
+    (C2Anim_OpTable) runs with M=0, A = X = the opcode * 2, C2Anim_Ptr (DP
+    $52) on the opcode, C2Scene_TaskCur a task record; it returns Z=0 with
+    the bytes to add to C2Anim_Ptr in A, or Z=1 to stop there (the next
+    frame runs the same opcode). Read here only for check()'s lock on the
+    record bytes ops write (anim_check)."""
+    name = 'anim'
+
+    def __init__(self, root: Path = ROOT):
+        super().__init__(root)
+        names = battle.table_handlers('C2Anim_OpTable', Path(root) / 'asm' / 'bankC2' / 'bankC2.asm')
+        self.count = len(names)
+        self.handler_names = names
+        self.names = [f'Op{op:02X}_{h.removeprefix("C2Anim_")}' for op, h in enumerate(names)]
+        self.handlers = self.table('C2Anim_OpTable', self.count)
+        self.ptr = self.d['C2Anim_Ptr']
+        self.task = self.d['C2Scene_TaskRecords'] + 4 * self.d['C2Scene_TaskSize']   # record 4
+        self.ret_bias = 0
+        self.timer = struct_offsets(root, 'C2Scene_Task')['AnimTimer']
+
+    def entry(self, known: dict, ptr: int):
+        """The handler's entry state for the opcode at ptr."""
+        op = known[ptr]
+        s = self._state()
+        s.pc = self.handlers[op]
+        s.a, s.b, s.x, s.y = (op * 2) & 0xFF, (op * 2) >> 8, op * 2, None
+        s.d, s.db, s.m, s.xf = 0, 0x00, False, False
+        s.c = False                                     # from the runner's ASL of the opcode
+        p, t = self.ptr, self.task
+        mem = {p: ptr & 0xFF, p + 1: ptr >> 8 & 0xFF, p + 2: ptr >> 16,
+               self.d['C2Scene_TaskCur']: t & 0xFF, self.d['C2Scene_TaskCur'] + 1: t >> 8}
+        s.mem = {absint._wram(0x7E0000 | k): v for k, v in mem.items()}
+        return s
+
+    def _trace(self, known: dict, ptr: int) -> dict:
+        op = known[ptr]
+        reads, control, opaque, outs = set(), set(), set(), set()
+        self.chains = set()
+        if op >= self.count:
+            return {'reads': [], 'control': [], 'outs': [('bad', f'opcode ${op:02X} has no handler')], 'opaque': []}
+        # .AnimTimer is 0 when an op is first run (C2Scene_SetAnim zeroes it,
+        # and the timed ops advance only at 0); on later calls of the same
+        # op it holds what the op left. So the op runs from each value it
+        # can leave there, from 0 on (ShowFrame/Wait with 0 then hold).
+        tk = absint._wram(0x7E0000 | self.task + self.timer)
+        todo, seen, ends = [0], set(), []
+        while todo:
+            v = todo.pop()
+            if v in seen:
+                continue
+            seen.add(v)
+            s = self.entry(known, ptr)
+            s.mem[tk] = v
+            got, err = self._run(s, known, ptr, reads, control, opaque)
+            if got is None:
+                return {'reads': [], 'control': [], 'outs': [('bad', err)], 'opaque': []}
+            for st, how in got:
+                left = st.mem.get(tk)
+                if left is None:
+                    return {'reads': [], 'control': [], 'outs': [('bad', 'it leaves .AnimTimer unknown')],
+                            'opaque': []}
+                if how == 'rts' and st.z:               # stays: the next call starts from what it left
+                    todo.append(left)
+            ends += got
+        pw = absint._wram(0x7E0000 | self.ptr)
+        for st, how in ends:
+            if how != 'rts':
+                outs.add(('bad', f'returns with {how}'))
+            elif st.z is None:
+                outs.add(('ram', bool(self.machine.opaque)))
+            elif st.z:
+                outs.add(('pos', 0, False, (), None, None))
+            else:
+                base = [st.mem.get(pw + i) for i in range(2)]
+                if None in base or st.a is None or st.b is None:
+                    outs.add(('ram', bool(self.machine.opaque)))
+                    continue
+                taint = st.memt.get(pw, absint.E) | st.memt.get(pw + 1, absint.E) | st.at
+                new = (ptr & 0xFF0000) | ((base[0] | base[1] << 8) + (st.a | st.b << 8)) & 0xFFFF
+                outs.add(('pos', new - ptr, bool(taint), tuple(sorted(a - ptr for a in taint)), None,
+                          new if taint else None))
+        return {'reads': sorted(k for k in reads if k > 0), 'control': sorted(control),
+                'outs': sorted(outs, key=str), 'opaque': sorted(opaque), 'chains': sorted(self.chains)}
+
+
 def _out_to(o: dict) -> dict:
     return {'reads': list(o['reads']), 'control': list(o['control']), 'opaque': [list(x) for x in o['opaque']],
             'chains': [list(x) for x in o.get('chains', ())],
@@ -606,6 +711,12 @@ def jump_spec(lang: Lang, known: dict, ptr: int, res: dict) -> tuple:
             if t is None or t != spec_target(spec, k2, ptr):
                 ok = False
                 break
+        if ok and kind == 'word' and ptr + j + 1 in known:
+            # a word: its high byte moves the target too (a byte read 16-bit
+            # and masked would pass the low byte's changes alone)
+            k2 = dict(known)
+            k2[ptr + j + 1] = (known[ptr + j + 1] + 1) & 0xFF
+            ok = target_with({j + 1: known[ptr + j + 1] + 1}) == spec_target(spec, k2, ptr)
         if ok and spec_target(spec, known, ptr) == base[0]:
             lang.specs[op] = spec
             lang.dirty = True
@@ -1260,7 +1371,7 @@ CALL_VIA = {'C2Script_CallNear_call': 2, 'C2Script_CallLong_call': 3}   # target
 
 def trusted_by(lang: 'Lang', chain: tuple, known: dict, ptr: int) -> str | None:
     """The TRUST routine a callee not followed is inside, or None."""
-    trust = {lang.labels[n]: n for n in TRUST[lang.name] if n in lang.labels}
+    trust = {lang.labels[n]: n for n in TRUST.get(lang.name, {}) if n in lang.labels}
     via = {lang.labels[n]: k for n, k in CALL_VIA.items() if n in lang.labels}
     if chain and chain[0] in via:
         b = [known.get(ptr + 1 + i) for i in range(via[chain[0]])]
@@ -1274,31 +1385,45 @@ def trusted_by(lang: 'Lang', chain: tuple, known: dict, ptr: int) -> str | None:
 
 
 def _code_closure(lang: 'Lang', seeds: list[tuple[int, bool]]) -> list[tuple[int, str, str, int]]:
-    """Every instruction reached from the seeds (address, M=1?) by direct
-    flow, calls into other banks included: (address, mnemonic, mode,
-    operand)."""
+    """Every instruction reached from the seeds (address, M=1?; X=0) by
+    direct flow, calls into other banks included: (address, mnemonic,
+    mode, operand), once for each M and X width it is reached at (the
+    width decides the operand's length, and so what follows)."""
     import disasm
-    ds: dict[int, disasm.Disassembler] = {}
-    work, done = list(seeds), set()
+    work = [(a, m, False) for a, m in seeds]
+    done, out = set(), []
     while work:
-        a, m = work.pop()
-        if (a, m) in done:
+        a, m, x = work.pop()
+        if (a, m, x) in done:
             continue
-        done.add((a, m))
-        d = ds.get(a >> 16)
-        if d is None:
-            d = ds[a >> 16] = disasm.Disassembler(lang.image, a >> 16)
-        d.trace([a & 0xFFFF], disasm.CPUState(m=m, x=False, e=False))
-        for at, (raw, mn, _, _) in list(d.insns.items()):
-            if mn in ('JSL', 'JML') and len(raw) == 4:
-                t = raw[1] | raw[2] << 8 | raw[3] << 16
-                if t >> 16 != a >> 16:
-                    work.append((t, d.visited[at].m))
-    out = []
-    for bank, d in ds.items():
-        for at, (raw, mn, _, _) in d.insns.items():
-            mode = disasm._OPCODES[raw[0]][1]
-            out.append((bank << 16 | at, mn, mode, int.from_bytes(raw[1:], 'little')))
+        done.add((a, m, x))
+        off = disasm.snes_to_file(a >> 16, a & 0xFFFF)
+        if off is None or off >= len(lang.image) or lang.image[off] not in disasm._OPCODES:
+            continue
+        mn, mode = disasm._OPCODES[lang.image[off]]
+        operand, n = disasm.read_operand(lang.image, off + 1, mode, disasm.CPUState(m=m, x=x, e=False))
+        out.append((a, mn, mode, operand))
+        bank, nxt = a & 0xFF0000, a & 0xFF0000 | (a + 1 + n) & 0xFFFF
+        if mn == 'REP':
+            m, x = m and not operand & 0x20, x and not operand & 0x10
+        elif mn == 'SEP':
+            m, x = m or bool(operand & 0x20), x or bool(operand & 0x10)
+        if mn in ('JSR', 'JMP') and mode == 'abs':
+            work.append((bank | operand, m, x))
+            if mn == 'JSR':
+                work.append((nxt, m, x))
+        elif mn in ('JSL', 'JML') and mode == 'long':
+            work.append((operand, m, x))
+            if mn == 'JSL':
+                work.append((nxt, m, x))
+        elif mode in ('rel', 'rlong'):
+            work.append((bank | disasm.branch_target(mode, operand, (a + 1 + n) & 0xFFFF), m, x))
+            if mn not in ('BRA', 'BRL'):
+                work.append((nxt, m, x))
+        elif mn in ('RTS', 'RTL', 'RTI', 'STP', 'BRK', 'COP') or mn in ('JMP', 'JML'):
+            pass                                    # an end, or an indirect jump (its targets are seeds)
+        else:
+            work.append((nxt, m, x))                # JSR (abs,X) included: it comes back
     return out
 
 
@@ -1452,6 +1577,219 @@ def exits_check(rom: bytes, pieces: list[dict], root: Path = ROOT) -> list[str]:
     return out
 
 
+# The TRUST routines that unpack with Decomp_ToWram (their reason rests on
+# where the packs go): unpack_check proves that each pack they can name
+# fits between its destination and the end of that WRAM bank.
+UNPACKERS = ('C2Scene_LoadBgGfx', 'C2Scene_LoadExtraObjPack', 'C2Scene_LoadUnkC600', 'C2Scene_UnpackBg3MapPack',
+             'C2Scene_UnpackBgPack', 'C6Scene_UnpackObjPackA', 'C6Scene_UnpackObjPackB', 'C6Scene_UnpackPalPackA',
+             'C6Scene_UnpackPalPackB')
+
+
+class _Watch(_Machine):
+    """The machine, noting the state at the addresses in `watch`."""
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.watch: dict[int, list] = {}
+        self.spawns = set()
+
+    def step(self, s, base_depth):
+        if s.pc in self.watch:
+            self.watch[s.pc].append(s.copy())
+            # only its arguments matter here: go on after the call as if it
+            # returned (absint's way past a callee it does not follow)
+            raise absint.Unresolved('watched')
+        return super().step(s, base_depth)
+
+
+def unpack_check(lang: 'SceneLang', rom: bytes, info: list | None = None) -> list[str]:
+    """For each UNPACKERS routine: the pack tables its code reads (LDA.l
+    table,X in its code, followed statically), every pack in them, and
+    the destinations it gives Decomp_ToWram, traced from its entry as
+    $34/$4E call it with the header pointer on a scene header of zeros
+    (so its loop over the header's slots is followed exactly). Each pack
+    must fit before the end of its destination's bank and miss the bytes
+    the TRUST reason names (DP $58-$5A, the task records, the member
+    words, the script buffer)."""
+    import extract_data
+    pieces = extract_data.read_manifest()
+    by_start = {(0xC00000 + p['offset']): p for p in pieces}
+    tables = {}
+    for p in pieces:
+        if p['piece'] == 'table' and p['param'].startswith('dl x '):
+            a = 0xC00000 + p['offset']
+            tables[a] = [int.from_bytes(rom[p['offset'] + 3 * i:p['offset'] + 3 * i + 3], 'little')
+                         for i in range(int(p['param'][5:]))]
+    size_of = {}
+    for t in {x for v in tables.values() for x in v}:
+        q = by_start.get(t)
+        m = q and re.match(r'^lz(11|12) -> (\d+) B', q['param'])
+        if m:
+            size_of[t] = int(m.group(2))
+    scene_max = max((int(extract_data.PACK_PARAM.match(p['param']).group(2)) for p in pieces
+                     if p['piece'] == 'scene'), default=0)
+    d = lang.d
+    keep = [(0x7E0000 | lang.ptr, 3, 'C2Script_Ptr'),
+            (0x7E0000 | d['C2Scene_TaskRecords'], d['C2Scene_TaskSize'] * 64, 'the task records'),
+            (0x7E0000 | d['C2Scene_MemberWords'], 6, 'C2Scene_MemberWords'),
+            (SCENE_BUF, scene_max, 'the script buffer')]
+    dec = lang.labels['Decomp_ToWram']
+    hdr = 0x7F0000                                  # a scene header of zeros, as known memory
+    known = {hdr + i: 0 for i in range(0x20)}
+    out = []
+    for name in UNPACKERS:
+        code = _code_closure(lang, [(lang.labels[name], True)])
+        used = sorted({op for _, mn, mode, op in code if mn == 'LDA' and mode == 'long_x' and op in tables})
+        if not used:
+            out.append(f'unpack: {name}: its code reads no pack table')
+            continue
+        m = _Watch(lang.image, lang.mask, max_steps=lang.machine.max_steps, callee_steps=lang.machine.callee_steps)
+        m.watch = {dec: []}
+        st = lang._state()
+        st.pc = lang.labels[name]
+        st.a, st.b, st.x, st.y = None, None, None, None
+        st.d, st.db, st.m, st.xf = 0, 0x00, True, False
+        hp = d['C2Scene_HeaderPtr']
+        st.mem = {absint._wram(0x7E0000 | hp + i): hdr >> 8 * i & 0xFF for i in range(3)}
+        try:
+            m.run(st, known)
+        except absint.Unresolved as e:
+            out.append(f'unpack: {name}: not followed to Decomp_ToWram ({e})')
+            continue
+        dests = set()
+        for w in m.watch[dec]:
+            b = [w.mem.get(0x7E0000 | d['Decomp_Dest']), w.mem.get(0x7E0000 | d['Decomp_Dest'] + 1),
+                 w.mem.get(0x7E0000 | d['Decomp_DestBank'])]
+            if None in b:
+                out.append(f'unpack: {name}: a destination not known ({b})')
+                continue
+            dests.add((0x7E | b[2] & 1) << 16 | b[0] | b[1] << 8)     # DestBank bit 0: $7E or $7F
+        if not dests:
+            out.append(f'unpack: {name}: no call of Decomp_ToWram traced')
+        packs = {x: size_of[x] for t in used for x in tables[t] if x in size_of}
+        if info is not None:
+            info.append((name, [by_start[t]['label'] for t in used], sorted(dests), max(packs.values(), default=0)))
+        out += unpack_fit(name, packs, dests, keep)
+    return out
+
+
+def unpack_fit(name: str, packs: dict[int, int], dests: set[int], keep: list[tuple[int, int, str]]) -> list[str]:
+    """Each pack ({address: unpacked size}) at each destination must end
+    within the destination's bank and miss the `keep` ranges."""
+    out = []
+    for pack, n in sorted(packs.items()):
+        for dst in sorted(dests):
+            if (dst & 0xFFFF) + n > 0x10000:
+                out.append(f'unpack: {name}: the pack at ${pack:06X} ({n} B) runs past the end of bank '
+                           f'${dst >> 16:02X} from ${dst:06X}')
+            for a, k, what in keep:
+                if dst < a + k and a < dst + n:
+                    out.append(f'unpack: {name}: the pack at ${pack:06X} unpacked at ${dst:06X} covers {what}')
+    return out
+
+
+# The task record bytes an animation op must not write: .ScriptReturn and
+# .ScriptPtr/.ScriptBank (+$05-$09), which the scene opcodes that run
+# C2Anim_Run (TRUST) are trusted to leave as the script left them, and
+# .AnimTimer, which AnimLang takes to be 0 when an op starts.
+def anim_guard(root: Path = ROOT) -> set[int]:
+    f = struct_offsets(root, 'C2Scene_Task')
+    return set(range(f['ScriptReturn'], f['ScriptBank'] + 1)) | {f['AnimTimer']}
+
+
+def anim_sources(lang: 'AnimLang', rom: bytes) -> list[tuple[str, dict, tuple[int, int], set]]:
+    """(name, known bytes, region, entries) of every animation script the
+    code starts: C2SceneRom_AnimTable's (C2Scene_SetAnim), the two in bank
+    $C2 (C2Scene_TaskLeaderMarker, C2Scene_TaskObjAMarker), and the one in
+    RAM at C2Scene_Unk8600 as C2Scene_Unk5775 builds it (from
+    C2Scene_Unk8600Init and C2Scene_Unk8604Init; a later write to that RAM
+    is not traced)."""
+    import data_survey
+    out = []
+    t = lang.d['C2SceneRom_AnimTable']
+    row = next(r for r in data_survey.read_rows() if r['start'] == f'${t >> 16:02X}:{t & 0xFFFF:04X}')
+    end = t + int(row['size'])
+    known = {t + i: rom[t - 0xC00000 + i] for i in range(end - t)}
+    n, first = 0, None
+    while first is None or t + 2 * n < first:
+        w = (t & 0xFF0000) | known[t + 2 * n] | known[t + 2 * n + 1] << 8
+        first = w if first is None else min(first, w)
+        n += 1
+    entries = {(t & 0xFF0000) | known[t + 2 * i] | known[t + 2 * i + 1] << 8 for i in range(n)}
+    out.append(('C2SceneRom_AnimTable', known, (t + 2 * n, end), entries))
+    by_addr = sorted(lang.labels.values())
+    for name in ('C2Scene_AnimLeaderMarker', 'C2Scene_AnimObjAMarker'):
+        a = lang.labels[name]
+        b = next(x for x in by_addr if x > a)
+        off = a - 0xC00000
+        out.append((name, {a + i: lang.image[off + i] for i in range(b - a)}, (a, b), {a}))
+    ram, size = 0x7E0000 | lang.d['C2Scene_Unk8600'] & 0xFFFF, 4 + lang.d['C2Scene_Unk8604Size']
+    src = [lang.labels['C2Scene_Unk8600Init'] - 0xC00000 + i for i in range(4)]
+    src += [lang.labels['C2Scene_Unk8604Init'] - 0xC00000 + i for i in range(size - 4)]
+    out.append(('C2Scene_Unk8600', {ram + i: lang.image[o] for i, o in enumerate(src)}, (ram, ram + size), {ram}))
+    return out
+
+
+def anim_record_writes(lang: 'AnimLang', op: int, v: int) -> set[int]:
+    """The task record offsets the handler of `op` writes with operand byte
+    v (and zeros after it)."""
+    p = 0x7F0000
+    known = {p: op, p + 1: v, p + 2: 0, p + 3: 0, p + 4: 0}
+    s = lang.entry(known, p)
+    ends = lang.machine.run(s, known)
+    t = 0x7E0000 | lang.task
+    return {k - t for st, _ in ends for k in st.mem if t <= k < t + lang.d['C2Scene_TaskSize']}
+
+
+def anim_check(rom: bytes, root: Path = ROOT) -> list[str]:
+    """The lock on C2Anim_Run's trust: no animation op the code can reach
+    writes the task record bytes ANIM_GUARD. Ops that write the record byte
+    their operand names (found by running each handler with several
+    operands) must not name one in any animation script; no op may write
+    one at a fixed offset."""
+    lang = AnimLang(root)
+    lang.load(root)
+    guard = anim_guard(root)
+    named, out = anim_named_ops(lang, lambda op, v: anim_record_writes(lang, op, v), guard)
+    out += anim_lock(lang, anim_sources(lang, rom), named, guard)
+    lang.save(root)
+    return out
+
+
+ANIM_PROBES = (0x05, 0x09, 0x21)
+
+
+def anim_named_ops(lang: 'Lang', writes, guard: set[int]) -> tuple[set[int], list[str]]:
+    """(the ops that write the record byte their operand names, problems):
+    `writes(op, v)` is the record offsets op's handler writes with operand
+    v. An op writing a guarded byte whatever its operand is a problem (the
+    timed ops' .AnimTimer is theirs to count)."""
+    named, out = set(), []
+    for op in range(lang.count):
+        probes = {v: writes(op, v) for v in ANIM_PROBES}
+        if all(v in w for v, w in probes.items()):
+            named.add(op)
+        fixed = set.intersection(*probes.values()) & guard - {getattr(lang, 'timer', None)}
+        if fixed:
+            out.append(f'anim: {op_name(lang, op)} writes task record byte(s) {sorted(fixed)} whatever its operand')
+    return named, out
+
+
+def anim_lock(lang: 'Lang', sources, named: set[int], guard: set[int]) -> list[str]:
+    """No op of `named` in the animation scripts reachable from `sources`
+    names a guarded record byte."""
+    out = []
+    for name, known, region, entries in sources:
+        try:
+            d = disassemble(lang, known, [region], entries)
+        except ScriptsError as e:
+            out.append(f'anim: {name}: {e}')
+            continue
+        for a, o in sorted(d['ops'].items()):
+            if o.op in named and known[a + 1] in guard:
+                out.append(f'anim: {name} ${a:06X}: {op_name(lang, o.op)} writes task record byte ${known[a + 1]:02X}')
+    return out
+
+
 def check(rom: bytes, root: Path = ROOT, quiet: bool = True) -> list[str]:
     import extract_data
     pieces = extract_data.read_manifest()
@@ -1463,6 +1801,8 @@ def check(rom: bytes, root: Path = ROOT, quiet: bool = True) -> list[str]:
             st = stats(text)
             print(f'scripts: {p["label"]}: {st["lines"]:,} lines, {st["data"]:,} B nothing reaches')
     problems += exits_check(rom, pieces, root)
+    problems += anim_check(rom, root)
+    problems += unpack_check(SceneLang(root), rom)
     return problems
 
 
