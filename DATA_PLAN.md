@@ -563,7 +563,11 @@ palette index is the pixel value) and a sidecar (format, tile count, region) to
 them as "graphics". No image is committed. The PNG reader is the tool's own (no library). It
 takes indexed PNGs of bit depth 1-8 with any row filter. It refuses anything else, an image of
 another size, an index the format cannot hold, and pixels in the cells past the last tile. The
-palette is a grey ramp: the regions' own palettes are not proven here.
+palette is a grey ramp: the regions' own palettes are not proven here. The PNG must keep that
+ramp (PLTE first entries as written). Many editors sort or optimise a palette and renumber the
+pixels to match; the picture looks the same, but the bytes would differ, so the build refuses
+it and says why. Bytes after IEND, a second IHDR, and a sidecar line given twice or naming other
+addresses are refused too.
 
 - **How a format is proved** (the proof of each region is in `graphics.FORMATS`): from where
   the code sends the bytes and what the PPU makes of that VRAM at that point, or from how the
@@ -574,7 +578,9 @@ palette is a grey ramp: the regions' own palettes are not proven here.
       goes to the BG3 tiles, and is also copied 16 B per tile into planes 0-1 of 4bpp tiles;
     - `MenuRom_Tiles4bpp`, `MenuRom_WindowGfx`, `MenuRom_VramTiles` and the two blocks
       `Menu_VramRecsWin` sends from `$FF:0000` and `$FF:E55C` go to the BG1/BG2 tiles: 4bpp;
-    - `MenuRom_ObjTiles` goes to the sprite tiles;
+    - `MenuRom_ObjTiles` goes to the sprite tiles. `Menu_TilesOrPlanes23` then sets planes 2-3
+      to planes 0 OR 1, so the stored planes 2-3 are never shown. `MenuRom_WindowGfx`'s plane 3
+      is replaced the same way (`Menu_TilesOrPlane3`). The images show the bytes as stored;
     - `MenuRom_Tiles3bpp` is 3bpp as `Menu_Expand3bppTiles` reads it (24 B: planes 0-1, then
       plane 2);
     - `MenuRom_GlyphRows` is 2bpp as `BankFF_BuildTileSets` copies it into planes 0-1.
@@ -583,21 +589,23 @@ palette is a grey ramp: the regions' own palettes are not proven here.
     tiles the OAM records name. Sprite tiles are 4bpp.
   - **The map view's markers**: `C2Scene_MapView` sets OBSEL and DMAs them to sprite tiles.
   - **`BattleRom_InitTiles2bpp`**: `Battle_InitSceneGfx` widens it, 16 B and 16 zero bytes per
-    4bpp tile.
+    tile. The 16 B are planes 0-1, rows interleaved, which is the same layout at every depth, so
+    the proof does not need the depth of the buffer or the layer.
+  - **`BattleRom_InitTiles4bpp`** (`$D1:3900`): the same routine copies its 64 tiles, 32 B each,
+    into that buffer after them. The buffer is the code's own 32-B tiles (2bpp ones widened to 32 B
+    with zero planes 2-3), so they are 4bpp. The VRAM layer it reaches is not traced.
 - **Survey rows cut to their readers.** Three rows are cut where their readers' extents end:
   - `$FF:0000`: its $1F80 B have the reader `Menu_VramRecsWin`, which the survey did not have;
     224 B after them have none.
   - `$FF:9390`: 8 B past the font's $E00 B.
   - `MenuRom_Tiles3bpp`: `Menu_Expand3bppTiles` reads $95 tiles, but only $65 are used, and the
     rest of the row is the 4bpp block sent to $1E00.
-- **Results.** 21 regions, 242,904 B, encode back byte-exact: 6,848 4bpp tiles of the seven
+- **Results.** 22 regions, 244,952 B, encode back byte-exact: 6,848 4bpp tiles of the seven
   characters (219,136 B), the menu's tiles and the two smaller sets.
-- **Not proven, still extracted** (102,784 B of `graphics` and `font` rows; listed in the survey):
+- **Not proven, still extracted** (100,736 B of `graphics` and `font` rows; listed in the survey):
   - the battle's uploads whose VRAM layer is not traced. The battle never writes BG12NBA, BG34NBA
     or OBSEL, and its BG mode comes from HDMA line data. These are `BattleRom_FxTileGfx` (`$CF`),
-    `BattleRom_FxGfxSrc` (`$D0`), `BattleRom_InitTiles4bpp` (its 32-B units follow the widened
-    tiles in the same buffer, but the layer is not traced), `BattleRom_InitTilesB/C/D` and
-    `BattleRom_InitGfxA`;
+    `BattleRom_FxGfxSrc` (`$D0`), `BattleRom_InitTilesB/C/D` and `BattleRom_InitGfxA`;
   - the text font (`TextWinRom_Font`, `TextWinRom_FontRight`), which `TextWin_DrawGlyph` draws in
     code: not traced yet;
   - the mode-7 dial pixels (`C2SceneRom_DialNibbles`).

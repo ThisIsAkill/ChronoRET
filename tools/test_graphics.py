@@ -68,7 +68,7 @@ def png_with(width, height, pixels, depth=8, ctype=3, filters=None, interlace=0)
     chunk = g._chunk
     return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, depth, ctype, 0, 0,
                                                                 interlace))
-            + chunk(b'PLTE', bytes(48)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+            + chunk(b'PLTE', g.grey_ramp(4) + bytes(36)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
 
 
 class Tiles(unittest.TestCase):
@@ -157,14 +157,40 @@ class Images(unittest.TestCase):
                 (b'GIF89a' + good[6:], 'not a PNG file'),
                 (good[:ihdr_end + 3], 'ends inside a chunk header'),
                 (good[:-12], 'no IHDR or no IEND'),
-                (chunk_file((b'IHDR', ihdr), (b'IDAT', b'not zlib'), (b'IEND', b'')), 'does not inflate'),
-                (chunk_file((b'IHDR', ihdr), (b'IDAT', zlib.compress(bytes(10))), (b'IEND', b'')),
+                (chunk_file((b'IHDR', ihdr), (b'PLTE', g.grey_ramp(4)), (b'IDAT', b'not zlib'), (b'IEND', b'')), 'does not inflate'),
+                (chunk_file((b'IHDR', ihdr), (b'PLTE', g.grey_ramp(4)), (b'IDAT', zlib.compress(bytes(10))), (b'IEND', b'')),
                  'image data is 10 B, not'),
-                (chunk_file((b'IHDR', ihdr), (b'IDAT', zlib.compress(bytes([5] + [0] * 128) * 16)),
+                (chunk_file((b'IHDR', ihdr), (b'PLTE', g.grey_ramp(4)), (b'IDAT', zlib.compress(bytes([5] + [0] * 128) * 16)),
                             (b'IEND', b'')), 'row filter 5')):
             with self.subTest(why=why):
                 with self.assertRaisesRegex(g.GraphicsError, why):
                     g.read_png(data)
+
+    def test_palette_must_be_the_ramp_written(self):
+        good = self.png()
+        _, _, px = g.read_png(good)
+        i = good.index(b'PLTE') - 4
+        n = int.from_bytes(good[i:i + 4], 'big')
+        ramp = g.grey_ramp(4)
+        # an editor's reorder: colours 1 and 2 swapped, the indices remapped; the picture is the same
+        swapped = ramp[:3] + ramp[6:9] + ramp[3:6] + ramp[9:]
+        remap = [{1: 2, 2: 1}.get(v, v) for v in px]
+        png = png_with(128, 16, remap)
+        png = png.replace(g._chunk(b'PLTE', g.grey_ramp(4) + bytes(36)), g._chunk(b'PLTE', swapped))
+        with self.assertRaisesRegex(g.GraphicsError, r'not the grey ramp .* \(entry 1 is \(170, 170, 170\)'):
+            g.from_image('2bpp', 32, png, b'')
+        no_plte = good[:i] + good[i + 12 + n:]
+        with self.assertRaisesRegex(g.GraphicsError, 'no PLTE chunk'):
+            g.read_png(no_plte)
+        self.assertEqual(g.from_image('2bpp', 32, good, b''), DATA)      # the ramp as written
+
+    def test_bytes_after_iend_and_second_ihdr_refused(self):
+        good = self.png()
+        with self.assertRaisesRegex(g.GraphicsError, '4 B after its IEND chunk'):
+            g.read_png(good + b'junk')
+        twice = good[:33] + good[8:33] + good[33:]
+        with self.assertRaisesRegex(g.GraphicsError, 'second or malformed IHDR'):
+            g.read_png(twice)
 
     def test_png_errors_name_the_file(self):
         with self.assertRaisesRegex(g.GraphicsError, '^x.png: not a PNG file'):
@@ -180,7 +206,8 @@ class Images(unittest.TestCase):
             g.read_sidecar(side.replace('width 16', 'width 8'))
 
     def test_piece_size_checked(self):
-        p = {'label': 'X', 'param': '2bpp 32 tiles', 'size': str(len(DATA) + 1)}
+        p = {'label': 'X', 'param': '2bpp 32 tiles', 'size': str(len(DATA) + 1), 'start': '$FF:0000',
+             'end': '$FF:01FF'}
         side = g.sidecar('X', '$FF:0000', '$FF:01FF', '2bpp', 32, b'')
         with self.assertRaisesRegex(g.GraphicsError, '512 B; the piece is 513'):
             g.encode_piece(p, self.png(), side)
@@ -203,18 +230,23 @@ class Images(unittest.TestCase):
             g.from_image('2bpp', 20, png_with(128, 16, px), b'')
 
     def test_sidecar_must_match(self):
-        p = {'label': 'X', 'param': '2bpp 32 tiles', 'size': str(len(DATA))}
+        p = {'label': 'X', 'param': '2bpp 32 tiles', 'size': str(len(DATA)), 'start': '$FF:0000', 'end': '$FF:01FF'}
         side = g.sidecar('X', '$FF:0000', '$FF:01FF', '2bpp', 32, b'')
         self.assertEqual(g.encode_piece(p, self.png(), side), DATA)
         with self.assertRaisesRegex(g.GraphicsError, 'the sidecar says 4bpp'):
             g.encode_piece(p, self.png(), side.replace('format 2bpp', 'format 4bpp'))
         with self.assertRaisesRegex(g.GraphicsError, 'the sidecar is for Y'):
             g.encode_piece(p, self.png(), side.replace('region X', 'region Y'))
+        with self.assertRaisesRegex(g.GraphicsError, r'the sidecar is for X \$12:3456'):
+            g.encode_piece(p, self.png(), side.replace('$FF:0000 $FF:01FF', '$12:3456 $12:FFFF'))
+        with self.assertRaisesRegex(g.GraphicsError, 'a second format line'):
+            g.encode_piece(p, self.png(), side + 'format 2bpp\n')
 
     def test_tail_kept(self):
         data = DATA + b'\x12\x34'
         png, tail = g.to_image('2bpp', data, 2)
-        p = {'label': 'X', 'param': '2bpp 32 tiles + 2 B', 'size': str(len(data))}
+        p = {'label': 'X', 'param': '2bpp 32 tiles + 2 B', 'size': str(len(data)), 'start': '$FF:0000',
+             'end': '$FF:0201'}
         side = g.sidecar('X', '$FF:0000', '$FF:0201', '2bpp', 32, tail)
         self.assertEqual(g.encode_piece(p, png, side), data)
         with self.assertRaisesRegex(g.GraphicsError, 'the tail is XX bytes'):

@@ -955,7 +955,7 @@ BattleRom_UnkColours38FA:
 ; Read by Battle_InitSceneGfx.
 org $D13900
 BattleRom_InitTiles4bpp:
-    incbin "../../build/assets/graphics/BattleRom_InitTiles4bpp.bin"
+    incbin "../../build/gfx/BattleRom_InitTiles4bpp.bin"          ; graphics: 4bpp 64 tiles
 
 ; $D1:4100-$D1:4345 (582 B), palette, confirmed: 6 B per colour set (3 colours)
 ; Read by BattleAct_OpLoadPalEntry, BattleAct_StepPalettes.
