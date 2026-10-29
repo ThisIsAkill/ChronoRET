@@ -66,6 +66,12 @@ How each piece's bytes are made (the manifest's `piece` column):
              (tools/scripts.py's FX_ROWS): build/assets/fx/<label>.bfx; the
              build assembles it to build/fx/<label>.bin, which is incbin'd.
              Counted as "layer-effect scripts".
+  graphics   a row of tile graphics whose format a reader proves
+             (tools/graphics.py's FORMATS): build/assets/gfx/<label>.png (an
+             indexed PNG, palette index = pixel value) and <label>.gfx (its
+             sidecar); the build encodes them to build/gfx/<label>.bin,
+             which is incbin'd. param: "<format> N tiles [+ T B]". Counted
+             as "graphics".
   records    a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
@@ -114,6 +120,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import battle  # noqa: E402
+import graphics  # noqa: E402
 import scripts  # noqa: E402
 import data_survey  # noqa: E402
 import records  # noqa: E402
@@ -130,6 +137,7 @@ RECORDS_OUT = Path('build/records')    # the encoded records pieces (tools/build
 BATTLE_OUT = Path('build/battle')      # the assembled battle script pieces (tools/build_rom.py)
 SCENE_OUT = Path('build/scene')        # the assembled (unpacked) scene scripts (tools/build_rom.py)
 FX_OUT = Path('build/fx')              # the assembled layer-effect scripts (tools/build_rom.py)
+GFX_OUT = Path('build/gfx')            # the encoded graphics pieces (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
@@ -140,9 +148,11 @@ TEXT_PREFIX = '../../build/text/'
 RECORDS_PREFIX = '../../build/records/'
 BATTLE_PREFIX = '../../build/battle/'
 FX_PREFIX = '../../build/fx/'
+GFX_PREFIX = '../../build/gfx/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx')
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
+          'graphics')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -152,6 +162,7 @@ EVENT_PACK = re.compile(r'\bvia Evt_PackPtrs\[')
 BATTLE_ASSET = re.compile(r'^battle/([a-z]+)\.bscr$')
 SCENE_ASSET = re.compile(r'^scene/([A-Za-z_][A-Za-z0-9_]*)\.scn$')
 SCENE_PACK = re.compile(r'\bvia C2SceneRom_ScriptPacks\[')
+GFX_ASSET = re.compile(r'^gfx/([A-Za-z_][A-Za-z0-9_]*)\.png$')
 FX_ASSET = re.compile(r'^fx/([A-Za-z_][A-Za-z0-9_]*)\.bfx$')
 BATTLE_PARAM = re.compile(r'^([a-z]+)/([a-z]+)$')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
@@ -338,6 +349,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'scene/{label}.scn'
         elif piece == 'fx':
             asset = f'fx/{label}.bfx'
+        elif piece == 'graphics':
+            asset = f'gfx/{label}.png'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
@@ -356,6 +369,9 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             add(label, s, e, 'events' if EVENT_PACK.search(row['notes'])
                 else 'scene' if SCENE_PACK.search(row['notes']) else 'packed',
                 param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
+        elif kind == 'graphics' and graphics.layout_for(row['start'], e - s) is not None:
+            add(label, s, e, 'graphics', param=graphics.param_of(*graphics.layout_for(row['start'], e - s)),
+                row=row)
         elif row['start'] in scripts.FX_ROWS:
             if kind != 'battle_script':
                 raise DataError(f'{row["start"]}: a {kind} row cannot be the layer-effect scripts')
@@ -456,6 +472,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
                 problems.append(f'{where}: a scene piece\'s asset is scene/<label>.scn and its param '
                                 f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'graphics':
+            m = GFX_ASSET.match(p['asset'])
+            if not m or m.group(1) != p['label'] or not graphics.PARAM.match(p['param']):
+                problems.append(f'{where}: a graphics piece\'s asset is gfx/<label>.png and its param '
+                                f'"<format> N tiles [+ T B]": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'fx':
             m = FX_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or p['param']:
@@ -501,6 +522,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
         elif p['piece'] == 'fx':
             out[f'{FX_PREFIX}{p["label"]}.bin'] = p
+        elif p['piece'] == 'graphics':
+            out[f'{GFX_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'text':
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'records':
@@ -522,6 +545,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
         elif p['piece'] == 'fx':
             out[FX_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif p['piece'] == 'graphics':
+            out[GFX_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'text':
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'records':
@@ -640,8 +665,9 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; from your own ROM to build/assets/, a pack tools/build_rom.py',
         '; makes from one in build/packs/ (event scripts assembled from',
         '; their disassembly first), text or records it encodes into',
-        '; build/text/ and build/records/, or battle and layer-effect',
-        '; scripts it assembles into build/battle/ and build/fx/',
+        '; build/text/ and build/records/, battle and layer-effect',
+        '; scripts it assembles into build/battle/ and build/fx/, or',
+        '; graphics it encodes from images into build/gfx/',
         '; (symbols/data_assets.csv lists them; nothing here is ROM data).',
         '; ============================================================',
     ]
@@ -676,6 +702,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene script')
         elif p['piece'] == 'fx':
             out.append(f'    incbin "{FX_PREFIX}{p["label"]}.bin"          ; layer-effect scripts')
+        elif p['piece'] == 'graphics':
+            out.append(f'    incbin "{GFX_PREFIX}{p["label"]}.bin"          ; graphics: {p["param"]}')
         elif p['piece'] == 'records':
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'battle':
@@ -782,7 +810,7 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
-    for tool in ('events.py', 'battle.py', 'scripts.py', 'absint.py', 'disasm.py'):   # the script disassemblies
+    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'absint.py', 'disasm.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
@@ -795,8 +823,9 @@ def _stamp_text(key: str, out_dir: Path, pieces: list[dict]) -> str:
     for p in pieces:
         if p['asset'] and p['asset'] not in seen:       # a text unit's file serves several pieces
             seen.add(p['asset'])
-            f = out_dir / p['asset']
-            lines.append(f'{hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else "-"} {p["asset"]}')
+            for a in [p['asset']] + ([graphics.sidecar_path(p['asset'])] if p['piece'] == 'graphics' else []):
+                f = out_dir / a
+                lines.append(f'{hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else "-"} {a}')
     return '\n'.join(lines) + '\n'
 
 
@@ -828,6 +857,15 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         if p['piece'] in ('table', 'text', 'records'):
             continue
         if p['piece'] in ('events', 'battle', 'scene', 'fx'):
+            continue
+        if p['piece'] == 'graphics':
+            fmt, tiles, tail = graphics.parse_param(p['param'])
+            png, t = graphics.to_image(fmt, rom[s:e], tail)
+            dest = out_dir / p['asset']
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            c3pack._write(dest, png)
+            c3pack._write(out_dir / graphics.sidecar_path(p['asset']),
+                          graphics.sidecar(p['label'], p['start'], p['end'], fmt, tiles, t).encode())
             continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)

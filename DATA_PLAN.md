@@ -523,6 +523,57 @@ source.
   - The fx opcodes with no handler (`$FA`-`$FE`) and scene opcodes above `$52` would jump through
     the code after their tables. None is reached; the interpreter refuses them.
 
+## Graphics as images (step 8, first part: raw tiles)
+
+On the `data-graphics` branch. `tools/graphics.py` turns tile graphics whose format a reader
+proves into `graphics` pieces. Extraction writes an indexed PNG per region (16 tiles wide; the
+palette index is the pixel value) and a sidecar (format, tile count, region) to
+`build/assets/gfx/`. The build encodes them back to `build/gfx/`, and `tools/verify.py` counts
+them as "graphics". No image is committed. The PNG reader is the tool's own (no library). It
+takes indexed PNGs of bit depth 1-8 with any row filter. It refuses anything else, an image of
+another size, an index the format cannot hold, and pixels in the cells past the last tile. The
+palette is a grey ramp: the regions' own palettes are not proven here.
+
+- **How a format is proved** (the proof of each region is in `graphics.FORMATS`): from where
+  the code sends the bytes and what the PPU makes of that VRAM at that point, or from how the
+  code itself rebuilds them:
+  - **The menu** (`Menu_InitPpuAndRam`: mode 1, BG1/BG2 tiles at VRAM $0000, BG3 tiles at $7000,
+    sprite tiles at $4000; `Menu_LoadGraphics` runs after it):
+    - the 2bpp font (`MenuRom_Font2bpp`'s $E00 B, which covers three rows, and `MenuRom_Font2bppB`)
+      goes to the BG3 tiles, and is also copied 16 B per tile into planes 0-1 of 4bpp tiles;
+    - `MenuRom_Tiles4bpp`, `MenuRom_WindowGfx`, `MenuRom_VramTiles` and the two blocks
+      `Menu_VramRecsWin` sends from `$FF:0000` and `$FF:E55C` go to the BG1/BG2 tiles: 4bpp;
+    - `MenuRom_ObjTiles` goes to the sprite tiles;
+    - `MenuRom_Tiles3bpp` is 3bpp as `Menu_Expand3bppTiles` reads it (24 B: planes 0-1, then
+      plane 2);
+    - `MenuRom_GlyphRows` is 2bpp as `BankFF_BuildTileSets` copies it into planes 0-1.
+  - **The character sprite tiles** (`$D2`-`$D5`): the sprite tile builders (`Spr_CopyTile` and
+    its bank copiers, 32 B per tile number) fill the sprite tile buffer that goes to the OBJ
+    tiles the OAM records name. Sprite tiles are 4bpp.
+  - **The map view's markers**: `C2Scene_MapView` sets OBSEL and DMAs them to sprite tiles.
+  - **`BattleRom_InitTiles2bpp`**: `Battle_InitSceneGfx` widens it, 16 B and 16 zero bytes per
+    4bpp tile.
+- **Survey rows cut to their readers.** Three rows are cut where their readers' extents end:
+  - `$FF:0000`: its $1F80 B have the reader `Menu_VramRecsWin`, which the survey did not have;
+    224 B after them have none.
+  - `$FF:9390`: 8 B past the font's $E00 B.
+  - `MenuRom_Tiles3bpp`: `Menu_Expand3bppTiles` reads $95 tiles, but only $65 are used, and the
+    rest of the row is the 4bpp block sent to $1E00.
+- **Results.** 21 regions, 242,904 B, encode back byte-exact: 6,848 4bpp tiles of the seven
+  characters (219,136 B), the menu's tiles and the two smaller sets.
+- **Not proven, still extracted** (102,784 B of `graphics` and `font` rows; listed in the survey):
+  - the battle's uploads whose VRAM layer is not traced. The battle never writes BG12NBA, BG34NBA
+    or OBSEL, and its BG mode comes from HDMA line data. These are `BattleRom_FxTileGfx` (`$CF`),
+    `BattleRom_FxGfxSrc` (`$D0`), `BattleRom_InitTiles4bpp` (its 32-B units follow the widened
+    tiles in the same buffer, but the layer is not traced), `BattleRom_InitTilesB/C/D` and
+    `BattleRom_InitGfxA`;
+  - the text font (`TextWinRom_Font`, `TextWinRom_FontRight`), which `TextWin_DrawGlyph` draws in
+    code: not traced yet;
+  - the mode-7 dial pixels (`C2SceneRom_DialNibbles`).
+- **Left:** the packed graphics (location tiles, object sprite tiles, scene BG and sprite
+  graphics, battle backgrounds) are the second part. Edits to any extracted asset are lost when
+  extraction runs again (as for the text and scripts); the encoder itself takes edited PNGs.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
@@ -552,7 +603,8 @@ source.
    extracted, and the inferred table ends.
 7. **Script languages**: battle, layer-effect, scene and location event scripts (done,
    below), music sequences (2-3).
-8. **Readable assets**: tile and palette converters (2-3), sprite frames (2), maps if wanted.
+8. **Readable assets**: tile converters (raw tiles: first part done, below; the packed ones
+   next), palette converters, sprite frames (2), maps if wanted.
 9. **Unknown and probable rows** (1).
 
 ## Overall estimate

@@ -9,15 +9,23 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/
+; build/text/ and build/records/, battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/, or
+; graphics it encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $FF:0000-$FF:205F (8,288 B), graphics, probable: tile-like bytes (2bpp, by their look)
+; $FF:0000-$FF:1F7F (8,064 B), graphics, confirmed: $1F80 B of 4bpp tiles to VRAM $2010 (BG1/BG2
+; tiles in the menu's mode 1)
+; Read by Menu_LoadGraphics.
 org $FF0000
 Gfx_FF0000:
-    incbin "../../build/assets/graphics/Gfx_FF0000.bin"
+    incbin "../../build/gfx/Gfx_FF0000.bin"          ; graphics: 4bpp 252 tiles
+
+; $FF:1F80-$FF:205F (224 B), unknown, unknown: 224 B after the $1F80 B Menu_VramRecsWin sends
+org $FF1F80
+Unknown_FF1F80:
+    incbin "../../build/assets/unknown/Unknown_FF1F80.bin"
 
 ; $FF:2060-$FF:385F (6,144 B), font, confirmed: 24 B per glyph code (256): the left 8 pixels of
 ; 24 rows (12 lines x 2 planes, probably)
@@ -97,21 +105,26 @@ BattleRom_InitGfxA:
 ; Read by Menu_LoadGraphics.
 org $FF8E60
 MenuRom_Font2bpp:
-    incbin "../../build/assets/graphics/MenuRom_Font2bpp.bin"
+    incbin "../../build/gfx/MenuRom_Font2bpp.bin"          ; graphics: 2bpp 64 tiles
 
 ; $FF:9260-$FF:938F (304 B), graphics, confirmed: 64 B sent to VRAM $57E0 (then bytes no reader
 ; of its own reads)
 ; Read by Field_UploadUnk57E0.
 org $FF9260
 FieldRom_Unk9260:
-    incbin "../../build/assets/graphics/FieldRom_Unk9260.bin"
+    incbin "../../build/gfx/FieldRom_Unk9260.bin"          ; graphics: 2bpp 19 tiles
 
-; $FF:9390-$FF:9C67 (2,264 B), graphics, confirmed: 10 x 16 B 2bpp tiles (then bytes no reader
+; $FF:9390-$FF:9C5F (2,256 B), graphics, confirmed: 10 x 16 B 2bpp tiles (then bytes no reader
 ; of its own reads)
 ; Read by BankFF_WidenTiles.
 org $FF9390
 MenuRom_ShadowTiles:
-    incbin "../../build/assets/graphics/MenuRom_ShadowTiles.bin"
+    incbin "../../build/gfx/MenuRom_ShadowTiles.bin"          ; graphics: 2bpp 141 tiles
+
+; $FF:9C60-$FF:9C67 (8 B), unknown, unknown: 8 B past the $FF:8E60 block's $E00 B
+org $FF9C60
+Unknown_FF9C60:
+    incbin "../../build/assets/unknown/Unknown_FF9C60.bin"
 
 ; $FF:9C68-$FF:9C6F (8 B), palette, confirmed: 4 colours
 ; Read by Battle_InitScene, Menu_LoadGraphics.
@@ -150,7 +163,7 @@ org $FF9CF0
 BattleRom_ObjTilePieces:
 FieldRom_Unk9CF0:
 MenuRom_ObjTiles:
-    incbin "../../build/assets/graphics/BattleRom_ObjTilePieces.bin"
+    incbin "../../build/gfx/BattleRom_ObjTilePieces.bin"          ; graphics: 4bpp 8 tiles
 
 ; $FF:9DF0-$FF:9E09 (26 B), palette, confirmed: 16 colours -> $80-$8F (the first sprite palette)
 ; Read by Menu_LoadGraphics, Menu_MainMenuLoop.
@@ -170,7 +183,7 @@ MenuRom_MainPalC:
 ; Read by Menu_LoadGraphics, Menu_LoadWindowGfx.
 org $FF9E10
 MenuRom_WindowGfx:
-    incbin "../../build/assets/graphics/MenuRom_WindowGfx.bin"
+    incbin "../../build/gfx/MenuRom_WindowGfx.bin"          ; graphics: 4bpp 160 tiles
 
 ; $FF:B210-$FF:B30F (256 B), palette, confirmed: colour sets 16 B apart (window palettes)
 ; Read by Pal_LoadUnkRow0, Menu_LoadWindowPal.
@@ -622,14 +635,14 @@ MenuRom_NameChars:
 ; Read by Menu_LoadGraphics.
 org $FFC9FC
 MenuRom_Font2bppB:
-    incbin "../../build/assets/graphics/MenuRom_Font2bppB.bin"
+    incbin "../../build/gfx/MenuRom_Font2bppB.bin"          ; graphics: 2bpp 16 tiles
 
 ; $FF:CAFC-$FF:CB9B (160 B), graphics, confirmed: 10 x 16 B: 2bpp tiles BankFF_BuildTileSets
 ; starts from
 ; Read by BankFF_BuildTileSets.
 org $FFCAFC
 MenuRom_GlyphRows:
-    incbin "../../build/assets/graphics/MenuRom_GlyphRows.bin"
+    incbin "../../build/gfx/MenuRom_GlyphRows.bin"          ; graphics: 2bpp 10 tiles
 
 ; $FF:CB9C-$FF:CBA3 (8 B), palette, confirmed: 4 colours -> $84-$87 for the HP / MP numbers
 ; Read by Menu_UseHealOn.
@@ -907,13 +920,20 @@ MenuRom_XchgUnkD57A:
 ; Read by Menu_LoadGraphics.
 org $FFD5E4
 MenuRom_Tiles4bpp:
-    incbin "../../build/assets/graphics/MenuRom_Tiles4bpp.bin"
+    incbin "../../build/gfx/MenuRom_Tiles4bpp.bin"          ; graphics: 4bpp 48 tiles
 
-; $FF:DBE4-$FF:E8DB (3,320 B), graphics, confirmed: $95 3bpp tiles expanded after them
+; $FF:DBE4-$FF:E55B (2,424 B), graphics, confirmed: $65 3bpp tiles (24 B) expanded after them
 ; Read by Menu_LoadGraphics.
 org $FFDBE4
 MenuRom_Tiles3bpp:
-    incbin "../../build/assets/graphics/MenuRom_Tiles3bpp.bin"
+    incbin "../../build/gfx/MenuRom_Tiles3bpp.bin"          ; graphics: 3bpp 101 tiles
+
+; $FF:E55C-$FF:E8DB (896 B), graphics, confirmed: $380 B of 4bpp tiles to VRAM $1E00 (BG1/BG2
+; tiles in the menu's mode 1)
+; Read by Menu_LoadGraphics.
+org $FFE55C
+Gfx_FFE55C:
+    incbin "../../build/gfx/Gfx_FFE55C.bin"          ; graphics: 4bpp 28 tiles
 
 ; $FF:E8DC-$FF:EB87 (684 B), packed_lz, confirmed: lz12 -> 1536 B: menu screen data (unpacked to
 ; Menu_SprUnpackBuf)
@@ -927,7 +947,7 @@ MenuRom_ScreenGfx:
 ; Read by Menu_VramRecRomTiles.
 org $FFEB88
 MenuRom_VramTiles:
-    incbin "../../build/assets/graphics/MenuRom_VramTiles.bin"
+    incbin "../../build/gfx/MenuRom_VramTiles.bin"          ; graphics: 4bpp 36 tiles
 
 ; $FF:F008-$FF:F547 (1,344 B), tilemap, confirmed: tilemap data Menu_NameChoiceInit copies
 ; Read by Menu_NameChoiceInit.

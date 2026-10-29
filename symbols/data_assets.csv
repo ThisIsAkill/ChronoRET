@@ -137,7 +137,7 @@ Padding_C6DD05,$C6:DD05,$C6:DFFF,763,fill,,$00
 Text_C6F000,$C6:F000,$C6:F355,854,text,text/SceneLabels.txt,strings
 Padding_C6F356,$C6:F356,$C6:F3FF,170,fill,,$00
 C2SceneRom_LabelStrings,$C6:F400,$C6:F4FF,256,text,text/SceneLabels.txt,ptrs ptr
-C2SceneRom_MapMarkerTiles,$C6:F500,$C6:F53F,64,extracted,graphics/C2SceneRom_MapMarkerTiles.bin,
+C2SceneRom_MapMarkerTiles,$C6:F500,$C6:F53F,64,graphics,gfx/C2SceneRom_MapMarkerTiles.png,4bpp 2 tiles
 C2SceneRom_MapViewObjPal,$C6:F540,$C6:F55F,32,records,records/C2SceneRom_MapViewObjPal.tsv,palette 16 x 2 B
 C2SceneRom_ZoomDivA,$C6:F560,$C6:F59F,64,records,records/C2SceneRom_ZoomDivA.tsv,table 32 x 2 B
 C2SceneRom_ZoomDivB,$C6:F5A0,$C6:F5DF,64,records,records/C2SceneRom_ZoomDivB.tsv,table 32 x 2 B
@@ -700,7 +700,7 @@ BattleRom_PalSets14,$D1:4400,$D1:49AF,1456,extracted,palette/BattleRom_PalSets14
 Padding_D149B0,$D1:49B0,$D1:4AFF,336,fill,,$00
 BattleRom_WeaponColours,$D1:4B00,$D1:4BBF,192,extracted,palette/BattleRom_WeaponColours.bin,
 Padding_D14BC0,$D1:4BC0,$D1:4C7F,192,fill,,$00
-Gfx_D14C80,$D1:4C80,$D1:4D7F,256,extracted,graphics/Gfx_D14C80.bin,
+Gfx_D14C80,$D1:4C80,$D1:4D7F,256,graphics,gfx/Gfx_D14C80.png,2bpp 16 tiles
 BattleRom_HitNumColours,$D1:4D80,$D1:4D8F,16,records,records/BattleRom_HitNumColours.tsv,palette 8 x 2 B
 BattleRom_SpecialPals,$D1:4D90,$D1:50A1,786,extracted,palette/BattleRom_SpecialPals.bin,
 Table_D150A2,$D1:50A2,$D1:57FF,1886,extracted,table/Table_D150A2.bin,
@@ -722,13 +722,13 @@ BattleRom_FxScripts,$D1:6240,$D1:646B,556,extracted,table/BattleRom_FxScripts.bi
 BattleRom_FxScriptPtrs,$D1:646C,$D1:A232,15815,fx,fx/BattleRom_FxScriptPtrs.bfx,
 BattleRom_FxRecords,$D1:A233,$D1:A574,834,extracted,table/BattleRom_FxRecords.bin,
 BattleRom_FxMapPtrs,$D1:A575,$D1:E709,16789,extracted,tilemap/BattleRom_FxMapPtrs.bin,
-Gfx_D20000,$D2:0000,$D2:72BF,29376,extracted,graphics/Gfx_D20000.bin,
-Gfx_D272C0,$D2:72C0,$D2:EE7F,31680,extracted,graphics/Gfx_D272C0.bin,
+Gfx_D20000,$D2:0000,$D2:72BF,29376,graphics,gfx/Gfx_D20000.png,4bpp 918 tiles
+Gfx_D272C0,$D2:72C0,$D2:EE7F,31680,graphics,gfx/Gfx_D272C0.png,4bpp 990 tiles
 SprTilesPack_236,$D2:EE80,$D2:F85D,2526,packed,packed_lz/SprTilesPack_236.bin,lz12 -> 2816 B
 SprTilesPack_227,$D2:F85E,$D2:FF93,1846,packed,packed_lz/SprTilesPack_227.bin,lz12 -> 2176 B
 Padding_D2FF94,$D2:FF94,$D2:FFFF,108,fill,,$00
-Gfx_D30000,$D3:0000,$D3:6B3F,27456,extracted,graphics/Gfx_D30000.bin,
-Gfx_D36B40,$D3:6B40,$D3:E27F,30528,extracted,graphics/Gfx_D36B40.bin,
+Gfx_D30000,$D3:0000,$D3:6B3F,27456,graphics,gfx/Gfx_D30000.png,4bpp 858 tiles
+Gfx_D36B40,$D3:6B40,$D3:E27F,30528,graphics,gfx/Gfx_D36B40.png,4bpp 954 tiles
 SprTilesPack_189,$D3:E280,$D3:E745,1222,packed,packed_lz/SprTilesPack_189.bin,lz12 -> 1600 B
 SprTilesPack_190,$D3:E746,$D3:E8A8,355,packed,packed_lz/SprTilesPack_190.bin,lz12 -> 384 B
 SprTilesPack_191,$D3:E8A9,$D3:EA5A,434,packed,packed_lz/SprTilesPack_191.bin,lz12 -> 608 B
@@ -752,13 +752,13 @@ SprTilesPack_240,$D3:FDBB,$D3:FE36,124,packed,packed_lz/SprTilesPack_240.bin,lz1
 SprTilesPack_239,$D3:FE37,$D3:FEC8,146,packed,packed_lz/SprTilesPack_239.bin,lz12 -> 320 B
 SprTilesPack_241,$D3:FEC9,$D3:FFD7,271,packed,packed_lz/SprTilesPack_241.bin,lz12 -> 416 B
 Padding_D3FFD8,$D3:FFD8,$D3:FFFF,40,fill,,$00
-Gfx_D40000,$D4:0000,$D4:7C3F,31808,extracted,graphics/Gfx_D40000.bin,
-Gfx_D47C40,$D4:7C40,$D4:FAFF,32448,extracted,graphics/Gfx_D47C40.bin,
+Gfx_D40000,$D4:0000,$D4:7C3F,31808,graphics,gfx/Gfx_D40000.png,4bpp 994 tiles
+Gfx_D47C40,$D4:7C40,$D4:FAFF,32448,graphics,gfx/Gfx_D47C40.png,4bpp 1014 tiles
 SprTilesPack_179,$D4:FB00,$D4:FCFA,507,packed,packed_lz/SprTilesPack_179.bin,lz12 -> 672 B
 SprTilesPack_180,$D4:FCFB,$D4:FDAF,181,packed,packed_lz/SprTilesPack_180.bin,lz12 -> 384 B
 SprTilesPack_187,$D4:FDB0,$D4:FF72,451,packed,packed_lz/SprTilesPack_187.bin,lz12 -> 480 B
 Padding_D4FF73,$D4:FF73,$D4:FFFF,141,fill,,$00
-Gfx_D50000,$D5:0000,$D5:8BFF,35840,extracted,graphics/Gfx_D50000.bin,
+Gfx_D50000,$D5:0000,$D5:8BFF,35840,graphics,gfx/Gfx_D50000.png,4bpp 1120 tiles
 SprTilesPack_155,$D5:8C00,$D5:A03F,5184,packed,packed_lz/SprTilesPack_155.bin,lz12 -> 8192 B
 SprTilesPack_164,$D5:A040,$D5:B298,4697,packed,packed_lz/SprTilesPack_164.bin,lz12 -> 6368 B
 SprTilesPack_165,$D5:B299,$D5:E177,11999,packed,packed_lz/SprTilesPack_165.bin,lz12 -> 15712 B
@@ -2120,7 +2120,8 @@ C3Pack_045,$FE:E2E1,$FE:F216,3894,packed,packed_lz/C3Pack_045.bin,lz12 -> 8192 B
 C3Pack_046,$FE:F217,$FE:F272,92,packed,packed_lz/C3Pack_046.bin,lz11 -> 96 B
 C3Pack_047,$FE:F273,$FE:F91D,1707,packed,packed_lz/C3Pack_047.bin,lz12 -> 2560 B
 Palette_FEF91E,$FE:F91E,$FE:FFFF,1762,extracted,palette/Palette_FEF91E.bin,
-Gfx_FF0000,$FF:0000,$FF:205F,8288,extracted,graphics/Gfx_FF0000.bin,
+Gfx_FF0000,$FF:0000,$FF:1F7F,8064,graphics,gfx/Gfx_FF0000.png,4bpp 252 tiles
+Unknown_FF1F80,$FF:1F80,$FF:205F,224,extracted,unknown/Unknown_FF1F80.bin,
 Font_FF2060,$FF:2060,$FF:385F,6144,extracted,font/Font_FF2060.bin,
 TextWinRom_FontRight,$FF:3860,$FF:445F,3072,extracted,font/TextWinRom_FontRight.bin,
 MsgTable_FF4460,$FF:4460,$FF:583C,5085,text,text/Messages_FF4460.txt,strtable
@@ -2132,17 +2133,18 @@ Text_FF83C5,$FF:83C5,$FF:83FF,59,text,text/StaleText.txt,strings
 MsgTable_FF8400,$FF:8400,$FF:8C02,2051,text,text/Messages_FF8400.txt,strtable
 Unknown_FF8C03,$FF:8C03,$FF:8C5F,93,extracted,unknown/Unknown_FF8C03.bin,
 BattleRom_InitGfxA,$FF:8C60,$FF:8E5F,512,extracted,graphics/BattleRom_InitGfxA.bin,
-MenuRom_Font2bpp,$FF:8E60,$FF:925F,1024,extracted,graphics/MenuRom_Font2bpp.bin,
-FieldRom_Unk9260,$FF:9260,$FF:938F,304,extracted,graphics/FieldRom_Unk9260.bin,
-MenuRom_ShadowTiles,$FF:9390,$FF:9C67,2264,extracted,graphics/MenuRom_ShadowTiles.bin,
+MenuRom_Font2bpp,$FF:8E60,$FF:925F,1024,graphics,gfx/MenuRom_Font2bpp.png,2bpp 64 tiles
+FieldRom_Unk9260,$FF:9260,$FF:938F,304,graphics,gfx/FieldRom_Unk9260.png,2bpp 19 tiles
+MenuRom_ShadowTiles,$FF:9390,$FF:9C5F,2256,graphics,gfx/MenuRom_ShadowTiles.png,2bpp 141 tiles
+Unknown_FF9C60,$FF:9C60,$FF:9C67,8,extracted,unknown/Unknown_FF9C60.bin,
 BattleRom_ColoursA,$FF:9C68,$FF:9C6F,8,records,records/BattleRom_ColoursA.tsv,palette 4 x 2 B
 BattleRom_ColoursB,$FF:9C70,$FF:9C77,8,records,records/BattleRom_ColoursB.tsv,palette 4 x 2 B
 MenuRom_PalB,$FF:9C78,$FF:9C7F,8,records,records/MenuRom_PalB.tsv,palette 4 x 2 B
 Unknown_FF9C80,$FF:9C80,$FF:9CEF,112,extracted,unknown/Unknown_FF9C80.bin,
-BattleRom_ObjTilePieces,$FF:9CF0,$FF:9DEF,256,extracted,graphics/BattleRom_ObjTilePieces.bin,
+BattleRom_ObjTilePieces,$FF:9CF0,$FF:9DEF,256,graphics,gfx/BattleRom_ObjTilePieces.png,4bpp 8 tiles
 MenuRom_ObjPal,$FF:9DF0,$FF:9E09,26,records,records/MenuRom_ObjPal.tsv,palette 13 x 2 B
 BattleRom_ColoursC,$FF:9E0A,$FF:9E0F,6,records,records/BattleRom_ColoursC.tsv,palette 3 x 2 B
-MenuRom_WindowGfx,$FF:9E10,$FF:B20F,5120,extracted,graphics/MenuRom_WindowGfx.bin,
+MenuRom_WindowGfx,$FF:9E10,$FF:B20F,5120,graphics,gfx/MenuRom_WindowGfx.png,4bpp 160 tiles
 FieldRom_PalRow0Sets,$FF:B210,$FF:B30F,256,extracted,palette/FieldRom_PalRow0Sets.bin,
 MenuRom_ItemTextPtrs,$FF:B310,$FF:BD17,2568,extracted,text/MenuRom_ItemTextPtrs.bin,
 MenuRom_DrawArgLens,$FF:BD18,$FF:BD2D,22,extracted,table/MenuRom_DrawArgLens.bin,
@@ -2208,8 +2210,8 @@ MenuRom_EquipLabel3,$FF:C96A,$FF:C970,7,extracted,text/MenuRom_EquipLabel3.bin,
 MenuRom_EquipLabel0,$FF:C971,$FF:C979,9,extracted,text/MenuRom_EquipLabel0.bin,
 MenuRom_EquipLabel12,$FF:C97A,$FF:C9AB,50,extracted,text/MenuRom_EquipLabel12.bin,
 MenuRom_NameChars,$FF:C9AC,$FF:C9FB,80,records,records/MenuRom_NameChars.tsv,table 8 x 10 B
-MenuRom_Font2bppB,$FF:C9FC,$FF:CAFB,256,extracted,graphics/MenuRom_Font2bppB.bin,
-MenuRom_GlyphRows,$FF:CAFC,$FF:CB9B,160,extracted,graphics/MenuRom_GlyphRows.bin,
+MenuRom_Font2bppB,$FF:C9FC,$FF:CAFB,256,graphics,gfx/MenuRom_Font2bppB.png,2bpp 16 tiles
+MenuRom_GlyphRows,$FF:CAFC,$FF:CB9B,160,graphics,gfx/MenuRom_GlyphRows.png,2bpp 10 tiles
 MenuRom_HealNumberPal,$FF:CB9C,$FF:CBA3,8,records,records/MenuRom_HealNumberPal.tsv,palette 4 x 2 B
 Unknown_FFCBA4,$FF:CBA4,$FF:CBAB,8,extracted,unknown/Unknown_FFCBA4.bin,
 MenuRom_Icon0Pal,$FF:CBAC,$FF:CBB3,8,records,records/MenuRom_Icon0Pal.tsv,palette 4 x 2 B
@@ -2253,8 +2255,9 @@ MenuRom_CfgTextTable,$FF:D3FE,$FF:D553,342,text,text/MenuSettingsTexts.txt,strta
 MenuRom_ButtonLetters,$FF:D554,$FF:D561,14,extracted,table/MenuRom_ButtonLetters.bin,
 MenuRom_CfgIcons,$FF:D562,$FF:D579,24,records,records/MenuRom_CfgIcons.tsv,table 12 x 2 B
 MenuRom_XchgUnkD57A,$FF:D57A,$FF:D5E3,106,extracted,table/MenuRom_XchgUnkD57A.bin,
-MenuRom_Tiles4bpp,$FF:D5E4,$FF:DBE3,1536,extracted,graphics/MenuRom_Tiles4bpp.bin,
-MenuRom_Tiles3bpp,$FF:DBE4,$FF:E8DB,3320,extracted,graphics/MenuRom_Tiles3bpp.bin,
+MenuRom_Tiles4bpp,$FF:D5E4,$FF:DBE3,1536,graphics,gfx/MenuRom_Tiles4bpp.png,4bpp 48 tiles
+MenuRom_Tiles3bpp,$FF:DBE4,$FF:E55B,2424,graphics,gfx/MenuRom_Tiles3bpp.png,3bpp 101 tiles
+Gfx_FFE55C,$FF:E55C,$FF:E8DB,896,graphics,gfx/Gfx_FFE55C.png,4bpp 28 tiles
 MenuRom_ScreenGfx,$FF:E8DC,$FF:EB87,684,packed,packed_lz/MenuRom_ScreenGfx.bin,lz12 -> 1536 B
-MenuRom_VramTiles,$FF:EB88,$FF:F007,1152,extracted,graphics/MenuRom_VramTiles.bin,
+MenuRom_VramTiles,$FF:EB88,$FF:F007,1152,graphics,gfx/MenuRom_VramTiles.png,4bpp 36 tiles
 MenuRom_NameChoiceMap,$FF:F008,$FF:F547,1344,extracted,tilemap/MenuRom_NameChoiceMap.bin,

@@ -10,7 +10,9 @@ the 3bpp plane 2), the codecs' round trips, the PNG reader on images this
 tool does not write (other row filters, a lower bit depth) and its
 refusals (not indexed, interlaced, a bad CRC, cut short), the image
 checks (size, an index the format cannot hold, a cell past the last tile,
-a sidecar that does not match).
+a sidecar that does not match), and the manifest's graphics pieces.
+
+With the ROM: every graphics region converts and encodes back byte-exact.
 """
 
 import random
@@ -21,7 +23,12 @@ import zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import data_survey  # noqa: E402
+import extract_data as ed  # noqa: E402
 import graphics as g  # noqa: E402
+
+HAVE_ROM = ed.ROM_PATH.exists()
+
 
 def png_with(width, height, pixels, depth=8, ctype=3, filters=None, interlace=0):
     """A PNG written the way other tools may write one."""
@@ -171,6 +178,26 @@ class Images(unittest.TestCase):
         self.assertEqual(g.encode_piece(p, png, side), data)
         with self.assertRaisesRegex(g.GraphicsError, 'the tail is XX bytes'):
             g.encode_piece(p, png, side.replace('tail 12 34', 'tail 12 3'))
+
+
+class Source(unittest.TestCase):
+
+    def test_manifest_graphics_pieces(self):
+        rows = {r['start']: r for r in data_survey.read_rows()}
+        pieces = [p for p in ed.read_manifest() if p['piece'] == 'graphics']
+        self.assertEqual({p['start'] for p in pieces}, set(g.FORMATS))
+        for p in pieces:
+            self.assertEqual(rows[p['start']]['kind'], 'graphics')
+            fmt, tiles, tail = g.parse_param(p['param'])
+            self.assertEqual(tiles * g.TILE_BYTES[fmt] + tail, int(p['size']))
+            self.assertEqual(fmt, g.FORMATS[p['start']][0])
+
+
+@unittest.skipUnless(HAVE_ROM, 'needs the ROM')
+class WithRom(unittest.TestCase):
+
+    def test_round_trips(self):
+        self.assertEqual(g.check(ed.read_rom()), [])
 
 
 if __name__ == '__main__':

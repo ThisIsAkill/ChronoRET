@@ -9,8 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/
+; build/text/ and build/records/, battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/, or
+; graphics it encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
@@ -317,7 +318,7 @@ C2SceneRom_LabelStrings:
 ; Read by C2Scene_MapView.
 org $C6F500
 C2SceneRom_MapMarkerTiles:
-    incbin "../../build/assets/graphics/C2SceneRom_MapMarkerTiles.bin"
+    incbin "../../build/gfx/C2SceneRom_MapMarkerTiles.bin"          ; graphics: 4bpp 2 tiles
 
 ; $C6:F540-$C6:F55F (32 B), palette, confirmed: 16 colours (BGR555): sprite palette 0 of the map
 ; view

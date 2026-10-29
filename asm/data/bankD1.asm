@@ -9,8 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/
+; build/text/ and build/records/, battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/, or
+; graphics it encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
@@ -997,7 +998,7 @@ Padding_D14BC0:
 ; Read by Battle_InitSceneGfx.
 org $D14C80
 Gfx_D14C80:
-    incbin "../../build/assets/graphics/Gfx_D14C80.bin"
+    incbin "../../build/gfx/Gfx_D14C80.bin"          ; graphics: 2bpp 16 tiles
 
 ; $D1:4D80-$D1:4D8F (16 B), palette, confirmed: 16 B: !Battle_HitNumColoursA and B
 ; Read by Battle_InitSceneGfx.
