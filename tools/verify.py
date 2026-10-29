@@ -23,8 +23,10 @@ ROM byte must be one of these or emitted by the code source. Text pieces
 (tools/text.py) are encoded by the build from text extracted from the ROM:
 counted apart as well, never as source, and so are records pieces
 (tools/records.py): tables and palettes encoded from records extracted
-from the ROM; and events pieces (tools/events.py): event script packs
-assembled from their disassembly, then packed.
+from the ROM; events pieces (tools/events.py): event script packs
+assembled from their disassembly, then packed; and battle pieces
+(tools/battle.py): battle scripts and their tables assembled from their
+readable form.
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -203,7 +205,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     for i in emitted:
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
-               'records_bytes': 0}
+               'records_bytes': 0, 'battle_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -230,15 +232,17 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         build_rom.build_packs()
         build_rom.build_text()
         build_rom.build_records()
+        build_rom.build_battle()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
         return figures, problems
     for p in pieces:
-        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events'):
+        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] in ('packed', 'events')
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
+                else extract_data.BATTLE_OUT / f'{p["label"]}.bin' if p['piece'] == 'battle'
                 else extract_data.RECORDS_OUT / f'{p["label"]}.bin')
         if path.read_bytes() != rom[p['offset']:p['stop']]:
             problems.append(f'{path} is not the ROM\'s bytes at {p["start"]}-{p["end"]}')
@@ -256,6 +260,14 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
             split['data'] += st['data']
             split['code'] += size - st['raw'] - st['data']
     figures['events_split'] = split
+    # How much of the battle scripts is read as scripts.
+    import battle
+    bsplit = {'data': 0, 'kept': 0}
+    for unit in sorted({p['param'].split('/')[0] for p in pieces if p['piece'] == 'battle'}):
+        st = battle.stats(unit, (extract_data.ASSETS / f'battle/{unit}.bscr').read_text())
+        bsplit['data'] += st['data'] - st['kept']
+        bsplit['kept'] += st['kept']
+    figures['battle_split'] = bsplit
     return figures, problems
 
 
@@ -351,6 +363,12 @@ def main() -> int:
               f'from scripts assembled from their disassembly (build/assets/events/ -> build/events/ -> '
               f'build/packs/, incbin); unpacked: {sp["code"]:,} B disassembled as code and header, '
               f'{sp["data"]:,} B no opcode reaches (data), {sp["raw"]:,} B in packs kept as bytes')
+        bs = data['battle_split']
+        print(f'  {"battle":<16} {data["battle_bytes"]:>9,} bytes of battle scripts (action scripts, enemy '
+              f'behaviour scripts and their tables) assembled by the build from their disassembly '
+              f'(build/assets/battle/ -> build/battle/, incbin): '
+              f'{data["battle_bytes"] - bs["data"] - bs["kept"]:,} B read as scripts and tables, '
+              f'{bs["data"]:,} B no opcode or record reaches (data), {bs["kept"]:,} B of scripts kept as bytes')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')

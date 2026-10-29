@@ -392,8 +392,72 @@ extraction: an edit is lost when it runs again.
   nothing to the disassembly. The same holds for some `$FF` sub-opcodes and the menu, sound and
   sprite callees of `$29`, `$82`, `$83`, `$AF`/`$B0`, `$CF`-`$D7`, `$E8`-`$EC` and `$F8`-`$FA`,
   whose handlers keep the script position in direct page or on the stack around the call.
-- **Left:** the battle scripts, the scene scripts and the music sequences (step 7); a
+- **Left:** the scene scripts and the music sequences (step 7; the battle scripts are below); a
   message's string number is still a number (the text units' strings have no names yet).
+
+## Battle scripts (step 7, second part)
+
+On the `data-battle-scripts` branch. `tools/battle.py` makes two units of `battle` pieces, one
+readable file each in `build/assets/battle/`, written afresh by `extract` (checked to assemble
+back, every line against the readers; a unit it cannot follow fails the extraction, the build
+and verify). The build assembles them to `build/battle/<label>.bin`, and `tools/verify.py`
+counts them as "battle", never as source.
+
+- **Action scripts (`actions.bscr`): a language.** The five script tables
+  (`BattleRom_PcAttackScripts` to `Kind3Scripts`), the subscript table `BattleRom_ActSubscripts`
+  (taken over from the records) and the five script regions in `$CD`/`$CE`. The opcodes are
+  `BattleAct_OpcodeTable`'s ($00-$DA; a byte of `!Battle_ActNumOpcodes` or more halts the
+  thread). `tools/absint.py` runs each handler's assembled code as `BattleAct_RunThread` calls it
+  (Y = 0, B = 0, the pointer in DP $E6-$E8, the opcode in `!Battle_ActOpcode`), once for each
+  kind of thread the handlers tell apart (a battler's, the target set's, an object's), with the
+  script bytes known: its operands are the bytes it reads, and where it leaves the pointer is
+  next (by a constant, or by a count from its own byte: `$80`), stay (a wait or the thread's
+  end), a call (`$1E`: from the subscript table, the return address kept) or a return (from
+  RAM). The movers that keep their length in RAM and wait (`$10`-`$18`, `$98`-`$9D`) are
+  run a second frame from the state the first left: where they go on then is their length. A
+  script's header is two thread masks (high byte first) and one offset per set bit
+  (`BattleAct_LoadAttack` and the other loaders); threads 5-7 are never run. After a call the
+  thread goes on only if the subscript can return. The assembler re-derives the structure from
+  the bytes and refuses any line that differs (an opcode of another length, an opcode no thread
+  reaches, reached bytes written as data, a header no table names, a thread or entry on the
+  wrong kind of line).
+- **Enemy behaviour scripts (`enemy.bscr`): records, not a language.** `BattleRom_AiScriptPtrs`
+  (256 enemy ids) and the scripts after it have no jumps: a script is a main and a reaction part,
+  each blocks of one or two 4-byte tests, `$FE`, action records, `$FE`, ended by `$FF`. They are
+  read under the records rule, as the readers walk them (`BattleAi_RunMainPart`,
+  `BattleAi_FindReactPart`, which starts the reaction part after the first `$FF`,
+  `BattleAi_TestPassed`, which scans for the `$FE` from the passing test, `BattleAi_EnemyTurn`):
+  an action record is `BattleFD_AiActLength[code]` bytes (read from the assembled source), code 4
+  (`BattleAi_ChooseByChance`) its code alone, and a code of `$80` or more ends the records. As a
+  cross-check, absint runs the run and choose handlers of every code used on a record: all 16
+  it can follow read inside the record. The assembler re-reads every script label the table and
+  the two fixed scripts (`$CC:8D08`, `$CC:8D1E`) name and refuses any line the readers do not read
+  so.
+- **Results.** All 12 pieces (87,204 B) assemble back byte-exact. Actions: 70,627 B, of which
+  1,770 B of tables (757 script entries, 128 subscript entries; 212 are `$FFFF`), 464 headers
+  (8,730 B, 3,437 thread offsets), 32,047 opcodes (59,529 B, 128 different opcodes, 742 calls) and
+  598 B no opcode reaches. Behaviour scripts: 256 entries, 2,924 records and delimiters; 50 B are
+  kept as bytes (below).
+- **Not pinned down:** 77 table entries name no script: `BattleRom_EnemyTechScripts` 194-255 point
+  at `$CD:EE23`, past every script region (the palette-step records), and
+  `BattleRom_EnemyAttackScripts` 145-159 at `$CD:95C4`, which is thread code other scripts'
+  headers share, not a header; they stay words. Enemy 127's script
+  (`$CC:A3E0`, 50 B) is kept as bytes: its main part's blocks run past the first `$FF`, where
+  `BattleAi_FindReactPart` starts the reaction part, so the two readers split it differently.
+  One PC tech thread runs on, after its last subscript returns, into the next script's header
+  (`$CE:30A3`); it is not followed there. The stale-OpLen path: `$98`/`$99` in the target-set
+  thread and in an object thread entered mid-move (`.object_moving` -> `.done`, at `$CE:D58F` and
+  `$CE:D62F`); `$18` in set and object threads. They advance by a length an earlier opcode left
+  in RAM (`!Battle_ActThreadOpLen`, `!Battle_ActThreadPathLen`; the handlers' headers say so):
+  classed "stale", not followed and not counted as returns; `tools/battle.py check` asserts
+  that over the data only these are stale and only `$1F`/`$21` are returns.
+  Opcode `$80` with a count of 0 (it copies 256 bytes and advances 1) is not modelled: the
+  interpreter refuses it; no script has one. Opcode `$26` in an object thread
+  runs its third byte as the next opcode (two `@inner` lines). The table extents are the survey's
+  (several inferred); every entry in them decodes as a header, `$FFFF` or one of the words above.
+  The layer-effect channel scripts (`BattleRom_FxScriptPtrs`, `$D1:646C`, 15,815 B) are a third
+  language (`BattleCD_RunFxScript`, opcodes `$80`-`$F9` with loops and calls) and are not done:
+  still extracted.
 
 ## Order of work
 
@@ -422,7 +486,8 @@ extraction: an edit is lost when it runs again.
 5. **Text** (done, above): the encoder and the dictionary question; the pointer tables.
 6. **Tables and palettes** (first part done, below; 2-4 sessions left): the tables still
    extracted, and the inferred table ends.
-7. **Script languages**: battle scripts (3-5), location event scripts (done, below),
+7. **Script languages**: battle scripts (done, below, but for the layer-effect scripts),
+   location event scripts (done, below),
    scene scripts (2-3), music sequences (2-3).
 8. **Readable assets**: tile and palette converters (2-3), sprite frames (2), maps if wanted.
 9. **Unknown and probable rows** (1).

@@ -485,12 +485,23 @@ class Machine:
             return None
         # stack
         if mn == 'PHA':
-            (self.push16 if wm else self.push8)(s, self.get_a(s), s.at)
+            # byte by byte: a known high byte (B) comes back known even when
+            # the low one is not
+            if wm:
+                self.push8(s, s.b, s.at)
+            self.push8(s, s.a, s.at)
             return None
         if mn == 'PLA':
-            v = self.pull16(s) if wm else self.pull_data8(s)
-            s.at = self.last_t
-            self.set_a(s, v)
+            lo = self.pull_data8(s)
+            t = self.last_t
+            if wm:
+                hi = self.pull_data8(s)
+                t |= self.last_t
+                s.a, s.b = lo, hi
+                v = None if lo is None or hi is None else lo | hi << 8
+            else:
+                s.a = v = lo
+            s.at = t
             self.flags_nz(s, v, wm)
             return None
         if mn in ('PHX', 'PHY'):
