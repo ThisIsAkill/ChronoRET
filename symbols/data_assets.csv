@@ -384,7 +384,7 @@ BattleRom_EnemyTechTarget,$CC:86C9,$CC:88C8,512,records,records/BattleRom_EnemyT
 Unknown_CC88C9,$CC:88C9,$CC:88CA,2,extracted,unknown/Unknown_CC88C9.bin,
 BattleRom_UnkCC88CB,$CC:88CB,$CC:89C5,251,extracted,table/BattleRom_UnkCC88CB.bin,
 BattleRom_EnemyEffectRecB,$CC:89C6,$CC:8B07,322,extracted,table/BattleRom_EnemyEffectRecB.bin,
-BattleRom_AiScriptPtrs,$CC:8B08,$CC:CBC8,16577,extracted,battle_script/BattleRom_AiScriptPtrs.bin,
+BattleRom_AiScriptPtrs,$CC:8B08,$CC:CBC8,16577,battle,battle/enemy.bscr,enemy/enemy
 BattleRom_ScriptMsgStrings,$CC:CBC9,$CC:CD8E,454,text,text/EnemyScriptMessages.txt,ptrs ptr
 Unknown_CCCD8F,$CC:CD8F,$CC:CD8F,1,extracted,unknown/Unknown_CCCD8F.bin,
 Text_CCCD90,$CC:CD90,$CC:DDC5,4150,text,text/EnemyScriptMessages.txt,strings
@@ -487,11 +487,11 @@ Table_CD4F26,$CD:4F26,$CD:5525,1536,extracted,table/Table_CD4F26.bin,
 Table_CD5526,$CD:5526,$CD:5C25,1792,extracted,table/Table_CD5526.bin,
 Table_CD5C26,$CD:5C26,$CD:5E01,476,records,records/Table_CD5C26.tsv,table 68 x 7 B
 Padding_CD5E02,$CD:5E02,$CD:5EC5,196,fill,,$FF
-BattleRom_PcAttackScripts,$CD:5EC6,$CD:5EEF,42,extracted,battle_script/BattleRom_PcAttackScripts.bin,
-BattleRom_PcTechScripts,$CD:5EF0,$CD:5FEF,256,extracted,battle_script/BattleRom_PcTechScripts.bin,
-BattleRom_EnemyAttackScripts,$CD:5FF0,$CD:61EF,512,extracted,battle_script/BattleRom_EnemyAttackScripts.bin,
-BattleRom_EnemyTechScripts,$CD:61F0,$CD:63EF,512,extracted,battle_script/BattleRom_EnemyTechScripts.bin,
-BattleRom_Kind3Scripts,$CD:63F0,$CD:64AF,192,extracted,battle_script/BattleRom_Kind3Scripts.bin,
+BattleRom_PcAttackScripts,$CD:5EC6,$CD:5EEF,42,battle,battle/actions.bscr,actions/table
+BattleRom_PcTechScripts,$CD:5EF0,$CD:5FEF,256,battle,battle/actions.bscr,actions/table
+BattleRom_EnemyAttackScripts,$CD:5FF0,$CD:61EF,512,battle,battle/actions.bscr,actions/table
+BattleRom_EnemyTechScripts,$CD:61F0,$CD:63EF,512,battle,battle/actions.bscr,actions/table
+BattleRom_Kind3Scripts,$CD:63F0,$CD:64AF,192,battle,battle/actions.bscr,actions/table
 BattleRom_PcAttackObjs,$CD:64B0,$CD:656D,190,extracted,table/BattleRom_PcAttackObjs.bin,
 BattleRom_TechObjs,$CD:656E,$CD:666D,256,extracted,table/BattleRom_TechObjs.bin,
 BattleRom_EnemyActObjs,$CD:666E,$CD:686D,512,extracted,table/BattleRom_EnemyActObjs.bin,
@@ -502,17 +502,17 @@ BattleRom_Kind3Pals,$CD:6C2C,$CD:6CEB,192,extracted,table/BattleRom_Kind3Pals.bi
 BattleRom_WeaponColourIdx,$CD:6CEC,$CD:6D4B,96,extracted,table/BattleRom_WeaponColourIdx.bin,
 BattleRom_PcAttackSfxA,$CD:6D4C,$CD:6DAB,96,extracted,table/BattleRom_PcAttackSfxA.bin,
 BattleRom_PcAttackSfxB,$CD:6DAC,$CD:6E0B,96,extracted,table/BattleRom_PcAttackSfxB.bin,
-BattleScript_CD6E0C,$CD:6E0C,$CD:96F9,10478,extracted,battle_script/BattleScript_CD6E0C.bin,
-BattleScript_CD96FA,$CD:96FA,$CD:EE22,22313,extracted,battle_script/BattleScript_CD96FA.bin,
+BattleScript_CD6E0C,$CD:6E0C,$CD:96F9,10478,battle,battle/actions.bscr,actions/scripts
+BattleScript_CD96FA,$CD:96FA,$CD:EE22,22313,battle,battle/actions.bscr,actions/scripts
 Table_CDEE23,$CD:EE23,$CD:F187,869,extracted,table/Table_CDEE23.bin,
 Table_CDF188,$CD:F188,$CD:F9B8,2097,extracted,table/Table_CDF188.bin,
 Padding_CDF9B9,$CD:F9B9,$CD:FFFF,1607,fill,,$FF
-BattleRom_ActSubscripts,$CE:0000,$CE:00FF,256,records,records/BattleRom_ActSubscripts.tsv,table 128 x 2 B
+BattleRom_ActSubscripts,$CE:0000,$CE:00FF,256,battle,battle/actions.bscr,actions/subscripts
 BattleRom_FxCycleColours,$CE:0100,$CE:037F,640,extracted,palette/BattleRom_FxCycleColours.bin,
-BattleScript_CE0380,$CE:0380,$CE:8293,32532,extracted,battle_script/BattleScript_CE0380.bin,
-BattleScript_CE8294,$CE:8294,$CE:886F,1500,extracted,battle_script/BattleScript_CE8294.bin,
+BattleScript_CE0380,$CE:0380,$CE:8293,32532,battle,battle/actions.bscr,actions/scripts
+BattleScript_CE8294,$CE:8294,$CE:886F,1500,battle,battle/actions.bscr,actions/scripts
 Table_CE8870,$CE:8870,$CE:D427,19384,extracted,table/Table_CE8870.bin,
-BattleScript_CED428,$CE:D428,$CE:DC19,2034,extracted,battle_script/BattleScript_CED428.bin,
+BattleScript_CED428,$CE:D428,$CE:DC19,2034,battle,battle/actions.bscr,actions/scripts
 Padding_CEDC1A,$CE:DC1A,$CE:DFFF,998,fill,,$FF
 BattleRom_MsgStrings,$CE:EF11,$CE:EFDF,207,text,text/BattleMessages.txt,strtable
 BattleRom_DissolveRec,$CE:EFE0,$CE:EFE9,10,extracted,table/BattleRom_DissolveRec.bin,

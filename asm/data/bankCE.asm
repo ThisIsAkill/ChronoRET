@@ -8,16 +8,17 @@
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
-; their disassembly first), or text or records it encodes into
-; build/text/ and build/records/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; their disassembly first), text or records it encodes into
+; build/text/ and build/records/, or battle scripts it assembles
+; into build/battle/ (symbols/data_assets.csv lists them; nothing
+; here is ROM data).
 ; ============================================================
 
 ; $CE:0000-$CE:00FF (256 B), table, confirmed: 128 u16 offsets of subscripts (bank $CE)
 ; Read by BattleAct_OpCall.
 org $CE0000
 BattleRom_ActSubscripts:
-    incbin "../../build/records/BattleRom_ActSubscripts.bin"          ; records: table 128 x 2 B
+    incbin "../../build/battle/BattleRom_ActSubscripts.bin"          ; battle scripts: actions/subscripts
 
 ; $CE:0100-$CE:037F (640 B), palette, confirmed: BGR555 colours of the status colour cycles
 ; Read by BattleCF_StepFxColourCycle.
@@ -29,13 +30,13 @@ BattleRom_FxCycleColours:
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
 org $CE0380
 BattleScript_CE0380:
-    incbin "../../build/assets/battle_script/BattleScript_CE0380.bin"
+    incbin "../../build/battle/BattleScript_CE0380.bin"          ; battle scripts: actions/scripts
 
 ; $CE:8294-$CE:886F (1,500 B), battle_script, confirmed: kind-3 action scripts
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
 org $CE8294
 BattleScript_CE8294:
-    incbin "../../build/assets/battle_script/BattleScript_CE8294.bin"
+    incbin "../../build/battle/BattleScript_CE8294.bin"          ; battle scripts: actions/scripts
 
 ; $CE:8870-$CE:D427 (19,384 B), table, confirmed: action object records (BattleRom_ActObjRec, 4
 ; B)
@@ -48,7 +49,7 @@ Table_CE8870:
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
 org $CED428
 BattleScript_CED428:
-    incbin "../../build/assets/battle_script/BattleScript_CED428.bin"
+    incbin "../../build/battle/BattleScript_CED428.bin"          ; battle scripts: actions/scripts
 
 ; $CE:DC1A-$CE:DFFF (998 B), padding, confirmed: 998 x $FF
 org $CEDC1A

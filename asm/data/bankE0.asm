@@ -8,9 +8,10 @@
 ; source; incbin reads an asset that tools/extract_data.py writes
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
-; their disassembly first), or text or records it encodes into
-; build/text/ and build/records/ (symbols/data_assets.csv lists
-; them; nothing here is ROM data).
+; their disassembly first), text or records it encodes into
+; build/text/ and build/records/, or battle scripts it assembles
+; into build/battle/ (symbols/data_assets.csv lists them; nothing
+; here is ROM data).
 ; ============================================================
 
 ; $E0:0000-$E0:0EBC (3,773 B), packed_lz, confirmed: lz12 -> 5024 B: object sprite tile graphics

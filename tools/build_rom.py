@@ -25,7 +25,12 @@ assets, with no copy of the original.
      table (build/assets/records/<label>.tsv) with tools/records.py to
      build/records/<label>.bin, the same way (a file is rewritten only when
      its bytes change; a piece whose size differs fails the build).
-  6. asar assembles asm/rom.asm (asm/main.asm, then the data layer
+  6. The battle scripts: every unit of `battle` pieces is assembled from
+     its readable file (build/assets/battle/<unit>.bscr) with
+     tools/battle.py, every line checked against the readers, to
+     build/battle/<label>.bin per piece (a file is rewritten only when its
+     bytes change; a piece whose size differs fails the build).
+  7. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets
      write every byte of the ROM; the result is build/chrono_trigger.built.sfc.
@@ -181,6 +186,49 @@ def build_events(root: Path = ROOT) -> int:
     return written
 
 
+def build_battle(root: Path = ROOT) -> int:
+    """Assemble every battle script unit (see the docstring); returns how
+    many files were written."""
+    import battle
+    root = Path(root)
+    pieces = extract_data.read_manifest()
+    units = sorted({p['param'].split('/')[0] for p in pieces if p['piece'] == 'battle'})
+    if not units:
+        return 0
+    try:
+        interp = battle.ActInterp(root)          # every opcode line is checked against its handler
+        interp.load(root)
+        fmt = battle.AiFormat(root, interp.image, interp.labels)
+    except battle.BattleError as e:
+        raise BuildError(f'battle: {e}') from None
+    out_dir = root / extract_data.BATTLE_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written, wrong = 0, []
+    try:
+        for unit in units:
+            text_ = (root / extract_data.ASSETS / f'battle/{unit}.bscr').read_text()
+            try:
+                out = battle.assemble_unit(unit, text_, pieces, interp, fmt, root)
+            except battle.BattleError as e:
+                raise BuildError(f'battle: {unit}: {e}') from None
+            for p in pieces:
+                if p['piece'] != 'battle' or p['param'].split('/')[0] != unit:
+                    continue
+                data = out.get(p['label'], b'')
+                if len(data) != int(p['size']):
+                    wrong.append(f'{p["label"]}: {len(data)} B, its piece {p["size"]} B')
+                    continue
+                path = out_dir / f'{p["label"]}.bin'
+                if not path.exists() or path.read_bytes() != data:
+                    c3pack._write(path, data)
+                    written += 1
+    finally:
+        interp.save(root)
+    if wrong:
+        raise BuildError('battle scripts that do not fit their place:\n  ' + '\n  '.join(wrong))
+    return written
+
+
 def build_records(root: Path = ROOT) -> int:
     """Encode every `records` piece (see the docstring); returns how many
     files were written."""
@@ -239,6 +287,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_packs(root, quiet=quiet)
     build_text(root)
     build_records(root)
+    build_battle(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp:

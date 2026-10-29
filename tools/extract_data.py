@@ -48,6 +48,14 @@ How each piece's bytes are made (the manifest's `piece` column):
              extraction); the build assembles it to build/events/
              <label>.bin and packs that to build/packs/<label>.lz, which is
              incbin'd. param as for packed. Counted as "event scripts".
+  battle     a row of a battle script unit (tools/battle.py's ROWS: the action
+             scripts with their script and subscript tables, or the enemy
+             behaviour scripts with their table): the unit's readable file
+             goes to build/assets/battle/<unit>.bscr (checked to assemble
+             back, every line against the readers, when it is written; a
+             unit it cannot follow fails the extraction); the build
+             assembles it to build/battle/<label>.bin, which is incbin'd.
+             param: <unit>/<role>. Counted as "battle scripts".
   records    a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
@@ -95,6 +103,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
+import battle  # noqa: E402
 import data_survey  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
@@ -107,6 +116,7 @@ ASSETS = Path('build/assets')          # relative to the repository root
 PACKS = Path('build/packs')
 TEXT_OUT = Path('build/text')          # the encoded text pieces (tools/build_rom.py)
 RECORDS_OUT = Path('build/records')    # the encoded records pieces (tools/build_rom.py)
+BATTLE_OUT = Path('build/battle')      # the assembled battle script pieces (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
@@ -115,15 +125,18 @@ ASSET_PREFIX = '../../build/assets/'
 PACK_PREFIX = '../../build/packs/'
 TEXT_PREFIX = '../../build/text/'
 RECORDS_PREFIX = '../../build/records/'
+BATTLE_PREFIX = '../../build/battle/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events')
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
 EVENTS_ASSET = re.compile(r'^events/([A-Za-z_][A-Za-z0-9_]*)\.evt$')
 EVENTS_OUT = Path('build/events')      # the assembled (unpacked) event scripts (tools/build_rom.py)
 EVENT_PACK = re.compile(r'\bvia Evt_PackPtrs\[')
+BATTLE_ASSET = re.compile(r'^battle/([a-z]+)\.bscr$')
+BATTLE_PARAM = re.compile(r'^([a-z]+)/([a-z]+)$')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
 RECORDS_PARAM = re.compile(r'^(table|palette) (\d+) x (\d+) B$')
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
@@ -321,6 +334,11 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             m = data_survey.PACK_FORMAT.match(row['format'])
             add(label, s, e, 'events' if EVENT_PACK.search(row['notes']) else 'packed',
                 param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
+        elif row['start'] in battle.ROWS:
+            unit, role = battle.ROWS[row['start']]
+            if kind not in ('battle_script', 'table'):
+                raise DataError(f'{row["start"]}: a {kind} row cannot be a battle script unit\'s')
+            add(label, s, e, 'battle', asset=f'battle/{unit}.bscr', param=f'{unit}/{role}', row=row)
         elif row['start'] in text.ROWS:
             unit, fmt = text.ROWS[row['start']]
             if kind not in ('text', 'table'):
@@ -407,6 +425,12 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
                 problems.append(f'{where}: an events piece\'s asset is events/<label>.evt and its param '
                                 f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'battle':
+            m, mp = BATTLE_ASSET.match(p['asset']), BATTLE_PARAM.match(p['param'])
+            if not m or not mp or m.group(1) != mp.group(1) or m.group(1) not in battle.UNITS \
+                    or mp.group(2) not in battle.ROLES:
+                problems.append(f'{where}: a battle piece\'s asset is battle/<unit>.bscr of a unit of '
+                                f'tools/battle.py and its param "<unit>/<role>": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'records':
             m = RECORDS_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or not RECORDS_PARAM.match(p['param']):
@@ -443,6 +467,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'records':
             out[f'{RECORDS_PREFIX}{p["label"]}.bin'] = p
+        elif p['piece'] == 'battle':
+            out[f'{BATTLE_PREFIX}{p["label"]}.bin'] = p
     return out
 
 
@@ -460,6 +486,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'records':
             out[RECORDS_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif p['piece'] == 'battle':
+            out[BATTLE_OUT / f'{p["label"]}.bin'] = int(p['size'])
     return out
 
 
@@ -571,9 +599,10 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; source; incbin reads an asset that tools/extract_data.py writes',
         '; from your own ROM to build/assets/, a pack tools/build_rom.py',
         '; makes from one in build/packs/ (event scripts assembled from',
-        '; their disassembly first), or text or records it encodes into',
-        '; build/text/ and build/records/ (symbols/data_assets.csv lists',
-        '; them; nothing here is ROM data).',
+        '; their disassembly first), text or records it encodes into',
+        '; build/text/ and build/records/, or battle scripts it assembles',
+        '; into build/battle/ (symbols/data_assets.csv lists them; nothing',
+        '; here is ROM data).',
         '; ============================================================',
     ]
     for p in pieces:
@@ -605,6 +634,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, event script')
         elif p['piece'] == 'records':
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
+        elif p['piece'] == 'battle':
+            out.append(f'    incbin "{BATTLE_PREFIX}{p["label"]}.bin"          ; battle scripts: {p["param"]}')
         elif p['piece'] == 'text':
             out.append(f'    incbin "{TEXT_PREFIX}{p["label"]}.bin"          ; text unit '
                        f'{Path(p["asset"]).stem} ({p["param"]})')
@@ -707,7 +738,7 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
-    for tool in ('events.py', 'absint.py', 'disasm.py'):   # the event scripts' disassembly
+    for tool in ('events.py', 'battle.py', 'absint.py', 'disasm.py'):   # the script disassemblies
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
@@ -741,6 +772,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     stamp.unlink(missing_ok=True)
     problems = extract_text(rom, out_dir, pieces) + extract_records(rom, out_dir, pieces)
     problems += extract_events(rom, out_dir, pieces, root, quiet)
+    problems += extract_battle(rom, out_dir, pieces, root)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -750,7 +782,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('table', 'text', 'records'):
             continue
-        if p['piece'] == 'events':
+        if p['piece'] in ('events', 'battle'):
             continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -838,6 +870,39 @@ def extract_events(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = R
         if not quiet and k % 100 == 0:
             print(f'extract_data: {k} event scripts disassembled')
     interp.save(Path(root))
+    return problems
+
+
+def extract_battle(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = ROOT) -> list[str]:
+    """Write the readable file of every battle script unit (tools/battle.py),
+    each disassembled afresh and checked to assemble back to the ROM's
+    bytes, every line against the readers; the problems. A unit the tool
+    cannot follow is a problem, never kept as bytes. What the action
+    handlers do with given bytes is kept between runs (build/battle/
+    traces.*, refused when changed by hand)."""
+    import c3pack
+    units = sorted({p['param'].split('/')[0] for p in pieces if p['piece'] == 'battle'})
+    if not units:
+        return []
+    try:
+        interp = battle.ActInterp(Path(root))
+        interp.load(Path(root))
+        fmt = battle.AiFormat(Path(root), interp.image, interp.labels)
+    except battle.BattleError as e:
+        return [f'battle: {e}']
+    problems = []
+    try:
+        for unit in units:
+            try:
+                text_ = battle.extract_unit(unit, rom, pieces, interp, fmt, Path(root))
+            except battle.BattleError as e:
+                problems.append(f'battle: {unit}: {e}')
+                continue
+            dest = out_dir / f'battle/{unit}.bscr'
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            c3pack._write(dest, text_.encode())
+    finally:
+        interp.save(Path(root))
     return problems
 
 
