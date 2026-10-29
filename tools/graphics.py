@@ -88,8 +88,15 @@ FORMATS = {
     '$C6:F500': ('4bpp', 'C2SceneRom_MapMarkerTiles: C2Scene_MapView sets OBSEL to sprite tiles at VRAM $6000 '
                          '(!OBSEL_Size16And32_Base6000) and DMAs the two 32-B tiles to sprite tiles 0 and 2 '
                          '(C2Scene_MapObjVram): sprite tiles, 4bpp'),
-    '$D1:4C80': ('2bpp', 'BattleRom_InitTiles2bpp: Battle_InitSceneGfx widens its 16 tiles into the 4bpp tile '
-                         'buffer !Battle_InitTileBuf: 16 B (planes 0-1) and 16 zero bytes (planes 2-3) per tile'),
+    '$D1:3900': ('4bpp', 'BattleRom_InitTiles4bpp: Battle_InitSceneGfx copies its 64 tiles, 32 B each, into '
+                         '!Battle_InitTileBuf after the 16 tiles it widens from $D1:4C80 to 32 B (16 B, then 16 zero '
+                         'bytes as planes 2-3): the buffer is the code\'s own 32-B 4bpp tiles. The VRAM layer it '
+                         'goes to ($1800, Battle_InitUploadStep) is not traced, so the depth rests on that layout, '
+                         'not on a BG mode'),
+    '$D1:4C80': ('2bpp', 'BattleRom_InitTiles2bpp: Battle_InitSceneGfx widens its 16 tiles into !Battle_InitTileBuf: '
+                         '16 B and 16 zero bytes per tile. The 16 B are planes 0-1, rows interleaved, which is the '
+                         'same layout at every depth, so this does not depend on the depth of the buffer or of the '
+                         'layer'),
     '$FF:0000': ('4bpp', 'Menu_VramRecsWin sends $FF:0000, $1F80 B, to VRAM $2010: BG1/BG2 tiles ($2010 = tile '
                          '$201 of the character base $0000), 4bpp in mode 1. ' + _MENU),
     '$FF:8E60': ('2bpp', 'MenuRom_Font2bpp: Menu_LoadGraphics copies $E00 B from it to Menu_Bg3TileBuf, which '
@@ -103,9 +110,13 @@ FORMATS = {
                          'planes 0-1 of 4bpp tiles'),
     '$FF:9CF0': ('4bpp', 'MenuRom_ObjTiles: Menu_LoadGraphics copies four 64-B pieces (two 32-B tiles each) '
                          'over 4bpp tiles of Menu_TileBuf, which Menu_VramRecObj sends to VRAM $4000, the '
-                         'sprite tiles (OBSEL): 4bpp. ' + _MENU),
+                         'sprite tiles (OBSEL): 4bpp. Before the upload Menu_TilesOrPlanes23 sets planes 2-3 of '
+                         'all eight to planes 0 OR 1, so the stored planes 2-3 are not what the menu shows '
+                         '(this is the only reader). ' + _MENU),
     '$FF:9E10': ('4bpp', 'MenuRom_WindowGfx: Menu_LoadGraphics copies its $1400 B to Menu_TileBuf, which '
-                         'Menu_VramRecsWin sends to VRAM $3000: BG1/BG2 tiles, 4bpp in mode 1. ' + _MENU),
+                         'Menu_VramRecsWin sends to VRAM $3000: BG1/BG2 tiles, 4bpp in mode 1. Before the upload '
+                         'Menu_TilesOrPlane3 (also in Menu_LoadWindowGfx) sets plane 3 to planes 0 OR 1 OR 2, so '
+                         'the stored plane 3 is not what the menu shows. ' + _MENU),
     '$FF:C9FC': ('2bpp', 'MenuRom_Font2bppB: Menu_LoadGraphics copies its $100 B over tile $10 of the 2bpp '
                          'font buffer (Menu_Font2bppBTile), sent with it to the BG3 tiles (see $FF:8E60)'),
     '$FF:CAFC': ('2bpp', 'MenuRom_GlyphRows: BankFF_BuildTileSets copies its ten 16-B tiles 32 B apart as '
@@ -420,9 +431,14 @@ def _chunk(kind: bytes, data: bytes) -> bytes:
     return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xFFFFFFFF)
 
 
+def grey_ramp(colours: int) -> bytes:
+    """The palette write_png writes: `colours` greys, black to white."""
+    return b''.join(bytes([v, v, v]) for v in (i * 255 // max(colours - 1, 1) for i in range(colours)))
+
+
 def write_png(width: int, height: int, pixels: list[int], colours: int) -> bytes:
     """An 8-bit indexed PNG with a grey ramp of `colours` entries."""
-    pal = b''.join(bytes([v, v, v]) for v in (i * 255 // max(colours - 1, 1) for i in range(colours)))
+    pal = grey_ramp(colours)
     raw = bytearray()
     for y in range(height):
         raw.append(0)
@@ -433,11 +449,16 @@ def write_png(width: int, height: int, pixels: list[int], colours: int) -> bytes
 
 def read_png(data: bytes) -> tuple[int, int, list[int]]:
     """(width, height, the palette index of every pixel) of an indexed PNG
-    (bit depth 1, 2, 4 or 8, not interlaced, any row filters); anything
-    else is refused."""
+    (bit depth 1, 2, 4 or 8, not interlaced, any row filters, a PLTE
+    chunk); anything else is refused."""
+    return read_png_palette(data)[:3]
+
+
+def read_png_palette(data: bytes) -> tuple[int, int, list[int], bytes]:
+    """read_png, and the PLTE chunk's bytes."""
     if data[:8] != b'\x89PNG\r\n\x1a\n':
         raise GraphicsError('not a PNG file')
-    pos, ihdr, idat, end = 8, None, bytearray(), False
+    pos, ihdr, idat, end, plte = 8, None, bytearray(), False, None
     while pos < len(data):
         if pos + 8 > len(data):
             raise GraphicsError('the PNG ends inside a chunk header')
@@ -449,11 +470,17 @@ def read_png(data: bytes) -> tuple[int, int, list[int]]:
         if struct.unpack('>I', crc)[0] != zlib.crc32(kind + body) & 0xFFFFFFFF:
             raise GraphicsError(f'the PNG\'s {kind!r} chunk fails its CRC')
         if kind == b'IHDR':
+            if ihdr is not None or len(body) != 13:
+                raise GraphicsError('the PNG has a second or malformed IHDR chunk')
             ihdr = struct.unpack('>IIBBBBB', body)
+        elif kind == b'PLTE':
+            plte = bytes(body)
         elif kind == b'IDAT':
             idat += body
         elif kind == b'IEND':
             end = True
+            if pos + 12 + n != len(data):
+                raise GraphicsError(f'the PNG has {len(data) - pos - 12 - n} B after its IEND chunk')
             break
         pos += 12 + n
     if ihdr is None or not end:
@@ -462,6 +489,8 @@ def read_png(data: bytes) -> tuple[int, int, list[int]]:
     if ctype != 3:
         raise GraphicsError(f'the PNG is colour type {ctype}, not indexed (3): keep it indexed, the palette '
                             f'index is the pixel value')
+    if plte is None:
+        raise GraphicsError('the PNG has no PLTE chunk (an indexed PNG must have its palette)')
     if depth not in (1, 2, 4, 8) or comp or filt or interlace:
         raise GraphicsError(f'the PNG is bit depth {depth}, compression {comp}, filter {filt}, interlace '
                             f'{interlace}: only 1/2/4/8-bit, standard, not interlaced')
@@ -501,7 +530,7 @@ def read_png(data: bytes) -> tuple[int, int, list[int]]:
             bit = x * depth
             v = line[bit // 8] >> (8 - depth - bit % 8) & ((1 << depth) - 1)
             pixels.append(v)
-    return width, height, pixels
+    return width, height, pixels, plte
 
 
 # ── Regions ───────────────────────────────────────────────────────────────
@@ -555,9 +584,17 @@ def from_image(fmt: str, tiles: int, png: bytes, tail: bytes, name: str = '<png>
     """The region's bytes from its PNG and tail; refuses a PNG of another
     size, a value the format cannot hold, or pixels past the last tile."""
     try:
-        w, h, px = read_png(png)
+        w, h, px, plte = read_png_palette(png)
     except GraphicsError as e:
         raise GraphicsError(f'{name}: {e}') from None
+    ramp = grey_ramp(1 << BPP[fmt])
+    if plte[:len(ramp)] != ramp:
+        k = next((i for i in range(len(ramp) // 3) if plte[3 * i:3 * i + 3] != ramp[3 * i:3 * i + 3]),
+                 len(plte) // 3)
+        raise GraphicsError(f'{name}: the palette is not the grey ramp tools/graphics.py wrote (entry {k} is '
+                            f'{tuple(plte[3 * k:3 * k + 3])}, not {tuple(ramp[3 * k:3 * k + 3])}): an editor that '
+                            f'sorted or changed it has renumbered the pixels, which would change the bytes. Keep '
+                            f'the palette as written and change only the pixels')
     rows = (tiles + WIDTH_TILES - 1) // WIDTH_TILES
     if (w, h) != (WIDTH_TILES * 8, rows * 8):
         raise GraphicsError(f'{name}: the image is {w}x{h}; {tiles} {fmt} tiles are {WIDTH_TILES * 8}x{rows * 8}')
@@ -600,6 +637,8 @@ def read_sidecar(text: str, name: str = '<gfx>') -> dict:
         if not line:
             continue
         key, _, rest = line.partition(' ')
+        if key in out:
+            raise GraphicsError(f'{name}: a second {key} line')
         out[key] = rest
     for k in ('region', 'format', 'tiles', 'width', 'tail'):
         if k not in out:
@@ -629,8 +668,9 @@ def encode_piece(p: dict, png: bytes, side: str) -> bytes:
     if (s['format'], s['tiles'], len(s['tail'])) != (fmt, tiles, tail):
         raise GraphicsError(f'{p["label"]}: the sidecar says {s["format"]} {s["tiles"]} tiles + '
                             f'{len(s["tail"])} B; the manifest {p["param"]}')
-    if s['region'].split()[:1] != [p['label']]:
-        raise GraphicsError(f'{p["label"]}: the sidecar is for {s["region"]}')
+    if s['region'].split() != [p['label'], p['start'], p['end']]:
+        raise GraphicsError(f'{p["label"]}: the sidecar is for {s["region"]}, not {p["label"]} {p["start"]} '
+                            f'{p["end"]}')
     data = from_image(fmt, tiles, png, s['tail'], p['label'] + '.png')
     m = PACKED_PARAM.match(p['param'])
     size = int(m.group(2)) if m else int(p['size'])        # a pack: its unpacked size

@@ -693,7 +693,7 @@ Unknown_D138F1,$D1:38F1,$D1:38F1,1,extracted,unknown/Unknown_D138F1.bin,
 BattleRom_UnkColours38F2,$D1:38F2,$D1:38F7,6,records,records/BattleRom_UnkColours38F2.tsv,palette 3 x 2 B
 Unknown_D138F8,$D1:38F8,$D1:38F9,2,extracted,unknown/Unknown_D138F8.bin,
 BattleRom_UnkColours38FA,$D1:38FA,$D1:38FF,6,records,records/BattleRom_UnkColours38FA.tsv,palette 3 x 2 B
-BattleRom_InitTiles4bpp,$D1:3900,$D1:40FF,2048,extracted,graphics/BattleRom_InitTiles4bpp.bin,
+BattleRom_InitTiles4bpp,$D1:3900,$D1:40FF,2048,graphics,gfx/BattleRom_InitTiles4bpp.png,4bpp 64 tiles
 BattleRom_PalSets6,$D1:4100,$D1:4345,582,extracted,palette/BattleRom_PalSets6.bin,
 Padding_D14346,$D1:4346,$D1:43FF,186,fill,,$00
 BattleRom_PalSets14,$D1:4400,$D1:49AF,1456,extracted,palette/BattleRom_PalSets14.bin,
