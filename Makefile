@@ -86,8 +86,9 @@ test-hooks:
 # manifest, lint and isolation (tools/test_data_layer.py), the text
 # encoder and its round trip (tools/test_text.py), the tables and
 # palettes as records (tools/test_records.py), the event scripts'
-# disassembly and its interpreter (tools/test_events.py), and the battle
-# scripts' readable form (tools/test_battle.py).
+# disassembly and its interpreter (tools/test_events.py), the battle
+# scripts' readable form (tools/test_battle.py), and the scene and
+# layer-effect scripts' (tools/test_scripts.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -104,6 +105,7 @@ test-tools:
 	python3 tools/test_records.py
 	python3 tools/test_events.py
 	python3 tools/test_battle.py
+	python3 tools/test_scripts.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]

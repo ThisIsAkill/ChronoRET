@@ -392,7 +392,7 @@ extraction: an edit is lost when it runs again.
   nothing to the disassembly. The same holds for some `$FF` sub-opcodes and the menu, sound and
   sprite callees of `$29`, `$82`, `$83`, `$AF`/`$B0`, `$CF`-`$D7`, `$E8`-`$EC` and `$F8`-`$FA`,
   whose handlers keep the script position in direct page or on the stack around the call.
-- **Left:** the scene scripts and the music sequences (step 7; the battle scripts are below); a
+- **Left:** the music sequences (step 7; the battle, scene and layer-effect scripts are below); a
   message's string number is still a number (the text units' strings have no names yet).
 
 ## Battle scripts (step 7, second part)
@@ -455,9 +455,73 @@ counts them as "battle", never as source.
   interpreter refuses it; no script has one. Opcode `$26` in an object thread
   runs its third byte as the next opcode (two `@inner` lines). The table extents are the survey's
   (several inferred); every entry in them decodes as a header, `$FFFF` or one of the words above.
-  The layer-effect channel scripts (`BattleRom_FxScriptPtrs`, `$D1:646C`, 15,815 B) are a third
-  language (`BattleCD_RunFxScript`, opcodes `$80`-`$F9` with loops and calls) and are not done:
-  still extracted.
+  The layer-effect channel scripts are below.
+
+## Scene and layer-effect scripts (step 7, third part)
+
+On the `data-scene-fx-scripts` branch. `tools/scripts.py` handles two more languages the same way
+as the battle scripts. `scene` pieces are the eight `C2SceneRom_ScriptPacks` streams: one file
+each in `build/assets/scene/`, which the build assembles to the unpacked bytes and packs as before.
+The `fx` piece is `BattleRom_FxScriptPtrs` (`$D1:646C`, its 148 entries and the scripts after
+it): one file in `build/assets/fx/`, assembled to `build/fx/`. Both are written afresh by
+`extract` and checked to assemble back. `tools/verify.py` counts them as "scene" and "fx", never as
+source.
+
+- **Both are languages.** absint runs each handler as its interpreter calls it, with the script
+  bytes known and other RAM unknown. The handler's paths give the outcomes:
+  - next (a constant; a count from its own bytes when no jump encoding fits);
+  - stay;
+  - jump or call: a target computed from the operands. Its encoding (a word in the script's
+    bank plus a constant, or a signed, added or subtracted byte from the opcode) is found by
+    changing the bytes and watching the target move. A call is a jump that keeps the place after
+    its operands in RAM.
+  - return: the position from the return slot, which the trace fills with a mark;
+  - done: the task or channel ends;
+  - ram: a position from other RAM.
+
+  After a call the script goes on only when the part it calls can return. Bytes nothing reaches
+  are data. The assembler re-derives the structure from its bytes and refuses any line that
+  differs: an opcode of another length, an opcode nothing reaches, reached bytes written as data,
+  or an `@jump`/`@spawn` line that is not the operand's encoding. `tools/scripts.py check` also
+  asserts which opcodes are classed return (scene `$37`, fx `$92`), done (`$52`, `$FF`) and ram
+  (fx `$84`, `$86`, `$D0`; none in the scenes) over the data.
+- **Scene scripts** (`C2Scene_TaskRunScript`, `C2Script_OpTable` `$00`-`$52`). The handler runs
+  with M=0, A = X = opcode × 2 and `C2Script_Ptr` on the opcode. It returns Z=0 with the bytes to
+  add (after its own changes to the pointer), or Z=1 to stop; C=1 then ends the task.
+  - **Entries:**
+    - the pack's start;
+    - the `C2Scene_ListD` script addresses of the scene whose header (`C2SceneRom_HeaderTable`)
+      names the pack (3 in all; `C2Scene_GetListBScript`);
+    - the addresses opcodes `$09`/`$43` hand to `C2Scene_TaskSpawnScript(Low)`;
+    - the words opcode `$08` stores in `C2Scene_MemberWords`, the leader's and members' scripts
+      (`C2Scene_LeaderScriptStart`, `C2Scene_MemberScriptStart`).
+
+    397 entries come from those last two. The jumps are `$1A` (word + 1), `$36` (call) and the
+    conditional branches (a signed byte). A call goes on after `$37` returns.
+  - **Results:** all 8 packs (27,757 B unpacked, 17,112 B packed) assemble back byte-exact:
+    8,235 opcodes (70 different opcodes, 580 jumps, 314 calls), and 1,089 B nothing reaches.
+- **Layer-effect scripts** (`BattleCD_RunFxScript`).
+  - **How the runner reads them:** a byte below `$7F` is a tile page and `$7F` a step with no
+    page; both end the step. `$FF` ends the channel. These are traced in the runner itself.
+    `$80`-`$F9` run through `BattleCD_RunFxOp` (`BattleCD_FxOpTable`), and the runner goes on at
+    DP `$40` + 1. A script starts one byte after its table entry (the period byte: traced in
+    `BattleCD_StartFxChannel`). `$91`/`$92` call and return, `$CA`/`$CB` jump, and the waits go
+    back by a byte (`$A9`, `$BF`, `$F1`, `$F6`).
+  - **Results:** 142 scripts; 6,086 steps and opcodes (4,618 opcodes of 106 different ones, 854
+    pages, 485 `$7F`, 129 ends) in 15,401 B read as scripts and table, and 414 B nothing reaches.
+- **Not pinned down:**
+  - Scene packs 1-4 and 6 hold 1,089 B no known entry reaches (one block in pack 4 spawns
+    a script itself); they look like scripts started from elsewhere (tasks the scene code starts,
+    lists not traced). They stay data.
+  - Two scene scripts end with an opcode that goes on past the end of their pack (packs 0 and 6):
+    not followed.
+  - Fx opcodes `$84`/`$86` go back to their loop's start from RAM (the loop body is reached from
+    `$83`/`$85` anyway).
+  - The switch `$D0` at `$D1:82CE` (and `$D1`) jumps through a list after its operand, indexed by
+    a variable. The list's length is not bounded by the handler, so the list and what only it
+    reaches are data.
+  - The fx opcodes with no handler (`$FA`-`$FE`) and scene opcodes above `$52` would jump through
+    the code after their tables. None is reached; the interpreter refuses them.
 
 ## Order of work
 
@@ -486,9 +550,8 @@ counts them as "battle", never as source.
 5. **Text** (done, above): the encoder and the dictionary question; the pointer tables.
 6. **Tables and palettes** (first part done, below; 2-4 sessions left): the tables still
    extracted, and the inferred table ends.
-7. **Script languages**: battle scripts (done, below, but for the layer-effect scripts),
-   location event scripts (done, below),
-   scene scripts (2-3), music sequences (2-3).
+7. **Script languages**: battle, layer-effect, scene and location event scripts (done,
+   below), music sequences (2-3).
 8. **Readable assets**: tile and palette converters (2-3), sprite frames (2), maps if wanted.
 9. **Unknown and probable rows** (1).
 

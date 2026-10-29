@@ -56,6 +56,16 @@ How each piece's bytes are made (the manifest's `piece` column):
              unit it cannot follow fails the extraction); the build
              assembles it to build/battle/<label>.bin, which is incbin'd.
              param: <unit>/<role>. Counted as "battle scripts".
+  scene      a scene script pack (a Decomp_ToWram stream reached through
+             C2SceneRom_ScriptPacks): build/assets/scene/<label>.scn holds
+             its disassembly (tools/scripts.py; checked to assemble back
+             when written); the build assembles it to build/scene/
+             <label>.bin and packs that, which is incbin'd. param as for
+             packed. Counted as "scene scripts".
+  fx         the battle layer-effect scripts with their table
+             (tools/scripts.py's FX_ROWS): build/assets/fx/<label>.bfx; the
+             build assembles it to build/fx/<label>.bin, which is incbin'd.
+             Counted as "layer-effect scripts".
   records    a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
@@ -104,6 +114,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import battle  # noqa: E402
+import scripts  # noqa: E402
 import data_survey  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
@@ -117,6 +128,8 @@ PACKS = Path('build/packs')
 TEXT_OUT = Path('build/text')          # the encoded text pieces (tools/build_rom.py)
 RECORDS_OUT = Path('build/records')    # the encoded records pieces (tools/build_rom.py)
 BATTLE_OUT = Path('build/battle')      # the assembled battle script pieces (tools/build_rom.py)
+SCENE_OUT = Path('build/scene')        # the assembled (unpacked) scene scripts (tools/build_rom.py)
+FX_OUT = Path('build/fx')              # the assembled layer-effect scripts (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
@@ -126,9 +139,10 @@ PACK_PREFIX = '../../build/packs/'
 TEXT_PREFIX = '../../build/text/'
 RECORDS_PREFIX = '../../build/records/'
 BATTLE_PREFIX = '../../build/battle/'
+FX_PREFIX = '../../build/fx/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle')
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -136,6 +150,9 @@ EVENTS_ASSET = re.compile(r'^events/([A-Za-z_][A-Za-z0-9_]*)\.evt$')
 EVENTS_OUT = Path('build/events')      # the assembled (unpacked) event scripts (tools/build_rom.py)
 EVENT_PACK = re.compile(r'\bvia Evt_PackPtrs\[')
 BATTLE_ASSET = re.compile(r'^battle/([a-z]+)\.bscr$')
+SCENE_ASSET = re.compile(r'^scene/([A-Za-z_][A-Za-z0-9_]*)\.scn$')
+SCENE_PACK = re.compile(r'\bvia C2SceneRom_ScriptPacks\[')
+FX_ASSET = re.compile(r'^fx/([A-Za-z_][A-Za-z0-9_]*)\.bfx$')
 BATTLE_PARAM = re.compile(r'^([a-z]+)/([a-z]+)$')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
 RECORDS_PARAM = re.compile(r'^(table|palette) (\d+) x (\d+) B$')
@@ -317,6 +334,10 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'records/{label}.tsv'
         elif piece == 'events':
             asset = f'events/{label}.evt'
+        elif piece == 'scene':
+            asset = f'scene/{label}.scn'
+        elif piece == 'fx':
+            asset = f'fx/{label}.bfx'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
@@ -332,8 +353,13 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             add(label, s, e, 'fill', param=f'${m.group(2)}', row=row)
         elif kind == 'packed_lz':
             m = data_survey.PACK_FORMAT.match(row['format'])
-            add(label, s, e, 'events' if EVENT_PACK.search(row['notes']) else 'packed',
+            add(label, s, e, 'events' if EVENT_PACK.search(row['notes'])
+                else 'scene' if SCENE_PACK.search(row['notes']) else 'packed',
                 param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
+        elif row['start'] in scripts.FX_ROWS:
+            if kind != 'battle_script':
+                raise DataError(f'{row["start"]}: a {kind} row cannot be the layer-effect scripts')
+            add(label, s, e, 'fx', row=row)
         elif row['start'] in battle.ROWS:
             unit, role = battle.ROWS[row['start']]
             if kind not in ('battle_script', 'table'):
@@ -425,6 +451,16 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
                 problems.append(f'{where}: an events piece\'s asset is events/<label>.evt and its param '
                                 f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'scene':
+            m = SCENE_ASSET.match(p['asset'])
+            if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
+                problems.append(f'{where}: a scene piece\'s asset is scene/<label>.scn and its param '
+                                f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'fx':
+            m = FX_ASSET.match(p['asset'])
+            if not m or m.group(1) != p['label'] or p['param']:
+                problems.append(f'{where}: an fx piece\'s asset is fx/<label>.bfx and it has no param: '
+                                f'{p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'battle':
             m, mp = BATTLE_ASSET.match(p['asset']), BATTLE_PARAM.match(p['param'])
             if not m or not mp or m.group(1) != mp.group(1) or m.group(1) not in battle.UNITS \
@@ -461,8 +497,10 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSET_PREFIX + p['asset']] = p
-        elif p['piece'] in ('packed', 'events'):
+        elif p['piece'] in ('packed', 'events', 'scene'):
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
+        elif p['piece'] == 'fx':
+            out[f'{FX_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'text':
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'records':
@@ -480,8 +518,10 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSETS / p['asset']] = int(p['size'])
-        elif p['piece'] in ('packed', 'events'):
+        elif p['piece'] in ('packed', 'events', 'scene'):
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
+        elif p['piece'] == 'fx':
+            out[FX_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'text':
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'records':
@@ -600,9 +640,9 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; from your own ROM to build/assets/, a pack tools/build_rom.py',
         '; makes from one in build/packs/ (event scripts assembled from',
         '; their disassembly first), text or records it encodes into',
-        '; build/text/ and build/records/, or battle scripts it assembles',
-        '; into build/battle/ (symbols/data_assets.csv lists them; nothing',
-        '; here is ROM data).',
+        '; build/text/ and build/records/, or battle and layer-effect',
+        '; scripts it assembles into build/battle/ and build/fx/',
+        '; (symbols/data_assets.csv lists them; nothing here is ROM data).',
         '; ============================================================',
     ]
     for p in pieces:
@@ -632,6 +672,10 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}')
         elif p['piece'] == 'events':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, event script')
+        elif p['piece'] == 'scene':
+            out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene script')
+        elif p['piece'] == 'fx':
+            out.append(f'    incbin "{FX_PREFIX}{p["label"]}.bin"          ; layer-effect scripts')
         elif p['piece'] == 'records':
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'battle':
@@ -738,7 +782,7 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
-    for tool in ('events.py', 'battle.py', 'absint.py', 'disasm.py'):   # the script disassemblies
+    for tool in ('events.py', 'battle.py', 'scripts.py', 'absint.py', 'disasm.py'):   # the script disassemblies
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
@@ -773,6 +817,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     problems = extract_text(rom, out_dir, pieces) + extract_records(rom, out_dir, pieces)
     problems += extract_events(rom, out_dir, pieces, root, quiet)
     problems += extract_battle(rom, out_dir, pieces, root)
+    problems += extract_scripts(rom, out_dir, pieces, root)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -782,7 +827,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('table', 'text', 'records'):
             continue
-        if p['piece'] in ('events', 'battle'):
+        if p['piece'] in ('events', 'battle', 'scene', 'fx'):
             continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -903,6 +948,20 @@ def extract_battle(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = R
             c3pack._write(dest, text_.encode())
     finally:
         interp.save(Path(root))
+    return problems
+
+
+def extract_scripts(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = ROOT) -> list[str]:
+    """Write the readable file of every scene and fx piece
+    (tools/scripts.py), each disassembled afresh and checked to assemble
+    back to its bytes, every line against the handlers; the problems. A
+    piece the tool cannot follow is a problem, never kept as bytes."""
+    import c3pack
+    problems = []
+    for p, text_ in scripts.extract_all(rom, pieces, Path(root), problems):
+        dest = out_dir / p['asset']
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        c3pack._write(dest, text_.encode())
     return problems
 
 

@@ -9,9 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle scripts it assembles
-; into build/battle/ (symbols/data_assets.csv lists them; nothing
-; here is ROM data).
+; build/text/ and build/records/, or battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/
+; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $D1:0000-$D1:005F (96 B), table, confirmed: 2 B per !Battle_ActFramesIdx: packed sprite frames
@@ -1120,7 +1120,7 @@ BattleRom_FxScripts:
 ; Read by BattleCD_StartFxChannel.
 org $D1646C
 BattleRom_FxScriptPtrs:
-    incbin "../../build/assets/battle_script/BattleRom_FxScriptPtrs.bin"
+    incbin "../../build/fx/BattleRom_FxScriptPtrs.bin"          ; layer-effect scripts
 
 ; $D1:A233-$D1:A574 (834 B), table, confirmed: 6 B per layer effect: !Battle_FxRecord
 ; Read by BattleCD_LoadFxRecord.

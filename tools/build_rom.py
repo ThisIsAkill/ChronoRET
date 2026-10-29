@@ -25,7 +25,12 @@ assets, with no copy of the original.
      table (build/assets/records/<label>.tsv) with tools/records.py to
      build/records/<label>.bin, the same way (a file is rewritten only when
      its bytes change; a piece whose size differs fails the build).
-  6. The battle scripts: every unit of `battle` pieces is assembled from
+  6. The scene and layer-effect scripts: every `scene` piece is
+     assembled from build/assets/scene/<label>.scn to its unpacked bytes
+     in build/scene/ (step 3 packs them), every `fx` piece from
+     build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
+     tools/scripts.py, every line checked against the handlers.
+  6b. The battle scripts: every unit of `battle` pieces is assembled from
      its readable file (build/assets/battle/<unit>.bscr) with
      tools/battle.py, every line checked against the readers, to
      build/battle/<label>.bin per piece (a file is rewritten only when its
@@ -77,11 +82,12 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('packed', 'events'):
+        if p['piece'] not in ('packed', 'events', 'scene'):
             continue
         mode = int(extract_data.PACK_PARAM.match(p['param']).group(1))
         src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
-               else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin')
+               else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin' if p['piece'] == 'events'
+               else root / extract_data.SCENE_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
         sizes[p['label']] = int(p['size'])
@@ -186,6 +192,47 @@ def build_events(root: Path = ROOT) -> int:
     return written
 
 
+def build_scripts(root: Path = ROOT) -> int:
+    """Assemble every scene piece (to its unpacked bytes in build/scene/,
+    which build_packs packs) and fx piece (build/fx/), each from its
+    readable file with tools/scripts.py, every line checked against the
+    handlers; returns how many files were written."""
+    import scripts
+    root = Path(root)
+    pieces = [p for p in extract_data.read_manifest() if p['piece'] in ('scene', 'fx')]
+    if not pieces:
+        return 0
+    try:
+        scene, fx = scripts.langs(root)
+    except scripts.ScriptsError as e:
+        raise BuildError(f'scripts: {e}') from None
+    written, wrong = 0, []
+    try:
+        for p in pieces:
+            text_ = (root / extract_data.ASSETS / p['asset']).read_text()
+            try:
+                data = scripts.assemble_piece(scene if p['piece'] == 'scene' else fx, text_, p)
+            except scripts.ScriptsError as e:
+                raise BuildError(f'scripts: {e}') from None
+            size = (int(extract_data.PACK_PARAM.match(p['param']).group(2)) if p['piece'] == 'scene'
+                    else int(p['size']))
+            if len(data) != size:
+                wrong.append(f'{p["label"]}: {len(data)} B, its piece {size} B')
+                continue
+            out_dir = root / (extract_data.SCENE_OUT if p['piece'] == 'scene' else extract_data.FX_OUT)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            path = out_dir / f'{p["label"]}.bin'
+            if not path.exists() or path.read_bytes() != data:
+                c3pack._write(path, data)
+                written += 1
+    finally:
+        scene.save(root)
+        fx.save(root)
+    if wrong:
+        raise BuildError('scripts that do not fit their place:\n  ' + '\n  '.join(wrong))
+    return written
+
+
 def build_battle(root: Path = ROOT) -> int:
     """Assemble every battle script unit (see the docstring); returns how
     many files were written."""
@@ -284,6 +331,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     finally:
         os.chdir(cwd)
     build_events(root)
+    build_scripts(root)
     build_packs(root, quiet=quiet)
     build_text(root)
     build_records(root)

@@ -9,9 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle scripts it assembles
-; into build/battle/ (symbols/data_assets.csv lists them; nothing
-; here is ROM data).
+; build/text/ and build/records/, or battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/
+; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $C9:0000-$C9:0E36 (3,639 B), brr_sample, confirmed: u16 length + BRR blocks (9 B)
