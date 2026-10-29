@@ -445,10 +445,12 @@ counts them as "battle", never as source.
   (`$CC:A3E0`, 50 B) is kept as bytes: its main part's blocks run past the first `$FF`, where
   `BattleAi_FindReactPart` starts the reaction part, so the two readers split it differently.
   One PC tech thread runs on, after its last subscript returns, into the next script's header
-  (`$CE:30A3`); it is not followed there. The arcs `$98`/`$99` in the target-set thread and the
-  path move `$18` in the target-set and object threads advance by a stale length an earlier
-  opcode left in RAM (`!Battle_ActThreadOpLen`, `!Battle_ActThreadPathLen`; the handlers'
-  headers say so): classed "stale", not followed and not counted as returns.
+  (`$CE:30A3`); it is not followed there. The stale-OpLen path: `$98`/`$99` in the target-set
+  thread and in an object thread entered mid-move (`.object_moving` -> `.done`, at `$CE:D58F` and
+  `$CE:D62F`); `$18` in set and object threads. They advance by a length an earlier opcode left
+  in RAM (`!Battle_ActThreadOpLen`, `!Battle_ActThreadPathLen`; the handlers' headers say so):
+  classed "stale", not followed and not counted as returns; `tools/battle.py check` asserts
+  that over the data only these are stale and only `$1F`/`$21` are returns.
   Opcode `$80` with a count of 0 (it copies 256 bytes and advances 1) is not modelled: the
   interpreter refuses it; no script has one. Opcode `$26` in an object thread
   runs its third byte as the next opcode (two `@inner` lines). The table extents are the survey's

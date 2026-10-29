@@ -347,6 +347,19 @@ class WithRom(unittest.TestCase):
         rom = ed.read_rom()
         self.assertEqual(battle.check(rom), [])
 
+    def test_exits_over_the_data(self):
+        # 'end' only for the returns, 'stale' only for the movers that
+        # advance by an earlier opcode's length (the STALE marker of
+        # battle._Machine; without it the movers would count as returns)
+        rom = ed.read_rom()
+        interp = battle.ActInterp()
+        interp.load()
+        ps = battle._pieces_of(rom, ed.read_manifest(), 'actions')
+        d = battle.disassemble_actions(interp, ps, battle._banks())
+        kinds = [o for per in d['kinds'].values() for o in per.values()]
+        self.assertEqual({o.op for o in kinds if o.end}, {0x1F, 0x21})
+        self.assertEqual({o.op for o in kinds if o.stale}, {0x18, 0x98, 0x99})
+
 
 if __name__ == '__main__':
     unittest.main()

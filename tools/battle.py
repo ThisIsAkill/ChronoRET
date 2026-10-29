@@ -30,8 +30,9 @@ the subscript table (BattleRom_ActSubscripts) that point into them:
              the place after the operands kept as the return address;
       end    the pointer taken from RAM no script byte sets (a return);
       stale  the pointer moved by a count from RAM this opcode did not leave
-             ($98/$99 in the target-set thread, $18 in the target-set and
-             object threads): not followed, no return.
+             ($98/$99 in the target-set thread and in an object thread
+             entered mid-move, $18 in the target-set and object threads):
+             not followed, no return.
     Opcode $80 with a count of 0 (256 bytes copied, advance 1) is refused.
     A handler that waits (the pointer unchanged) is run for a second frame
     from the state the first left (the movers $10-$18 and $98-$9D keep
@@ -626,9 +627,14 @@ def disassemble_actions(interp: ActInterp, pieces: list[Piece], banks: dict[str,
                 elif m.call is None:
                     m.call = o.call
             else:
-                ops[a] = o
+                # (a copy: what the kinds add is merged into it, while each
+                # kind's own outcome stays in kinds)
+                ops[a] = m = Op()
+                for k in Op.__slots__:
+                    setattr(m, k, getattr(o, k))
+                m.inside = list(o.inside)
                 if o.call is not None:
-                    o.next = False              # until its subscript is seen to return
+                    m.next = False              # until its subscript is seen to return
             if o.call is not None:
                 pending.append((a, kind, o))
                 work.append((o.call, kind))
@@ -675,7 +681,7 @@ def disassemble_actions(interp: ActInterp, pieces: list[Piece], banks: dict[str,
     called = {o.call for _, _, o in pending}
     code_entries |= called | sub_entries
     return {'entries': entries, 'headers': headers, 'ops': ops, 'code_entries': code_entries,
-            'into_headers': into}
+            'into_headers': into, 'kinds': kinds}
 
 
 def _thread_numbers(m1: int, m2: int) -> list[int]:
@@ -992,9 +998,12 @@ def assemble_actions(text: str, pieces: dict[str, tuple[str, int, int]], names: 
                 raise BattleError(f'{where}: the opcode at ${at:06X} ({names[o.op] if not o.halt else "Halt"}) '
                                   f'is reached: those bytes are not data')
         for where, at in after_op:
-            if d['ops'][at].next:
-                raise BattleError(f'{where}: @bytes after {names[d["ops"][at].op]}, which goes on to the next '
-                                  f'opcode: those bytes are reached')
+            # (the check above already refuses this case: the opcode after
+            # one that goes on is reached and is no line)
+            if at not in d['ops'] or not d['ops'][at].next:
+                continue
+            raise BattleError(f'{where}: @bytes after {names[d["ops"][at].op]}, which goes on to the next '
+                              f'opcode: those bytes are reached')
         heads = {at for at, k in kinds.items() if k == 'threads'}
         if heads != set(d['headers']):
             extra = sorted(heads ^ set(d['headers']))[0]
@@ -1354,6 +1363,31 @@ def stats(unit: str, text: str) -> dict:
     return {'data': data, 'kept': kept, 'lines': ops}
 
 
+# What the real scripts are known to hold (DATA_PLAN.md): the opcodes whose
+# pointer comes from RAM (returns) and those that advance by a length an
+# earlier opcode left (stale). A change in either set is a change in how
+# the interpreter reads the handlers, and check() reports it.
+RETURNS = {0x1F, 0x21}
+STALES = {0x18, 0x98, 0x99}
+
+
+def exits_check(rom: bytes, manifest: list[dict], interp: ActInterp, root: Path = ROOT) -> list[str]:
+    ps = _pieces_of(rom, manifest, 'actions')
+    if not ps:
+        return []
+    d = disassemble_actions(interp, ps, _banks(root))
+    ends = {o.op for per in d['kinds'].values() for o in per.values() if o.end}
+    stales = {o.op for per in d['kinds'].values() for o in per.values() if o.stale}
+    out = []
+    if ends != RETURNS:
+        out.append(f'actions: the opcodes classed end (returns) are {sorted(map(hex, ends))}, '
+                   f'not {sorted(map(hex, RETURNS))}')
+    if stales != STALES:
+        out.append(f'actions: the opcodes classed stale are {sorted(map(hex, stales))}, '
+                   f'not {sorted(map(hex, STALES))}')
+    return out
+
+
 def check(rom: bytes, root: Path = ROOT, quiet: bool = True) -> list[str]:
     import extract_data
     manifest = extract_data.read_manifest()
@@ -1368,6 +1402,7 @@ def check(rom: bytes, root: Path = ROOT, quiet: bool = True) -> list[str]:
         if not quiet:
             print(f'battle: enemy: {len(reads)} action codes\' handlers read inside their records '
                   f'(BattleFD_AiActLength)')
+    problems += exits_check(rom, manifest, interp, root)
     for unit in UNITS:
         try:
             text = extract_unit(unit, rom, manifest, interp, fmt, root)
