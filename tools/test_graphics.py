@@ -8,7 +8,9 @@ indexed PNGs).
 Without the ROM: the tile layouts on hand-made tiles (planes, bit order,
 the 3bpp plane 2), the codecs' round trips, the PNG reader on images this
 tool does not write (other row filters, a lower bit depth) and its
-refusals (not indexed, interlaced, a bad CRC, cut short), the image
+refusals (not indexed, interlaced, a bad CRC, cut short, no signature,
+IHDR or IEND, data that does not inflate or is the wrong size, an unknown
+row filter), the param and sidecar lines, the piece size, the image
 checks (size, an index the format cannot hold, a cell past the last tile,
 a sidecar that does not match), and the manifest's graphics pieces.
 
@@ -143,6 +145,45 @@ class Images(unittest.TestCase):
     def test_cut_short_refused(self):
         with self.assertRaisesRegex(g.GraphicsError, "ends inside its b'IDAT' chunk"):
             g.read_png(self.png()[:-14])
+
+    def test_malformed_png_refused(self):
+        good = self.png()
+        ihdr_end = 8 + 12 + 13
+
+        def chunk_file(*chunks):
+            return b'\x89PNG\r\n\x1a\n' + b''.join(g._chunk(k, b) for k, b in chunks)
+        ihdr = good[16:29]
+        for data, why in (
+                (b'GIF89a' + good[6:], 'not a PNG file'),
+                (good[:ihdr_end + 3], 'ends inside a chunk header'),
+                (good[:-12], 'no IHDR or no IEND'),
+                (chunk_file((b'IHDR', ihdr), (b'IDAT', b'not zlib'), (b'IEND', b'')), 'does not inflate'),
+                (chunk_file((b'IHDR', ihdr), (b'IDAT', zlib.compress(bytes(10))), (b'IEND', b'')),
+                 'image data is 10 B, not'),
+                (chunk_file((b'IHDR', ihdr), (b'IDAT', zlib.compress(bytes([5] + [0] * 128) * 16)),
+                            (b'IEND', b'')), 'row filter 5')):
+            with self.subTest(why=why):
+                with self.assertRaisesRegex(g.GraphicsError, why):
+                    g.read_png(data)
+
+    def test_png_errors_name_the_file(self):
+        with self.assertRaisesRegex(g.GraphicsError, '^x.png: not a PNG file'):
+            g.from_image('2bpp', 32, b'junk', b'', 'x.png')
+
+    def test_param_and_sidecar_lines_checked(self):
+        with self.assertRaisesRegex(g.GraphicsError, 'not a graphics param'):
+            g.parse_param('2bpp 32 tile')
+        side = g.sidecar('X', '$FF:0000', '$FF:01FF', '2bpp', 32, b'')
+        with self.assertRaisesRegex(g.GraphicsError, 'no tiles line'):
+            g.read_sidecar(side.replace('tiles 32', 'tile 32'))
+        with self.assertRaisesRegex(g.GraphicsError, 'format, tiles or width'):
+            g.read_sidecar(side.replace('width 16', 'width 8'))
+
+    def test_piece_size_checked(self):
+        p = {'label': 'X', 'param': '2bpp 32 tiles', 'size': str(len(DATA) + 1)}
+        side = g.sidecar('X', '$FF:0000', '$FF:01FF', '2bpp', 32, b'')
+        with self.assertRaisesRegex(g.GraphicsError, '512 B; the piece is 513'):
+            g.encode_piece(p, self.png(), side)
 
     def test_wrong_size_refused(self):
         with self.assertRaisesRegex(g.GraphicsError, 'the image is 128x24'):
