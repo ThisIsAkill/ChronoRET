@@ -9,9 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle scripts it assembles
-; into build/battle/ (symbols/data_assets.csv lists them; nothing
-; here is ROM data).
+; build/text/ and build/records/, or battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/
+; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $F6:0000-$F6:1BFF (7,168 B), table, confirmed: 512 x 14 B location records (LocRom struct)

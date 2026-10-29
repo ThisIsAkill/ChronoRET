@@ -9,9 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle scripts it assembles
-; into build/battle/ (symbols/data_assets.csv lists them; nothing
-; here is ROM data).
+; build/text/ and build/records/, or battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/
+; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
 ; $C3:10CB-$C3:11FF (309 B), padding, confirmed: 309 x $00
@@ -45,56 +45,56 @@ SceneDialPack_000:
 ; Read by C2Scene_LoadScript.
 org $C38B6C
 SceneScriptPack_000:
-    incbin "../../build/packs/SceneScriptPack_000.lz"          ; lz12 -> 5557 B
+    incbin "../../build/packs/SceneScriptPack_000.lz"          ; lz12 -> 5557 B, scene script
 
 ; $C3:97D7-$C3:9F40 (1,898 B), packed_lz, confirmed: lz12 -> 2999 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C397D7
 SceneScriptPack_001:
-    incbin "../../build/packs/SceneScriptPack_001.lz"          ; lz12 -> 2999 B
+    incbin "../../build/packs/SceneScriptPack_001.lz"          ; lz12 -> 2999 B, scene script
 
 ; $C3:9F41-$C3:A606 (1,734 B), packed_lz, confirmed: lz12 -> 2661 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C39F41
 SceneScriptPack_002:
-    incbin "../../build/packs/SceneScriptPack_002.lz"          ; lz12 -> 2661 B
+    incbin "../../build/packs/SceneScriptPack_002.lz"          ; lz12 -> 2661 B, scene script
 
 ; $C3:A607-$C3:AC3D (1,591 B), packed_lz, confirmed: lz12 -> 2021 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C3A607
 SceneScriptPack_003:
-    incbin "../../build/packs/SceneScriptPack_003.lz"          ; lz12 -> 2021 B
+    incbin "../../build/packs/SceneScriptPack_003.lz"          ; lz12 -> 2021 B, scene script
 
 ; $C3:AC3E-$C3:BA13 (3,542 B), packed_lz, confirmed: lz12 -> 6293 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C3AC3E
 SceneScriptPack_004:
-    incbin "../../build/packs/SceneScriptPack_004.lz"          ; lz12 -> 6293 B
+    incbin "../../build/packs/SceneScriptPack_004.lz"          ; lz12 -> 6293 B, scene script
 
 ; $C3:BA14-$C3:BF7A (1,383 B), packed_lz, confirmed: lz12 -> 2167 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C3BA14
 SceneScriptPack_005:
-    incbin "../../build/packs/SceneScriptPack_005.lz"          ; lz12 -> 2167 B
+    incbin "../../build/packs/SceneScriptPack_005.lz"          ; lz12 -> 2167 B, scene script
 
 ; $C3:BF7B-$C3:C804 (2,186 B), packed_lz, confirmed: lz12 -> 3368 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C3BF7B
 SceneScriptPack_006:
-    incbin "../../build/packs/SceneScriptPack_006.lz"          ; lz12 -> 3368 B
+    incbin "../../build/packs/SceneScriptPack_006.lz"          ; lz12 -> 3368 B, scene script
 
 ; $C3:C805-$C3:CE43 (1,599 B), packed_lz, confirmed: lz12 -> 2691 B: scene script (C2Scene
 ; bytecode)
 ; Read by C2Scene_LoadScript.
 org $C3C805
 SceneScriptPack_007:
-    incbin "../../build/packs/SceneScriptPack_007.lz"          ; lz12 -> 2691 B
+    incbin "../../build/packs/SceneScriptPack_007.lz"          ; lz12 -> 2691 B, scene script
 
 ; $C3:CE44-$C3:CED9 (150 B), packed_lz, confirmed: lz11 -> 256 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,

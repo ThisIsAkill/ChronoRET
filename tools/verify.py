@@ -24,9 +24,11 @@ ROM byte must be one of these or emitted by the code source. Text pieces
 counted apart as well, never as source, and so are records pieces
 (tools/records.py): tables and palettes encoded from records extracted
 from the ROM; events pieces (tools/events.py): event script packs
-assembled from their disassembly, then packed; and battle pieces
+assembled from their disassembly, then packed; battle pieces
 (tools/battle.py): battle scripts and their tables assembled from their
-readable form.
+readable form; and scene and fx pieces (tools/scripts.py): the scene
+script packs and the layer-effect scripts, assembled the same way (the
+scene packs then packed).
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -205,7 +207,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     for i in emitted:
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
-               'records_bytes': 0, 'battle_bytes': 0}
+               'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -229,6 +231,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     try:
         extract_data.extract()
         build_rom.build_events()
+        build_rom.build_scripts()
         build_rom.build_packs()
         build_rom.build_text()
         build_rom.build_records()
@@ -237,10 +240,11 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         problems.append(str(e))
         return figures, problems
     for p in pieces:
-        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle'):
+        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
-                else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] in ('packed', 'events')
+                else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] in ('packed', 'events', 'scene')
+                else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
                 else extract_data.BATTLE_OUT / f'{p["label"]}.bin' if p['piece'] == 'battle'
                 else extract_data.RECORDS_OUT / f'{p["label"]}.bin')
@@ -268,6 +272,15 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         bsplit['data'] += st['data'] - st['kept']
         bsplit['kept'] += st['kept']
     figures['battle_split'] = bsplit
+    # How much of the scene and layer-effect scripts nothing reaches (data).
+    import scripts
+    ssplit = {'scene': 0, 'fx': 0, 'scene_unpacked': 0}
+    for p in pieces:
+        if p['piece'] in ('scene', 'fx'):
+            ssplit[p['piece']] += scripts.stats((extract_data.ASSETS / p['asset']).read_text())['data']
+            if p['piece'] == 'scene':
+                ssplit['scene_unpacked'] += int(extract_data.PACK_PARAM.match(p['param']).group(2))
+    figures['scripts_split'] = ssplit
     return figures, problems
 
 
@@ -369,6 +382,15 @@ def main() -> int:
               f'(build/assets/battle/ -> build/battle/, incbin): '
               f'{data["battle_bytes"] - bs["data"] - bs["kept"]:,} B read as scripts and tables, '
               f'{bs["data"]:,} B no opcode or record reaches (data), {bs["kept"]:,} B of scripts kept as bytes')
+        ss = data['scripts_split']
+        print(f'  {"scene":<16} {data["scene_bytes"]:>9,} bytes of scene scripts packed by the build from '
+              f'scripts assembled from their disassembly (build/assets/scene/ -> build/scene/ -> '
+              f'build/packs/, incbin); unpacked: {ss["scene_unpacked"] - ss["scene"]:,} B read as scripts, '
+              f'{ss["scene"]:,} B nothing reaches (data)')
+        print(f'  {"fx":<16} {data["fx_bytes"]:>9,} bytes of battle layer-effect scripts and their table '
+              f'assembled by the build from their disassembly (build/assets/fx/ -> build/fx/, incbin): '
+              f'{data["fx_bytes"] - ss["fx"]:,} B read as scripts and table, {ss["fx"]:,} B nothing reaches '
+              f'(data)')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')

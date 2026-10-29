@@ -10,14 +10,14 @@ Padding_C310CB,$C3:10CB,$C3:11FF,309,fill,,$00
 C3Pack_000,$C3:1200,$C3:1312,275,packed,packed_lz/C3Pack_000.bin,lz12 -> 1024 B
 Padding_C37A2C,$C3:7A2C,$C3:7FFF,1492,fill,,$00
 SceneDialPack_000,$C3:8000,$C3:8B6B,2924,packed,packed_lz/SceneDialPack_000.bin,lz11 -> 3648 B
-SceneScriptPack_000,$C3:8B6C,$C3:97D6,3179,packed,packed_lz/SceneScriptPack_000.bin,lz12 -> 5557 B
-SceneScriptPack_001,$C3:97D7,$C3:9F40,1898,packed,packed_lz/SceneScriptPack_001.bin,lz12 -> 2999 B
-SceneScriptPack_002,$C3:9F41,$C3:A606,1734,packed,packed_lz/SceneScriptPack_002.bin,lz12 -> 2661 B
-SceneScriptPack_003,$C3:A607,$C3:AC3D,1591,packed,packed_lz/SceneScriptPack_003.bin,lz12 -> 2021 B
-SceneScriptPack_004,$C3:AC3E,$C3:BA13,3542,packed,packed_lz/SceneScriptPack_004.bin,lz12 -> 6293 B
-SceneScriptPack_005,$C3:BA14,$C3:BF7A,1383,packed,packed_lz/SceneScriptPack_005.bin,lz12 -> 2167 B
-SceneScriptPack_006,$C3:BF7B,$C3:C804,2186,packed,packed_lz/SceneScriptPack_006.bin,lz12 -> 3368 B
-SceneScriptPack_007,$C3:C805,$C3:CE43,1599,packed,packed_lz/SceneScriptPack_007.bin,lz12 -> 2691 B
+SceneScriptPack_000,$C3:8B6C,$C3:97D6,3179,scene,scene/SceneScriptPack_000.scn,lz12 -> 5557 B
+SceneScriptPack_001,$C3:97D7,$C3:9F40,1898,scene,scene/SceneScriptPack_001.scn,lz12 -> 2999 B
+SceneScriptPack_002,$C3:9F41,$C3:A606,1734,scene,scene/SceneScriptPack_002.scn,lz12 -> 2661 B
+SceneScriptPack_003,$C3:A607,$C3:AC3D,1591,scene,scene/SceneScriptPack_003.scn,lz12 -> 2021 B
+SceneScriptPack_004,$C3:AC3E,$C3:BA13,3542,scene,scene/SceneScriptPack_004.scn,lz12 -> 6293 B
+SceneScriptPack_005,$C3:BA14,$C3:BF7A,1383,scene,scene/SceneScriptPack_005.scn,lz12 -> 2167 B
+SceneScriptPack_006,$C3:BF7B,$C3:C804,2186,scene,scene/SceneScriptPack_006.scn,lz12 -> 3368 B
+SceneScriptPack_007,$C3:C805,$C3:CE43,1599,scene,scene/SceneScriptPack_007.scn,lz12 -> 2691 B
 ScenePalPack_000,$C3:CE44,$C3:CED9,150,packed,packed_lz/ScenePalPack_000.bin,lz11 -> 256 B
 ScenePalPack_001,$C3:CEDA,$C3:CF6B,146,packed,packed_lz/ScenePalPack_001.bin,lz11 -> 160 B
 ScenePalPack_002,$C3:CF6C,$C3:CFF4,137,packed,packed_lz/ScenePalPack_002.bin,lz12 -> 128 B
@@ -719,7 +719,7 @@ BattleRom_PcKoFrame,$D1:5F42,$D1:5F5D,28,records,records/BattleRom_PcKoFrame.tsv
 Unknown_D15F5E,$D1:5F5E,$D1:5FFF,162,extracted,unknown/Unknown_D15F5E.bin,
 BattleRom_FxColours,$D1:6000,$D1:623F,576,extracted,palette/BattleRom_FxColours.bin,
 BattleRom_FxScripts,$D1:6240,$D1:646B,556,extracted,table/BattleRom_FxScripts.bin,
-BattleRom_FxScriptPtrs,$D1:646C,$D1:A232,15815,extracted,battle_script/BattleRom_FxScriptPtrs.bin,
+BattleRom_FxScriptPtrs,$D1:646C,$D1:A232,15815,fx,fx/BattleRom_FxScriptPtrs.bfx,
 BattleRom_FxRecords,$D1:A233,$D1:A574,834,extracted,table/BattleRom_FxRecords.bin,
 BattleRom_FxMapPtrs,$D1:A575,$D1:E709,16789,extracted,tilemap/BattleRom_FxMapPtrs.bin,
 Gfx_D20000,$D2:0000,$D2:72BF,29376,extracted,graphics/Gfx_D20000.bin,
