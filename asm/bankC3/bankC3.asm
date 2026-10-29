@@ -725,7 +725,9 @@ C3_RandomByte:
 ; $7E:520D it comes from a 14-byte MVN copy of a record at $1400 or
 ; $140E into $1F-$2C, whose first word the module sets to 4
 ; ($7E:502A) and 3 ($7E:50B6) respectively (other writes to those
-; words, at $7E:9B2B, $7E:8BA5 and $7E:9E15, not traced to this use).
+; words, at $7E:9B2B and $7E:9E15, not traced to this use; $7E:8BA5,
+; C3Mod_Prog10StripNmi, writes $140E as BG1's scroll for an HDMA table,
+; not as a record).
 ; Quirks (carries not set or cleared first):
 ;   - the first C3Scale_Acc add takes the caller's carry; later ones get
 ;     C=0 from the CLC/ADC that steps C3Scale_Dest;
@@ -739,12 +741,13 @@ C3_RandomByte:
 ;     with C=0 and a difference of 1 nothing is cleared.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   C3Mod_ScaleJob, $7E:520D, C3Mod_Prog6ScaleIdle, $7E:82A0, and
-;   $7E:897F), with M=0 and DB=$7F (PEA/PLB).
+;   C3Mod_Prog10ScaleIdle, $7E:897F), with M=0 and DB=$7F (PEA/PLB).
 ; Entry: M=0, X=0 (16-bit throughout), DP = the module's (the
 ;        C3Scale_* direct-page bytes; 0 at $7E:520D, C3Mod_ScaleJob,
-;        and $7E:82A0, C3Mod_Prog6ScaleIdle, both run from
-;        C3Mod_Start's idle loop; $7E:897F's not traced), DB = the bank of the source and the output ($7F at
-;        all three sites: STA abs,Y and MVN $7F,$7F).
+;        $7E:82A0, C3Mod_Prog6ScaleIdle, and $7E:897F,
+;        C3Mod_Prog10ScaleIdle, all run from C3Mod_Start's idle loop),
+;        DB = the bank of the source and the output ($7F at all three
+;        sites: STA abs,Y and MVN $7F,$7F).
 ; Exit:  M=0, X=0, DB as on entry (the MVNs set it to $7F, the bank it
 ;        already is at the call sites); A, X, Y changed; C3Scale_Acc, Rows,
 ;        Dest, DestPos, SrcRow, GroupsLeft, PrevEnd, the Pixels bytes
@@ -1927,7 +1930,7 @@ C3_CopyCodeOrder:
 ; turns the scaled image into tiles (inferred from the arithmetic; the
 ; module's use is not traced further).
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
-;   $7E:3CFB, C3Mod_Prog6 at $7E:799D, and $7E:8569).
+;   $7E:3CFB, C3Mod_Prog6 at $7E:799D, and C3Mod_Prog10 at $7E:8569).
 ; Entry: M any (REP #$20 here), X=0; DP any and DB any (set to 0 here,
 ;        not restored); X = the destination (low byte 0), Y = the
 ;        source base; WMADDL/M/H = where the code goes.
@@ -2568,14 +2571,15 @@ C3_SprListSmall:
 ; byte is always shifted right by 2 with size = 1 and X bit 8 put in.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, C3Mod_Prog6Sprites
-;   at $7E:8245, $7E:88A0, $7E:88B4 and $7E:9A07).
+;   at $7E:8245, C3Mod_Prog10SprNmi at $7E:88A0 and $7E:88B4, and
+;   $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (0 at
-;        $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F and $7E:8245,
-;        the others not traced), DB = a bank that maps the I/O
-;        registers and low WRAM ($00-$3F or $80-$BF: WMADDL/H, WMDATA
-;        and the OAM shadow are absolute; $00 at those six, under a task
-;        or C3Mod_Prog6; the other sites' not traced); A = the list's
-;        address.
+;        $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245,
+;        $7E:88A0 and $7E:88B4; $7E:9A07's not traced), DB = a bank
+;        that maps the I/O registers and low WRAM ($00-$3F or $80-$BF:
+;        WMADDL/H, WMDATA and the OAM shadow are absolute; $00 at those
+;        eight, under a task, an NMI task or C3Mod_Prog6; $7E:9A07's
+;        not traced); A = the list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:

@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:8CD0,C3Mod_Prog10Grid,2026-10-09,rev202a,approved,763a7dca34dc,"Y = 0 from LDY #0 at $8D21, nothing in the loop writes Y; 4 STY a block x 8 blocks x 4 rows x 8 bands = 1024 writes of 0 to $217F (APUIO3 mirror); rest of the header rechecked."
