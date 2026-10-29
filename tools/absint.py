@@ -80,6 +80,9 @@ class Machine:
         self.callee_steps = callee_steps
         self.widen_after = 48
         self.opaque: set[tuple[int, str]] = set()
+        # per callee not followed, the calls in progress there (outermost
+        # first), for a caller that trusts some routines and no others
+        self.opaque_chains: set[tuple[int, ...]] = set()
 
     # ── memory ──
     def _rom(self, addr: int) -> int | None:
@@ -239,6 +242,7 @@ class Machine:
         self.reads = set()
         self.control = set()
         self.opaque = set()
+        self.opaque_chains = set()
         entry.frames = []
         base_depth = len(entry.sp)
         stack = [entry]
@@ -284,6 +288,7 @@ class Machine:
                     # if it returned with A, X, Y and the flags unknown
                     fallback, _, callee = s.frames[-1]
                     self.opaque.add((callee, str(e)))
+                    self.opaque_chains.add(tuple(f[2] for f in s.frames))
                     s = fallback.copy()
                     continue
                 if r is None:
