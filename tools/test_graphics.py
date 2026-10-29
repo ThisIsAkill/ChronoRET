@@ -311,7 +311,8 @@ class Packed(unittest.TestCase):
         self.assertEqual(g.parse_param('lz12 -> 4096 B; 4bpp 124 tiles + 128 B'), ('4bpp', 124, 128))
         data = DATA + b'\x12\x34'
         png, tail = g.to_image('2bpp', data, 2)
-        p = {'label': 'X', 'param': 'lz11 -> 514 B; 2bpp 32 tiles + 2 B', 'size': '300', 'piece': 'gfxpack'}
+        p = {'label': 'X', 'param': 'lz11 -> 514 B; 2bpp 32 tiles + 2 B', 'size': '300', 'piece': 'gfxpack',
+             'start': '$E0:0000', 'end': '$E0:012B'}
         side = g.sidecar('X', '$E0:0000', '$E0:012B', '2bpp', 32, tail)
         self.assertEqual(g.encode_piece(p, png, side), data)              # the unpacked size, not the piece's
         p['param'] = 'lz11 -> 515 B; 2bpp 32 tiles + 2 B'
