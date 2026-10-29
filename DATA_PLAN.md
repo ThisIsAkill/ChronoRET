@@ -605,6 +605,49 @@ palette is a grey ramp: the regions' own palettes are not proven here.
   graphics, battle backgrounds) are the second part. Edits to any extracted asset are lost when
   extraction runs again (as for the text and scripts); the encoder itself takes edited PNGs.
 
+## Graphics as images (step 8, second part: packed tiles)
+
+On the `data-graphics-2` branch. A pack whose unpacked bytes are tiles becomes a `gfxpack`
+piece: extraction writes the image and sidecar of the unpacked bytes to `build/assets/gfx/`, and
+the build encodes them to `build/gfxpack/` and packs that (`tools/c3pack.py`) back to the ROM's
+stream. `tools/verify.py` counts them as "packed graphics". The palette is grey, as in part 1.
+
+- **How a pack's format is proved:** from each use the data makes of it, and what the reader
+  does with that use (`graphics.PACK_PROOFS`; `derive_packed` finds them, and `check` asserts
+  they are `graphics.PACKED`). Uses that disagree leave a pack unproved; none do here.
+  - **Location tiles** (`LocGfx_PackPtrs`). The field draws in BG mode 1 (`NmiHandler` writes
+    `Nmi_BgMode` every frame), with BG1/BG2 tiles at VRAM $1000 and BG3 tiles at $5000
+    (`Ppu_SetBgLayout`, from `LocLoad_DrawMap`).
+    - Packs 0-5 of a location's `LocGfx_Lists` entry (`LocRom.Tileset12`) are uploaded to
+      $2000-$4FBF (`LocLoad_Unk0960`, `LocLoad_UploadPack`): BG1/BG2 tiles, 4bpp. Pack 5 sends
+      $0F80 B, so 18 packs used only there keep their last $80 B as bytes.
+    - The `LocRom.Tileset3` pack goes to $5000 (`LocLoad_Unk6DCF`): BG3 tiles, 2bpp.
+    - Packs 6 and 7 of a list go to `$7F:6000`/`$7F:7000`, which nothing traced reads.
+    - The battle backgrounds (`BattleFx_BgSetPacks`) name only packs the field proves.
+  - **Sprite tiles** (`BattleRom_SprTilesPtr`, which `Field_E4Ptr0` and `MenuRom_E4GfxPtrs` also
+    read): `Evt_Op82_InitWramSprite`/`Evt_Op83_InitEnemySprite` unpack them to bank $7F and
+    `Menu_SprLoad` to `Menu_SprUnpackBuf`. The sprite tile builders read them 32 B per tile
+    (`Spr_CopyTile7F`) into the sprite tiles: 4bpp.
+  - **Scene graphics** (`BankC2_InitHwRegs`: mode 1, sprite tiles at $0000, BG1/BG2 tiles at
+    $2000, BG3 tiles at $7000). In the eight scene headers:
+    - the `C2Scene_HdrBgGfx` packs go to VRAM $2000 (4bpp);
+    - the `C2Scene_HdrBg3Gfx` pack goes to $7000 (2bpp);
+    - the `C2Scene_HdrObjGfx` packs go to $0000 (4bpp).
+
+    Each is unpacked $1000 B apart in `C2Scene_DecompBuf`. A pack longer than its slot is read
+    on only into slots the header leaves alone.
+- **Results.** 483 packs (1,241,368 B packed, 1,668,960 B unpacked) pack back byte-exact:
+  241 sprite tile sets, 178 location tile packs (4bpp) and 18 (2bpp), 32 scene BG packs, 4 BG3
+  packs and 10 scene sprite packs. 2,304 B past the tiles the readers read stay as bytes.
+- **Not proven, still packed as bytes:**
+  - Location packs 19-24 (only in list slot 6) and 3, 31 and 211 (named by no location).
+  - Scene BG pack 36 and sprite packs 0, 1, 3 and 13. Those are the party graphics, which
+    `C2Scene_LoadPartyGfx` copies in pieces, and packs that only `C2Scene_LoadUnkC800`,
+    `C2Scene_LoadExtraObjPack` or the script routines unpack, with no traced reader of the result.
+  - The `$C3` module's packs (`C3Rom_PackPtrs`, each read by its own module code), the dial packs
+    (mode 7), `MenuRom_ScreenGfx` (`BankFF_BuildScreenMap`), the scene `Unk7000`/`Unk7200` packs,
+    and the ten packs no pointer names.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed

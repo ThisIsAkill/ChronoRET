@@ -34,14 +34,14 @@ Gfx_D272C0:
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D2EE80
 SprTilesPack_236:
-    incbin "../../build/packs/SprTilesPack_236.lz"          ; lz12 -> 2816 B
+    incbin "../../build/packs/SprTilesPack_236.lz"          ; lz12 -> 2816 B; 4bpp 88 tiles (graphics)
 
 ; $D2:F85E-$D2:FF93 (1,846 B), packed_lz, confirmed: lz12 -> 2176 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D2F85E
 SprTilesPack_227:
-    incbin "../../build/packs/SprTilesPack_227.lz"          ; lz12 -> 2176 B
+    incbin "../../build/packs/SprTilesPack_227.lz"          ; lz12 -> 2176 B; 4bpp 68 tiles (graphics)
 
 ; $D2:FF94-$D2:FFFF (108 B), padding, confirmed: 108 x $00
 org $D2FF94

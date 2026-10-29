@@ -221,7 +221,87 @@ class Images(unittest.TestCase):
             g.encode_piece(p, png, side.replace('tail 12 34', 'tail 12 3'))
 
 
+def fake_rows(packs):
+    """Survey rows for derive_packed: the location records and packs
+    ([(table, index, unpacked size)])."""
+    rows = [{'start': '$F6:0000', 'size': str(14 * 4), 'kind': 'table', 'format': '', 'notes': ''}]
+    for k, (table, i, size) in enumerate(packs):
+        rows.append({'start': f'$E0:{k * 16:04X}', 'size': '16', 'kind': 'packed_lz',
+                     'format': f'lz12 -> {size} B', 'notes': f'via {table}[{i}]; repacks'})
+    return rows
+
+
+class Packed(unittest.TestCase):
+    """Which packs are tiles, from the data that names them (a synthetic
+    ROM: four location records, a pack list, no scene headers)."""
+
+    def rom(self, recs, lists):
+        rom = bytearray(ed.ROM_SIZE)
+        for k, (t12, t3) in enumerate(recs):
+            rom[0x360000 + 14 * k + 1], rom[0x360000 + 14 * k + 2] = t12, t3
+        for k, b in enumerate(lists):
+            rom[0x361C00 + k] = b
+        return bytes(rom)
+
+    def test_uses_give_format_and_extent(self):
+        rows = fake_rows([('LocGfx_PackPtrs', 1, 4096), ('LocGfx_PackPtrs', 2, 4096), ('LocGfx_PackPtrs', 3, 4096),
+                          ('LocGfx_PackPtrs', 4, 4096), ('BattleRom_SprTilesPtr', 0, 2816)])
+        lists = [1, 0xFF, 0xFF, 0xFF, 0xFF, 2, 4, 0xFF]          # pack 1 in slot 0, 2 in slot 5, 4 in slot 6
+        got, conflicts = g.derive_packed(self.rom([(0, 3), (0xFF, 0xFF), (0xFF, 0xFF), (0xFF, 0xFF)], lists),
+                                         rows)
+        self.assertEqual(conflicts, [])
+        self.assertEqual(got['$E0:0000'], ('4bpp', 4096, ('loc12',)))
+        self.assertEqual(got['$E0:0010'], ('4bpp', 3968, ('loc12',)))      # pack 5: $0F80 B uploaded
+        self.assertEqual(got['$E0:0020'], ('2bpp', 4096, ('loc3',)))
+        self.assertNotIn('$E0:0030', got)                                  # slot 6: no reader traced
+        self.assertEqual(got['$E0:0040'], ('4bpp', 2816, ('spr',)))
+
+    def test_two_formats_refused(self):
+        rows = fake_rows([('LocGfx_PackPtrs', 1, 4096)])
+        got, conflicts = g.derive_packed(self.rom([(0, 1), (0xFF, 0xFF), (0xFF, 0xFF), (0xFF, 0xFF)],
+                                                  [1] + [0xFF] * 7), rows)
+        self.assertNotIn('$E0:0000', got)
+        self.assertEqual(conflicts, ['$E0:0000: read as 2bpp and 4bpp'])
+
+    def test_manifest_gfxpack_form_checked(self):
+        import tempfile
+        text = ed.MANIFEST.read_text()
+        line = next(ln for ln in text.splitlines() if ',gfxpack,' in ln)
+        bad = line.replace('; 4bpp', '; 5bpp')
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'm.csv'
+            path.write_text(text.replace(line, bad))
+            self.assertTrue(any('a gfxpack piece' in x for x in ed.manifest_problems(path)))
+        with self.assertRaisesRegex(ed.DataError, 'not a pack param'):
+            ed.pack_param('4bpp 3 tiles')
+
+    def test_pack_param_and_size(self):
+        self.assertEqual(g.parse_param('lz12 -> 4096 B; 4bpp 124 tiles + 128 B'), ('4bpp', 124, 128))
+        data = DATA + b'\x12\x34'
+        png, tail = g.to_image('2bpp', data, 2)
+        p = {'label': 'X', 'param': 'lz11 -> 514 B; 2bpp 32 tiles + 2 B', 'size': '300', 'piece': 'gfxpack'}
+        side = g.sidecar('X', '$E0:0000', '$E0:012B', '2bpp', 32, tail)
+        self.assertEqual(g.encode_piece(p, png, side), data)              # the unpacked size, not the piece's
+        p['param'] = 'lz11 -> 515 B; 2bpp 32 tiles + 2 B'
+        with self.assertRaisesRegex(g.GraphicsError, '514 B; the piece is 515'):
+            g.encode_piece(p, png, side)
+
+
 class Source(unittest.TestCase):
+
+    def test_manifest_gfxpack_pieces(self):
+        rows = {r['start']: r for r in data_survey.read_rows()}
+        pieces = [p for p in ed.read_manifest() if p['piece'] == 'gfxpack']
+        want = {start for items in g.PACKED.values() for start in items}
+        self.assertEqual({p['start'] for p in pieces}, want)
+        for keys in g.PACKED:
+            self.assertTrue(keys and all(k in g.PACK_PROOFS for k in keys))
+        for p in pieces:
+            self.assertEqual(rows[p['start']]['kind'], 'packed_lz')
+            mode, size = ed.pack_param(p['param'])
+            fmt, tiles, tail = g.parse_param(p['param'])
+            self.assertEqual(tiles * g.TILE_BYTES[fmt] + tail, size)
+            self.assertEqual((fmt, tiles, tail), g.packed_layout(p['start'], size))
 
     def test_manifest_graphics_pieces(self):
         rows = {r['start']: r for r in data_survey.read_rows()}
