@@ -20,189 +20,189 @@
 ; Read by LocLoad_UnkA33B.
 org $F40000
 MapPropsPack_138:
-    incbin "../../build/packs/MapPropsPack_138.lz"          ; lz11 -> 939 B
+    incbin "../../build/packs/MapPropsPack_138.lz"          ; lz11 -> 939 B, location map
 
 ; $F4:0238-$F4:03C4 (397 B), packed_lz, confirmed: lz11 -> 646 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F40238
 MapPropsPack_139:
-    incbin "../../build/packs/MapPropsPack_139.lz"          ; lz11 -> 646 B
+    incbin "../../build/packs/MapPropsPack_139.lz"          ; lz11 -> 646 B, location map
 
 ; $F4:03C5-$F4:0A37 (1,651 B), packed_lz, confirmed: lz11 -> 5026 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F403C5
 MapPropsPack_140:
-    incbin "../../build/packs/MapPropsPack_140.lz"          ; lz11 -> 5026 B
+    incbin "../../build/packs/MapPropsPack_140.lz"          ; lz11 -> 5026 B, location map
 
 ; $F4:0A38-$F4:0C93 (604 B), packed_lz, confirmed: lz11 -> 1045 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F40A38
 MapPropsPack_141:
-    incbin "../../build/packs/MapPropsPack_141.lz"          ; lz11 -> 1045 B
+    incbin "../../build/packs/MapPropsPack_141.lz"          ; lz11 -> 1045 B, location map
 
 ; $F4:0C94-$F4:0E6C (473 B), packed_lz, confirmed: lz11 -> 1006 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F40C94
 MapPropsPack_142:
-    incbin "../../build/packs/MapPropsPack_142.lz"          ; lz11 -> 1006 B
+    incbin "../../build/packs/MapPropsPack_142.lz"          ; lz11 -> 1006 B, location map
 
 ; $F4:0E6D-$F4:1617 (1,963 B), packed_lz, confirmed: lz11 -> 4393 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F40E6D
 MapPropsPack_143:
-    incbin "../../build/packs/MapPropsPack_143.lz"          ; lz11 -> 4393 B
+    incbin "../../build/packs/MapPropsPack_143.lz"          ; lz11 -> 4393 B, location map
 
 ; $F4:1618-$F4:1909 (754 B), packed_lz, confirmed: lz11 -> 1909 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F41618
 MapPropsPack_144:
-    incbin "../../build/packs/MapPropsPack_144.lz"          ; lz11 -> 1909 B
+    incbin "../../build/packs/MapPropsPack_144.lz"          ; lz11 -> 1909 B, location map
 
 ; $F4:190A-$F4:1B56 (589 B), packed_lz, confirmed: lz11 -> 2542 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4190A
 MapPropsPack_145:
-    incbin "../../build/packs/MapPropsPack_145.lz"          ; lz11 -> 2542 B
+    incbin "../../build/packs/MapPropsPack_145.lz"          ; lz11 -> 2542 B, location map
 
 ; $F4:1B57-$F4:1C8C (310 B), packed_lz, confirmed: lz11 -> 950 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F41B57
 MapPropsPack_146:
-    incbin "../../build/packs/MapPropsPack_146.lz"          ; lz11 -> 950 B
+    incbin "../../build/packs/MapPropsPack_146.lz"          ; lz11 -> 950 B, location map
 
 ; $F4:1C8D-$F4:1F3E (690 B), packed_lz, confirmed: lz11 -> 1090 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F41C8D
 MapPropsPack_147:
-    incbin "../../build/packs/MapPropsPack_147.lz"          ; lz11 -> 1090 B
+    incbin "../../build/packs/MapPropsPack_147.lz"          ; lz11 -> 1090 B, location map
 
 ; $F4:1F3F-$F4:23AC (1,134 B), packed_lz, confirmed: lz11 -> 2223 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F41F3F
 MapPropsPack_148:
-    incbin "../../build/packs/MapPropsPack_148.lz"          ; lz11 -> 2223 B
+    incbin "../../build/packs/MapPropsPack_148.lz"          ; lz11 -> 2223 B, location map
 
 ; $F4:23AD-$F4:2D85 (2,521 B), packed_lz, confirmed: lz11 -> 4938 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F423AD
 MapPropsPack_149:
-    incbin "../../build/packs/MapPropsPack_149.lz"          ; lz11 -> 4938 B
+    incbin "../../build/packs/MapPropsPack_149.lz"          ; lz11 -> 4938 B, location map
 
 ; $F4:2D86-$F4:43C4 (5,695 B), packed_lz, confirmed: lz11 -> 16022 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F42D86
 MapPropsPack_150:
-    incbin "../../build/packs/MapPropsPack_150.lz"          ; lz11 -> 16022 B
+    incbin "../../build/packs/MapPropsPack_150.lz"          ; lz11 -> 16022 B, location map
 
 ; $F4:43C5-$F4:542F (4,203 B), packed_lz, confirmed: lz11 -> 12037 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F443C5
 MapPropsPack_151:
-    incbin "../../build/packs/MapPropsPack_151.lz"          ; lz11 -> 12037 B
+    incbin "../../build/packs/MapPropsPack_151.lz"          ; lz11 -> 12037 B, location map
 
 ; $F4:5430-$F4:61D5 (3,494 B), packed_lz, confirmed: lz11 -> 8279 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F45430
 MapPropsPack_152:
-    incbin "../../build/packs/MapPropsPack_152.lz"          ; lz11 -> 8279 B
+    incbin "../../build/packs/MapPropsPack_152.lz"          ; lz11 -> 8279 B, location map
 
 ; $F4:61D6-$F4:671A (1,349 B), packed_lz, confirmed: lz11 -> 2040 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F461D6
 MapPropsPack_153:
-    incbin "../../build/packs/MapPropsPack_153.lz"          ; lz11 -> 2040 B
+    incbin "../../build/packs/MapPropsPack_153.lz"          ; lz11 -> 2040 B, location map
 
 ; $F4:671B-$F4:727E (2,916 B), packed_lz, confirmed: lz11 -> 11234 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4671B
 MapPropsPack_154:
-    incbin "../../build/packs/MapPropsPack_154.lz"          ; lz11 -> 11234 B
+    incbin "../../build/packs/MapPropsPack_154.lz"          ; lz11 -> 11234 B, location map
 
 ; $F4:727F-$F4:7FA0 (3,362 B), packed_lz, confirmed: lz11 -> 10750 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4727F
 MapPropsPack_155:
-    incbin "../../build/packs/MapPropsPack_155.lz"          ; lz11 -> 10750 B
+    incbin "../../build/packs/MapPropsPack_155.lz"          ; lz11 -> 10750 B, location map
 
 ; $F4:7FA1-$F4:9066 (4,294 B), packed_lz, confirmed: lz11 -> 12333 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F47FA1
 MapPropsPack_156:
-    incbin "../../build/packs/MapPropsPack_156.lz"          ; lz11 -> 12333 B
+    incbin "../../build/packs/MapPropsPack_156.lz"          ; lz11 -> 12333 B, location map
 
 ; $F4:9067-$F4:9315 (687 B), packed_lz, confirmed: lz11 -> 1511 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F49067
 MapPropsPack_157:
-    incbin "../../build/packs/MapPropsPack_157.lz"          ; lz11 -> 1511 B
+    incbin "../../build/packs/MapPropsPack_157.lz"          ; lz11 -> 1511 B, location map
 
 ; $F4:9316-$F4:9699 (900 B), packed_lz, confirmed: lz11 -> 2216 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F49316
 MapPropsPack_158:
-    incbin "../../build/packs/MapPropsPack_158.lz"          ; lz11 -> 2216 B
+    incbin "../../build/packs/MapPropsPack_158.lz"          ; lz11 -> 2216 B, location map
 
 ; $F4:969A-$F4:B1DB (6,978 B), packed_lz, confirmed: lz11 -> 11620 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4969A
 MapPropsPack_159:
-    incbin "../../build/packs/MapPropsPack_159.lz"          ; lz11 -> 11620 B
+    incbin "../../build/packs/MapPropsPack_159.lz"          ; lz11 -> 11620 B, location map
 
 ; $F4:B1DC-$F4:B561 (902 B), packed_lz, confirmed: lz11 -> 1273 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4B1DC
 MapPropsPack_160:
-    incbin "../../build/packs/MapPropsPack_160.lz"          ; lz11 -> 1273 B
+    incbin "../../build/packs/MapPropsPack_160.lz"          ; lz11 -> 1273 B, location map
 
 ; $F4:B562-$F4:D82F (8,910 B), packed_lz, confirmed: lz11 -> 14676 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4B562
 MapPropsPack_161:
-    incbin "../../build/packs/MapPropsPack_161.lz"          ; lz11 -> 14676 B
+    incbin "../../build/packs/MapPropsPack_161.lz"          ; lz11 -> 14676 B, location map
 
 ; $F4:D830-$F4:E3B0 (2,945 B), packed_lz, confirmed: lz11 -> 8844 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4D830
 MapPropsPack_162:
-    incbin "../../build/packs/MapPropsPack_162.lz"          ; lz11 -> 8844 B
+    incbin "../../build/packs/MapPropsPack_162.lz"          ; lz11 -> 8844 B, location map
 
 ; $F4:E3B1-$F4:FA07 (5,719 B), packed_lz, confirmed: lz11 -> 12222 B: location map: MapProps
 ; header + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4E3B1
 MapPropsPack_163:
-    incbin "../../build/packs/MapPropsPack_163.lz"          ; lz11 -> 12222 B
+    incbin "../../build/packs/MapPropsPack_163.lz"          ; lz11 -> 12222 B, location map
 
 ; $F4:FA08-$F4:FDED (998 B), packed_lz, confirmed: lz11 -> 2171 B: location map: MapProps header
 ; + packed tile planes
 ; Read by LocLoad_UnkA33B.
 org $F4FA08
 MapPropsPack_164:
-    incbin "../../build/packs/MapPropsPack_164.lz"          ; lz11 -> 2171 B
+    incbin "../../build/packs/MapPropsPack_164.lz"          ; lz11 -> 2171 B, location map
 
 ; $F4:FDEE-$F4:FFFF (530 B), padding, confirmed: 530 x $00
 org $F4FDEE

@@ -35,7 +35,7 @@ class Layouts(unittest.TestCase):
         for start in list(records.STRUCTS) + list(records.ARRAYS):
             with self.subTest(row=start):
                 self.assertIn(start, rows)
-                self.assertEqual(rows[start]['kind'], 'table')
+                self.assertIn(rows[start]['kind'], ('table', 'map') if start in records.STRUCTS else ('table',))
                 self.assertNotIn(start, ed.TABLES)
         for start in records.PALETTES:
             with self.subTest(row=start):

@@ -25,7 +25,7 @@ ExitRom_LocOfs:
 ; Read by Map_LoadExitTiles, Map_StepTileEffects.
 org $E50402
 MapData_E50402:
-    incbin "../../build/assets/map/MapData_E50402.bin"
+    incbin "../../build/records/MapData_E50402.bin"          ; records: map 814 x 7 B
 
 ; $E5:1A44-$E5:1FFF (1,468 B), padding, confirmed: 1468 x $00
 org $E51A44

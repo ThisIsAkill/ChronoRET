@@ -84,11 +84,12 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('packed', 'events', 'scene'):
+        if p['piece'] not in ('packed', 'events', 'scene', 'mapprops', 'metatiles'):
             continue
         mode = int(extract_data.PACK_PARAM.match(p['param']).group(1))
         src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
                else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin' if p['piece'] == 'events'
+               else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in ('mapprops', 'metatiles')
                else root / extract_data.SCENE_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
@@ -262,6 +263,30 @@ def build_graphics(root: Path = ROOT) -> int:
     return written
 
 
+def build_maps(root: Path = ROOT) -> int:
+    """Assemble every `mapprops` and `metatiles` piece from its text
+    (build/assets/maps/, tools/maps.py) to its unpacked bytes in
+    build/maps/, which build_packs packs; returns how many files were
+    written."""
+    import maps
+    root = Path(root)
+    written = 0
+    for p in extract_data.read_manifest():
+        if p['piece'] not in ('mapprops', 'metatiles'):
+            continue
+        try:
+            data = maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
+        except (OSError, maps.MapsError) as e:
+            raise BuildError(f'maps: {e}') from None
+        out_dir = root / extract_data.MAPS_OUT
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f'{p["label"]}.bin'
+        if not path.exists() or path.read_bytes() != data:
+            c3pack._write(path, data)
+            written += 1
+    return written
+
+
 def build_battle(root: Path = ROOT) -> int:
     """Assemble every battle script unit (see the docstring); returns how
     many files were written."""
@@ -361,6 +386,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
         os.chdir(cwd)
     build_events(root)
     build_scripts(root)
+    build_maps(root)
     build_packs(root, quiet=quiet)
     build_text(root)
     build_records(root)
