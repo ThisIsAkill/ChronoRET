@@ -891,7 +891,9 @@ C3Mod_SquareRoot:
 ; C3Mod_Prog6ColourB), the $00 at $350B as CGADSUB (C3Mod_Prog6MathB)
 ; and the one at $350C as COLDATA (no colour: C3Mod_Prog6ColourA);
 ; C3Mod_Prog3Bg2Vofs reads the zero word at $350B as BG2VOFS, and
-; C3Mod_Prog10ScreenB's last entry ($905D) reads the $00 there as TS.
+; C3Mod_Prog10ScreenB's last entry ($905D) reads the $00 there as TS,
+; and the table at $A00C (not matched yet), which C3Mod_Prog10HdmaGrid
+; sends to COLDATA, names $350B three times.
 ; Nothing reads the $FF at $350D.
 C3Mod_FillBytes:
     db $FF, $00, $00, $FF
@@ -9179,12 +9181,12 @@ C3Mod_DrawTextDone:
 ; byte right twice: LSR / SEC / ROR puts the size bit in for a 16x16
 ; sprite, LSR / LSR or LSR / CLC / ROR leaves both bits 0. X bit 8 is
 ; always 0.
-; Callers note: JMP from C3Mod_TextTask ($64C2) and JSR from $9B5C (code
-;   not matched yet).
+; Callers note: JMP from C3Mod_TextTask ($64C2) and JSR from $9B5C (in
+;   the task at $9B4F, code not matched yet, which the trace reaches).
 ; Entry: M any (P saved; 8-bit set here), X=0 (16-bit index), DP = the
 ;        page of C3_OamPos.. with low byte 0 (TDC / XBA makes B = DP's
-;        low byte, so the TAX of c is c; 0 at C3Mod_TextTask's call,
-;        $9B5C's not traced), DB any (set to $7E with PEA $007E / PLB;
+;        low byte, so the TAX of c is c; 0 at both calls: C3Mod_TextTask
+;        and the task at $9B4F run with C3Mod_RunTasks' DP 0), DB any (set to $7E with PEA $007E / PLB;
 ;        $00 at the exit); X = the text.
 ; Exit:  through C3Mod_DrawTextDone: P restored, DB = $00; A =
 ;        C3_TextEnd, X past the text, Y = C3_OamPos (advanced);
@@ -14512,7 +14514,12 @@ C3Mod_Prog6Anims:
 ;     DP_PPU, 320 times (a 16-bit count at $7F:8000): the next number n
 ;     (WMDATA from $7F:2200, AND $FF) and 32 bytes from $7F:0200 + 32n
 ;     to the next 32 at $7F:D800 on (MVN in bank $7F; Y + 32 each), so
-;     $7F:D800-$FFFF holds the tiles in the numbers' order; DP = 0;
+;     $7F:D800-$FFFF holds the tiles in the numbers' order (an
+;     overrun of the original: pack 60's entries 108-111 and 124-127
+;     are tile 208, whose 32 bytes, $7F:1C00-$1C1F, lie past pack 63's
+;     end at $7F:1B9F; they are zeros left by pack 45, so those eight
+;     copies, at $7F:E580-$E5FF and $E780-$E7FF, are blank tiles, in
+;     the part sent to VRAM below); DP = 0;
 ;     $7F:E000-$E7FF ($800 bytes) to VRAM word $5C00 (DMA channel 7,
 ;     two registers, VMDATAL; VMAIN still $80); the NMI task at $9CE2
 ;     (C3Mod_NmiTaskAdd; code not matched yet);
@@ -14775,8 +14782,9 @@ C3Mod_Prog10:
 ; Callers note: C3Mod_Prog0LoadGfx ($3DF1, $3DFE), C3Mod_Prog10 ($859F,
 ;   $85AC) and C3Mod_Prog10Turn ($87C4, $87C7).
 ; Entry: M=1, X=0 (the 16-bit register pairs), DP any, DB = a bank with
-;        the I/O registers ($00 at C3Mod_Prog0LoadGfx's calls; the
-;        others' not traced); VMADD set.
+;        the I/O registers: $00 at all six calls (C3Mod_Prog0LoadGfx's
+;        two, C3Mod_Prog10's $859F and $85AC, C3Mod_Prog10Turn's $87C4
+;        and $87C7 after its PEA $7E00 / PLB); VMADD set.
 ; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = C3_M7MapHalf ($2000); Y
 ;        unchanged; VMAIN = 0; VMADD past the bytes.
 C3Mod_SendM7Map:
@@ -14871,7 +14879,10 @@ C3Mod_Prog10Turn:
 ; block at $7F:4E00 back by $400 each time (the row pointer at
 ; $7F:0202, REP #$21 / SBC #$3FF: - $400; the count byte at $7F:0204,
 ; 8-bit DEC / BNE): C3Mod_MirrorRows twice (16 rows, each mirrored
-; right to left with 32 zero bytes after it); so $7F:5600-$91FF holds
+; right to left with 32 zero bytes after it: the source's columns 32
+; down to 1, C3_MirrorEnd being $20, so each row's column 0 is
+; dropped; pack 72 has pixels in column 0 in 33 of its 304 rows, 24
+; of them in the 15 blocks mirrored here); so $7F:5600-$91FF holds
 ; the blocks $4E00-$51FF down to $1600-$19FF, mirrored and in reverse
 ; order: with pack 72's blocks from $1200 on, 32 frames of $400 bytes
 ; from $7F:1200 (C3Mod_Prog10FrameTask's frame k at $1200 + k x
@@ -15441,12 +15452,15 @@ C3Mod_Prog10Strip:
 
 ; $7E:8B52 — C3Mod_Prog10StripNmi (93 bytes, $8B52–$8BAE)
 ; An NMI task: with v = page $0A00's var 5 (C3_M7Angle's word here;
-; 16-bit, kept to $E0 at most: CMP / BMI, signed, so a negative v
-; stays), 8-bit: n = v's low byte / 2 (LSR, C = its bit 0) to the
+; 16-bit: CMP #$E0 / BMI keeps v when v - $E0 has bit 15 set, that
+; is v in $0000-$00DF or $80E0-$FFFF, and makes it $E0 for
+; $00E0-$80DF), 8-bit: n = v's low byte / 2 (LSR, C = its bit 0) to the
 ; two counts of C3Mod_Prog10Scroll and the first of
 ; C3Mod_Prog10ModeStrip, n + C (ADC #0) to C3Mod_Prog10ModeStrip's
-; second and both of C3Mod_Prog10ScreenB (so ModeStrip's two make v
-; lines, the others one less for an odd v); then 16-bit (REP #$21: C =
+; second and both of C3Mod_Prog10ScreenB (for v's low byte b:
+; C3Mod_Prog10ModeStrip's two make b lines, C3Mod_Prog10Scroll's 2n,
+; one less for an odd b, and C3Mod_Prog10ScreenB's 2n + 2C, one more
+; for an odd b); then 16-bit (REP #$21: C =
 ; 0) with v again (unclamped): C3_Prog10LowVofs = -(v + $31) (EOR /
 ; INC; C3Mod_Prog10Scroll's BG1VOFS under the split), BG2VOFS = the
 ; low byte of that word + $20 + the ADC #$31's carry, then the stored
@@ -15681,8 +15695,9 @@ C3Mod_Prog10Greys:
 ; byte); then by C3_EntryArg's low nibble (8-bit CMP / BNE):
 ;   - $F: page $0A00's script pointer = $9315 (not matched yet); .exit;
 ;   - else C3Mod_DestBitmapSrc; pack 58 ($400 bytes) to $7F:0200, pack
-;     47 ($A00) to $7F:0400 and pack 64 ($100) to $7F:0F00 (Decomp_Dest
-;     set before each); DP = DP_PPU: WMADD = $7F:1000 (WMADDH as the
+;     47 ($A00) to $7F:0400 (over pack 58's second half,
+;     $0400-$05FF) and pack 64 ($100) to $7F:0F00 (Decomp_Dest set
+;     before each); DP = DP_PPU: WMADD = $7F:1000 (WMADDH as the
 ;     unpack left it); 8 times (a byte count at $00F0, DEC / BNE), for
 ;     X = 0, 4, 8, $C (CPX #$10 / BNE): 8 times (the byte at $00F2) the
 ;     four map words X, X + 1, X + 2, X + 3 (TXA: X's low byte) with
@@ -16264,10 +16279,20 @@ C3Mod_Prog10WindowTable:
 ; $7E:9070 — C3Mod_Prog10Window (16 bytes, $9070–$907F)
 ; A direct HDMA table for WH0 / WH1 (two bytes a line, after each
 ; count): window 1 shut (left 1, right 0) for the first two entries'
-; lines (56 + 56 as assembled; C3Mod_Prog10SprNmi writes them: the
-; sprite picture's top line / 2, + its bit 0), then .third and
-; .fourth (16 or 32 lines each, a left and right edge around the
-; picture: C3Mod_Prog10SprNmi), then one shut line; the end.
+; lines (56 + 56 as assembled), then .third and .fourth (112 lines
+; each as assembled, a left and right edge), then one shut line; the
+; end. Two writers rewrite the counts and edges:
+;   - C3Mod_Prog10SprNmi: the first two counts = the sprite picture's
+;     top line / 2 and that + its bit 0; .third / .fourth's counts $10
+;     or $20 (by C3_Prog10Large); edges C3_SprBaseX and + $40 ($FF
+;     when that carries);
+;   - the task at $9C58 (added by script opcode $FA at $9125, $91BF and
+;     $9203; code not matched yet; M=1 there): the left edges ($9C77,
+;     $9C7B) = -(page $0B00's var 1 + the byte at $6D) (8-bit, EOR /
+;     INC), the right edges ($9C82, $9C86) = that + the byte at $AB
+;     (CLC); the first two counts ($9C96, $9C9C) = -(var 2 + the byte
+;     at $6F) / 2 and that + the LSR's carry; .third / .fourth's counts
+;     ($9CA3, $9CA9) = the byte at $AC / 2 and that + the carry.
 C3Mod_Prog10Window:
     db 56, 1, 0
 .second:
@@ -16316,7 +16341,10 @@ C3Mod_Prog10SplitNmi:
 ;   C3Mod_Prog10GridNmi ($8D89) and C3Mod_Prog13 ($8F57). C3Mod_VramFill:
 ;   C3Mod_Prog10Fill ($8A53, $8A6C) and $9F84 (code not matched yet).
 ; Entry: M=1, X=0 (16-bit X and Y), DP any, DB = a bank with the I/O
-;        registers ($00 at C3Mod_Prog4's call; the others' not traced);
+;        registers: $00 at C3Mod_Prog4's call ($5476), C3Mod_Prog10's
+;        ($85B2), C3Mod_Prog10Fill's ($8A53, $8A6C: after its PEA $7E00
+;        / PLB), C3Mod_Prog10GridNmi's ($8D89) and C3Mod_Prog13's
+;        ($8F57); $9F84's not traced;
 ;        X = the byte count, VMADD and VMAIN set. C3Mod_VramFill: the
 ;        same, Y = DMAP7 | BBAD7 << 8.
 ; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = C3Mod_FillBytes + 1, Y = the DMAP
