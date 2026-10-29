@@ -545,6 +545,20 @@ class Locks(unittest.TestCase):
         self.assertEqual(named, {0})
         self.assertEqual(out, ['anim: Op05_Stub writes task record byte(s) [7] whatever its operand'])
 
+    def test_struct_offsets(self):
+        f = scripts.struct_offsets(scripts.ROOT, 'C2Scene_Task')
+        self.assertEqual((f['ScriptReturn'], f['ScriptBank'], f['AnimTimer'], f['OpState'], f['Unk37']),
+                         (0x05, 0x09, 0x0E, 0x32, 0x37))
+        with tempfile.TemporaryDirectory() as tmp:
+            inc = Path(tmp) / 'asm' / 'include'
+            inc.mkdir(parents=True)
+            (inc / 'x.inc').write_text('struct S $7E0000\n.A: skip 1 ; a\n            skip $10\n.B:\n.C: skip 2\n'
+                                       '.D: skip 3\nendstruct\n')
+            self.assertEqual(scripts.struct_offsets(tmp, 'S'), {'A': 0, 'B': 0x11, 'C': 0x11, 'D': 0x13})
+            (inc / 'x.inc').write_text('struct S $7E0000\n.A: skip one\nendstruct\n')
+            with self.assertRaisesRegex(scripts.ScriptsError, 'a line not read'):
+                scripts.struct_offsets(tmp, 'S')
+
     def test_unpack_must_fit(self):
         keep = [(B, 0x100, 'the script buffer')]
         self.assertEqual(scripts.unpack_fit('R', {0xC40000: 4096}, {0x7FF000}, keep), [])
@@ -581,6 +595,40 @@ class WithSource(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_ROM, 'needs the ROM and asar')
 class WithRom(unittest.TestCase):
+
+    def test_anim_lock_sees_every_script(self):
+        info = []
+        self.assertEqual(scripts.anim_check(ed.read_rom(), info=info), [])
+        self.assertEqual(info, [('C2SceneRom_AnimTable', 161, 708), ('C2Scene_AnimLeaderMarker', 1, 3),
+                                ('C2Scene_AnimObjAMarker', 1, 4), ('C2Scene_Unk8600', 1, 1), ('named', [0, 1, 2])])
+
+    def test_unpack_lock_sees_every_unpacker(self):
+        info = []
+        self.assertEqual(scripts.unpack_check(scripts.SceneLang(), ed.read_rom(), info), [])
+        bufs = [0x7F9000 + 0x1000 * k for k in range(7)]
+        self.assertEqual(info, [
+            ('C2Scene_LoadBgGfx', ['C2SceneRom_BgPacks'], bufs, 4096),
+            ('C2Scene_LoadExtraObjPack', ['C2SceneRom_ObjPacks'], [0x7F9000], 8192),
+            ('C2Scene_LoadUnkC600', ['C2SceneRom_PalettePacks'], [0x7EC600], 608),
+            ('C2Scene_UnpackBg3MapPack', ['C2SceneRom_Bg3MapPacks'], [0x7F9000], 4096),
+            ('C2Scene_UnpackBgPack', ['C2SceneRom_BgPacks'], [0x7F9000], 4096),
+            ('C6Scene_UnpackObjPackA', ['C2SceneRom_ObjPacks'], [0x7F9000], 8192),
+            ('C6Scene_UnpackObjPackB', ['C2SceneRom_ObjPacks'], [0x7F9000], 8192),
+            ('C6Scene_UnpackPalPackA', ['C2SceneRom_PalettePacks'], [0x7F8C00], 608),
+            ('C6Scene_UnpackPalPackB', ['C2SceneRom_PalettePacks'], [0x7F8C00], 608)])
+        self.assertEqual(tuple(r[0] for r in info), scripts.UNPACKERS)
+
+    def test_check_runs_the_locks(self):
+        saved = scripts.anim_check, scripts.unpack_check, scripts.trust_check
+        scripts.anim_check = lambda rom, root=scripts.ROOT, info=None: ['anim lock ran']
+        scripts.unpack_check = lambda lang, rom, info=None: ['unpack lock ran']
+        scripts.trust_check = lambda lang: [f'trust lock ran: {lang.name}']
+        try:
+            got = scripts.check(ed.read_rom())
+        finally:
+            scripts.anim_check, scripts.unpack_check, scripts.trust_check = saved
+        for x in ('anim lock ran', 'unpack lock ran', 'trust lock ran: scene', 'trust lock ran: fx'):
+            self.assertIn(x, got)
 
     def test_round_trips_and_exits(self):
         self.assertEqual(scripts.check(ed.read_rom()), [])

@@ -439,20 +439,27 @@ class FxLang(Lang):
 
 
 def struct_offsets(root: Path, name: str) -> dict[str, int]:
-    """{field: offset} of a struct of asm/include/ (labels without a skip
-    share the next field's offset)."""
+    """{field: offset} of a struct of asm/include/: each `skip N` (decimal
+    or $hex, labelled or not) moves the offset on; a label with no skip
+    names the next field's offset."""
     for path in sorted((Path(root) / 'asm' / 'include').glob('*.inc')):
         lines = path.read_text(errors='replace').splitlines()
         for i, line in enumerate(lines):
             if re.match(rf'^struct\s+{name}\s', line):
                 out, off = {}, 0
                 for body in lines[i + 1:]:
-                    if body.strip().startswith('endstruct'):
+                    code = body.split(';', 1)[0]
+                    if code.strip().startswith('endstruct'):
                         return out
-                    m = re.match(r'^\s*\.([A-Za-z_][A-Za-z0-9_]*):\s*(?:skip\s+(\d+))?', body)
-                    if m:
+                    m = re.match(r'^\s*(?:\.([A-Za-z_][A-Za-z0-9_]*):)?\s*(?:skip\s+(\$[0-9A-Fa-f]+|\d+))?\s*$',
+                                 code)
+                    if not m:
+                        raise ScriptsError(f'{path.name}: struct {name}: a line not read: {body.strip()!r}')
+                    if m.group(1):
                         out[m.group(1)] = off
-                        off += int(m.group(2) or 0)
+                    if m.group(2):
+                        t = m.group(2)
+                        off += int(t[1:], 16) if t.startswith('$') else int(t)
     raise ScriptsError(f'no struct {name} in asm/include/')
 
 
@@ -1740,7 +1747,7 @@ def anim_record_writes(lang: 'AnimLang', op: int, v: int) -> set[int]:
     return {k - t for st, _ in ends for k in st.mem if t <= k < t + lang.d['C2Scene_TaskSize']}
 
 
-def anim_check(rom: bytes, root: Path = ROOT) -> list[str]:
+def anim_check(rom: bytes, root: Path = ROOT, info: list | None = None) -> list[str]:
     """The lock on C2Anim_Run's trust: no animation op the code can reach
     writes the task record bytes ANIM_GUARD. Ops that write the record byte
     their operand names (found by running each handler with several
@@ -1750,7 +1757,9 @@ def anim_check(rom: bytes, root: Path = ROOT) -> list[str]:
     lang.load(root)
     guard = anim_guard(root)
     named, out = anim_named_ops(lang, lambda op, v: anim_record_writes(lang, op, v), guard)
-    out += anim_lock(lang, anim_sources(lang, rom), named, guard)
+    out += anim_lock(lang, anim_sources(lang, rom), named, guard, info)
+    if info is not None:
+        info.append(('named', sorted(named)))
     lang.save(root)
     return out
 
@@ -1774,7 +1783,7 @@ def anim_named_ops(lang: 'Lang', writes, guard: set[int]) -> tuple[set[int], lis
     return named, out
 
 
-def anim_lock(lang: 'Lang', sources, named: set[int], guard: set[int]) -> list[str]:
+def anim_lock(lang: 'Lang', sources, named: set[int], guard: set[int], info: list | None = None) -> list[str]:
     """No op of `named` in the animation scripts reachable from `sources`
     names a guarded record byte."""
     out = []
@@ -1784,6 +1793,8 @@ def anim_lock(lang: 'Lang', sources, named: set[int], guard: set[int]) -> list[s
         except ScriptsError as e:
             out.append(f'anim: {name}: {e}')
             continue
+        if info is not None:
+            info.append((name, len(entries), len(d['ops'])))
         for a, o in sorted(d['ops'].items()):
             if o.op in named and known[a + 1] in guard:
                 out.append(f'anim: {name} ${a:06X}: {op_name(lang, o.op)} writes task record byte ${known[a + 1]:02X}')

@@ -562,6 +562,14 @@ source.
       - The RAM script is checked as `C2Scene_Unk5775` builds it from `C2Scene_Unk8600Init`
         (one `ShowFrame` of the frame after it, duration 0: it holds). A later write to that RAM
         is not traced.
+      - Two things the interpreter takes as they are, neither touching the lock:
+        - op `$03` (JumpBack) reads a 16-bit word from its operand and masks it, so its stay
+          and jump paths read one byte past it;
+        - `$04` (ShowFrame) with duration 0 holds forever.
+      - `check`'s own test asserts what the lock sees: 4 sources, 161, 1, 1 and 1 entries,
+        708, 3, 4 and 1 opcodes. For the unpackers it asserts the 9 routines with their tables,
+        destinations and largest packs. Struct offsets come from `asm/include` (hex and unlabelled
+        `skip`s counted).
     - **Unpackers.** Each one's code (followed statically) reads one pack table, and its
       destinations are traced from its entry with a scene header of zeros. Every pack in that
       table fits before its bank's end (`C2Scene_LoadBgGfx`'s last slot, `$7F:F000`, takes the
