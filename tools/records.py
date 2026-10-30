@@ -37,6 +37,14 @@ field is invented:
 A row's size must be exactly its count of records: the bytes past the
 reader's extent are survey rows of their own (DATA_PLAN.md lists them).
 
+Where the count comes from the source or the ROM rather than a stated
+domain, DERIVED re-derives it and `check` (and the extraction) compare it
+with the layout: the defines that size a record or bound an index
+(Battle_LevelMax, SprRec_FirstNpc, ...), the largest index the only source
+of it holds (LocRom.Tileset12 for LocGfx_Lists), and the object records
+the action object lists cover (obj_lists_extent: BattleAct_IndexObjLists
+run from every object pointer).
+
 The readable form, one tab-separated file per piece:
 
   ; comment lines (what the table is, its layout and reader)
@@ -136,6 +144,8 @@ STRUCTS = {
                                                   # 513th offset (the end) is $1A44 = $0402 + 814 x 7
     '$F5:F402': ('TreasureRom', 249),             # Map_LoadTreasureTiles: the same through TreasureRom_LocOfs; its
                                                   # end $F7E6 = $F402 + 249 x 4
+    '$CE:8870': ('BattleRom_ActObjRec', 4691),    # BattleAct_IndexObjLists: 16 lists from each object pointer
+                                                  # (DERIVED: obj_lists_extent re-derives the records they cover)
 }
 
 
@@ -225,6 +235,37 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$FF:CF18': (_f('RecSize'), 5),                           # MenuRom_ItemRecSizesA: item categories 0-4
     '$FF:CF1D': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesB: item categories 0-4
     '$FF:D562': (_f('Tile', t='u16'), 12),                    # MenuRom_CfgIcons: entries 0-11
+    # (data-tables-3) Each count below is the whole domain of the reader's
+    # index, or the bound DERIVED re-derives from the source or the ROM.
+    '$CC:4700': ([('Hp', 'u16'), ('Unk3F', 'u8')] + [(f'Unk4C_{k}', 'u8') for k in range(3, 8)]
+                 + [(f'Unk64_{k:X}', 'u8') for k in range(12)] + [(f'Unk46_{k}', 'u8') for k in range(3)], 256),
+                                                              # BattleRom_EnemyStats: BattleFD_UnkB438, id = a byte of
+                                                              # Battler_UnkAF0A (high byte cleared) x 23; +0 is copied to
+                                                              # CurHp/MaxHp lo and hi, the rest byte by byte
+    '$CC:7AC9': ([(f'Byte{k}', 'u8') for k in range(12)], 255),
+                                                              # BattleRom_EnemyEffectRecA: BattleSys_UnkD7C4, part number =
+                                                              # a byte of BattleRom_UnkCC6FCB, $FF (Battle_EnemyPartNone)
+                                                              # skipped, x Battle_EffectRecSize, copied byte by byte
+    '$CC:2632': (_f('Exp', t='u16'), 100),                    # BattleRom_ExpToLevel: BattleSys_ApplyExpStep, PcStatBlk.Level
+                                                              # clamped to Battle_LevelMax (99) x 2, read 16-bit
+    '$CD:666E': (_f('Objects', t='ptr16:CE'), 256),           # BattleRom_EnemyActObjs: Battle_ActObjIdx (1 B, its high byte
+                                                              # zeroed) x 2
+    '$CE:F28E': (_f('Point', t='u16'), 256),                  # BattleRom_HalfPlaneEdge: BattleCD_FxOpHalfPlane, an angle byte
+                                                              # x 2, read 16-bit into BattleCE_LineP1
+    '$CF:A000': ([(f'Entry{k}', 'u16') for k in range(32)], 256),
+                                                              # BattleRom_FxGfxLists: BattleCD_ConvertFxGfx, the set (a byte:
+                                                              # Battle_FxTileSet) x 64, BattleCD_GfxPartTiles (32) words
+    '$CF:E000': (_f('Colours', t='u16'), 256),                # BattleRom_FxGfxColours: the same set x 2, read 16-bit
+    '$E4:2A00': (_f('Offset', t='u16'), 256),                 # MenuRom_E4Palettes' table: Menu_SprLoad, a sprite record's
+                                                              # palette byte (byte 2) x 2
+    '$E4:F000': (_f('Gfx', 'Frames', 'Pal', 'Anim', 'Size'), 263),
+                                                              # RomE4_SprRec: Evt_LoadSpriteRec (a record byte) and
+                                                              # Evt_Op82_InitWramSprite / Menu_SprLoad kind 1 (SprRec_FirstNpc
+                                                              # + a byte): records 0-262
+    '$F6:1C00': (_f(*[f'Pack{k}' for k in range(8)]), 54),    # LocGfx_Lists: LocLoad_Unk0960, LocRom.Tileset12 x
+                                                              # LocGfx_ListSize, $FF none; the only source of the index is
+                                                              # LocRom, whose values reach entry 53 (DERIVED)
+    '$FF:D296': (_f('Nibbles'), 256),                         # MenuRom_SlotEraNibbles: Menu_UnkD36C, a 9-bit location / 2
 }
 
 # Palette rows: row start -> (colours per record, record count). Only rows
@@ -244,7 +285,102 @@ PALETTES: dict[str, tuple[int, int]] = {
     '$FF:CBC4': (1, 8), '$FF:CBE4': (1, 24), '$FF:CC14': (1, 8), '$FF:CC34': (1, 8),
     '$FF:CC64': (1, 8), '$FF:CC74': (1, 8), '$FF:CDF4': (1, 8), '$FF:CE04': (1, 8),
     '$FF:CE30': (1, 16), '$FF:CE9A': (1, 16),
+    '$E4:0000': (12, 256),      # the sprite palettes: a sprite record's palette byte x Pal_ObjColorBytes (Obj_PalSrc,
+                                # the field's 24-byte copy of colours 1-12; MenuRom_E4Palettes' offsets the same)
 }
+
+
+# ── Counts and extents the check re-derives ───────────────────────────────
+
+def obj_lists_extent(rom: bytes, d: dict) -> tuple[int, int]:
+    """[start, stop) (file offsets) of the object records the action
+    object lists cover: every word of BattleRom_PcAttackObjs, TechObjs and
+    EnemyActObjs (one table after the other; Battle_ActObjIdx, a byte x 2,
+    reaches no further from any of them) is an offset in bank $CE, from
+    which BattleAct_IndexObjLists reads Battle_ActObjects lists of 4-byte
+    records: a record whose top three bits (Battle_ActObjRecTypeMask) are
+    1xx or 001 ends a list, 010 is a mark, and the first record of lists
+    1-15 is not tested. Raises when the covered records leave a gap."""
+    ce = (d['BattleRom_ScriptsCE'] - 0xC00000) & 0xFF0000
+    lo, hi = d['BattleRom_PcAttackObjs'] - 0xC00000, d['BattleRom_EnemyActObjs'] - 0xC00000 + 2 * 256
+    starts = {rom[a] | rom[a + 1] << 8 for a in range(lo, hi, 2)} - {0xFFFF}
+    covered = set()
+    for x in starts:
+        lists, first = 0, True
+        while True:
+            t = rom[ce + x] & d['Battle_ActObjRecTypeMask']
+            covered.add(x)
+            x += 4
+            if first and lists:
+                first = False
+                continue
+            first = False
+            if t == 0 or t & d['Battle_ActObjRecMark'] and not t & 0x80:
+                continue
+            lists += 1
+            if lists == d['Battle_ActObjects']:
+                break
+            first = True
+    s, e = min(covered), max(covered) + 4
+    if len(covered) != (e - s) // 4 or any((x - s) % 4 for x in covered):
+        raise RecordsError(f'the object lists leave a gap in ${s:04X}-${e - 1:04X}')
+    return ce + s, ce + e
+
+
+def _loc_tilesets(rom: bytes, d: dict) -> int:
+    """Entries of LocGfx_Lists the locations name: 1 + the largest
+    LocRom.Tileset12 other than LocRom_SetNone."""
+    base = d['LocRom'] if 'LocRom' in d else 0xF60000
+    used = [rom[base - 0xC00000 + 14 * k + 1] for k in range(512)]
+    return 1 + max(v for v in used if v != d['LocRom_SetNone'])
+
+
+# Row start -> (what, count(rom, defines)): the reader's bound, re-derived
+# from the source's defines or the ROM by `check` (and the extraction),
+# against the layout's count.
+DERIVED = {
+    '$CE:8870': ('the records the object lists cover', lambda rom, d: (lambda se: (se[1] - se[0]) // 4)(
+        obj_lists_extent(rom, d))),
+    '$CC:4700': ('256 ids; 3 + Battle_EnemyRec4FBytes + Rec64Bytes + Rec46Bytes = 23 B',
+                 lambda rom, d: 256 if 3 + d['Battle_EnemyRec4FBytes'] + d['Battle_EnemyRec64Bytes']
+                 + d['Battle_EnemyRec46Bytes'] == 23 else -1),
+    '$CC:7AC9': ('part numbers below Battle_EnemyPartNone, Battle_EffectRecSize B',
+                 lambda rom, d: d['Battle_EnemyPartNone'] if d['Battle_EffectRecSize'] == 12 else -1),
+    '$CC:2632': ('levels 0-Battle_LevelMax', lambda rom, d: d['Battle_LevelMax'] + 1),
+    '$CF:A000': ('256 sets of BattleCD_GfxPartTiles words', lambda rom, d: 256 if d['BattleCD_GfxPartTiles'] == 32
+                 else -1),
+    '$E4:0000': ('256 palettes of Pal_ObjColorBytes (ObjPal_CopyCount + 1)',
+                 lambda rom, d: 256 if d['Pal_ObjColorBytes'] == d['ObjPal_CopyCount'] + 1 == 24 else -1),
+    '$E4:F000': ('SprRec_FirstNpc + 256 records', lambda rom, d: d['SprRec_FirstNpc'] + 256),
+    '$F6:1C00': ('1 + the largest LocRom.Tileset12', _loc_tilesets),
+}
+
+
+def derived_problems(rom: bytes, d: dict | None = None, pieces: list[dict] | None = None) -> list[str]:
+    """Where a DERIVED count is not the layout's, or the object records'
+    piece does not start where the lists do."""
+    if d is None:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import battle
+        d = battle.defines(ROOT)
+    problems = []
+    for start, (what, count) in DERIVED.items():
+        kind = 'palette' if start in PALETTES else 'table'
+        lay = layout_for(start, kind)
+        try:
+            n = count(rom, d)
+        except RecordsError as err:
+            problems.append(f'{start}: {err}')
+            continue
+        if lay is None or n != lay.count:
+            problems.append(f'{start}: {what} give {n} records, the layout {lay.count if lay else None}')
+    try:
+        s, _ = obj_lists_extent(rom, d)
+        if pieces is not None and not any(p['offset'] == s and p['piece'] == 'records' for p in pieces):
+            problems.append(f'no records piece starts at the object lists\' first record (${s & 0xFFFF:04X})')
+    except RecordsError:
+        pass
+    return problems
 
 
 class Layout:
@@ -414,8 +550,12 @@ def piece_layout(piece: dict) -> Layout:
 
 def extract_all(rom: bytes, pieces: list[dict]) -> dict[str, str]:
     """{label: readable file} of every records piece, each checked to encode
-    back to the ROM's bytes (raises RecordsError otherwise)."""
+    back to the ROM's bytes, after the DERIVED counts (raises RecordsError
+    otherwise)."""
     labels, addresses = piece_labels(pieces)
+    problems = derived_problems(rom, pieces=pieces)
+    if problems:
+        raise RecordsError('; '.join(problems))
     out = {}
     for p in pieces:
         if p['piece'] != 'records':
@@ -444,7 +584,7 @@ def check(rom: bytes) -> list[str]:
     import extract_data
     pieces = extract_data.read_manifest()
     labels, addresses = piece_labels(pieces)
-    problems = []
+    problems = derived_problems(rom, pieces=pieces)
     for p in pieces:
         if p['piece'] != 'records':
             continue

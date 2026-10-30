@@ -32,7 +32,9 @@ scene packs then packed); and graphics pieces (tools/graphics.py): tile
 graphics encoded from indexed images; and mapprops and metatiles pieces
 (tools/maps.py): the location maps and their metatiles assembled from
 text, then packed; and sprframes pieces (tools/sprites.py): the sprite frame
-records assembled from text.
+records assembled from text; and animframes / animtimes pieces
+(tools/anims.py): the sprite animation lists assembled from text; and
+drawlist pieces (tools/drawlists.py): the menu draw lists, the same way.
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -213,7 +215,8 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
                'graphics_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
-               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'sprframes_bytes': 0}
+               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'sprframes_bytes': 0,
+               'animframes_bytes': 0, 'animtimes_bytes': 0, 'drawlist_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -245,13 +248,14 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         build_rom.build_battle()
         build_rom.build_graphics()
         build_rom.build_sprites()
+        build_rom.build_text_tools()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
         return figures, problems
     for p in pieces:
         if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
                               'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
-                              'graphics', 'sprframes'):
+                              'graphics', 'sprframes') and not extract_data.text_tool(p['piece']):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz'
@@ -260,6 +264,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
                 else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.SPRITES_OUT / f'{p["label"]}.bin' if p['piece'] == 'sprframes'
+                else extract_data.text_out(p) if extract_data.text_tool(p['piece'])
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
                 else extract_data.BATTLE_OUT / f'{p["label"]}.bin' if p['piece'] == 'battle'
                 else extract_data.RECORDS_OUT / f'{p["label"]}.bin')
@@ -448,6 +453,13 @@ def main() -> int:
               f'in {ps["runs"]} runs ({ps["pieces"]} regions; record size from the sets\' sprite records) '
               f'assembled by the build from text extracted from the ROM (build/assets/sprites/ -> '
               f'build/sprites/, incbin)')
+        print(f'  {"animations":<16} {data["animframes_bytes"] + data["animtimes_bytes"]:>9,} bytes of sprite '
+              f'animation lists ({data["animframes_bytes"]:,} B of frame ids, {data["animtimes_bytes"]:,} B of '
+              f'durations) assembled by the build from text extracted from the ROM (build/assets/anims/ -> '
+              f'build/anims/, incbin)')
+        print(f'  {"draw lists":<16} {data["drawlist_bytes"]:>9,} bytes of menu draw lists (Menu_RunDrawList '
+              f'commands) assembled by the build from text extracted from the ROM (build/assets/menu/ -> '
+              f'build/menulists/, incbin)')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')

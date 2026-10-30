@@ -172,7 +172,7 @@ BattleRom_StatGrowth:
 ; Read by BattleSys_ApplyExpStep.
 org $CC2632
 BattleRom_ExpToLevel:
-    incbin "../../build/assets/table/BattleRom_ExpToLevel.bin"
+    incbin "../../build/records/BattleRom_ExpToLevel.bin"          ; records: table 100 x 2 B
 
 ; $CC:26FA-$CC:2769 (112 B), table, confirmed: 16 B per character id: tech points per tech (2 B
 ; each)
@@ -338,7 +338,7 @@ Padding_CC43AF:
 ; Read by BattleFD_UnkB438.
 org $CC4700
 BattleRom_EnemyStats:
-    incbin "../../build/assets/table/BattleRom_EnemyStats.bin"
+    incbin "../../build/records/BattleRom_EnemyStats.bin"          ; records: table 256 x 23 B
 
 ; $CC:5E00-$CC:64F8 (1,785 B), table, confirmed: 7 B per enemy id: reward record
 ; (BattleRom_EnemyReward struct)
@@ -373,11 +373,16 @@ org $CC6FCB
 BattleRom_UnkCC6FCB:
     incbin "../../build/assets/table/BattleRom_UnkCC6FCB.bin"
 
-; $CC:7AC9-$CC:86C8 (3,072 B), table, confirmed: 12 B per part number: effect records
+; $CC:7AC9-$CC:86BC (3,060 B), table, confirmed: 12 B per part number 0-254: effect records
 ; Read by BattleSys_UnkD7C4.
 org $CC7AC9
 BattleRom_EnemyEffectRecA:
-    incbin "../../build/assets/table/BattleRom_EnemyEffectRecA.bin"
+    incbin "../../build/records/BattleRom_EnemyEffectRecA.bin"          ; records: table 255 x 12 B
+
+; $CC:86BD-$CC:86C8 (12 B), unknown, unknown: 12 bytes
+org $CC86BD
+Unknown_CC86BD:
+    incbin "../../build/assets/unknown/Unknown_CC86BD.bin"
 
 ; $CC:86C9-$CC:88C8 (512 B), table, confirmed: 2 B per !Battle_UnkB18C: target mode, area number
 ; Read by BattleSys_UnkC1DD.

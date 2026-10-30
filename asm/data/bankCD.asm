@@ -137,7 +137,7 @@ BattleRom_TechObjs:
 ; Read by BattleAct_LoadAttack, BattleAct_LoadTech.
 org $CD666E
 BattleRom_EnemyActObjs:
-    incbin "../../build/assets/table/BattleRom_EnemyActObjs.bin"
+    incbin "../../build/records/BattleRom_EnemyActObjs.bin"          ; records: table 256 x 2 B
 
 ; $CD:686E-$CD:692B (190 B), table, confirmed: u16 per palette index (95): palette-step offset
 ; in bank $CD ($FFFF none)

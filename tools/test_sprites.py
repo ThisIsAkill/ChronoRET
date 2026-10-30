@@ -130,7 +130,7 @@ class Runs(unittest.TestCase):
             runs_of(bad)
 
     def test_record_tables_from_the_survey(self):
-        self.assertEqual(sprites._row_size('$E4:F000') // D['SprRec_Bytes'], 262)
+        self.assertEqual(sprites._row_size('$E4:F000') // D['SprRec_Bytes'], 263)
         with self.assertRaisesRegex(sprites.SpritesError, 'no row at \\$E4:F001'):
             sprites._row_size('$E4:F001')
 
@@ -316,6 +316,10 @@ class Manifest(unittest.TestCase):
             self.assertEqual(p['param'], '')
             self.assertIn(f'../../build/sprites/{p["label"]}.bin', ed.allowed_incbins(pieces))
             self.assertEqual(ed.placeholder_files(pieces)[ed.SPRITES_OUT / f'{p["label"]}.bin'], int(p['size']))
+        ptrs = [p for p in ed.read_manifest() if p['start'] == '$E4:2300']
+        self.assertEqual([(p['label'], p['piece'], p['param']) for p in ptrs],
+                         [('BattleRom_SprFramesPtr', 'table', 'dl x 256')])
+        self.assertEqual(ed.TABLES['$E4:2300'], 3)
         others = [r for r in rows.values() if r['kind'] == 'sprite_layout' and not sprites.is_piece_row(r)]
         self.assertEqual(len(others), 4)
         for r in others:
@@ -324,7 +328,8 @@ class Manifest(unittest.TestCase):
     def test_survey_rows_choose_the_piece(self):
         row = {'start': '$DC:0000', 'end': '$DC:0027', 'size': '40', 'bank': '$DC', 'kind': 'sprite_layout',
                'format': sprites.FORMAT + ': x', 'readers': '', 'confidence': 'confirmed', 'notes': 'runs'}
-        self.assertEqual([p['piece'] for p in ed.layout([row])], ['sprframes'])
+        self.assertEqual([(p['piece'], p['asset']) for p in ed.layout([row])],
+                         [('sprframes', 'sprites/SprLayout_DC0000.spr')])
         self.assertEqual([p['piece'] for p in ed.layout([dict(row, format='per sprite set')])], ['extracted'])
         self.assertEqual([p['piece'] for p in ed.layout([dict(row, kind='table')])], ['extracted'])
 

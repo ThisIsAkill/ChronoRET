@@ -377,7 +377,8 @@ $CC:64F9,$CC:64FF,7,$CC,unknown,7 B after BattleRom_EnemyReward (past its reader
 $CC:6500,$CC:6FC8,2761,$CC,text,11-byte enemy names (251),"Battle_InitScene, TextWin_ExtEnemyName",confirmed,"named BattleRom_EnemyNames, TextWinRom_EnemyNames; extent: 251 whole names (tools/text.py)"
 $CC:6FC9,$CC:6FCA,2,$CC,unknown,2 bytes after the last whole enemy name,,unknown,not a whole 11-byte name; reader unknown
 $CC:6FCB,$CC:7AC8,2814,$CC,table,11 B per !Battle_UnkB18C: action records (TechRec layout from 2 B earlier),"BattleFD_LoadUnkB18E, BattleSys_UnkD7C4",confirmed,named BattleRom_UnkCC6FCB; extent to the next named table (end inferred)
-$CC:7AC9,$CC:86C8,3072,$CC,table,12 B per part number: effect records,BattleSys_UnkD7C4,confirmed,named BattleRom_EnemyEffectRecA; extent to the next named table (end inferred)
+$CC:7AC9,$CC:86BC,3060,$CC,table,12 B per part number 0-254: effect records,BattleSys_UnkD7C4,confirmed,"named BattleRom_EnemyEffectRecA; extent: part numbers below Battle_EnemyPartNone ($FF, skipped by the reader)"
+$CC:86BD,$CC:86C8,12,$CC,unknown,12 bytes,,unknown,"the record part number $FF would index: BattleSys_UnkD7C4 skips $FF (Battle_EnemyPartNone), so nothing reads it"
 $CC:86C9,$CC:88C8,512,$CC,table,"2 B per !Battle_UnkB18C: target mode, area number",BattleSys_UnkC1DD,confirmed,named BattleRom_EnemyTechTarget; extent: the reader's 256 records (tools/records.py)
 $CC:88C9,$CC:88CA,2,$CC,unknown,2 B after BattleRom_EnemyTechTarget (past its reader's 256 records),,unknown,split off BattleRom_EnemyTechTarget in step 6: its reader reaches 256 records (tools/records.py); no reader found for these bytes
 $CC:88CB,$CC:89C5,251,$CC,table,11 B per !Battle_UnkB18C: action records,"BattleFD_LoadUnkB18E2, BattleSys_UnkD8D1",confirmed,named BattleRom_UnkCC88CB; extent to the next named table (end inferred)
@@ -509,7 +510,8 @@ $CE:0000,$CE:00FF,256,$CE,table,128 u16 offsets of subscripts (bank $CE),BattleA
 $CE:0100,$CE:037F,640,$CE,palette,BGR555 colours of the status colour cycles,BattleCF_StepFxColourCycle,confirmed,named BattleRom_FxCycleColours; extent to the next named table (end inferred)
 $CE:0380,$CE:8293,32532,$CE,battle_script,PC attack and tech action scripts,BattleAct_LoadScript and its loaders (BattleAct_Load*),confirmed,targets of BattleRom_PcAttackScripts / PcTechScripts
 $CE:8294,$CE:886F,1500,$CE,battle_script,kind-3 action scripts,BattleAct_LoadScript and its loaders (BattleAct_Load*),confirmed,targets of BattleRom_Kind3Scripts
-$CE:8870,$CE:D427,19384,$CE,table,"action object records (BattleRom_ActObjRec, 4 B)","BattleAct_LoadAttack, BattleAct_LoadKind3, BattleAct_LoadTech, BattleAct_StepObjAnim",confirmed,targets of the *Objs offset tables
+$CE:8870,$CE:D1BB,18764,$CE,table,"action object records (BattleRom_ActObjRec, 4 B)","BattleAct_LoadAttack, BattleAct_LoadKind3, BattleAct_LoadTech, BattleAct_StepObjAnim",confirmed,named BattleRom_ActObjRec_Lists; extent: the records the object lists cover (BattleAct_IndexObjLists: 16 lists from every word of the three *Objs tables; tools/records.py re-derives it)
+$CE:D1BC,$CE:D427,620,$CE,unknown,620 bytes shaped like object records,,unknown,after the last record the action object lists reach: no object pointer leads here (BattleAct_IndexObjLists from every *Objs entry stops before it)
 $CE:D428,$CE:DC19,2034,$CE,battle_script,subscripts (opcode $1E),BattleAct_LoadScript and its loaders (BattleAct_Load*),confirmed,targets of BattleRom_ActSubscripts ($D428-$DBE9); end = start of the $FF fill
 $CE:DC1A,$CE:DFFF,998,$CE,padding,998 x $FF,,confirmed,uniform fill; nothing points into it
 $CE:EF11,$CE:EFDF,207,$CE,text,"string table (u16 pointers, then TextWin strings)","BattleCD_ShowMessage, BattleCD_ShowMessageTimed, BattleCD_ShowTargetInfo",confirmed,named BattleRom_MsgStrings; extent to the next named table (end inferred)
@@ -1096,16 +1098,22 @@ $E3:46A0,$E3:E857,41400,$E3,sprite_layout,"frame records: N tile words (tile in 
 $E3:E858,$E3:E8A7,80,$E3,sprite_layout,per sprite set: frame records of unknown record size,,probable,"set 216 of BattleRom_SprFramesPtr point here (extent to the next set's pointer); no RomE4_SprRec or RomE4_EnemySprRec record names it, so no reader gives the record size: kept as bytes"
 $E3:E8A8,$E3:F90F,4200,$E3,sprite_layout,"frame records: N tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size","Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1), Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate (MenuRom_E4FramePtrs)",confirmed,"5 runs, 58 frames (40/80/120 B records), from the set pointers at $E4:2300 (tools/sprites.py); record size: byte 4 bits 0-1 of the sets' RomE4_SprRec / RomE4_EnemySprRec records; extent inferred: a reader bounds no frame count, so each run ends at the next set's pointer"
 $E3:F910,$E3:FFFF,1776,$E3,padding,1776 x $00,,probable,"zero fill after the area's last frame record (its last non-zero byte, rounded up to a whole record): a reader bounds no frame count, so these bytes may still be read as frames"
-$E4:0000,$E4:1FFF,8192,$E4,table,"anim tables: word offset table at $E4:0000, then lists","Menu_LoadCharPalettes, Menu_SprLoad, Obj_AnimTickAndQueue, BattleAct_StepBattlerAnims, Battle_RunPcPose, Battle_TickPcSlots, BankFF_LoadE4Palette",confirmed,AnimRom; internal layout not split
+$E4:0000,$E4:17FF,6144,$E4,palette,256 x 12 colours (BGR555): sprite palettes by a sprite record's palette byte,"Evt_LoadSpriteRec / Evt_Op82 / Evt_Op83 (Obj_PalSrc = palette x Pal_ObjColorBytes), Menu_SprLoad and BankFF_LoadE4Palette (through MenuRom_E4Palettes)",confirmed,"named AnimRom_Palettes; extent: the palette byte's 256 values x 24 B (the field copies 24 B, colours 1-12)"
+$E4:1800,$E4:1FFF,2048,$E4,padding,2048 x $00,,probable,"zero fill after the 256 palettes: Menu_SprLoad's alternate palettes (+Menu_SprPalAltOfs, $200) may still read up to $E4:19FF"
 $E4:2000,$E4:22FF,768,$E4,table,256 x 3 B long pointers to sprite graphics packs,"Battle_InitScene, Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad",confirmed,BattleRom_SprTilesPtr = Field_E4Ptr0 (RomE4_PtrInit word 0)
 $E4:2300,$E4:25FF,768,$E4,table,256 x 3 B long pointers to sprite frame data,"Battle_InitScene, Spr_* (Field_E4Ptr1)",confirmed,BattleRom_SprFramesPtr (RomE4_PtrInit word 1)
 $E4:2600,$E4:27FF,512,$E4,table,256 u16 offsets of animation frame-id lists,"Battle_InitScene, Menu_SprLoad",confirmed,BattleRom_SprAnimFrames (RomE4_PtrInit word 2)
 $E4:2800,$E4:29FF,512,$E4,table,256 u16 offsets of animation duration lists,"Battle_InitScene, Menu_SprLoad",confirmed,BattleRom_SprAnimDurs (RomE4_PtrInit word 3)
-$E4:2A00,$E4:2FFF,1536,$E4,palette,"u16 offsets per sprite set, then 12-colour palettes (BGR555)","Menu_SprLoad (MenuRom_E4Palettes), Obj palette loaders (Field_E4Ptr*)",probable,MenuRom_E4Palettes = $2A00; the split between offsets and colours not measured
-$E4:3000,$E4:A7FF,30720,$E4,table,animation frame-id lists ($FF-ended),"Obj_AnimTickAndQueue, Battle anim tick (BattleRom_SprAnimFrames targets)",confirmed,targets of $E4:2600 ($3000-$A5F0)
-$E4:A800,$E4:EFFF,18432,$E4,table,animation duration lists,"Obj_AnimTickAndQueue, Battle anim tick (BattleRom_SprAnimDurs targets)",confirmed,targets of $E4:2800 ($A800-$CC57); the bytes after the last list up to $F000 not separated
-$E4:F000,$E4:F521,1314,$E4,table,5 B per sprite record (SprRec_Bytes),Evt_LoadSpriteRec,confirmed,named RomE4_SprRec; extent to the next named table (end inferred)
-$E4:F522,$E4:F5FF,222,$E4,padding,222 x $00,,probable,fill after the region before it ($E4:F000): the reader's extent is not settled: these bytes may still be read
+$E4:2A00,$E4:2BFF,512,$E4,table,u16 per sprite palette number: offset of its 12 colours in bank $E4,"Menu_SprLoad, BankFF_LoadE4Palette (MenuRom_E4Palettes)",confirmed,named MenuRom_E4PalOffsets; extent: the palette byte's 256 values (Menu_SprLoad: definition byte 2 x 2)
+$E4:2C00,$E4:2FFF,1024,$E4,padding,1024 x $00,,probable,"zero fill after the 256 palette offsets, up to the animation frame-id lists"
+$E4:3000,$E4:A5EF,30192,$E4,table,"animation frame-id lists: per animation four facing blocks of (next offset - this) / 4 bytes, rows of 4 frame ids ($FF ends a row)","Obj_AnimFrameLookup (Field_E4Ptr2), Battle_TickPcSlots / Battle_TickEnemyGroup / BattleAct_StepBattlerAnims (BattleRom_SprAnimFrames), Menu_SprAnimate (MenuRom_E4AnimFrames)",confirmed,"named AnimRom_FrameLists; 193 animations (0-192), from the offsets at $E4:2600 (tools/anims.py); extent: every reader takes a facing block's size from the next animation's offset"
+$E4:A5F0,$E4:A5F0,1,$E4,unknown,1 byte,,unknown,"animation 193's frame-id offset points here; its next entry is 0, so no reader gives it an extent and no sprite record names it (a lone byte after the last list, as at $E1:DDB2)"
+$E4:A5F1,$E4:A7FF,527,$E4,padding,527 x $00,,probable,"zero fill after the last animation list, up to the next table"
+$E4:A800,$E4:CC56,9303,$E4,table,animation duration lists: per animation rows of 4 durations (0 ends a row),"Obj_AnimTickAndQueue (Field_E4Ptr3), Battle_TickPcSlots / Battle_TickEnemyGroup / BattleAct_StepBattlerAnims (BattleRom_SprAnimDurs), Menu_SprAnimate (MenuRom_E4AnimTimes)",confirmed,"named AnimRom_TimeLists; 193 animations (0-192), from the offsets at $E4:2800 (tools/anims.py); extent inferred: a reader bounds no row count, so each list ends at the next animation's offset"
+$E4:CC57,$E4:CC57,1,$E4,unknown,1 byte,,unknown,"animation 193's duration offset points here; its next entry is 0, so no reader gives it an extent and no sprite record names it (a lone byte after the last list, as at $E1:DDB2)"
+$E4:CC58,$E4:EFFF,9128,$E4,padding,9128 x $00,,probable,"zero fill after the last animation list, up to the next table"
+$E4:F000,$E4:F522,1315,$E4,table,5 B per sprite record (SprRec_Bytes),"Evt_LoadSpriteRec, Evt_Op82_InitWramSprite, Menu_SprLoad",confirmed,named RomE4_SprRec; extent: records 0-262 (Evt_Op82_InitWramSprite and Menu_SprLoad kind 1: SprRec_FirstNpc + a byte); record 262's last byte is $00
+$E4:F523,$E4:F5FF,221,$E4,padding,221 x $00,,confirmed,"uniform fill after record 262, the last a reader reaches"
 $E4:F600,$E4:FFDF,2528,$E4,table,10 B per enemy sprite record,"Evt_Op83_InitEnemySprite, Battle_InitScene",confirmed,"named RomE4_EnemySprRec, BattleRom_EnemySpr; extent to the next named table (end inferred)"
 $E4:FFE0,$E4:FFED,14,$E4,table,7 u16: low words of the bank-$E4 table pointers,"Field_InitLoadState, Menu_SprLoad",confirmed,RomE4_PtrInit / MenuRom_E4GfxPtrs: one word per bank-$E4 table
 $E4:FFEE,$E4:FFFF,18,$E4,padding,18 x $00,,confirmed,uniform fill; nothing points into it
@@ -1600,7 +1608,8 @@ $F5:F402,$F5:F7E5,996,$F5,map,249 x 4 B treasure records (TreasureRom struct),"F
 $F5:F7E6,$F5:FE03,1566,$F5,unknown,high-entropy bytes,,unknown,after the treasure records; probably stale packed data
 $F5:FE04,$F5:FFFF,508,$F5,padding,508 x $00,,confirmed,uniform fill; nothing points into it
 $F6:0000,$F6:1BFF,7168,$F6,table,512 x 14 B location records (LocRom struct),"FieldFD_LoadAnimSetA, FieldFD_LoadAnimSetB, LocLoad_AudioSetup, LocLoad_Unk0960, LocLoad_Unk09DD, LocLoad_Unk0A14, LocLoad_Unk56D4, LocLoad_Unk6DCF, LocLoad_Unk7084, LocLoad_UnkA33B, Map_InitMasksAndLimits",confirmed,LocRom; PalAnimRom ($F6:0000) is only a base address
-$F6:1C00,$F6:1DFF,512,$F6,table,64 x 8 B graphics pack numbers per tileset,LocLoad_Unk0960,confirmed,LocGfx_Lists
+$F6:1C00,$F6:1DAF,432,$F6,table,54 x 8 B graphics pack numbers per tileset,LocLoad_Unk0960,confirmed,"named LocGfx_Lists; extent: entries 0-53, the LocRom.Tileset12 values the locations name (the only source of the index)"
+$F6:1DB0,$F6:1DFF,80,$F6,table,"8 B entries: pack numbers $D3, $CC, $D4, then $FF",,probable,LocGfx_Lists entries 54-63: no location's Tileset12 names them
 $F6:1E00,$F6:20FF,768,$F6,table,"256 x 3 B long pointers (201 used, 202-255 $000000)",LocLoad_UnkA33B,confirmed,"Map_PropsPtrs; entry 201 points at $F5:EE02 (not a pack), unused (max LocRom.MapProps is 200)"
 $F6:2100,$F6:21BF,192,$F6,table,64 x 3 B long pointers,LocLoad_Unk09DD,confirmed,LocGfx_Meta12Ptrs
 $F6:21C0,$F6:221F,96,$F6,table,32 x 3 B long pointers,LocLoad_Unk0A14,confirmed,LocGfx_Meta3Ptrs; entries 19-22 point at $EF:B168-$E168 (not packs); no LocRom record selects them
@@ -2159,14 +2168,14 @@ $FF:9E10,$FF:B20F,5120,$FF,graphics,8 window styles of $280 B (4bpp tiles),"Menu
 $FF:B210,$FF:B30F,256,$FF,palette,colour sets 16 B apart (window palettes),"Pal_LoadUnkRow0, Menu_LoadWindowPal",confirmed,"named FieldRom_PalRow0Sets, MenuRom_WindowPals; extent to the next named table (end inferred)"
 $FF:B310,$FF:BD17,2568,$FF,text,"u16 per item id: address of its 9-byte string, then the strings",Menu_DrawInvEntry,confirmed,named MenuRom_ItemTextPtrs; extent to the next named table (end inferred)
 $FF:BD18,$FF:BD2D,22,$FF,table,per command byte: argument bytes - 1 (Menu_RunDrawList),,confirmed,named MenuRom_DrawArgLens; extent to the next named table (end inferred)
-$FF:BD2E,$FF:BD50,35,$FF,table,Menu_RunDrawList list,Menu_MainMenuIcons,confirmed,named MenuRom_MainIconList; extent to the next named table (end inferred)
+$FF:BD2E,$FF:BD50,35,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_MainMenuIcons,confirmed,named MenuRom_MainIconList; extent to the next named table (end inferred)
 $FF:BD51,$FF:BD5B,11,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_MainMenuLoop,confirmed,named MenuRom_MainConfirmList; extent to the next named table (end inferred)
 $FF:BD5C,$FF:BD73,24,$FF,table,6 OAM entries: the icons,Menu_MainIconSprites,confirmed,named MenuRom_MainIconOam; extent to the next named table (end inferred)
 $FF:BD74,$FF:BDCC,89,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Icon0Preview,confirmed,named MenuRom_Icon0List; extent to the next named table (end inferred)
 $FF:BDCD,$FF:BDEE,34,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Mode01Init,confirmed,named MenuRom_Mode01List; extent to the next named table (end inferred)
 $FF:BDEF,$FF:BE0D,31,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_EquipSlotsClose,confirmed,named MenuRom_SlotsCloseList; extent to the next named table (end inferred)
 $FF:BE0E,$FF:BE14,7,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),"Menu_DrawMemberRow, Menu_PlaceMemberSprites",confirmed,named MenuRom_MemberRowList; extent to the next named table (end inferred)
-$FF:BE15,$FF:BE1B,7,$FF,table,Menu_RunDrawList list,Menu_DrawEmptyRow,confirmed,named MenuRom_EmptyRowList; extent to the next named table (end inferred)
+$FF:BE15,$FF:BE1B,7,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_DrawEmptyRow,confirmed,named MenuRom_EmptyRowList; extent to the next named table (end inferred)
 $FF:BE1C,$FF:BE25,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_DrawMemberStatus,confirmed,named MenuRom_StatusList; extent to the next named table (end inferred)
 $FF:BE26,$FF:BE5A,53,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_EquipSlotsSlideIn,confirmed,named MenuRom_SlotsSlideInList; extent to the next named table (end inferred)
 $FF:BE5B,$FF:BE6C,18,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_EquipSlotsSlideOut,confirmed,named MenuRom_SlotsSlideOutList; extent to the next named table (end inferred)
@@ -2175,7 +2184,8 @@ $FF:BEA4,$FF:BEBC,25,$FF,table,Menu_RunDrawList draw list (command bytes and arg
 $FF:BEBD,$FF:BEE1,37,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_EquipItemsSlideOut,confirmed,named MenuRom_ItemsSlideOutList; extent to the next named table (end inferred)
 $FF:BEE2,$FF:BEEB,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_EquipCompareStats,confirmed,named MenuRom_CompareList; extent to the next named table (end inferred)
 $FF:BEEC,$FF:BF04,25,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_EquipItemsOpen,confirmed,named MenuRom_ItemsOpenList; extent to the next named table (end inferred)
-$FF:BF05,$FF:BF47,67,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_XchgPreviewA,confirmed,named MenuRom_XchgListA; extent to the next named table (end inferred)
+$FF:BF05,$FF:BF39,53,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_XchgPreviewA,confirmed,named MenuRom_XchgListA; extent: the list's end byte (Menu_RunDrawList)
+$FF:BF3A,$FF:BF47,14,$FF,unknown,14 bytes,,unknown,"after MenuRom_XchgListA's end byte: two runs ended by $FF, shaped like draw-list commands, but no reader found (no address of them in the code)"
 $FF:BF48,$FF:BF7A,51,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_XchgPreviewB,confirmed,named MenuRom_XchgListB; extent to the next named table (end inferred)
 $FF:BF7B,$FF:BF9F,37,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_XchgInit,confirmed,named MenuRom_XchgList; extent to the next named table (end inferred)
 $FF:BFA0,$FF:BFD9,58,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Icon2Preview,confirmed,named MenuRom_Icon2List; extent to the next named table (end inferred)
@@ -2184,7 +2194,8 @@ $FF:C01F,$FF:C025,7,$FF,table,Menu_RunDrawList draw list (command bytes and argu
 $FF:C026,$FF:C02F,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_TechNextMark,confirmed,named MenuRom_TechNextList; extent to the next named table (end inferred)
 $FF:C030,$FF:C036,7,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),"Menu_TechDrawMembers, Menu_TechDrawRows",confirmed,named MenuRom_TechEmptyRowList; extent to the next named table (end inferred)
 $FF:C037,$FF:C041,11,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Icon2Redraw,confirmed,named MenuRom_Icon2RedrawList; extent to the next named table (end inferred)
-$FF:C042,$FF:C055,20,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Mode03H1,confirmed,named MenuRom_TechMembersList; extent to the next named table (end inferred)
+$FF:C042,$FF:C04A,9,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Mode03H1,confirmed,named MenuRom_TechMembersList; extent: the list's end byte (Menu_RunDrawList)
+$FF:C04B,$FF:C055,11,$FF,unknown,11 bytes,,unknown,"after MenuRom_TechMembersList's end byte: shaped like a draw list ended by $FF, but no reader found (no address of it in the code)"
 $FF:C056,$FF:C05C,7,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_TechTargetRows,confirmed,named MenuRom_TechTargetList; extent to the next named table (end inferred)
 $FF:C05D,$FF:C0A5,73,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Icon1Preview,confirmed,named MenuRom_Icon1List; extent to the next named table (end inferred)
 $FF:C0A6,$FF:C0D4,47,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_Mode02Init,confirmed,named MenuRom_Mode02List; extent to the next named table (end inferred)
@@ -2203,12 +2214,12 @@ $FF:C213,$FF:C2AF,157,$FF,table,Menu_RunDrawList draw list (command bytes and ar
 $FF:C2B0,$FF:C2C0,17,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),"Menu_Mode0CH6, Menu_ShopListClose",confirmed,named MenuRom_ShopCloseList; extent to the next named table (end inferred)
 $FF:C2C1,$FF:C2CA,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopBuyOpen,confirmed,named MenuRom_ShopBuyList; extent to the next named table (end inferred)
 $FF:C2CB,$FF:C2D4,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopSellOpen,confirmed,named MenuRom_ShopSellList; extent to the next named table (end inferred)
-$FF:C2D5,$FF:C2DD,9,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopToMembers,confirmed,named MenuRom_ShopMembersList; extent to the next named table (end inferred)
+$FF:C2D5,$FF:C2DD,9,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopToMembers,confirmed,named MenuRom_ShopMembersList; no end byte: the list runs on into the next row's list (Menu_RunDrawList stops only at an end byte)
 $FF:C2DE,$FF:C2E7,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopQtyDraw,confirmed,named MenuRom_ShopQtyList; extent to the next named table (end inferred)
 $FF:C2E8,$FF:C2F4,13,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopQtyLists,confirmed,named MenuRom_ShopQtyListA; extent to the next named table (end inferred)
 $FF:C2F5,$FF:C301,13,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopQtyLists,confirmed,named MenuRom_ShopQtyListB; extent to the next named table (end inferred)
 $FF:C302,$FF:C308,7,$FF,table,Menu_RunDrawList draw list,Menu_ShopQtyLists,confirmed,named MenuRom_ShopQtyListC; extent to the next named table (end inferred)
-$FF:C309,$FF:C317,15,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),"Menu_ShopEquipNext, Menu_ShopEquipOpen",confirmed,named MenuRom_ShopEquipList; extent to the next named table (end inferred)
+$FF:C309,$FF:C317,15,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),"Menu_ShopEquipNext, Menu_ShopEquipOpen",confirmed,named MenuRom_ShopEquipList; no end byte: the list runs on into the next row's list (Menu_RunDrawList stops only at an end byte)
 $FF:C318,$FF:C321,10,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_ShopCompare,confirmed,named MenuRom_ShopCompareList; extent to the next named table (end inferred)
 $FF:C322,$FF:C36A,73,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_LoadInit,confirmed,named MenuRom_LoadRowsList; extent to the next named table (end inferred)
 $FF:C36B,$FF:C390,38,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_LoadInit,confirmed,named MenuRom_LoadRow3List; extent to the next named table (end inferred)

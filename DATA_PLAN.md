@@ -728,9 +728,95 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
     they name ids past the run. In four of these the next run's records are a different size,
     and set 228's ids would read past `$DE:C000` into the message tables. Those animation rows
     are probably never played.
-  - The battle-action frames (`$D1`), and `$E4:0000`-`$1FFF`, are separate tables, not done here.
+  - The battle-action frames (`$D1`) are separate tables, not done here (`$E4:0000`-`$17FF` holds the
+    sprite palettes: "Tables, part 2").
 
-## Order of work
+## Tables, part 2: readers' extents
+
+On the `data-tables-3` branch. Of the 157,019 B of tables still raw in 212 pieces, 95,257 B now
+have readable forms whose layout and extent come from the code that reads them. 11,703 B turned
+out to be zero fill and 659 B are split off as unknown. 49,400 B in 143 pieces stay bytes (listed
+below). Each group's bound is re-derived by its tool's `check` and again at extraction.
+
+- **Sprite animation lists** (`tools/anims.py`; pieces `animframes`, `animtimes`; 39,495 B):
+  `AnimRom_FrameLists` (`$E4:3000`, 30,192 B) and `AnimRom_TimeLists` (`$E4:A800`, 9,303 B), for
+  193 animations from the offsets at `$E4:2600`/`$2800`.
+  - The field (`Evt_LoadSpriteRec`), battle (`Battle_InitScene`) and the menu (`Menu_SprLoad`) all
+    take a facing block's size from the next animation's offset: (next - this) / 4.
+  - Facing f starts at + f x stride, and row r at + 4r (`Obj_AnimFrameLookup`,
+    `Battle_TickPcSlots`, `Menu_SprAnimate`). So a frame-id list's extent is the readers'.
+  - Durations are rows of 4 at + 4r (`Obj_AnimTickAndQueue` and the same two). No reader bounds the
+    row count, so each list ends at the next offset (inferred, as for the sprite frames).
+  - `check` derives both lists from the offsets. It also checks that the field and the menu read
+    the same two tables (`RomE4_PtrInit` words 2/3, `MenuRom_E4AnimFrames`/`AnimTimes`), and that
+    the lists start at `RomE4_PtrInit` words 5/6.
+  - Animation 193's next offset is 0, so no reader gives it an extent and no sprite record names
+    it. Its one byte (`$DD`) after each area is an unknown row, as at `$E1:DDB2`. The zeros after
+    it are padding.
+- **Menu draw lists** (`tools/drawlists.py`; piece `drawlist`; 56 lists, 1,784 B):
+  `Menu_RunDrawList` reads commands up to the first byte with bit 7 set.
+  - A command's argument count is `MenuRom_DrawArgLens[c] + 1`. The command must be even and inside
+    `Menu_DrawCmdTable` (the names come from that table).
+  - Two rows hold whole commands and no end byte (`MenuRom_ShopMembersList`, `ShopEquipList`).
+    They run on into the next row's list: their text ends `continues`, and extraction refuses one
+    with no draw list after it.
+  - The bytes after the end of `MenuRom_XchgListA` (14 B) and of `MenuRom_TechMembersList`
+    (11 B) are list-shaped, but no reader is known: unknown rows.
+- **Records** (`tools/records.py`; 13 pieces, 54,490 B, including `$E4:2A00`'s offsets; `DERIVED`
+  re-derives each bound):
+  - Action object records (`BattleRom_ActObjRec_Lists`, `$CE:8870`, 4,691 x 4 B). Every word of
+    the three `*Objs` tables is an object pointer: `Battle_ActObjIdx` is a byte x 2, so it reaches
+    no further than these tables.
+    - `BattleAct_IndexObjLists` reads 16 lists from each pointer: 1xx/001 ends a list, 010 marks
+      it, and the first record of lists 1-15 is untested.
+    - Together they cover `$CE:8870`-`$D1BB` with no gap (`obj_lists_extent`). The 620 B after
+      that are reached by none: an unknown row.
+  - Domain bounds:
+    - `BattleRom_FxGfxLists` (`$CF:A000`, 256 sets x 32 words) and `FxGfxColours`: the set is a
+      byte (`Battle_FxTileSet`).
+    - `BattleRom_EnemyStats` (`$CC:4700`, 256 x 23 B, the fields as `BattleFD_UnkB438` copies
+      them).
+    - `BattleRom_EnemyEffectRecA` (255 x 12 B; part number $FF is skipped, and its 12 B are split
+      off).
+    - `BattleRom_ExpToLevel` (levels 0-`Battle_LevelMax`).
+    - `BattleRom_EnemyActObjs`, `BattleRom_HalfPlaneEdge` (an angle byte),
+      `MenuRom_SlotEraNibbles` (a 9-bit location / 2).
+    - The sprite palettes `AnimRom_Palettes` (`$E4:0000`, 256 x 12 colours: a palette byte x
+      `Pal_ObjColorBytes`) and their offsets `MenuRom_E4PalOffsets` (`$E4:2A00`).
+    - `RomE4_SprRec`, now 263 records: `Evt_Op82_InitWramSprite` reads `SprRec_FirstNpc` + a byte,
+      so the last record's size byte is the old padding's first byte.
+  - Data bound: `LocGfx_Lists` holds 54 entries. Its index's only source is `LocRom.Tileset12`,
+    whose values reach 53. Entries 54-63 (80 B) stay bytes.
+- **Pointer table**: `BattleRom_SprFramesPtr` (`$E4:2300`) is now written as labels into the sprite
+  frame pieces.
+- **Still raw** (49,400 B in 143 pieces), by reader:
+  - **Battle action loaders** (`BattleAct_*`, 25 pieces, 11,418 B): `BattleRom_PcAttackAct`,
+    `PcTechAct`, `EnemyAttackAct`, `EnemyAttack2Act`, `EnemyTechAct`, `ActObjInit`, the palette
+    steps (`$CD:EE23`), `TechObjs` and the other palette and object tables. Some indexes are read
+    16-bit without the high byte cleared, so no bound is proved: `Battler_Unk984D` is a word, and
+    `Battle_ActId` and the PC attack record have B not cleared. Others are bytes that reach past
+    the row into the next table.
+  - **Battle layer effects** (`BattleCD_*`, 10 pieces, 9,988 B):
+    - `BattleRom_FxTileLists`: the set word is a byte plus bit 6 of the count byte, which reaches
+      past the row;
+    - `FxRecords` (masked with `$7FFF`) and `FxScripts`;
+    - smaller tables indexed by values from those records.
+  - **Sound** (`AudioRom_Song*`, 5,810 B), left for the music work.
+  - **Battle system and stats** (`BattleSys_*`, `BattleFD_*`; 21 pieces, 9,275 B):
+    - the area and item records at `$CC:0000`, the tech records, the equipment records;
+    - `BattleRom_UnkCC6FCB`, the effect records B;
+    - all indexed by values from other unproved tables.
+  - **No reader found** (6 pieces, 2,756 B): `$CD:F188`, `$F8:AF6F`, `$CC:FC2C`, `$CC:F383`,
+    `MenuRom_DrawArgLens` (indexed by any command byte below $80, while the commands stop at $14),
+    and `LocGfx_Lists`' tail.
+  - **HDMA sets** (`BattleRom_HdmaSetRecs`/`SetOfs`, 2,738 B): records, then tables at the
+    offsets the records hold; not traced.
+  - **`RomE4_EnemySprRec`** (2,528 B): battle's index is an enemy id x 10, which reaches into
+    `RomE4_PtrInit`.
+  - **Small menu, battle-menu, battle-sprite and scene tables** (75 pieces, 4,887 B): their
+    readers' indexes reach past the row (a slot or row number wider than the table), or are
+    computed from values not traced. This includes the `C2SceneRom_*_Tail` bytes after the scene
+    pointer tables.
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
    graphics or music are stored here. Describing the data "in source" therefore cannot mean
@@ -827,5 +913,5 @@ None found beyond what is already known:
   bytes split off the text rows in step 5, 17 the bytes past their readers' reach split off
   tables and palettes in step 6): stale bytes beside unused pointer
   entries, four single bytes of the same value right after a run of packs, and small gaps.
-- The internal layout of `$E4:0000`-`$1FFF` (the sprite frame records: "Sprite frame records as
-  text").
+- (Settled: `$E4:0000`-`$17FF` is the sprite palettes, "Tables, part 2"; the sprite frame records,
+  "Sprite frame records as text".)

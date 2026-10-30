@@ -87,6 +87,14 @@ How each piece's bytes are made (the manifest's `piece` column):
              back when written, after the rows are checked against the
              runs); the build assembles it to build/sprites/<label>.bin,
              which is incbin'd. No param. Counted as "sprite frames".
+  animframes, animtimes, drawlist  the pieces of the text tools
+             (TEXT_TOOLS below): the sprite animation frame-id and duration
+             lists of bank $E4 (tools/anims.py: build/assets/anims/
+             <label>.anf / .ant) and the menu's draw lists (tools/
+             drawlists.py: build/assets/menu/<label>.mdl), each checked
+             against its readers and to assemble back when written; the
+             build assembles them to build/<OUT>/<label>.bin, which is
+             incbin'd. No param. Counted under their kinds.
   records   a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
@@ -139,6 +147,8 @@ import maps  # noqa: E402
 import graphics  # noqa: E402
 import scripts  # noqa: E402
 import sprites  # noqa: E402
+import anims  # noqa: E402
+import drawlists  # noqa: E402
 import data_survey  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
@@ -173,7 +183,7 @@ SPRITES_PREFIX = '../../build/sprites/'
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
           'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
-          'graphics', 'sprframes')
+          'graphics', 'sprframes', 'animframes', 'animtimes', 'drawlist')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -211,6 +221,7 @@ TABLES = {
     '$D1:0000': 2,      # BattleRom_PcAttackFrames (bank $D1)
     '$D1:0060': 2,      # BattleRom_ActFrames (bank $D1)
     '$E4:2000': 3,      # BattleRom_SprTilesPtr
+    '$E4:2300': 3,      # BattleRom_SprFramesPtr (into the sprite frame pieces, tools/sprites.py)
     '$F6:1E00': 3,      # Map_PropsPtrs
     '$F6:2100': 3,      # LocGfx_Meta12Ptrs
     '$F6:21C0': 3,      # LocGfx_Meta3Ptrs
@@ -253,6 +264,25 @@ KIND_LABELS = {
     'palette': 'Palette', 'tilemap': 'Tilemap', 'map': 'MapData', 'padding': 'Padding',
     'unknown': 'Unknown',
 }
+
+
+# The text tools: modules that turn pieces of their own kinds into
+# readable text and back. Each has KINDS (its piece kinds), ASSET_DIR and
+# ASSET_EXT ({kind: extension}: build/assets/<dir>/<label>.<ext>), OUT
+# (build/<OUT>/<label>.bin, what is incbin'd), INCBIN_NOTE, ERROR,
+# is_piece_row(survey row) -> kind or None (no ROM), extract_texts(rom,
+# pieces) -> ({label: text}, problems) and assemble_piece(piece, text).
+TEXT_TOOLS = (anims, drawlists)
+
+
+def text_tool(piece: str):
+    """The text tool of a piece kind, or None."""
+    return next((t for t in TEXT_TOOLS if piece in t.KINDS), None)
+
+
+def text_out(p: dict) -> Path:
+    """The assembled file of a text tool's piece, relative to the root."""
+    return Path('build') / text_tool(p['piece']).OUT / f'{p["label"]}.bin'
 
 
 class DataError(Exception):
@@ -378,6 +408,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'gfx/{label}.png'
         elif piece == 'sprframes':
             asset = f'sprites/{label}.spr'
+        elif text_tool(piece):
+            asset = f'{text_tool(piece).ASSET_DIR}/{label}.{text_tool(piece).ASSET_EXT[piece]}'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
@@ -406,6 +438,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
                 row=row)
         elif sprites.is_piece_row(row):
             add(label, s, e, 'sprframes', row=row)
+        elif any(t.is_piece_row(row) for t in TEXT_TOOLS):
+            add(label, s, e, next(t.is_piece_row(row) for t in TEXT_TOOLS if t.is_piece_row(row)), row=row)
         elif row['start'] in scripts.FX_ROWS:
             if kind != 'battle_script':
                 raise DataError(f'{row["start"]}: a {kind} row cannot be the layer-effect scripts')
@@ -523,6 +557,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or p['param']:
                 problems.append(f'{where}: a sprframes piece\'s asset is sprites/<label>.spr and it has no '
                                 f'param: {p["asset"]!r}, {p["param"]!r}')
+        elif text_tool(p['piece']):
+            t = text_tool(p['piece'])
+            if p['asset'] != f'{t.ASSET_DIR}/{p["label"]}.{t.ASSET_EXT[p["piece"]]}' or p['param']:
+                problems.append(f'{where}: a {p["piece"]} piece\'s asset is {t.ASSET_DIR}/<label>.'
+                                f'{t.ASSET_EXT[p["piece"]]} and it has no param: {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'fx':
             m = FX_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or p['param']:
@@ -572,6 +611,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{GFX_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'sprframes':
             out[f'{SPRITES_PREFIX}{p["label"]}.bin'] = p
+        elif text_tool(p['piece']):
+            out[f'../../{text_out(p)}'] = p
         elif p['piece'] == 'text':
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'records':
@@ -597,6 +638,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[GFX_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'sprframes':
             out[SPRITES_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif text_tool(p['piece']):
+            out[text_out(p)] = int(p['size'])
         elif p['piece'] == 'text':
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'records':
@@ -669,7 +712,9 @@ def table_entries(piece: dict, rom: bytes, pieces: list[dict], code: dict[int, s
             if t == target['offset']:
                 out.append((target['label'], ''))
             else:
-                out.append((f'{target["label"]}+${t - target["offset"]:X}', 'inside the piece: not a stream start'))
+                why = ('a sprite set\'s first frame record' if target['piece'] == 'sprframes'
+                       else 'inside the piece: not a stream start')
+                out.append((f'{target["label"]}+${t - target["offset"]:X}', why))
             continue
         if t in code:
             out.append((code[t], ''))
@@ -762,6 +807,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{GFX_PREFIX}{p["label"]}.bin"          ; graphics: {p["param"]}')
         elif p['piece'] == 'sprframes':
             out.append(f'    incbin "{SPRITES_PREFIX}{p["label"]}.bin"          ; sprite frame records')
+        elif text_tool(p['piece']):
+            out.append(f'    incbin "../../{text_out(p)}"          ; {text_tool(p["piece"]).INCBIN_NOTE[p["piece"]]}')
         elif p['piece'] == 'records':
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'battle':
@@ -868,8 +915,8 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
-    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'sprites.py', 'absint.py',
-                 'disasm.py'):
+    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'sprites.py', 'anims.py',
+                 'drawlists.py', 'absint.py', 'disasm.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
@@ -907,6 +954,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     problems += extract_battle(rom, out_dir, pieces, root)
     problems += extract_scripts(rom, out_dir, pieces, root)
     problems += extract_sprites(rom, out_dir, pieces)
+    problems += extract_text_tools(rom, out_dir, pieces)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -916,7 +964,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('table', 'text', 'records'):
             continue
-        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'sprframes'):
+        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'sprframes') or text_tool(p['piece']):
             continue
         if p['piece'] in maps.PIECES:
             data, why = unpack_piece(rom, p)
@@ -1108,6 +1156,26 @@ def extract_sprites(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
         c3pack._write(dest, text_.encode())
+    return problems
+
+
+def extract_text_tools(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:
+    """Write the readable file of every piece of the TEXT_TOOLS (each
+    tool's extract_texts checks its pieces against what the readers make
+    of the ROM and that every text assembles back to the ROM's bytes);
+    the problems. A tool with a problem writes nothing."""
+    import c3pack
+    problems = []
+    for t in TEXT_TOOLS:
+        texts, found = t.extract_texts(rom, pieces)
+        if found:
+            problems += found
+            continue
+        for p in pieces:
+            if p['piece'] in t.KINDS:
+                dest = out_dir / p['asset']
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                c3pack._write(dest, texts[p['label']].encode())
     return problems
 
 

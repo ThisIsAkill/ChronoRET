@@ -31,14 +31,14 @@ BattleRom_FxTileLists:
 ; Read by BattleCD_ConvertFxGfx.
 org $CFA000
 BattleRom_FxGfxLists:
-    incbin "../../build/assets/table/BattleRom_FxGfxLists.bin"
+    incbin "../../build/records/BattleRom_FxGfxLists.bin"          ; records: table 256 x 64 B
 
 ; $CF:E000-$CF:E1FF (512 B), table, confirmed: 2 B per action graphics set: four 2-bit colour
 ; fields per byte
 ; Read by BattleCD_ConvertFxGfx.
 org $CFE000
 BattleRom_FxGfxColours:
-    incbin "../../build/assets/table/BattleRom_FxGfxColours.bin"
+    incbin "../../build/records/BattleRom_FxGfxColours.bin"          ; records: table 256 x 2 B
 
 ; $CF:E200-$CF:E27F (128 B), table, confirmed: bitmaps by tile word + tile row: tiles that get
 ; palette bit !BattleCD_FxAttrPal

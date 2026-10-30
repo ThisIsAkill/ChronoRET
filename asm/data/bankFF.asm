@@ -205,18 +205,19 @@ org $FFBD18
 MenuRom_DrawArgLens:
     incbin "../../build/assets/table/MenuRom_DrawArgLens.bin"
 
-; $FF:BD2E-$FF:BD50 (35 B), table, confirmed: Menu_RunDrawList list
+; $FF:BD2E-$FF:BD50 (35 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
+; arguments)
 ; Read by Menu_MainMenuIcons.
 org $FFBD2E
 MenuRom_MainIconList:
-    incbin "../../build/assets/table/MenuRom_MainIconList.bin"
+    incbin "../../build/menulists/MenuRom_MainIconList.bin"          ; menu draw list
 
 ; $FF:BD51-$FF:BD5B (11 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_MainMenuLoop.
 org $FFBD51
 MenuRom_MainConfirmList:
-    incbin "../../build/assets/table/MenuRom_MainConfirmList.bin"
+    incbin "../../build/menulists/MenuRom_MainConfirmList.bin"          ; menu draw list
 
 ; $FF:BD5C-$FF:BD73 (24 B), table, confirmed: 6 OAM entries: the icons
 ; Read by Menu_MainIconSprites.
@@ -229,376 +230,387 @@ MenuRom_MainIconOam:
 ; Read by Menu_Icon0Preview.
 org $FFBD74
 MenuRom_Icon0List:
-    incbin "../../build/assets/table/MenuRom_Icon0List.bin"
+    incbin "../../build/menulists/MenuRom_Icon0List.bin"          ; menu draw list
 
 ; $FF:BDCD-$FF:BDEE (34 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode01Init.
 org $FFBDCD
 MenuRom_Mode01List:
-    incbin "../../build/assets/table/MenuRom_Mode01List.bin"
+    incbin "../../build/menulists/MenuRom_Mode01List.bin"          ; menu draw list
 
 ; $FF:BDEF-$FF:BE0D (31 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipSlotsClose.
 org $FFBDEF
 MenuRom_SlotsCloseList:
-    incbin "../../build/assets/table/MenuRom_SlotsCloseList.bin"
+    incbin "../../build/menulists/MenuRom_SlotsCloseList.bin"          ; menu draw list
 
 ; $FF:BE0E-$FF:BE14 (7 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_DrawMemberRow, Menu_PlaceMemberSprites.
 org $FFBE0E
 MenuRom_MemberRowList:
-    incbin "../../build/assets/table/MenuRom_MemberRowList.bin"
+    incbin "../../build/menulists/MenuRom_MemberRowList.bin"          ; menu draw list
 
-; $FF:BE15-$FF:BE1B (7 B), table, confirmed: Menu_RunDrawList list
+; $FF:BE15-$FF:BE1B (7 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
+; arguments)
 ; Read by Menu_DrawEmptyRow.
 org $FFBE15
 MenuRom_EmptyRowList:
-    incbin "../../build/assets/table/MenuRom_EmptyRowList.bin"
+    incbin "../../build/menulists/MenuRom_EmptyRowList.bin"          ; menu draw list
 
 ; $FF:BE1C-$FF:BE25 (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_DrawMemberStatus.
 org $FFBE1C
 MenuRom_StatusList:
-    incbin "../../build/assets/table/MenuRom_StatusList.bin"
+    incbin "../../build/menulists/MenuRom_StatusList.bin"          ; menu draw list
 
 ; $FF:BE26-$FF:BE5A (53 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipSlotsSlideIn.
 org $FFBE26
 MenuRom_SlotsSlideInList:
-    incbin "../../build/assets/table/MenuRom_SlotsSlideInList.bin"
+    incbin "../../build/menulists/MenuRom_SlotsSlideInList.bin"          ; menu draw list
 
 ; $FF:BE5B-$FF:BE6C (18 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipSlotsSlideOut.
 org $FFBE5B
 MenuRom_SlotsSlideOutList:
-    incbin "../../build/assets/table/MenuRom_SlotsSlideOutList.bin"
+    incbin "../../build/menulists/MenuRom_SlotsSlideOutList.bin"          ; menu draw list
 
 ; $FF:BE6D-$FF:BEA3 (55 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipSlotsOpen.
 org $FFBE6D
 MenuRom_SlotsOpenList:
-    incbin "../../build/assets/table/MenuRom_SlotsOpenList.bin"
+    incbin "../../build/menulists/MenuRom_SlotsOpenList.bin"          ; menu draw list
 
 ; $FF:BEA4-$FF:BEBC (25 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipItemsSlideIn.
 org $FFBEA4
 MenuRom_ItemsSlideInList:
-    incbin "../../build/assets/table/MenuRom_ItemsSlideInList.bin"
+    incbin "../../build/menulists/MenuRom_ItemsSlideInList.bin"          ; menu draw list
 
 ; $FF:BEBD-$FF:BEE1 (37 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipItemsSlideOut.
 org $FFBEBD
 MenuRom_ItemsSlideOutList:
-    incbin "../../build/assets/table/MenuRom_ItemsSlideOutList.bin"
+    incbin "../../build/menulists/MenuRom_ItemsSlideOutList.bin"          ; menu draw list
 
 ; $FF:BEE2-$FF:BEEB (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipCompareStats.
 org $FFBEE2
 MenuRom_CompareList:
-    incbin "../../build/assets/table/MenuRom_CompareList.bin"
+    incbin "../../build/menulists/MenuRom_CompareList.bin"          ; menu draw list
 
 ; $FF:BEEC-$FF:BF04 (25 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_EquipItemsOpen.
 org $FFBEEC
 MenuRom_ItemsOpenList:
-    incbin "../../build/assets/table/MenuRom_ItemsOpenList.bin"
+    incbin "../../build/menulists/MenuRom_ItemsOpenList.bin"          ; menu draw list
 
-; $FF:BF05-$FF:BF47 (67 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
+; $FF:BF05-$FF:BF39 (53 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_XchgPreviewA.
 org $FFBF05
 MenuRom_XchgListA:
-    incbin "../../build/assets/table/MenuRom_XchgListA.bin"
+    incbin "../../build/menulists/MenuRom_XchgListA.bin"          ; menu draw list
+
+; $FF:BF3A-$FF:BF47 (14 B), unknown, unknown: 14 bytes
+org $FFBF3A
+Unknown_FFBF3A:
+    incbin "../../build/assets/unknown/Unknown_FFBF3A.bin"
 
 ; $FF:BF48-$FF:BF7A (51 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_XchgPreviewB.
 org $FFBF48
 MenuRom_XchgListB:
-    incbin "../../build/assets/table/MenuRom_XchgListB.bin"
+    incbin "../../build/menulists/MenuRom_XchgListB.bin"          ; menu draw list
 
 ; $FF:BF7B-$FF:BF9F (37 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_XchgInit.
 org $FFBF7B
 MenuRom_XchgList:
-    incbin "../../build/assets/table/MenuRom_XchgList.bin"
+    incbin "../../build/menulists/MenuRom_XchgList.bin"          ; menu draw list
 
 ; $FF:BFA0-$FF:BFD9 (58 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Icon2Preview.
 org $FFBFA0
 MenuRom_Icon2List:
-    incbin "../../build/assets/table/MenuRom_Icon2List.bin"
+    incbin "../../build/menulists/MenuRom_Icon2List.bin"          ; menu draw list
 
 ; $FF:BFDA-$FF:C01E (69 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode03Init.
 org $FFBFDA
 MenuRom_Mode03List:
-    incbin "../../build/assets/table/MenuRom_Mode03List.bin"
+    incbin "../../build/menulists/MenuRom_Mode03List.bin"          ; menu draw list
 
 ; $FF:C01F-$FF:C025 (7 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_TechDrawMemberRow.
 org $FFC01F
 MenuRom_TechRowList:
-    incbin "../../build/assets/table/MenuRom_TechRowList.bin"
+    incbin "../../build/menulists/MenuRom_TechRowList.bin"          ; menu draw list
 
 ; $FF:C026-$FF:C02F (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_TechNextMark.
 org $FFC026
 MenuRom_TechNextList:
-    incbin "../../build/assets/table/MenuRom_TechNextList.bin"
+    incbin "../../build/menulists/MenuRom_TechNextList.bin"          ; menu draw list
 
 ; $FF:C030-$FF:C036 (7 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_TechDrawMembers, Menu_TechDrawRows.
 org $FFC030
 MenuRom_TechEmptyRowList:
-    incbin "../../build/assets/table/MenuRom_TechEmptyRowList.bin"
+    incbin "../../build/menulists/MenuRom_TechEmptyRowList.bin"          ; menu draw list
 
 ; $FF:C037-$FF:C041 (11 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Icon2Redraw.
 org $FFC037
 MenuRom_Icon2RedrawList:
-    incbin "../../build/assets/table/MenuRom_Icon2RedrawList.bin"
+    incbin "../../build/menulists/MenuRom_Icon2RedrawList.bin"          ; menu draw list
 
-; $FF:C042-$FF:C055 (20 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
+; $FF:C042-$FF:C04A (9 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode03H1.
 org $FFC042
 MenuRom_TechMembersList:
-    incbin "../../build/assets/table/MenuRom_TechMembersList.bin"
+    incbin "../../build/menulists/MenuRom_TechMembersList.bin"          ; menu draw list
+
+; $FF:C04B-$FF:C055 (11 B), unknown, unknown: 11 bytes
+org $FFC04B
+Unknown_FFC04B:
+    incbin "../../build/assets/unknown/Unknown_FFC04B.bin"
 
 ; $FF:C056-$FF:C05C (7 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_TechTargetRows.
 org $FFC056
 MenuRom_TechTargetList:
-    incbin "../../build/assets/table/MenuRom_TechTargetList.bin"
+    incbin "../../build/menulists/MenuRom_TechTargetList.bin"          ; menu draw list
 
 ; $FF:C05D-$FF:C0A5 (73 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Icon1Preview.
 org $FFC05D
 MenuRom_Icon1List:
-    incbin "../../build/assets/table/MenuRom_Icon1List.bin"
+    incbin "../../build/menulists/MenuRom_Icon1List.bin"          ; menu draw list
 
 ; $FF:C0A6-$FF:C0D4 (47 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode02Init.
 org $FFC0A6
 MenuRom_Mode02List:
-    incbin "../../build/assets/table/MenuRom_Mode02List.bin"
+    incbin "../../build/menulists/MenuRom_Mode02List.bin"          ; menu draw list
 
 ; $FF:C0D5-$FF:C0E3 (15 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShowEquipInfo.
 org $FFC0D5
 MenuRom_EquipInfoList:
-    incbin "../../build/assets/table/MenuRom_EquipInfoList.bin"
+    incbin "../../build/menulists/MenuRom_EquipInfoList.bin"          ; menu draw list
 
 ; $FF:C0E4-$FF:C0EC (9 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_UseTargetsOpen.
 org $FFC0E4
 MenuRom_UseTargetsList:
-    incbin "../../build/assets/table/MenuRom_UseTargetsList.bin"
+    incbin "../../build/menulists/MenuRom_UseTargetsList.bin"          ; menu draw list
 
 ; $FF:C0ED-$FF:C137 (75 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_LoadInit, Menu_UnkD065.
 org $FFC0ED
 MenuRom_LoadList:
-    incbin "../../build/assets/table/MenuRom_LoadList.bin"
+    incbin "../../build/menulists/MenuRom_LoadList.bin"          ; menu draw list
 
 ; $FF:C138-$FF:C15D (38 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_UnkD0E5.
 org $FFC138
 MenuRom_SaveList:
-    incbin "../../build/assets/table/MenuRom_SaveList.bin"
+    incbin "../../build/menulists/MenuRom_SaveList.bin"          ; menu draw list
 
 ; $FF:C15E-$FF:C167 (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_UnkD36C.
 org $FFC15E
 MenuRom_SlotDetailList:
-    incbin "../../build/assets/table/MenuRom_SlotDetailList.bin"
+    incbin "../../build/menulists/MenuRom_SlotDetailList.bin"          ; menu draw list
 
 ; $FF:C168-$FF:C16E (7 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_UnkD36C.
 org $FFC168
 MenuRom_SlotMemberList:
-    incbin "../../build/assets/table/MenuRom_SlotMemberList.bin"
+    incbin "../../build/menulists/MenuRom_SlotMemberList.bin"          ; menu draw list
 
 ; $FF:C16F-$FF:C190 (34 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_SaveAskOpen.
 org $FFC16F
 MenuRom_SaveAskList:
-    incbin "../../build/assets/table/MenuRom_SaveAskList.bin"
+    incbin "../../build/menulists/MenuRom_SaveAskList.bin"          ; menu draw list
 
 ; $FF:C191-$FF:C19B (11 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode0EH3, Menu_SaveAskClose.
 org $FFC191
 MenuRom_LoadAskClose:
-    incbin "../../build/assets/table/MenuRom_LoadAskClose.bin"
+    incbin "../../build/menulists/MenuRom_LoadAskClose.bin"          ; menu draw list
 
 ; $FF:C19C-$FF:C1B8 (29 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Icon3Preview.
 org $FFC19C
 MenuRom_Icon3List:
-    incbin "../../build/assets/table/MenuRom_Icon3List.bin"
+    incbin "../../build/menulists/MenuRom_Icon3List.bin"          ; menu draw list
 
 ; $FF:C1B9-$FF:C1F5 (61 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Icon3Preview.
 org $FFC1B9
 MenuRom_Icon3ListB:
-    incbin "../../build/assets/table/MenuRom_Icon3ListB.bin"
+    incbin "../../build/menulists/MenuRom_Icon3ListB.bin"          ; menu draw list
 
 ; $FF:C1F6-$FF:C212 (29 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode04Init.
 org $FFC1F6
 MenuRom_Mode04List:
-    incbin "../../build/assets/table/MenuRom_Mode04List.bin"
+    incbin "../../build/menulists/MenuRom_Mode04List.bin"          ; menu draw list
 
 ; $FF:C213-$FF:C2AF (157 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopInit.
 org $FFC213
 MenuRom_ShopList:
-    incbin "../../build/assets/table/MenuRom_ShopList.bin"
+    incbin "../../build/menulists/MenuRom_ShopList.bin"          ; menu draw list
 
 ; $FF:C2B0-$FF:C2C0 (17 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_Mode0CH6, Menu_ShopListClose.
 org $FFC2B0
 MenuRom_ShopCloseList:
-    incbin "../../build/assets/table/MenuRom_ShopCloseList.bin"
+    incbin "../../build/menulists/MenuRom_ShopCloseList.bin"          ; menu draw list
 
 ; $FF:C2C1-$FF:C2CA (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopBuyOpen.
 org $FFC2C1
 MenuRom_ShopBuyList:
-    incbin "../../build/assets/table/MenuRom_ShopBuyList.bin"
+    incbin "../../build/menulists/MenuRom_ShopBuyList.bin"          ; menu draw list
 
 ; $FF:C2CB-$FF:C2D4 (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopSellOpen.
 org $FFC2CB
 MenuRom_ShopSellList:
-    incbin "../../build/assets/table/MenuRom_ShopSellList.bin"
+    incbin "../../build/menulists/MenuRom_ShopSellList.bin"          ; menu draw list
 
 ; $FF:C2D5-$FF:C2DD (9 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopToMembers.
 org $FFC2D5
 MenuRom_ShopMembersList:
-    incbin "../../build/assets/table/MenuRom_ShopMembersList.bin"
+    incbin "../../build/menulists/MenuRom_ShopMembersList.bin"          ; menu draw list
 
 ; $FF:C2DE-$FF:C2E7 (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopQtyDraw.
 org $FFC2DE
 MenuRom_ShopQtyList:
-    incbin "../../build/assets/table/MenuRom_ShopQtyList.bin"
+    incbin "../../build/menulists/MenuRom_ShopQtyList.bin"          ; menu draw list
 
 ; $FF:C2E8-$FF:C2F4 (13 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopQtyLists.
 org $FFC2E8
 MenuRom_ShopQtyListA:
-    incbin "../../build/assets/table/MenuRom_ShopQtyListA.bin"
+    incbin "../../build/menulists/MenuRom_ShopQtyListA.bin"          ; menu draw list
 
 ; $FF:C2F5-$FF:C301 (13 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopQtyLists.
 org $FFC2F5
 MenuRom_ShopQtyListB:
-    incbin "../../build/assets/table/MenuRom_ShopQtyListB.bin"
+    incbin "../../build/menulists/MenuRom_ShopQtyListB.bin"          ; menu draw list
 
 ; $FF:C302-$FF:C308 (7 B), table, confirmed: Menu_RunDrawList draw list
 ; Read by Menu_ShopQtyLists.
 org $FFC302
 MenuRom_ShopQtyListC:
-    incbin "../../build/assets/table/MenuRom_ShopQtyListC.bin"
+    incbin "../../build/menulists/MenuRom_ShopQtyListC.bin"          ; menu draw list
 
 ; $FF:C309-$FF:C317 (15 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopEquipNext, Menu_ShopEquipOpen.
 org $FFC309
 MenuRom_ShopEquipList:
-    incbin "../../build/assets/table/MenuRom_ShopEquipList.bin"
+    incbin "../../build/menulists/MenuRom_ShopEquipList.bin"          ; menu draw list
 
 ; $FF:C318-$FF:C321 (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_ShopCompare.
 org $FFC318
 MenuRom_ShopCompareList:
-    incbin "../../build/assets/table/MenuRom_ShopCompareList.bin"
+    incbin "../../build/menulists/MenuRom_ShopCompareList.bin"          ; menu draw list
 
 ; $FF:C322-$FF:C36A (73 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_LoadInit.
 org $FFC322
 MenuRom_LoadRowsList:
-    incbin "../../build/assets/table/MenuRom_LoadRowsList.bin"
+    incbin "../../build/menulists/MenuRom_LoadRowsList.bin"          ; menu draw list
 
 ; $FF:C36B-$FF:C390 (38 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_LoadInit.
 org $FFC36B
 MenuRom_LoadRow3List:
-    incbin "../../build/assets/table/MenuRom_LoadRow3List.bin"
+    incbin "../../build/menulists/MenuRom_LoadRow3List.bin"          ; menu draw list
 
 ; $FF:C391-$FF:C3BB (43 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_LoadEraseOpen.
 org $FFC391
 MenuRom_LoadAskList:
-    incbin "../../build/assets/table/MenuRom_LoadAskList.bin"
+    incbin "../../build/menulists/MenuRom_LoadAskList.bin"          ; menu draw list
 
 ; $FF:C3BC-$FF:C41E (99 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_NameInit.
 org $FFC3BC
 MenuRom_NameList:
-    incbin "../../build/assets/table/MenuRom_NameList.bin"
+    incbin "../../build/menulists/MenuRom_NameList.bin"          ; menu draw list
 
 ; $FF:C41F-$FF:C428 (10 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_NameEdit, Menu_NameInit.
 org $FFC41F
 MenuRom_NameShowList:
-    incbin "../../build/assets/table/MenuRom_NameShowList.bin"
+    incbin "../../build/menulists/MenuRom_NameShowList.bin"          ; menu draw list
 
 ; $FF:C429-$FF:C456 (46 B), table, confirmed: Menu_RunDrawList draw list (command bytes and
 ; arguments)
 ; Read by Menu_NameChoiceInit.
 org $FFC429
 MenuRom_NameChoiceList:
-    incbin "../../build/assets/table/MenuRom_NameChoiceList.bin"
+    incbin "../../build/menulists/MenuRom_NameChoiceList.bin"          ; menu draw list
 
 ; $FF:C457-$FF:C969 (1,299 B), text, confirmed: u16 string addresses (bank $FF), then the
 ; strings
@@ -880,7 +892,7 @@ MenuRom_SlotStrings:
 ; Read by Menu_UnkD36C.
 org $FFD296
 MenuRom_SlotEraNibbles:
-    incbin "../../build/assets/table/MenuRom_SlotEraNibbles.bin"
+    incbin "../../build/records/MenuRom_SlotEraNibbles.bin"          ; records: table 256 x 1 B
 
 ; $FF:D396-$FF:D3FD (104 B), text, confirmed: string table (TextWin_StrTable) of those strings
 ; Read by Menu_UnkD36C.

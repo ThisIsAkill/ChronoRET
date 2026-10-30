@@ -90,8 +90,10 @@ test-hooks:
 # scripts' readable form (tools/test_battle.py), the scene and
 # layer-effect scripts' (tools/test_scripts.py), the tile graphics as
 # images (tools/test_graphics.py), the location maps and metatiles as
-# text (tools/test_maps.py), and the sprite frame records as text
-# (tools/test_sprites.py).
+# text (tools/test_maps.py), the sprite frame records as text
+# (tools/test_sprites.py), the sprite animation lists as text
+# (tools/test_anims.py), and the menu draw lists as text
+# (tools/test_drawlists.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -112,6 +114,8 @@ test-tools:
 	python3 tools/test_maps.py
 	python3 tools/test_graphics.py
 	python3 tools/test_sprites.py
+	python3 tools/test_anims.py
+	python3 tools/test_drawlists.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]
