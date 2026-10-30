@@ -141,15 +141,15 @@ class SceneLayers(unittest.TestCase):
     def test_round_trips(self):
         for render, assemble, data in ((maps.render_scene_maps, maps.assemble_scene_maps, self.MAPS),
                                        (maps.render_scene_meta, maps.assemble_scene_meta, self.META),
-                                       (maps.render_bg3, maps.assemble_bg3, self.BG3),
-                                       (maps.render_bg3, maps.assemble_bg3, self.BG3[:2048])):
+                                       (maps.render_bg3, maps.assemble_bg3, self.BG3)):
             with self.subTest(render=render.__name__, n=len(data)):
                 self.assertEqual(assemble(render('S', data), 'S'), data)
 
     def test_size_refused(self):
         for render, n, why in ((maps.render_scene_maps, 100, 'the two layer maps are 12288'),
                                (maps.render_scene_meta, 100, 'the two metatile sets are 4096'),
-                               (maps.render_bg3, 100, 'no whole number of 32x32-word screens')):
+                               (maps.render_bg3, 100, "100 B; BG3's tilemap is 4096"),
+                               (maps.render_bg3, 2048, "2048 B; BG3's tilemap is 4096")):
             with self.subTest(why=why):
                 with self.assertRaisesRegex(maps.MapsError, why):
                     render('S', bytes(n))
@@ -183,7 +183,10 @@ class SceneLayers(unittest.TestCase):
 
     def test_bg3_refusals(self):
         text = maps.render_bg3('S', self.BG3)
-        for old, new, why in (('@bg3map S 2', '@bg3map S 3', 'the first line is @bg3map S 1\\|2'),
+        one = '\n'.join(text.split('\n')[:3 + 1 + 33]).replace('@bg3map S 2', '@bg3map S 1') + '\n'
+        with self.assertRaisesRegex(maps.MapsError, 'the first line is @bg3map S 2'):
+            maps.assemble_bg3(one, 'S')            # one screen: C2Scene_LoadVram DMAs both
+        for old, new, why in (('@bg3map S 2', '@bg3map S 3', 'the first line is @bg3map S 2'),
                               ('@screen 1', '@screen 2', 'expected @screen 1')):
             with self.subTest(new=new):
                 with self.assertRaisesRegex(maps.MapsError, why):
@@ -193,6 +196,36 @@ class SceneLayers(unittest.TestCase):
             maps.assemble_bg3(text.replace(first_row, first_row + ' 000/0', 1), 'S')
         with self.assertRaisesRegex(maps.MapsError, '2 screens are 66 lines'):
             maps.assemble_bg3(text + '000/0\n', 'S')
+
+    def test_scene_named_skips_bit7(self):
+        rom = bytearray(ed.ROM_SIZE)
+        rom[0x06FD00:0x06FD02] = bytes([0x02, 0xFD])          # one scene header, at $C6:FD02
+        rom[0x06FD02 + 0x10], rom[0x06FD02 + 0x11], rom[0x06FD02 + 0x14] = 3, 0x85, 2   # maps: bit 7
+        self.assertEqual(maps.scene_named(bytes(rom)), {'C2SceneRom_MetatilePacks': {3}, 'C2SceneRom_MapPacks': set(),
+                                                        'C2SceneRom_Bg3MapPacks': {2}})
+
+    def test_build_checks_the_unpacked_size(self):
+        import tempfile
+        import build_rom
+        data, _ = make_map()
+        with tempfile.TemporaryDirectory() as tmp:
+            asset = Path(tmp) / ed.ASSETS / 'maps' / 'M.map'
+            asset.parent.mkdir(parents=True)
+            asset.write_text(maps.render_map('M', data))
+            saved = build_rom.extract_data.read_manifest
+            try:
+                for size, fails in ((len(data), False), (len(data) + 1, True)):
+                    piece = {'label': 'M', 'piece': 'mapprops', 'asset': 'maps/M.map', 'param': f'lz11 -> {size} B'}
+                    build_rom.extract_data.read_manifest = lambda: [piece]
+                    with self.subTest(size=size):
+                        if fails:
+                            with self.assertRaisesRegex(build_rom.BuildError, f'M: its text assembles to {len(data)} '
+                                                        f'B; the piece unpacks to {size} B'):
+                                build_rom.build_maps(tmp)
+                        else:
+                            self.assertEqual(build_rom.build_maps(tmp), 1)
+            finally:
+                build_rom.extract_data.read_manifest = saved
 
     def test_only_named_scene_packs(self):
         self.assertEqual(maps.kind_of('via C2SceneRom_Bg3MapPacks[4]; x'), ('scenebg3', 0x1000))

@@ -271,10 +271,11 @@ def build_graphics(root: Path = ROOT) -> int:
 
 
 def build_maps(root: Path = ROOT) -> int:
-    """Assemble every `mapprops` and `metatiles` piece from its text
+    """Assemble every maps piece (maps.PIECES) from its text
     (build/assets/maps/, tools/maps.py) to its unpacked bytes in
     build/maps/, which build_packs packs; returns how many files were
-    written."""
+    written. A text that assembles to another size than its piece's
+    unpacked size (its param) fails."""
     import maps
     root = Path(root)
     written = 0
@@ -285,6 +286,10 @@ def build_maps(root: Path = ROOT) -> int:
             data = maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
         except (OSError, maps.MapsError) as e:
             raise BuildError(f'maps: {e}') from None
+        size = extract_data.pack_param(p['param'])[1]
+        if len(data) != size:            # the pack would not be the one the reader unpacks
+            raise BuildError(f'maps: {p["label"]}: its text assembles to {len(data)} B; the piece unpacks to '
+                             f'{size} B ({p["param"]})')
         out_dir = root / extract_data.MAPS_OUT
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{p["label"]}.bin'
