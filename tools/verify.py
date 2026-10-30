@@ -29,7 +29,9 @@ assembled from their disassembly, then packed; battle pieces
 readable form; and scene and fx pieces (tools/scripts.py): the scene
 script packs and the layer-effect scripts, assembled the same way (the
 scene packs then packed); and graphics pieces (tools/graphics.py): tile
-graphics encoded from indexed images.
+graphics encoded from indexed images; and mapprops and metatiles pieces
+(tools/maps.py): the location maps and their metatiles assembled from
+text, then packed.
 
 Usage:
     python3 tools/verify.py                 verify, print per-bank totals
@@ -209,7 +211,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
-               'graphics_bytes': 0, 'gfxpack_bytes': 0}
+               'graphics_bytes': 0, 'gfxpack_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -234,6 +236,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         extract_data.extract()
         build_rom.build_events()
         build_rom.build_scripts()
+        build_rom.build_maps()
         build_rom.build_graphics()
         build_rom.build_packs()
         build_rom.build_text()
@@ -244,11 +247,12 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         return figures, problems
     for p in pieces:
         if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
+                              'mapprops', 'metatiles',
                               'graphics', 'gfxpack'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz'
-                if p['piece'] in ('packed', 'events', 'scene', 'gfxpack')
+                if p['piece'] in ('packed', 'events', 'scene', 'mapprops', 'metatiles', 'gfxpack')
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
                 else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
@@ -298,6 +302,13 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
             gsplit[pre + 'tail'] += tail
             gsplit['regions' if p['piece'] == 'graphics' else 'packs'] += 1
     figures['graphics_split'] = gsplit
+    # The maps: their pieces and unpacked bytes.
+    msplit = {'maps': 0, 'metas': 0, 'unpacked': 0}
+    for p in pieces:
+        if p['piece'] in ('mapprops', 'metatiles'):
+            msplit['maps' if p['piece'] == 'mapprops' else 'metas'] += 1
+            msplit['unpacked'] += int(extract_data.PACK_PARAM.match(p['param']).group(2))
+    figures['maps_split'] = msplit
     return figures, problems
 
 
@@ -417,6 +428,10 @@ def main() -> int:
               f'by the build from indexed images of their unpacked bytes (build/assets/gfx/ -> '
               f'build/gfxpack/ -> build/packs/, incbin): unpacked, {gs["pack_tiles"]:,} B in tiles, '
               f'{gs["pack_tail"]:,} B past the tiles the readers read kept as bytes')
+        ms = data['maps_split']
+        print(f'  {"maps":<16} {data["mapprops_bytes"] + data["metatiles_bytes"]:>9,} bytes of {ms["maps"]} location '
+              f'maps and {ms["metas"]} metatile packs packed by the build from text assembled to their unpacked '
+              f'bytes (build/assets/maps/ -> build/maps/ -> build/packs/, incbin): {ms["unpacked"]:,} B unpacked')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')

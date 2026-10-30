@@ -697,6 +697,53 @@ pointer and placement is fixed, so the build refuses a pack of another size and 
     (mode 7), `MenuRom_ScreenGfx` (`BankFF_BuildScreenMap`), the scene `Unk7000`/`Unk7200` packs,
     and the ten packs no pointer names.
 
+## Location maps as text
+
+On the `data-maps` branch. `tools/maps.py` gives the location maps and their metatiles readable
+forms in `build/assets/maps/`. The build assembles them to `build/maps/` and packs them as before
+(`tools/c3pack.py`). `tools/verify.py` counts them as "maps".
+
+- **Maps** (`mapprops` pieces: the 197 `Map_PropsPtrs` packs a `LocRom.MapProps` names).
+  `LocLoad_UnkA33B` unpacks one to `MapProps` (`$7E:B500`) and reads its six header bytes (struct
+  `MapProps`). `Map_UnpackTilePlanes` reads the rest through the WRAM port:
+  - layer 1's and layer 2's metatile numbers, row by row, and layer 3's when `Size3` bit 7 is set
+    (117 maps), sized `(two bits + 1) x 16` by `Size1`/`Size3`;
+  - then three bytes per layer-1 tile (`Map_TileHiBits`, `Map_TileAttrA`, `Map_TileAttrB`): an
+    entry, or with bit 7 of the first byte a run of a count of tiles (0 = 256) carried across row
+    ends.
+
+  `Map_WriteRow1`/`2` make bits 0/1 of HiBits bit 8 of the layer-1/2 metatile number. The text holds
+  the header, a hex grid per layer, and a grid of the attribute triples. All 197 maps write their
+  runs the same way: every repeat of two or more is a run of up to 256 tiles. So the assembler
+  re-makes the runs from the grid, and extraction refuses a map written otherwise. Five maps'
+  streams end before the attribute plane is full (`MapPropsPack_029`, `_058`, `_098`, `_191`, `_193`:
+  13-135 tiles short). The game then reads whatever follows the unpacked bytes in WRAM; the text
+  marks those cells `--------`.
+- **Metatiles** (`metatiles` pieces: the 53 `LocGfx_Meta12Ptrs` packs of 512 and the 18
+  `LocGfx_Meta3Ptrs` packs of 256 that a `LocRom.Tileset12` / `.Tileset3` names). Each metatile is four words, top-left, top-right,
+  bottom-left, bottom-right. The row and column writers send them unchanged to `Map_BufC800` and
+  the edge buffers, which go to the layers' BG tilemaps, so they are SNES tilemap words. The text
+  writes each word as `TTT/P` plus `p`, `h` and `v` (tile, palette, priority, flips).
+- **Exits and treasures** are now records (`tools/records.py`):
+  - `ExitRom` (814 x 7 B): `Map_LoadExitTiles` reads them through `ExitRom_LocOfs`, whose
+    end entry gives the count;
+  - `TreasureRom` (249 x 4 B; `Tile` and `Contents` read 16-bit by `Field_CheckTileInFront`).
+- **Which packs.** A pack is a map or metatiles only when a location record names it, as for
+  the packed graphics: `tools/maps.py`'s `derive_named` reads the 512 `LocRom` records'
+  `MapProps`, `Tileset12` and `Tileset3` (`$FF` names no metatiles), and `check` compares the
+  packs they name with the manifest's `mapprops` and `metatiles` pieces, both ways.
+- **Results.** 197 maps (380,613 B packed, 995,296 B unpacked) and 71 metatile packs
+  (174,649 B packed, 253,952 B unpacked) assemble and pack back byte-exact. 6,694 B of exit and
+  treasure records encode back too.
+- **Not done here, kept as bytes:**
+  - six whole packs no location record names (`packed` pieces): `Map_PropsPtrs` 10, 30, 141
+    and 172 (3,483 B packed), `LocGfx_Meta12Ptrs` 54 and `LocGfx_Meta3Ptrs` 3 (1,463 B);
+  - the ten 1-byte `LocGfx_Meta12Ptrs` packs (16, 55-63), which no location names either;
+  - `$F5:EE02` (510 B, not a valid pack; Map_PropsPtrs entry 201, unused);
+  - `$EF:B168` (`LocGfx_Meta3Ptrs` entries 19-22, which do not unpack and no location selects);
+  - the scene layer data (`C2SceneRom_MapPacks`, `Bg3MapPacks`, `MetatilePacks`), which the
+    scene loaders read in their own layout: not traced here.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed

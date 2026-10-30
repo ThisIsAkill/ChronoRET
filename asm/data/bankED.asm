@@ -20,112 +20,112 @@
 ; Read by LocLoad_Unk09DD.
 org $ED0000
 LocMeta12Pack_000:
-    incbin "../../build/packs/LocMeta12Pack_000.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_000.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:0DB6-$ED:13C5 (1,552 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED0DB6
 LocMeta12Pack_001:
-    incbin "../../build/packs/LocMeta12Pack_001.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_001.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:13C6-$ED:2148 (3,459 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED13C6
 LocMeta12Pack_002:
-    incbin "../../build/packs/LocMeta12Pack_002.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_002.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:2149-$ED:2DC7 (3,199 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED2149
 LocMeta12Pack_003:
-    incbin "../../build/packs/LocMeta12Pack_003.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_003.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:2DC8-$ED:3C38 (3,697 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED2DC8
 LocMeta12Pack_004:
-    incbin "../../build/packs/LocMeta12Pack_004.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_004.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:3C39-$ED:4765 (2,861 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED3C39
 LocMeta12Pack_005:
-    incbin "../../build/packs/LocMeta12Pack_005.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_005.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:4766-$ED:537D (3,096 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED4766
 LocMeta12Pack_006:
-    incbin "../../build/packs/LocMeta12Pack_006.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_006.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:537E-$ED:6011 (3,220 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED537E
 LocMeta12Pack_007:
-    incbin "../../build/packs/LocMeta12Pack_007.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_007.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:6012-$ED:6B6E (2,909 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED6012
 LocMeta12Pack_008:
-    incbin "../../build/packs/LocMeta12Pack_008.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_008.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:6B6F-$ED:79B7 (3,657 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED6B6F
 LocMeta12Pack_009:
-    incbin "../../build/packs/LocMeta12Pack_009.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_009.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:79B8-$ED:837F (2,504 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED79B8
 LocMeta12Pack_010:
-    incbin "../../build/packs/LocMeta12Pack_010.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_010.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:8380-$ED:8F2F (2,992 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED8380
 LocMeta12Pack_011:
-    incbin "../../build/packs/LocMeta12Pack_011.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_011.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:8F30-$ED:9E44 (3,861 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED8F30
 LocMeta12Pack_012:
-    incbin "../../build/packs/LocMeta12Pack_012.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_012.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:9E45-$ED:AABF (3,195 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $ED9E45
 LocMeta12Pack_013:
-    incbin "../../build/packs/LocMeta12Pack_013.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_013.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:AAC0-$ED:B8FB (3,644 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $EDAAC0
 LocMeta12Pack_014:
-    incbin "../../build/packs/LocMeta12Pack_014.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_014.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:B8FC-$ED:C310 (2,581 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $EDB8FC
 LocMeta12Pack_015:
-    incbin "../../build/packs/LocMeta12Pack_015.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_015.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:C311-$ED:C318 (8 B), packed_lz, confirmed: lz11 -> 1 B: layer 1/2 metatile tile maps
 ; Read by LocLoad_Unk09DD.
@@ -138,28 +138,28 @@ LocMeta12Pack_016:
 ; Read by LocLoad_Unk09DD.
 org $EDC319
 LocMeta12Pack_017:
-    incbin "../../build/packs/LocMeta12Pack_017.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_017.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:D2AD-$ED:E141 (3,733 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $EDD2AD
 LocMeta12Pack_018:
-    incbin "../../build/packs/LocMeta12Pack_018.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_018.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:E142-$ED:EFBE (3,709 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $EDE142
 LocMeta12Pack_019:
-    incbin "../../build/packs/LocMeta12Pack_019.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_019.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:EFBF-$ED:FF4B (3,981 B), packed_lz, confirmed: lz11 -> 4096 B: layer 1/2 metatile tile
 ; maps
 ; Read by LocLoad_Unk09DD.
 org $EDEFBF
 LocMeta12Pack_020:
-    incbin "../../build/packs/LocMeta12Pack_020.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/LocMeta12Pack_020.lz"          ; lz11 -> 4096 B, metatiles
 
 ; $ED:FF4C-$ED:FFFF (180 B), padding, confirmed: 180 x $00
 org $EDFF4C

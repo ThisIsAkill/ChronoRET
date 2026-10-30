@@ -84,6 +84,8 @@ FIELD_TYPES = {
     ('BattleRom_EnemyReward', 'Gold'): 'u16',        # the same, LDA .Gold,X
     ('LocRom', 'MapProps'): 'u16',                   # LocLoad_UnkA33B: 16-bit entry number
     ('LocRom', 'Events'): 'u16',                     # LocLoad_Unk56D4: 16-bit entry number
+    ('TreasureRom', 'Tile'): 'u16',                  # Field_CheckTileInFront: REP #$20, LDA .Tile,X, CMP Field_FrontTile
+    ('TreasureRom', 'Contents'): 'u16',              # the same, REP #$20, LDA .Contents,X
 }
 
 
@@ -130,6 +132,10 @@ STRUCTS = {
     '$CD:4000': ('BattleRom_PcAttackScript', 1),  # one header (its fields are read at fixed offsets)
     '$CD:5C26': ('BattleRom_Kind3Act', 68),       # BattleAct kind 3: index Battle_ActId - $BC, ids $BC-$FF
     '$F6:0000': ('LocRom', 512),                  # LocLoad_Unk092B: Loc_Id low byte x 14, + $E00 for bit 8 (9-bit id)
+    '$E5:0402': ('ExitRom', 814),                 # Map_LoadExitTiles: records ExitRom_LocOfs[id] to [id + 1]; the
+                                                  # 513th offset (the end) is $1A44 = $0402 + 814 x 7
+    '$F5:F402': ('TreasureRom', 249),             # Map_LoadTreasureTiles: the same through TreasureRom_LocOfs; its
+                                                  # end $F7E6 = $F402 + 249 x 4
 }
 
 
@@ -258,7 +264,7 @@ class Layout:
 def layout_for(start: str, kind: str) -> Layout | None:
     """The layout of the survey row at `start` (of `kind`), or None when it
     is not structured."""
-    if kind == 'table' and start in STRUCTS:
+    if kind in ('table', 'map') and start in STRUCTS:
         name, count = STRUCTS[start]
         return Layout(_struct_fields(name), count, f'struct {name} (asm/include/)')
     if kind == 'table' and start in ARRAYS:
