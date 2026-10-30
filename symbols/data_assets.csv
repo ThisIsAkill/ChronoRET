@@ -996,9 +996,16 @@ EvtPack_075,$DB:7FF2,$DB:7FF4,3,events,events/EvtPack_075.evt,lz12 -> 0 B
 Padding_DB7FF5,$DB:7FF5,$DB:BFFF,16395,fill,,$00
 Unknown_DBC000,$DB:C000,$DB:C000,1,extracted,unknown/Unknown_DBC000.bin,
 Padding_DBC001,$DB:C001,$DB:FFFF,16383,fill,,$00
-SprLayout_DC0000,$DC:0000,$DC:FFFF,65536,extracted,sprite_layout/SprLayout_DC0000.bin,
-SprLayout_DD0000,$DD:0000,$DD:FFFF,65536,extracted,sprite_layout/SprLayout_DD0000.bin,
-SprLayout_DE0000,$DE:0000,$DE:BFFF,49152,extracted,sprite_layout/SprLayout_DE0000.bin,
+SprLayout_DC0000,$DC:0000,$DC:DF97,57240,sprframes,sprites/SprLayout_DC0000.spr,
+Padding_DCDF98,$DC:DF98,$DC:FFFF,8296,fill,,$00
+SprLayout_DD0000,$DD:0000,$DD:B8FF,47360,sprframes,sprites/SprLayout_DD0000.spr,
+SprLayout_DDB900,$DD:B900,$DD:C02F,1840,extracted,sprite_layout/SprLayout_DDB900.bin,
+SprLayout_DDC030,$DD:C030,$DD:FD47,15640,sprframes,sprites/SprLayout_DDC030.spr,
+Padding_DDFD48,$DD:FD48,$DD:FFFF,696,fill,,$00
+SprLayout_DE0000,$DE:0000,$DE:B067,45160,sprframes,sprites/SprLayout_DE0000.spr,
+SprLayout_DEB068,$DE:B068,$DE:B0B7,80,extracted,sprite_layout/SprLayout_DEB068.bin,
+SprLayout_DEB0B8,$DE:B0B8,$DE:BF8F,3800,sprframes,sprites/SprLayout_DEB0B8.spr,
+Padding_DEBF90,$DE:BF90,$DE:BFFF,112,fill,,$00
 MsgTable_DEC000,$DE:C000,$DE:E2B0,8881,text,text/Messages_DEC000.txt,strtable
 Padding_DEE2B1,$DE:E2B1,$DE:E2FF,79,fill,,$00
 MsgTable_DEE300,$DE:E300,$DE:F96C,5741,text,text/Messages_DEE300.txt,strtable
@@ -1063,7 +1070,8 @@ BattleRom_EnemyKindList,$E1:DE00,$E1:DE2B,44,extracted,table/BattleRom_EnemyKind
 Padding_E1DE2C,$E1:DE2C,$E1:DE7F,84,fill,,$00
 BattleRom_UnkE1DE80,$E1:DE80,$E1:DF7A,251,extracted,table/BattleRom_UnkE1DE80.bin,
 Padding_E1DF7B,$E1:DF7B,$E1:DFFF,133,fill,,$00
-SprLayout_E1E000,$E1:E000,$E1:FFFF,8192,extracted,sprite_layout/SprLayout_E1E000.bin,
+SprLayout_E1E000,$E1:E000,$E1:F517,5400,sprframes,sprites/SprLayout_E1E000.spr,
+Padding_E1F518,$E1:F518,$E1:FFFF,2792,fill,,$00
 LocGfxPack_181,$E2:0000,$E2:0C1D,3102,gfxpack,gfx/LocGfxPack_181.png,lz12 -> 4096 B; 4bpp 128 tiles
 LocGfxPack_182,$E2:0C1E,$E2:17E9,3020,gfxpack,gfx/LocGfxPack_182.png,lz12 -> 4096 B; 4bpp 128 tiles
 LocGfxPack_183,$E2:17EA,$E2:2581,3480,gfxpack,gfx/LocGfxPack_183.png,lz12 -> 4096 B; 4bpp 128 tiles
@@ -1084,7 +1092,12 @@ LocGfxPack_197,$E2:D738,$E2:E753,4124,gfxpack,gfx/LocGfxPack_197.png,lz12 -> 409
 LocGfxPack_198,$E2:E754,$E2:F261,2830,gfxpack,gfx/LocGfxPack_198.png,lz12 -> 4096 B; 4bpp 128 tiles
 LocGfxPack_199,$E2:F262,$E2:FE45,3044,gfxpack,gfx/LocGfxPack_199.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E2FE46,$E2:FE46,$E2:FFFF,442,fill,,$00
-SprLayout_E30000,$E3:0000,$E3:FFFF,65536,extracted,sprite_layout/SprLayout_E30000.bin,
+SprLayout_E30000,$E3:0000,$E3:42DF,17120,sprframes,sprites/SprLayout_E30000.spr,
+SprLayout_E342E0,$E3:42E0,$E3:469F,960,extracted,sprite_layout/SprLayout_E342E0.bin,
+SprLayout_E346A0,$E3:46A0,$E3:E857,41400,sprframes,sprites/SprLayout_E346A0.spr,
+SprLayout_E3E858,$E3:E858,$E3:E8A7,80,extracted,sprite_layout/SprLayout_E3E858.bin,
+SprLayout_E3E8A8,$E3:E8A8,$E3:F90F,4200,sprframes,sprites/SprLayout_E3E8A8.spr,
+Padding_E3F910,$E3:F910,$E3:FFFF,1776,fill,,$00
 Table_E40000,$E4:0000,$E4:1FFF,8192,extracted,table/Table_E40000.bin,
 BattleRom_SprTilesPtr,$E4:2000,$E4:22FF,768,table,,dl x 256
 BattleRom_SprFramesPtr,$E4:2300,$E4:25FF,768,extracted,table/BattleRom_SprFramesPtr.bin,

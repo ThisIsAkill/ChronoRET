@@ -15,10 +15,50 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $E3:0000-$E3:FFFF (65,536 B), sprite_layout, confirmed: per sprite set: frame records of
-; sprite tiles (tile, attributes, offsets)
-; Read by Battle_InitScene (BattleRom_SprFramesPtr), Evt_LoadSpriteRec / Spr_Load*
-; (Field_E4Ptr1), Menu_SprLoad (MenuRom_E4FramePtrs).
+; $E3:0000-$E3:42DF (17,120 B), sprite_layout, confirmed (extent inferred): frame records: N
+; tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16
+; sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
 org $E30000
 SprLayout_E30000:
-    incbin "../../build/assets/sprite_layout/SprLayout_E30000.bin"
+    incbin "../../build/sprites/SprLayout_E30000.bin"          ; sprite frame records
+
+; $E3:42E0-$E3:469F (960 B), sprite_layout, probable: per sprite set: frame records of unknown
+; record size
+org $E342E0
+SprLayout_E342E0:
+    incbin "../../build/assets/sprite_layout/SprLayout_E342E0.bin"
+
+; $E3:46A0-$E3:E857 (41,400 B), sprite_layout, confirmed (extent inferred): frame records: N
+; tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16
+; sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
+org $E346A0
+SprLayout_E346A0:
+    incbin "../../build/sprites/SprLayout_E346A0.bin"          ; sprite frame records
+
+; $E3:E858-$E3:E8A7 (80 B), sprite_layout, probable: per sprite set: frame records of unknown
+; record size
+org $E3E858
+SprLayout_E3E858:
+    incbin "../../build/assets/sprite_layout/SprLayout_E3E858.bin"
+
+; $E3:E8A8-$E3:F90F (4,200 B), sprite_layout, confirmed (extent inferred): frame records: N tile
+; words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites;
+; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
+org $E3E8A8
+SprLayout_E3E8A8:
+    incbin "../../build/sprites/SprLayout_E3E8A8.bin"          ; sprite frame records
+
+; $E3:F910-$E3:FFFF (1,776 B), padding, probable: 1776 x $00
+org $E3F910
+Padding_E3F910:
+    fillbyte $00
+    fill 1776

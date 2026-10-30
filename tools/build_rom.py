@@ -30,15 +30,19 @@ assets, with no copy of the original.
      in build/scene/ (step 3 packs them), every `fx` piece from
      build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
      tools/scripts.py, every line checked against the handlers.
-  6c. The graphics: every `graphics` piece is encoded from its PNG and
-     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
-     every `gfxpack` piece the same way to its unpacked bytes in
-     build/gfxpack/, before step 3 packs them.
   6b. The battle scripts: every unit of `battle` pieces is assembled from
      its readable file (build/assets/battle/<unit>.bscr) with
      tools/battle.py, every line checked against the readers, to
      build/battle/<label>.bin per piece (a file is rewritten only when its
      bytes change; a piece whose size differs fails the build).
+  6c. The graphics: every `graphics` piece is encoded from its PNG and
+     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
+     every `gfxpack` piece the same way to its unpacked bytes in
+     build/gfxpack/, before step 3 packs them.
+  6d. The sprite frame records: every `sprframes` piece is assembled from
+     its text (build/assets/sprites/<label>.spr) with tools/sprites.py to
+     build/sprites/<label>.bin (a file is rewritten only when its bytes
+     change; a text that does not make its piece's bytes count fails).
   7. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets
@@ -270,6 +274,30 @@ def build_graphics(root: Path = ROOT) -> int:
     return written
 
 
+def build_sprites(root: Path = ROOT) -> int:
+    """Assemble every `sprframes` piece from its text
+    (build/assets/sprites/, tools/sprites.py) to build/sprites/<label>.bin;
+    returns how many files were written."""
+    import sprites
+    root = Path(root)
+    written = 0
+    for p in extract_data.read_manifest():
+        if p['piece'] != 'sprframes':
+            continue
+        try:
+            data = sprites.assemble((root / extract_data.ASSETS / p['asset']).read_text(), p['label'],
+                                    p['offset'], int(p['size']), p['label'])
+        except (OSError, sprites.SpritesError) as e:
+            raise BuildError(f'sprites: {e}') from None
+        out_dir = root / extract_data.SPRITES_OUT
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f'{p["label"]}.bin'
+        if not path.exists() or path.read_bytes() != data:
+            c3pack._write(path, data)
+            written += 1
+    return written
+
+
 def build_maps(root: Path = ROOT) -> int:
     """Assemble every maps piece (maps.PIECES) from its text
     (build/assets/maps/, tools/maps.py) to its unpacked bytes in
@@ -404,6 +432,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_text(root)
     build_records(root)
     build_battle(root)
+    build_sprites(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp:
