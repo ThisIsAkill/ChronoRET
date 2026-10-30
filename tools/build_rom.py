@@ -60,6 +60,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import c3pack  # noqa: E402
 import extract_data  # noqa: E402
+import maps  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
 
@@ -86,12 +87,12 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('packed', 'events', 'scene', 'mapprops', 'metatiles', 'gfxpack'):
+        if p['piece'] not in ('packed', 'events', 'scene', 'gfxpack') + maps.PIECES:
             continue
         mode = extract_data.pack_param(p['param'])[0]
         src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
                else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin' if p['piece'] == 'events'
-               else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in ('mapprops', 'metatiles')
+               else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in maps.PIECES
                else root / extract_data.GFXPACK_OUT / f'{p["label"]}.bin' if p['piece'] == 'gfxpack'
                else root / extract_data.SCENE_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
@@ -270,20 +271,25 @@ def build_graphics(root: Path = ROOT) -> int:
 
 
 def build_maps(root: Path = ROOT) -> int:
-    """Assemble every `mapprops` and `metatiles` piece from its text
+    """Assemble every maps piece (maps.PIECES) from its text
     (build/assets/maps/, tools/maps.py) to its unpacked bytes in
     build/maps/, which build_packs packs; returns how many files were
-    written."""
+    written. A text that assembles to another size than its piece's
+    unpacked size (its param) fails."""
     import maps
     root = Path(root)
     written = 0
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('mapprops', 'metatiles'):
+        if p['piece'] not in maps.PIECES:
             continue
         try:
             data = maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
         except (OSError, maps.MapsError) as e:
             raise BuildError(f'maps: {e}') from None
+        size = extract_data.pack_param(p['param'])[1]
+        if len(data) != size:            # the pack would not be the one the reader unpacks
+            raise BuildError(f'maps: {p["label"]}: its text assembles to {len(data)} B; the piece unpacks to '
+                             f'{size} B ({p["param"]})')
         out_dir = root / extract_data.MAPS_OUT
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{p["label"]}.bin'
