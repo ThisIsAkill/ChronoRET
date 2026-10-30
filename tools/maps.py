@@ -61,6 +61,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 PROPS_TABLE = 'Map_PropsPtrs'
+ACT_FRAMES_TABLE = 'BattleRom_PcAttackFrames/ActFrames'   # tools/actframes.py's packs (placed here)
 # The scene layer packs: {table: (piece kind, unpacked size)}. Their indexes
 # are the ones the eight scene headers name (SCENE_NAMED; check() derives
 # it from the headers): C2Scene_LoadMetatiles (C2Scene_HdrMetatiles),
@@ -484,11 +485,13 @@ def assemble_scene_pal(text: str, label: str, size: int, name: str = '<spal>') -
 # ── Pieces ───────────────────────────────────────────────────────────────
 
 def kind_of(notes: str) -> tuple[str, int] | None:
-    """('mapprops', 0), ('metatiles', count) or (scene kind, unpacked size)
-    for a pack row's notes."""
-    m = re.search(r'\bvia ([A-Za-z0-9_]+)\[(\d+)\]', notes)
+    """('mapprops', 0), ('metatiles', count), (scene kind, unpacked size)
+    or ('actframes', None) for a pack row's notes."""
+    m = re.search(r'\bvia ([A-Za-z0-9_/]+)\[(\d+)\]', notes)
     if not m:
         return None
+    if m.group(1) == ACT_FRAMES_TABLE:
+        return 'actframes', None
     if m.group(1) in SCENE_TABLES:
         return SCENE_TABLES[m.group(1)] if int(m.group(2)) in SCENE_NAMED[m.group(1)] else None
     if m.group(1) == PROPS_TABLE:
@@ -509,6 +512,12 @@ def render_piece(p: dict, data: bytes) -> str:
         return render_bg3(p['label'], data)
     if p['piece'] == 'scenepal':
         return render_scene_pal(p['label'], data)
+    if p['piece'] == 'actframes':
+        import actframes
+        try:
+            return actframes.render(p['label'], data)
+        except actframes.ActFramesError as e:
+            raise MapsError(str(e)) from None
     return render_meta(p['label'], data, meta_count(p))
 
 
@@ -523,20 +532,32 @@ def assemble_piece(p: dict, text: str) -> bytes:
         return assemble_bg3(text, p['label'], p['label'])
     if p['piece'] == 'scenepal':
         return assemble_scene_pal(text, p['label'], int(PACK_PARAM.match(p['param']).group(2)), p['label'])
+    if p['piece'] == 'actframes':
+        import actframes
+        try:
+            return actframes.assemble(text, p['label'], p['label'])
+        except actframes.ActFramesError as e:
+            raise MapsError(str(e)) from None
     return assemble_meta(text, p['label'], meta_count(p), p['label'])
 
 
-PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal')
+PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'actframes')
 ASSET_EXT = {'mapprops': 'map', 'metatiles': 'meta', 'scenemaps': 'smap', 'scenemeta': 'smeta', 'scenebg3': 'bg3',
-             'scenepal': 'spal'}
+             'scenepal': 'spal', 'actframes': 'afr'}
+
+
+def asset_dir(piece: str) -> str:
+    """The directory under build/assets/ of a piece kind's text."""
+    return 'actframes' if piece == 'actframes' else 'maps'
 
 
 def size_ok(kind: str, want: int | None, size: int) -> bool:
     """Whether a pack of `size` unpacked bytes is a piece of `kind`
-    (kind_of's size: exact; None: any whole number of colours)."""
+    (kind_of's size: exact; None: any whole number of colours for
+    scenepal, any size for actframes)."""
     if want is not None:
         return size == want
-    return size % 2 == 0
+    return kind == 'actframes' or size % 2 == 0
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
 
 
@@ -549,6 +570,10 @@ def check(rom: bytes, quiet: bool = True) -> list[str]:
     sys.path.insert(0, str(ROOT / 'tools'))
     import extract_data
     problems = []
+    if any(p['piece'] == 'actframes' for p in extract_data.read_manifest()):
+        import actframes
+        import battle
+        problems += actframes.reader_problems(battle.defines(ROOT))
     named = scene_named(rom)
     if named != SCENE_NAMED:
         problems.append(f'the scene headers name {named}, not SCENE_NAMED {SCENE_NAMED}')

@@ -72,6 +72,10 @@ How each piece's bytes are made (the manifest's `piece` column):
              text; built the same way. Counted as "maps".
   scenemaps, scenemeta, scenebg3, scenepal  the scene layer and palette
              packs the scene headers name (tools/maps.py), the same way.
+  actframes  a battle action-frame pack (BattleRom_PcAttackFrames/
+             ActFrames): build/assets/actframes/<label>.afr (tools/
+             actframes.py, placed through tools/maps.py), the same way.
+             Counted as "action frames".
   fx         the battle layer-effect scripts with their table
              (tools/scripts.py's FX_ROWS): build/assets/fx/<label>.bfx; the
              build assembles it to build/fx/<label>.bin, which is incbin'd.
@@ -184,7 +188,7 @@ SPRITES_PREFIX = '../../build/sprites/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
-          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal',
+          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'actframes',
           'graphics', 'sprframes', 'animframes', 'animtimes', 'drawlist')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
@@ -193,7 +197,7 @@ EVENTS_ASSET = re.compile(r'^events/([A-Za-z_][A-Za-z0-9_]*)\.evt$')
 EVENTS_OUT = Path('build/events')      # the assembled (unpacked) event scripts (tools/build_rom.py)
 EVENT_PACK = re.compile(r'\bvia Evt_PackPtrs\[')
 BATTLE_ASSET = re.compile(r'^battle/([a-z]+)\.bscr$')
-MAPS_ASSET = re.compile(r'^maps/([A-Za-z_][A-Za-z0-9_]*)\.([a-z0-9]+)$')
+MAPS_ASSET = re.compile(r'^([a-z]+)/([A-Za-z_][A-Za-z0-9_]*)\.([a-z0-9]+)$')
 SCENE_ASSET = re.compile(r'^scene/([A-Za-z_][A-Za-z0-9_]*)\.scn$')
 SCENE_PACK = re.compile(r'\bvia C2SceneRom_ScriptPacks\[')
 GFX_ASSET = re.compile(r'^gfx/([A-Za-z_][A-Za-z0-9_]*)\.png$')
@@ -403,7 +407,7 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
         elif piece == 'scene':
             asset = f'scene/{label}.scn'
         elif piece in maps.PIECES:
-            asset = f'maps/{label}.{maps.ASSET_EXT[piece]}'
+            asset = f'{maps.asset_dir(piece)}/{label}.{maps.ASSET_EXT[piece]}'
         elif piece == 'fx':
             asset = f'fx/{label}.bfx'
         elif piece == 'graphics':
@@ -539,9 +543,9 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
                                 f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] in maps.PIECES:
             m = MAPS_ASSET.match(p['asset'])
-            if not m or m.group(1) != p['label'] or m.group(2) != maps.ASSET_EXT[p['piece']] \
-                    or not PACK_PARAM.match(p['param']):
-                problems.append(f'{where}: a {p["piece"]} piece\'s asset is maps/<label>.'
+            if not m or m.group(1) != maps.asset_dir(p['piece']) or m.group(2) != p['label'] \
+                    or m.group(3) != maps.ASSET_EXT[p['piece']] or not PACK_PARAM.match(p['param']):
+                problems.append(f'{where}: a {p["piece"]} piece\'s asset is {maps.asset_dir(p["piece"])}/<label>.'
                                 f'{maps.ASSET_EXT[p["piece"]]} and its param "lzNN -> N B": {p["asset"]!r}, '
                                 f'{p["param"]!r}')
         elif p['piece'] == 'scene':
@@ -803,6 +807,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene layer data')
         elif p['piece'] == 'metatiles':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, metatiles')
+        elif p['piece'] == 'actframes':
+            out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, battle action frames')
         elif p['piece'] == 'fx':
             out.append(f'    incbin "{FX_PREFIX}{p["label"]}.bin"          ; layer-effect scripts')
         elif p['piece'] == 'graphics':
@@ -917,7 +923,7 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
-    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'sprites.py', 'anims.py',
+    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'actframes.py', 'sprites.py', 'anims.py',
                  'drawlists.py', 'absint.py', 'disasm.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()

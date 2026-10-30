@@ -867,6 +867,30 @@ colours it holds and that they reach CGRAM. Each count is re-derived by `check`.
     1, 2 and 11-17 (no header names them; script loads are not traced), and 18
     (`C2Scene_UnkC600Pack`, whose use is not traced).
 
+## Battle action frames as text
+
+On the `data-tables-4` branch, second commit. `tools/actframes.py` gives the 128 packs that
+`BattleRom_PcAttackFrames`/`ActFrames` point at (13,857 B packed) a readable form in
+`build/assets/actframes/`. `tools/maps.py` places them with its other packed text pieces (piece
+`actframes`); the build assembles and packs them, and verify counts them as "action frames".
+
+- **The reader.** `BattleAct_LoadCommon` unpacks a pack into `Battle_ActFrameBuf` and stores two
+  zero bytes after it. `BattleAct_UnpackFrames`, which it calls 8 times, builds
+  `Battle_ActFramesPerCall` (4) frames per call:
+  - a header byte: bits 0-3 are the row count; bits 4-7 are kept in DP `$80` but never read; 0 ends
+    the data;
+  - one mask per row, bit 7 = column 0, `Battle_ActFrameCols` columns;
+  - a tile byte and an attribute byte per set bit (a 16x16 sprite at column x 16, row x 16);
+  - 2 bytes it skips.
+- **The extent** is the reader's: frames up to the end of the unpacked data, where the appended
+  zero stops it.
+  - 119 packs end exactly there; 9 are empty.
+  - Extraction refuses a 0 header inside the data, a frame that runs past the data, and more than
+    32 frames (8 calls x 4).
+  - `actframes.reader_problems` checks those constants and the number of calls against the source.
+- **The text:** per frame its row count and the header's high nibble, per row `column=tile/attr`
+  (or `-`), and the skipped bytes.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed

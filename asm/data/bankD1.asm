@@ -158,769 +158,769 @@ BattleRom_ActFrames:
 ; Read by BattleAct_LoadCommon.
 org $D10100
 ActFramesPack_000:
-    incbin "../../build/packs/ActFramesPack_000.lz"          ; lz11 -> 101 B
+    incbin "../../build/packs/ActFramesPack_000.lz"          ; lz11 -> 101 B, battle action frames
 
 ; $D1:015B-$D1:01B9 (95 B), packed_lz, confirmed: lz11 -> 106 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1015B
 ActFramesPack_001:
-    incbin "../../build/packs/ActFramesPack_001.lz"          ; lz11 -> 106 B
+    incbin "../../build/packs/ActFramesPack_001.lz"          ; lz11 -> 106 B, battle action frames
 
 ; $D1:01BA-$D1:0226 (109 B), packed_lz, confirmed: lz11 -> 140 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D101BA
 ActFramesPack_002:
-    incbin "../../build/packs/ActFramesPack_002.lz"          ; lz11 -> 140 B
+    incbin "../../build/packs/ActFramesPack_002.lz"          ; lz11 -> 140 B, battle action frames
 
 ; $D1:0227-$D1:029A (116 B), packed_lz, confirmed: lz11 -> 127 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10227
 ActFramesPack_003:
-    incbin "../../build/packs/ActFramesPack_003.lz"          ; lz11 -> 127 B
+    incbin "../../build/packs/ActFramesPack_003.lz"          ; lz11 -> 127 B, battle action frames
 
 ; $D1:029B-$D1:02E1 (71 B), packed_lz, confirmed: lz11 -> 70 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1029B
 ActFramesPack_004:
-    incbin "../../build/packs/ActFramesPack_004.lz"          ; lz11 -> 70 B
+    incbin "../../build/packs/ActFramesPack_004.lz"          ; lz11 -> 70 B, battle action frames
 
 ; $D1:02E2-$D1:031C (59 B), packed_lz, confirmed: lz11 -> 84 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D102E2
 ActFramesPack_005:
-    incbin "../../build/packs/ActFramesPack_005.lz"          ; lz11 -> 84 B
+    incbin "../../build/packs/ActFramesPack_005.lz"          ; lz11 -> 84 B, battle action frames
 
 ; $D1:031D-$D1:03C8 (172 B), packed_lz, confirmed: lz11 -> 198 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1031D
 ActFramesPack_006:
-    incbin "../../build/packs/ActFramesPack_006.lz"          ; lz11 -> 198 B
+    incbin "../../build/packs/ActFramesPack_006.lz"          ; lz11 -> 198 B, battle action frames
 
 ; $D1:03C9-$D1:043E (118 B), packed_lz, confirmed: lz11 -> 198 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D103C9
 ActFramesPack_007:
-    incbin "../../build/packs/ActFramesPack_007.lz"          ; lz11 -> 198 B
+    incbin "../../build/packs/ActFramesPack_007.lz"          ; lz11 -> 198 B, battle action frames
 
 ; $D1:043F-$D1:04AF (113 B), packed_lz, confirmed: lz11 -> 113 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1043F
 ActFramesPack_008:
-    incbin "../../build/packs/ActFramesPack_008.lz"          ; lz11 -> 113 B
+    incbin "../../build/packs/ActFramesPack_008.lz"          ; lz11 -> 113 B, battle action frames
 
 ; $D1:04B0-$D1:04FB (76 B), packed_lz, confirmed: lz11 -> 88 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D104B0
 ActFramesPack_009:
-    incbin "../../build/packs/ActFramesPack_009.lz"          ; lz11 -> 88 B
+    incbin "../../build/packs/ActFramesPack_009.lz"          ; lz11 -> 88 B, battle action frames
 
 ; $D1:04FC-$D1:0553 (88 B), packed_lz, confirmed: lz11 -> 107 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D104FC
 ActFramesPack_010:
-    incbin "../../build/packs/ActFramesPack_010.lz"          ; lz11 -> 107 B
+    incbin "../../build/packs/ActFramesPack_010.lz"          ; lz11 -> 107 B, battle action frames
 
 ; $D1:0554-$D1:058B (56 B), packed_lz, confirmed: lz11 -> 78 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10554
 ActFramesPack_011:
-    incbin "../../build/packs/ActFramesPack_011.lz"          ; lz11 -> 78 B
+    incbin "../../build/packs/ActFramesPack_011.lz"          ; lz11 -> 78 B, battle action frames
 
 ; $D1:058C-$D1:0691 (262 B), packed_lz, confirmed: lz11 -> 273 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1058C
 ActFramesPack_012:
-    incbin "../../build/packs/ActFramesPack_012.lz"          ; lz11 -> 273 B
+    incbin "../../build/packs/ActFramesPack_012.lz"          ; lz11 -> 273 B, battle action frames
 
 ; $D1:0692-$D1:073A (169 B), packed_lz, confirmed: lz11 -> 238 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10692
 ActFramesPack_013:
-    incbin "../../build/packs/ActFramesPack_013.lz"          ; lz11 -> 238 B
+    incbin "../../build/packs/ActFramesPack_013.lz"          ; lz11 -> 238 B, battle action frames
 
 ; $D1:073B-$D1:079E (100 B), packed_lz, confirmed: lz11 -> 126 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1073B
 ActFramesPack_014:
-    incbin "../../build/packs/ActFramesPack_014.lz"          ; lz11 -> 126 B
+    incbin "../../build/packs/ActFramesPack_014.lz"          ; lz11 -> 126 B, battle action frames
 
 ; $D1:079F-$D1:0824 (134 B), packed_lz, confirmed: lz11 -> 165 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1079F
 ActFramesPack_015:
-    incbin "../../build/packs/ActFramesPack_015.lz"          ; lz11 -> 165 B
+    incbin "../../build/packs/ActFramesPack_015.lz"          ; lz11 -> 165 B, battle action frames
 
 ; $D1:0825-$D1:0892 (110 B), packed_lz, confirmed: lz11 -> 140 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10825
 ActFramesPack_016:
-    incbin "../../build/packs/ActFramesPack_016.lz"          ; lz11 -> 140 B
+    incbin "../../build/packs/ActFramesPack_016.lz"          ; lz11 -> 140 B, battle action frames
 
 ; $D1:0893-$D1:091B (137 B), packed_lz, confirmed: lz11 -> 205 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10893
 ActFramesPack_017:
-    incbin "../../build/packs/ActFramesPack_017.lz"          ; lz11 -> 205 B
+    incbin "../../build/packs/ActFramesPack_017.lz"          ; lz11 -> 205 B, battle action frames
 
 ; $D1:091C-$D1:095D (66 B), packed_lz, confirmed: lz11 -> 80 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1091C
 ActFramesPack_018:
-    incbin "../../build/packs/ActFramesPack_018.lz"          ; lz11 -> 80 B
+    incbin "../../build/packs/ActFramesPack_018.lz"          ; lz11 -> 80 B, battle action frames
 
 ; $D1:095E-$D1:09C5 (104 B), packed_lz, confirmed: lz11 -> 126 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1095E
 ActFramesPack_019:
-    incbin "../../build/packs/ActFramesPack_019.lz"          ; lz11 -> 126 B
+    incbin "../../build/packs/ActFramesPack_019.lz"          ; lz11 -> 126 B, battle action frames
 
 ; $D1:09C6-$D1:0A48 (131 B), packed_lz, confirmed: lz11 -> 180 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D109C6
 ActFramesPack_020:
-    incbin "../../build/packs/ActFramesPack_020.lz"          ; lz11 -> 180 B
+    incbin "../../build/packs/ActFramesPack_020.lz"          ; lz11 -> 180 B, battle action frames
 
 ; $D1:0A49-$D1:0AAF (103 B), packed_lz, confirmed: lz11 -> 115 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10A49
 ActFramesPack_021:
-    incbin "../../build/packs/ActFramesPack_021.lz"          ; lz11 -> 115 B
+    incbin "../../build/packs/ActFramesPack_021.lz"          ; lz11 -> 115 B, battle action frames
 
 ; $D1:0AB0-$D1:0B28 (121 B), packed_lz, confirmed: lz11 -> 156 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10AB0
 ActFramesPack_022:
-    incbin "../../build/packs/ActFramesPack_022.lz"          ; lz11 -> 156 B
+    incbin "../../build/packs/ActFramesPack_022.lz"          ; lz11 -> 156 B, battle action frames
 
 ; $D1:0B29-$D1:0BB4 (140 B), packed_lz, confirmed: lz11 -> 184 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10B29
 ActFramesPack_023:
-    incbin "../../build/packs/ActFramesPack_023.lz"          ; lz11 -> 184 B
+    incbin "../../build/packs/ActFramesPack_023.lz"          ; lz11 -> 184 B, battle action frames
 
 ; $D1:0BB5-$D1:0CEC (312 B), packed_lz, confirmed: lz11 -> 375 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10BB5
 ActFramesPack_024:
-    incbin "../../build/packs/ActFramesPack_024.lz"          ; lz11 -> 375 B
+    incbin "../../build/packs/ActFramesPack_024.lz"          ; lz11 -> 375 B, battle action frames
 
 ; $D1:0CED-$D1:0D79 (141 B), packed_lz, confirmed: lz11 -> 156 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10CED
 ActFramesPack_025:
-    incbin "../../build/packs/ActFramesPack_025.lz"          ; lz11 -> 156 B
+    incbin "../../build/packs/ActFramesPack_025.lz"          ; lz11 -> 156 B, battle action frames
 
 ; $D1:0D7A-$D1:0DB6 (61 B), packed_lz, confirmed: lz11 -> 126 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10D7A
 ActFramesPack_026:
-    incbin "../../build/packs/ActFramesPack_026.lz"          ; lz11 -> 126 B
+    incbin "../../build/packs/ActFramesPack_026.lz"          ; lz11 -> 126 B, battle action frames
 
 ; $D1:0DB7-$D1:0E30 (122 B), packed_lz, confirmed: lz11 -> 172 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10DB7
 ActFramesPack_027:
-    incbin "../../build/packs/ActFramesPack_027.lz"          ; lz11 -> 172 B
+    incbin "../../build/packs/ActFramesPack_027.lz"          ; lz11 -> 172 B, battle action frames
 
 ; $D1:0E31-$D1:0E91 (97 B), packed_lz, confirmed: lz11 -> 114 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10E31
 ActFramesPack_028:
-    incbin "../../build/packs/ActFramesPack_028.lz"          ; lz11 -> 114 B
+    incbin "../../build/packs/ActFramesPack_028.lz"          ; lz11 -> 114 B, battle action frames
 
 ; $D1:0E92-$D1:0F4B (186 B), packed_lz, confirmed: lz11 -> 235 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10E92
 ActFramesPack_029:
-    incbin "../../build/packs/ActFramesPack_029.lz"          ; lz11 -> 235 B
+    incbin "../../build/packs/ActFramesPack_029.lz"          ; lz11 -> 235 B, battle action frames
 
 ; $D1:0F4C-$D1:1037 (236 B), packed_lz, confirmed: lz11 -> 320 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D10F4C
 ActFramesPack_030:
-    incbin "../../build/packs/ActFramesPack_030.lz"          ; lz11 -> 320 B
+    incbin "../../build/packs/ActFramesPack_030.lz"          ; lz11 -> 320 B, battle action frames
 
 ; $D1:1038-$D1:10B3 (124 B), packed_lz, confirmed: lz11 -> 143 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11038
 ActFramesPack_031:
-    incbin "../../build/packs/ActFramesPack_031.lz"          ; lz11 -> 143 B
+    incbin "../../build/packs/ActFramesPack_031.lz"          ; lz11 -> 143 B, battle action frames
 
 ; $D1:10B4-$D1:111A (103 B), packed_lz, confirmed: lz11 -> 121 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D110B4
 ActFramesPack_032:
-    incbin "../../build/packs/ActFramesPack_032.lz"          ; lz11 -> 121 B
+    incbin "../../build/packs/ActFramesPack_032.lz"          ; lz11 -> 121 B, battle action frames
 
 ; $D1:111B-$D1:11BB (161 B), packed_lz, confirmed: lz11 -> 195 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1111B
 ActFramesPack_033:
-    incbin "../../build/packs/ActFramesPack_033.lz"          ; lz11 -> 195 B
+    incbin "../../build/packs/ActFramesPack_033.lz"          ; lz11 -> 195 B, battle action frames
 
 ; $D1:11BC-$D1:126F (180 B), packed_lz, confirmed: lz11 -> 248 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D111BC
 ActFramesPack_034:
-    incbin "../../build/packs/ActFramesPack_034.lz"          ; lz11 -> 248 B
+    incbin "../../build/packs/ActFramesPack_034.lz"          ; lz11 -> 248 B, battle action frames
 
 ; $D1:1270-$D1:1342 (211 B), packed_lz, confirmed: lz11 -> 232 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11270
 ActFramesPack_035:
-    incbin "../../build/packs/ActFramesPack_035.lz"          ; lz11 -> 232 B
+    incbin "../../build/packs/ActFramesPack_035.lz"          ; lz11 -> 232 B, battle action frames
 
 ; $D1:1343-$D1:13AB (105 B), packed_lz, confirmed: lz11 -> 112 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11343
 ActFramesPack_036:
-    incbin "../../build/packs/ActFramesPack_036.lz"          ; lz11 -> 112 B
+    incbin "../../build/packs/ActFramesPack_036.lz"          ; lz11 -> 112 B, battle action frames
 
 ; $D1:13AC-$D1:1430 (133 B), packed_lz, confirmed: lz11 -> 170 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D113AC
 ActFramesPack_037:
-    incbin "../../build/packs/ActFramesPack_037.lz"          ; lz11 -> 170 B
+    incbin "../../build/packs/ActFramesPack_037.lz"          ; lz11 -> 170 B, battle action frames
 
 ; $D1:1431-$D1:1487 (87 B), packed_lz, confirmed: lz11 -> 108 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11431
 ActFramesPack_038:
-    incbin "../../build/packs/ActFramesPack_038.lz"          ; lz11 -> 108 B
+    incbin "../../build/packs/ActFramesPack_038.lz"          ; lz11 -> 108 B, battle action frames
 
 ; $D1:1488-$D1:1565 (222 B), packed_lz, confirmed: lz11 -> 271 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11488
 ActFramesPack_039:
-    incbin "../../build/packs/ActFramesPack_039.lz"          ; lz11 -> 271 B
+    incbin "../../build/packs/ActFramesPack_039.lz"          ; lz11 -> 271 B, battle action frames
 
 ; $D1:1566-$D1:15C6 (97 B), packed_lz, confirmed: lz11 -> 104 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11566
 ActFramesPack_040:
-    incbin "../../build/packs/ActFramesPack_040.lz"          ; lz11 -> 104 B
+    incbin "../../build/packs/ActFramesPack_040.lz"          ; lz11 -> 104 B, battle action frames
 
 ; $D1:15C7-$D1:1658 (146 B), packed_lz, confirmed: lz11 -> 152 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D115C7
 ActFramesPack_041:
-    incbin "../../build/packs/ActFramesPack_041.lz"          ; lz11 -> 152 B
+    incbin "../../build/packs/ActFramesPack_041.lz"          ; lz11 -> 152 B, battle action frames
 
 ; $D1:1659-$D1:16BD (101 B), packed_lz, confirmed: lz11 -> 118 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11659
 ActFramesPack_042:
-    incbin "../../build/packs/ActFramesPack_042.lz"          ; lz11 -> 118 B
+    incbin "../../build/packs/ActFramesPack_042.lz"          ; lz11 -> 118 B, battle action frames
 
 ; $D1:16BE-$D1:1759 (156 B), packed_lz, confirmed: lz11 -> 180 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D116BE
 ActFramesPack_043:
-    incbin "../../build/packs/ActFramesPack_043.lz"          ; lz11 -> 180 B
+    incbin "../../build/packs/ActFramesPack_043.lz"          ; lz11 -> 180 B, battle action frames
 
 ; $D1:175A-$D1:182B (210 B), packed_lz, confirmed: lz11 -> 216 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1175A
 ActFramesPack_044:
-    incbin "../../build/packs/ActFramesPack_044.lz"          ; lz11 -> 216 B
+    incbin "../../build/packs/ActFramesPack_044.lz"          ; lz11 -> 216 B, battle action frames
 
 ; $D1:182C-$D1:18D8 (173 B), packed_lz, confirmed: lz11 -> 175 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1182C
 ActFramesPack_045:
-    incbin "../../build/packs/ActFramesPack_045.lz"          ; lz11 -> 175 B
+    incbin "../../build/packs/ActFramesPack_045.lz"          ; lz11 -> 175 B, battle action frames
 
 ; $D1:18D9-$D1:19B7 (223 B), packed_lz, confirmed: lz11 -> 286 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D118D9
 ActFramesPack_046:
-    incbin "../../build/packs/ActFramesPack_046.lz"          ; lz11 -> 286 B
+    incbin "../../build/packs/ActFramesPack_046.lz"          ; lz11 -> 286 B, battle action frames
 
 ; $D1:19B8-$D1:1A03 (76 B), packed_lz, confirmed: lz11 -> 79 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D119B8
 ActFramesPack_047:
-    incbin "../../build/packs/ActFramesPack_047.lz"          ; lz11 -> 79 B
+    incbin "../../build/packs/ActFramesPack_047.lz"          ; lz11 -> 79 B, battle action frames
 
 ; $D1:1A04-$D1:1A34 (49 B), packed_lz, confirmed: lz11 -> 50 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11A04
 ActFramesPack_048:
-    incbin "../../build/packs/ActFramesPack_048.lz"          ; lz11 -> 50 B
+    incbin "../../build/packs/ActFramesPack_048.lz"          ; lz11 -> 50 B, battle action frames
 
 ; $D1:1A35-$D1:1A65 (49 B), packed_lz, confirmed: lz11 -> 50 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11A35
 ActFramesPack_049:
-    incbin "../../build/packs/ActFramesPack_049.lz"          ; lz11 -> 50 B
+    incbin "../../build/packs/ActFramesPack_049.lz"          ; lz11 -> 50 B, battle action frames
 
 ; $D1:1A66-$D1:1ADD (120 B), packed_lz, confirmed: lz11 -> 152 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11A66
 ActFramesPack_050:
-    incbin "../../build/packs/ActFramesPack_050.lz"          ; lz11 -> 152 B
+    incbin "../../build/packs/ActFramesPack_050.lz"          ; lz11 -> 152 B, battle action frames
 
 ; $D1:1ADE-$D1:1B2C (79 B), packed_lz, confirmed: lz11 -> 87 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11ADE
 ActFramesPack_051:
-    incbin "../../build/packs/ActFramesPack_051.lz"          ; lz11 -> 87 B
+    incbin "../../build/packs/ActFramesPack_051.lz"          ; lz11 -> 87 B, battle action frames
 
 ; $D1:1B2D-$D1:1B45 (25 B), packed_lz, confirmed: lz11 -> 24 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11B2D
 ActFramesPack_052:
-    incbin "../../build/packs/ActFramesPack_052.lz"          ; lz11 -> 24 B
+    incbin "../../build/packs/ActFramesPack_052.lz"          ; lz11 -> 24 B, battle action frames
 
 ; $D1:1B46-$D1:1B6B (38 B), packed_lz, confirmed: lz11 -> 48 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11B46
 ActFramesPack_053:
-    incbin "../../build/packs/ActFramesPack_053.lz"          ; lz11 -> 48 B
+    incbin "../../build/packs/ActFramesPack_053.lz"          ; lz11 -> 48 B, battle action frames
 
 ; $D1:1B6C-$D1:1C98 (301 B), packed_lz, confirmed: lz11 -> 479 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11B6C
 ActFramesPack_054:
-    incbin "../../build/packs/ActFramesPack_054.lz"          ; lz11 -> 479 B
+    incbin "../../build/packs/ActFramesPack_054.lz"          ; lz11 -> 479 B, battle action frames
 
 ; $D1:1C99-$D1:1D0B (115 B), packed_lz, confirmed: lz11 -> 134 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11C99
 ActFramesPack_055:
-    incbin "../../build/packs/ActFramesPack_055.lz"          ; lz11 -> 134 B
+    incbin "../../build/packs/ActFramesPack_055.lz"          ; lz11 -> 134 B, battle action frames
 
 ; $D1:1D0C-$D1:1D24 (25 B), packed_lz, confirmed: lz11 -> 24 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11D0C
 ActFramesPack_056:
-    incbin "../../build/packs/ActFramesPack_056.lz"          ; lz11 -> 24 B
+    incbin "../../build/packs/ActFramesPack_056.lz"          ; lz11 -> 24 B, battle action frames
 
 ; $D1:1D25-$D1:1D55 (49 B), packed_lz, confirmed: lz11 -> 50 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11D25
 ActFramesPack_057:
-    incbin "../../build/packs/ActFramesPack_057.lz"          ; lz11 -> 50 B
+    incbin "../../build/packs/ActFramesPack_057.lz"          ; lz11 -> 50 B, battle action frames
 
 ; $D1:1D56-$D1:1D9A (69 B), packed_lz, confirmed: lz11 -> 102 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11D56
 ActFramesPack_058:
-    incbin "../../build/packs/ActFramesPack_058.lz"          ; lz11 -> 102 B
+    incbin "../../build/packs/ActFramesPack_058.lz"          ; lz11 -> 102 B, battle action frames
 
 ; $D1:1D9B-$D1:1E1E (132 B), packed_lz, confirmed: lz11 -> 173 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11D9B
 ActFramesPack_059:
-    incbin "../../build/packs/ActFramesPack_059.lz"          ; lz11 -> 173 B
+    incbin "../../build/packs/ActFramesPack_059.lz"          ; lz11 -> 173 B, battle action frames
 
 ; $D1:1E1F-$D1:1ED5 (183 B), packed_lz, confirmed: lz11 -> 198 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11E1F
 ActFramesPack_060:
-    incbin "../../build/packs/ActFramesPack_060.lz"          ; lz11 -> 198 B
+    incbin "../../build/packs/ActFramesPack_060.lz"          ; lz11 -> 198 B, battle action frames
 
 ; $D1:1ED6-$D1:1EEB (22 B), packed_lz, confirmed: lz11 -> 18 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11ED6
 ActFramesPack_061:
-    incbin "../../build/packs/ActFramesPack_061.lz"          ; lz11 -> 18 B
+    incbin "../../build/packs/ActFramesPack_061.lz"          ; lz11 -> 18 B, battle action frames
 
 ; $D1:1EEC-$D1:1F14 (41 B), packed_lz, confirmed: lz11 -> 48 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11EEC
 ActFramesPack_062:
-    incbin "../../build/packs/ActFramesPack_062.lz"          ; lz11 -> 48 B
+    incbin "../../build/packs/ActFramesPack_062.lz"          ; lz11 -> 48 B, battle action frames
 
 ; $D1:1F15-$D1:1F2D (25 B), packed_lz, confirmed: lz11 -> 24 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11F15
 ActFramesPack_063:
-    incbin "../../build/packs/ActFramesPack_063.lz"          ; lz11 -> 24 B
+    incbin "../../build/packs/ActFramesPack_063.lz"          ; lz11 -> 24 B, battle action frames
 
 ; $D1:1F2E-$D1:1F90 (99 B), packed_lz, confirmed: lz11 -> 110 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11F2E
 ActFramesPack_064:
-    incbin "../../build/packs/ActFramesPack_064.lz"          ; lz11 -> 110 B
+    incbin "../../build/packs/ActFramesPack_064.lz"          ; lz11 -> 110 B, battle action frames
 
 ; $D1:1F91-$D1:1FFA (106 B), packed_lz, confirmed: lz11 -> 122 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11F91
 ActFramesPack_065:
-    incbin "../../build/packs/ActFramesPack_065.lz"          ; lz11 -> 122 B
+    incbin "../../build/packs/ActFramesPack_065.lz"          ; lz11 -> 122 B, battle action frames
 
 ; $D1:1FFB-$D1:2163 (361 B), packed_lz, confirmed: lz11 -> 688 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D11FFB
 ActFramesPack_066:
-    incbin "../../build/packs/ActFramesPack_066.lz"          ; lz11 -> 688 B
+    incbin "../../build/packs/ActFramesPack_066.lz"          ; lz11 -> 688 B, battle action frames
 
 ; $D1:2164-$D1:21E7 (132 B), packed_lz, confirmed: lz11 -> 164 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12164
 ActFramesPack_067:
-    incbin "../../build/packs/ActFramesPack_067.lz"          ; lz11 -> 164 B
+    incbin "../../build/packs/ActFramesPack_067.lz"          ; lz11 -> 164 B, battle action frames
 
 ; $D1:21E8-$D1:2225 (62 B), packed_lz, confirmed: lz11 -> 98 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D121E8
 ActFramesPack_068:
-    incbin "../../build/packs/ActFramesPack_068.lz"          ; lz11 -> 98 B
+    incbin "../../build/packs/ActFramesPack_068.lz"          ; lz11 -> 98 B, battle action frames
 
 ; $D1:2226-$D1:2246 (33 B), packed_lz, confirmed: lz11 -> 30 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12226
 ActFramesPack_069:
-    incbin "../../build/packs/ActFramesPack_069.lz"          ; lz11 -> 30 B
+    incbin "../../build/packs/ActFramesPack_069.lz"          ; lz11 -> 30 B, battle action frames
 
 ; $D1:2247-$D1:2334 (238 B), packed_lz, confirmed: lz11 -> 310 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12247
 ActFramesPack_070:
-    incbin "../../build/packs/ActFramesPack_070.lz"          ; lz11 -> 310 B
+    incbin "../../build/packs/ActFramesPack_070.lz"          ; lz11 -> 310 B, battle action frames
 
 ; $D1:2335-$D1:238A (86 B), packed_lz, confirmed: lz11 -> 108 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12335
 ActFramesPack_071:
-    incbin "../../build/packs/ActFramesPack_071.lz"          ; lz11 -> 108 B
+    incbin "../../build/packs/ActFramesPack_071.lz"          ; lz11 -> 108 B, battle action frames
 
 ; $D1:238B-$D1:23F8 (110 B), packed_lz, confirmed: lz11 -> 119 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1238B
 ActFramesPack_072:
-    incbin "../../build/packs/ActFramesPack_072.lz"          ; lz11 -> 119 B
+    incbin "../../build/packs/ActFramesPack_072.lz"          ; lz11 -> 119 B, battle action frames
 
 ; $D1:23F9-$D1:248E (150 B), packed_lz, confirmed: lz11 -> 215 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D123F9
 ActFramesPack_073:
-    incbin "../../build/packs/ActFramesPack_073.lz"          ; lz11 -> 215 B
+    incbin "../../build/packs/ActFramesPack_073.lz"          ; lz11 -> 215 B, battle action frames
 
 ; $D1:248F-$D1:252F (161 B), packed_lz, confirmed: lz11 -> 169 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1248F
 ActFramesPack_074:
-    incbin "../../build/packs/ActFramesPack_074.lz"          ; lz11 -> 169 B
+    incbin "../../build/packs/ActFramesPack_074.lz"          ; lz11 -> 169 B, battle action frames
 
 ; $D1:2530-$D1:255F (48 B), packed_lz, confirmed: lz11 -> 66 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12530
 ActFramesPack_075:
-    incbin "../../build/packs/ActFramesPack_075.lz"          ; lz11 -> 66 B
+    incbin "../../build/packs/ActFramesPack_075.lz"          ; lz11 -> 66 B, battle action frames
 
 ; $D1:2560-$D1:2591 (50 B), packed_lz, confirmed: lz11 -> 39 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12560
 ActFramesPack_076:
-    incbin "../../build/packs/ActFramesPack_076.lz"          ; lz11 -> 39 B
+    incbin "../../build/packs/ActFramesPack_076.lz"          ; lz11 -> 39 B, battle action frames
 
 ; $D1:2592-$D1:25C8 (55 B), packed_lz, confirmed: lz11 -> 62 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12592
 ActFramesPack_077:
-    incbin "../../build/packs/ActFramesPack_077.lz"          ; lz11 -> 62 B
+    incbin "../../build/packs/ActFramesPack_077.lz"          ; lz11 -> 62 B, battle action frames
 
 ; $D1:25C9-$D1:263C (116 B), packed_lz, confirmed: lz11 -> 158 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D125C9
 ActFramesPack_078:
-    incbin "../../build/packs/ActFramesPack_078.lz"          ; lz11 -> 158 B
+    incbin "../../build/packs/ActFramesPack_078.lz"          ; lz11 -> 158 B, battle action frames
 
 ; $D1:263D-$D1:268D (81 B), packed_lz, confirmed: lz11 -> 110 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1263D
 ActFramesPack_079:
-    incbin "../../build/packs/ActFramesPack_079.lz"          ; lz11 -> 110 B
+    incbin "../../build/packs/ActFramesPack_079.lz"          ; lz11 -> 110 B, battle action frames
 
 ; $D1:268E-$D1:26C3 (54 B), packed_lz, confirmed: lz11 -> 52 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1268E
 ActFramesPack_080:
-    incbin "../../build/packs/ActFramesPack_080.lz"          ; lz11 -> 52 B
+    incbin "../../build/packs/ActFramesPack_080.lz"          ; lz11 -> 52 B, battle action frames
 
 ; $D1:26C4-$D1:2745 (130 B), packed_lz, confirmed: lz11 -> 131 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D126C4
 ActFramesPack_081:
-    incbin "../../build/packs/ActFramesPack_081.lz"          ; lz11 -> 131 B
+    incbin "../../build/packs/ActFramesPack_081.lz"          ; lz11 -> 131 B, battle action frames
 
 ; $D1:2746-$D1:27BD (120 B), packed_lz, confirmed: lz11 -> 137 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12746
 ActFramesPack_082:
-    incbin "../../build/packs/ActFramesPack_082.lz"          ; lz11 -> 137 B
+    incbin "../../build/packs/ActFramesPack_082.lz"          ; lz11 -> 137 B, battle action frames
 
 ; $D1:27BE-$D1:2817 (90 B), packed_lz, confirmed: lz11 -> 111 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D127BE
 ActFramesPack_083:
-    incbin "../../build/packs/ActFramesPack_083.lz"          ; lz11 -> 111 B
+    incbin "../../build/packs/ActFramesPack_083.lz"          ; lz11 -> 111 B, battle action frames
 
 ; $D1:2818-$D1:2879 (98 B), packed_lz, confirmed: lz11 -> 130 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12818
 ActFramesPack_084:
-    incbin "../../build/packs/ActFramesPack_084.lz"          ; lz11 -> 130 B
+    incbin "../../build/packs/ActFramesPack_084.lz"          ; lz11 -> 130 B, battle action frames
 
 ; $D1:287A-$D1:2947 (206 B), packed_lz, confirmed: lz11 -> 288 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1287A
 ActFramesPack_085:
-    incbin "../../build/packs/ActFramesPack_085.lz"          ; lz11 -> 288 B
+    incbin "../../build/packs/ActFramesPack_085.lz"          ; lz11 -> 288 B, battle action frames
 
 ; $D1:2948-$D1:29FD (182 B), packed_lz, confirmed: lz11 -> 223 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12948
 ActFramesPack_086:
-    incbin "../../build/packs/ActFramesPack_086.lz"          ; lz11 -> 223 B
+    incbin "../../build/packs/ActFramesPack_086.lz"          ; lz11 -> 223 B, battle action frames
 
 ; $D1:29FE-$D1:2AB4 (183 B), packed_lz, confirmed: lz11 -> 228 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D129FE
 ActFramesPack_087:
-    incbin "../../build/packs/ActFramesPack_087.lz"          ; lz11 -> 228 B
+    incbin "../../build/packs/ActFramesPack_087.lz"          ; lz11 -> 228 B, battle action frames
 
 ; $D1:2AB5-$D1:2B5F (171 B), packed_lz, confirmed: lz11 -> 231 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12AB5
 ActFramesPack_088:
-    incbin "../../build/packs/ActFramesPack_088.lz"          ; lz11 -> 231 B
+    incbin "../../build/packs/ActFramesPack_088.lz"          ; lz11 -> 231 B, battle action frames
 
 ; $D1:2B60-$D1:2B9F (64 B), packed_lz, confirmed: lz11 -> 96 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12B60
 ActFramesPack_089:
-    incbin "../../build/packs/ActFramesPack_089.lz"          ; lz11 -> 96 B
+    incbin "../../build/packs/ActFramesPack_089.lz"          ; lz11 -> 96 B, battle action frames
 
 ; $D1:2BA0-$D1:2BBE (31 B), packed_lz, confirmed: lz11 -> 27 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12BA0
 ActFramesPack_090:
-    incbin "../../build/packs/ActFramesPack_090.lz"          ; lz11 -> 27 B
+    incbin "../../build/packs/ActFramesPack_090.lz"          ; lz11 -> 27 B, battle action frames
 
 ; $D1:2BBF-$D1:2C0F (81 B), packed_lz, confirmed: lz11 -> 117 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12BBF
 ActFramesPack_091:
-    incbin "../../build/packs/ActFramesPack_091.lz"          ; lz11 -> 117 B
+    incbin "../../build/packs/ActFramesPack_091.lz"          ; lz11 -> 117 B, battle action frames
 
 ; $D1:2C10-$D1:2C73 (100 B), packed_lz, confirmed: lz11 -> 131 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12C10
 ActFramesPack_092:
-    incbin "../../build/packs/ActFramesPack_092.lz"          ; lz11 -> 131 B
+    incbin "../../build/packs/ActFramesPack_092.lz"          ; lz11 -> 131 B, battle action frames
 
 ; $D1:2C74-$D1:2CD4 (97 B), packed_lz, confirmed: lz11 -> 104 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12C74
 ActFramesPack_093:
-    incbin "../../build/packs/ActFramesPack_093.lz"          ; lz11 -> 104 B
+    incbin "../../build/packs/ActFramesPack_093.lz"          ; lz11 -> 104 B, battle action frames
 
 ; $D1:2CD5-$D1:2D3A (102 B), packed_lz, confirmed: lz11 -> 111 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12CD5
 ActFramesPack_094:
-    incbin "../../build/packs/ActFramesPack_094.lz"          ; lz11 -> 111 B
+    incbin "../../build/packs/ActFramesPack_094.lz"          ; lz11 -> 111 B, battle action frames
 
 ; $D1:2D3B-$D1:2DDB (161 B), packed_lz, confirmed: lz11 -> 195 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12D3B
 ActFramesPack_095:
-    incbin "../../build/packs/ActFramesPack_095.lz"          ; lz11 -> 195 B
+    incbin "../../build/packs/ActFramesPack_095.lz"          ; lz11 -> 195 B, battle action frames
 
 ; $D1:2DDC-$D1:2E2C (81 B), packed_lz, confirmed: lz11 -> 94 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12DDC
 ActFramesPack_096:
-    incbin "../../build/packs/ActFramesPack_096.lz"          ; lz11 -> 94 B
+    incbin "../../build/packs/ActFramesPack_096.lz"          ; lz11 -> 94 B, battle action frames
 
 ; $D1:2E2D-$D1:2E82 (86 B), packed_lz, confirmed: lz11 -> 76 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12E2D
 ActFramesPack_097:
-    incbin "../../build/packs/ActFramesPack_097.lz"          ; lz11 -> 76 B
+    incbin "../../build/packs/ActFramesPack_097.lz"          ; lz11 -> 76 B, battle action frames
 
 ; $D1:2E83-$D1:2F3B (185 B), packed_lz, confirmed: lz11 -> 280 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12E83
 ActFramesPack_098:
-    incbin "../../build/packs/ActFramesPack_098.lz"          ; lz11 -> 280 B
+    incbin "../../build/packs/ActFramesPack_098.lz"          ; lz11 -> 280 B, battle action frames
 
 ; $D1:2F3C-$D1:2F5D (34 B), packed_lz, confirmed: lz11 -> 36 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12F3C
 ActFramesPack_099:
-    incbin "../../build/packs/ActFramesPack_099.lz"          ; lz11 -> 36 B
+    incbin "../../build/packs/ActFramesPack_099.lz"          ; lz11 -> 36 B, battle action frames
 
 ; $D1:2F5E-$D1:2F87 (42 B), packed_lz, confirmed: lz11 -> 44 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12F5E
 ActFramesPack_100:
-    incbin "../../build/packs/ActFramesPack_100.lz"          ; lz11 -> 44 B
+    incbin "../../build/packs/ActFramesPack_100.lz"          ; lz11 -> 44 B, battle action frames
 
 ; $D1:2F88-$D1:3037 (176 B), packed_lz, confirmed: lz11 -> 194 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D12F88
 ActFramesPack_101:
-    incbin "../../build/packs/ActFramesPack_101.lz"          ; lz11 -> 194 B
+    incbin "../../build/packs/ActFramesPack_101.lz"          ; lz11 -> 194 B, battle action frames
 
 ; $D1:3038-$D1:308F (88 B), packed_lz, confirmed: lz11 -> 86 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13038
 ActFramesPack_102:
-    incbin "../../build/packs/ActFramesPack_102.lz"          ; lz11 -> 86 B
+    incbin "../../build/packs/ActFramesPack_102.lz"          ; lz11 -> 86 B, battle action frames
 
 ; $D1:3090-$D1:30BB (44 B), packed_lz, confirmed: lz11 -> 48 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13090
 ActFramesPack_103:
-    incbin "../../build/packs/ActFramesPack_103.lz"          ; lz11 -> 48 B
+    incbin "../../build/packs/ActFramesPack_103.lz"          ; lz11 -> 48 B, battle action frames
 
 ; $D1:30BC-$D1:3101 (70 B), packed_lz, confirmed: lz11 -> 95 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D130BC
 ActFramesPack_104:
-    incbin "../../build/packs/ActFramesPack_104.lz"          ; lz11 -> 95 B
+    incbin "../../build/packs/ActFramesPack_104.lz"          ; lz11 -> 95 B, battle action frames
 
 ; $D1:3102-$D1:3142 (65 B), packed_lz, confirmed: lz11 -> 67 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13102
 ActFramesPack_105:
-    incbin "../../build/packs/ActFramesPack_105.lz"          ; lz11 -> 67 B
+    incbin "../../build/packs/ActFramesPack_105.lz"          ; lz11 -> 67 B, battle action frames
 
 ; $D1:3143-$D1:31AF (109 B), packed_lz, confirmed: lz11 -> 92 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13143
 ActFramesPack_106:
-    incbin "../../build/packs/ActFramesPack_106.lz"          ; lz11 -> 92 B
+    incbin "../../build/packs/ActFramesPack_106.lz"          ; lz11 -> 92 B, battle action frames
 
 ; $D1:31B0-$D1:3266 (183 B), packed_lz, confirmed: lz11 -> 285 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D131B0
 ActFramesPack_107:
-    incbin "../../build/packs/ActFramesPack_107.lz"          ; lz11 -> 285 B
+    incbin "../../build/packs/ActFramesPack_107.lz"          ; lz11 -> 285 B, battle action frames
 
 ; $D1:3267-$D1:32DE (120 B), packed_lz, confirmed: lz11 -> 140 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13267
 ActFramesPack_108:
-    incbin "../../build/packs/ActFramesPack_108.lz"          ; lz11 -> 140 B
+    incbin "../../build/packs/ActFramesPack_108.lz"          ; lz11 -> 140 B, battle action frames
 
 ; $D1:32DF-$D1:3330 (82 B), packed_lz, confirmed: lz11 -> 80 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D132DF
 ActFramesPack_109:
-    incbin "../../build/packs/ActFramesPack_109.lz"          ; lz11 -> 80 B
+    incbin "../../build/packs/ActFramesPack_109.lz"          ; lz11 -> 80 B, battle action frames
 
 ; $D1:3331-$D1:3388 (88 B), packed_lz, confirmed: lz11 -> 96 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13331
 ActFramesPack_110:
-    incbin "../../build/packs/ActFramesPack_110.lz"          ; lz11 -> 96 B
+    incbin "../../build/packs/ActFramesPack_110.lz"          ; lz11 -> 96 B, battle action frames
 
 ; $D1:3389-$D1:33C1 (57 B), packed_lz, confirmed: lz11 -> 48 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13389
 ActFramesPack_111:
-    incbin "../../build/packs/ActFramesPack_111.lz"          ; lz11 -> 48 B
+    incbin "../../build/packs/ActFramesPack_111.lz"          ; lz11 -> 48 B, battle action frames
 
 ; $D1:33C2-$D1:3449 (136 B), packed_lz, confirmed: lz11 -> 136 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D133C2
 ActFramesPack_112:
-    incbin "../../build/packs/ActFramesPack_112.lz"          ; lz11 -> 136 B
+    incbin "../../build/packs/ActFramesPack_112.lz"          ; lz11 -> 136 B, battle action frames
 
 ; $D1:344A-$D1:3485 (60 B), packed_lz, confirmed: lz11 -> 59 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D1344A
 ActFramesPack_113:
-    incbin "../../build/packs/ActFramesPack_113.lz"          ; lz11 -> 59 B
+    incbin "../../build/packs/ActFramesPack_113.lz"          ; lz11 -> 59 B, battle action frames
 
 ; $D1:3486-$D1:3568 (227 B), packed_lz, confirmed: lz11 -> 208 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13486
 ActFramesPack_114:
-    incbin "../../build/packs/ActFramesPack_114.lz"          ; lz11 -> 208 B
+    incbin "../../build/packs/ActFramesPack_114.lz"          ; lz11 -> 208 B, battle action frames
 
 ; $D1:3569-$D1:35C1 (89 B), packed_lz, confirmed: lz11 -> 94 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13569
 ActFramesPack_115:
-    incbin "../../build/packs/ActFramesPack_115.lz"          ; lz11 -> 94 B
+    incbin "../../build/packs/ActFramesPack_115.lz"          ; lz11 -> 94 B, battle action frames
 
 ; $D1:35C2-$D1:3601 (64 B), packed_lz, confirmed: lz11 -> 94 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D135C2
 ActFramesPack_116:
-    incbin "../../build/packs/ActFramesPack_116.lz"          ; lz11 -> 94 B
+    incbin "../../build/packs/ActFramesPack_116.lz"          ; lz11 -> 94 B, battle action frames
 
 ; $D1:3602-$D1:36DC (219 B), packed_lz, confirmed: lz11 -> 224 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D13602
 ActFramesPack_117:
-    incbin "../../build/packs/ActFramesPack_117.lz"          ; lz11 -> 224 B
+    incbin "../../build/packs/ActFramesPack_117.lz"          ; lz11 -> 224 B, battle action frames
 
 ; $D1:36DD-$D1:3705 (41 B), packed_lz, confirmed: lz11 -> 39 B: battle action sprite frames
 ; Read by BattleAct_LoadCommon.
 org $D136DD
 ActFramesPack_118:
-    incbin "../../build/packs/ActFramesPack_118.lz"          ; lz11 -> 39 B
+    incbin "../../build/packs/ActFramesPack_118.lz"          ; lz11 -> 39 B, battle action frames
 
 ; $D1:3706-$D1:3708 (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D13706
 ActFramesPack_119:
-    incbin "../../build/packs/ActFramesPack_119.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_119.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:3709-$D1:370B (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D13709
 ActFramesPack_120:
-    incbin "../../build/packs/ActFramesPack_120.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_120.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:370C-$D1:370E (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D1370C
 ActFramesPack_121:
-    incbin "../../build/packs/ActFramesPack_121.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_121.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:370F-$D1:3711 (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D1370F
 ActFramesPack_122:
-    incbin "../../build/packs/ActFramesPack_122.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_122.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:3712-$D1:3714 (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D13712
 ActFramesPack_123:
-    incbin "../../build/packs/ActFramesPack_123.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_123.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:3715-$D1:3717 (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D13715
 ActFramesPack_124:
-    incbin "../../build/packs/ActFramesPack_124.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_124.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:3718-$D1:371A (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D13718
 ActFramesPack_125:
-    incbin "../../build/packs/ActFramesPack_125.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_125.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:371B-$D1:371D (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D1371B
 ActFramesPack_126:
-    incbin "../../build/packs/ActFramesPack_126.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_126.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:371E-$D1:3720 (3 B), packed_lz, confirmed: lz12 -> 0 B: empty pack
 ; Read by BattleAct_LoadCommon.
 org $D1371E
 ActFramesPack_127:
-    incbin "../../build/packs/ActFramesPack_127.lz"          ; lz12 -> 0 B
+    incbin "../../build/packs/ActFramesPack_127.lz"          ; lz12 -> 0 B, battle action frames
 
 ; $D1:3721-$D1:38F0 (464 B), padding, confirmed: 464 x $00
 org $D13721
