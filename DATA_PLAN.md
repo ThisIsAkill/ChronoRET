@@ -544,13 +544,39 @@ source.
     action data, so they are kept as data: probably scripts no longer used.
   - The routines trusted without being followed (`TRUST`), with the opcodes that call them:
     `C2Anim_Run` (scene `$31`, `$39`, `$3F`, `$40`: the animation script's handlers, by an
-    opcode in other data; ops 0-2 can write any task record byte their operand names, which an
-    animation script could aim at the script pointer's record copy: not checked); through
-    `$34`/`$4E`, the scene routines that unpack with `Decomp_ToWram` (its destination given and
-    length the pack's: a pack longer than the room to the bank's end is not ruled out), that build
-    window tables with the `$C3` window routines, and `C2Scene_ZoneSoundAtEntry` (the audio
-    driver's wait on the APU); fx `$8B` (`BattleCD_FxOpDrawShape`, the shape handler from RAM)
-    and `$B5` (`BattleCE_RunCopyWords`, the copy entry from DP `$4B`).
+    opcode in other data); through `$34`/`$4E`, the scene routines that unpack with
+    `Decomp_ToWram`, that build window tables with the `$C3` window routines, and
+    `C2Scene_ZoneSoundAtEntry` (the audio driver's wait on the APU); fx `$8B`
+    (`BattleCD_FxOpDrawShape`, the shape handler from RAM) and `$B5` (`BattleCE_RunCopyWords`,
+    the copy entry from DP `$4B`). `check` now locks three of their reasons:
+    - **Animation ops.** The animation scripts are read with the same interpreter (`AnimLang`,
+      `C2Anim_OpTable`; `.AnimTimer` taken as 0 when an op starts, as `C2Scene_SetAnim` and the
+      timed ops leave it, so a 0 duration holds). They are the 161 that `C2SceneRom_AnimTable`
+      names, the two in bank `$C2` (`C2Scene_AnimLeaderMarker`, `C2Scene_AnimObjAMarker`), and
+      the one in RAM at `C2Scene_Unk8600`.
+      - Running each handler with several operands shows which ops write the record byte
+        their operand names (ops 0-2).
+      - None of them, in any reachable script, names `.ScriptReturn`-`.ScriptBank`
+        (`+$05`-`$09`) or `.AnimTimer` (`+$0E`): they name only `+$26`. No op writes those bytes
+        at a fixed offset.
+      - The RAM script is checked as `C2Scene_Unk5775` builds it from `C2Scene_Unk8600Init`
+        (one `ShowFrame` of the frame after it, duration 0: it holds). A later write to that RAM
+        is not traced.
+      - Two things the interpreter takes as they are, neither touching the lock:
+        - op `$03` (JumpBack) reads a 16-bit word from its operand and masks it, so its stay
+          and jump paths read one byte past it;
+        - `$04` (ShowFrame) with duration 0 holds forever.
+      - `check`'s own test asserts what the lock sees: 4 sources, 161, 1, 1 and 1 entries,
+        708, 3, 4 and 1 opcodes. For the unpackers it asserts the 9 routines with their tables,
+        destinations and largest packs. Struct offsets come from `asm/include` (hex and unlabelled
+        `skip`s counted).
+    - **Unpackers.** Each one's code (followed statically) reads one pack table, and its
+      destinations are traced from its entry with a scene header of zeros. Every pack in that
+      table fits before its bank's end (`C2Scene_LoadBgGfx`'s last slot, `$7F:F000`, takes the
+      largest BG pack, 4,096 B, exactly). None covers `C2Script_Ptr`, the task records,
+      `C2Scene_MemberWords` or the script buffer.
+    - **The static scan** visits an address once for each M and X width it is reached at, so a
+      routine reached at both widths is read both ways.
   - The fx opcodes with no handler (`$FA`-`$FE`) and scene opcodes above `$52` would jump through
     the code after their tables. None is reached; the interpreter refuses them.
 
