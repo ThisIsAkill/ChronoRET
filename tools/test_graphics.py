@@ -288,6 +288,22 @@ class Packed(unittest.TestCase):
         self.assertNotIn('$E0:0030', got)                                  # slot 6: no reader traced
         self.assertEqual(got['$E0:0040'], ('4bpp', 2816, ('spr',)))
 
+    def test_party_slot_is_not_a_proof(self):
+        def rom_with(obj):
+            rom = bytearray(self.rom([(0xFF, 0xFF)] * 4, [0xFF] * 8))
+            rom[0x06FD00:0x06FD02] = bytes([0x02, 0xFD])                # one scene header, at $C6:FD02
+            hdr = bytearray([0x80] * 0x20)
+            hdr[0x0C:0x10] = bytes(obj)
+            rom[0x06FD02:0x06FD22] = hdr
+            return bytes(rom)
+        rows = fake_rows([('C2SceneRom_ObjPacks', 5, 8192)])
+        got, _ = g.derive_packed(rom_with([0x80, 0x80, 5, 0x80]), rows)
+        self.assertNotIn('$E0:0000', got)                       # slot 2: the party graphics go over it
+        got, _ = g.derive_packed(rom_with([5, 0x80, 0x80, 0x80]), rows)
+        self.assertEqual(got['$E0:0000'], ('4bpp', 8192, ('scene_obj',)))   # into slot 1, not past it
+        got, _ = g.derive_packed(rom_with([0x80, 5, 0x80, 0x80]), rows)
+        self.assertEqual(got['$E0:0000'], ('4bpp', 4096, ('scene_obj',)))
+
     def test_two_formats_refused(self):
         rows = fake_rows([('LocGfx_PackPtrs', 1, 4096)])
         got, conflicts = g.derive_packed(self.rom([(0, 1), (0xFF, 0xFF), (0xFF, 0xFF), (0xFF, 0xFF)],
@@ -306,6 +322,15 @@ class Packed(unittest.TestCase):
             self.assertTrue(any('a gfxpack piece' in x for x in ed.manifest_problems(path)))
         with self.assertRaisesRegex(ed.DataError, 'not a pack param'):
             ed.pack_param('4bpp 3 tiles')
+
+    def test_packed_must_be_what_the_data_gives(self):
+        packed = {('loc12',): {'$E0:0000': 4096}}
+        self.assertEqual(g.packed_problems({'$E0:0000': ('4bpp', 4096, ('loc12',))}, [], packed), [])
+        self.assertEqual(g.packed_problems({'$E0:0000': ('4bpp', 3968, ('loc12',))}, [], packed),
+                         ["packed graphics: $E0:0000 is ('4bpp', 3968, ('loc12',)) by the data, "
+                          "('4bpp', 4096, ('loc12',)) in PACKED"])
+        self.assertEqual(g.packed_problems({'$E0:0000': ('4bpp', 4096, ('loc12',))}, ['$E0:0010: read as x'], packed),
+                         ['packed graphics: $E0:0010: read as x'])
 
     def test_pack_param_and_size(self):
         self.assertEqual(g.parse_param('lz12 -> 4096 B; 4bpp 124 tiles + 128 B'), ('4bpp', 124, 128))
@@ -352,6 +377,16 @@ class WithRom(unittest.TestCase):
 
     def test_round_trips(self):
         self.assertEqual(g.check(ed.read_rom()), [])
+
+    def test_check_compares_with_the_data(self):
+        saved = g.derive_packed
+        g.derive_packed = lambda rom, rows: ({}, ['a conflict'])
+        try:
+            got = g.check(ed.read_rom())
+        finally:
+            g.derive_packed = saved
+        self.assertIn('packed graphics: a conflict', got)
+        self.assertTrue(any('by the data, None in PACKED' not in x and 'None by the data' in x for x in got))
 
 
 if __name__ == '__main__':

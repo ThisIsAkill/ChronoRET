@@ -141,7 +141,10 @@ FORMATS = {
 # given by every use the data makes of it (derive_packed): a pack no proved
 # use names stays a plain `packed` piece.
 _FIELD = ('the field draws locations in BG mode 1 (NmiHandler writes BGMODE = Nmi_BgMode every frame) with '
-          'BG1/BG2 tiles at VRAM $1000 and BG3 tiles at $5000 (Ppu_SetBgLayout, from LocLoad_DrawMap)')
+          'BG1/BG2 tiles at VRAM $1000 and BG3 tiles at $5000: Ppu_SetBgLayout, which LocLoad_DrawMap calls '
+          'from Scene_ReloadStep after each location load (and each return from bank $C2) before it draws the '
+          'map; no other field code writes BG12NBA or BG34NBA (the $C3 module\'s programs and the mode-7 '
+          'scenes do, and load no location pack)')
 _SCENE = ('BankC2_InitHwRegs: BG mode 1, sprite tiles at VRAM $0000 (OBSEL), BG1/BG2 tiles at $2000, BG3 '
           'tiles at $7000')
 PACK_PROOFS = {
@@ -160,7 +163,14 @@ PACK_PROOFS = {
     'scene_bg3': ('2bpp', 'C2SceneRom_BgPacks entries named by a scene header\'s byte C2Scene_HdrBg3Gfx: '
                           'C2Scene_LoadBg3Gfx, and C2Scene_LoadVram DMAs $1000 B to VRAM $7000: BG3 tiles, 2bpp. '
                           + _SCENE),
-    'scene_obj': ('4bpp', 'C2SceneRom_ObjPacks entries named by a scene header\'s bytes C2Scene_HdrObjGfx..+3: '
+    'scene_party': ('4bpp', 'C2SceneRom_ObjPacks entry C2Scene_PartyObjPack: C2Scene_LoadPartyGfx copies character '
+                            'n\'s $400 B at n x $400 (n = 0-6, Pc_NumChars) and its $40-B blocks at '
+                            'C2Scene_PartyGfxSrcB into C2Scene_PartyGfx, which C2Scene_LoadVram DMAs to VRAM '
+                            '$1000: sprite tiles, 4bpp; the prefix read whole is $1DC0 B. ' + _SCENE),
+    'scene_extra': ('4bpp', 'C2SceneRom_ObjPacks entry C2Scene_ExtraObjPack: C2Scene_LoadLocExtraGfx DMAs '
+                            '$800 B of it to VRAM $0C00 or $0000: sprite tiles, 4bpp. ' + _SCENE),
+    'scene_obj': ('4bpp', 'C2SceneRom_ObjPacks entries named by a scene header\'s bytes C2Scene_HdrObjGfx..+3 '
+                          '(slot 2 left out: C2Scene_LoadVram DMAs C2Scene_PartyGfx over it after them): '
                           'C2Scene_LoadObjGfx unpacks them $1000 B apart to C2Scene_DecompBuf and C2Scene_LoadVram '
                           'DMAs the $4000 B to VRAM $0000: sprite tiles, 4bpp. ' + _SCENE),
 }
@@ -215,6 +225,10 @@ def derive_packed(rom: bytes, rows: list[dict], root: Path = ROOT) -> tuple[dict
         words.append(w)
         first = min(first or w, w)
     slot = d['C2Scene_PackSlotSize']
+    # C2Scene_LoadVram DMAs C2Scene_PartyGfx over the sprite slots it covers
+    # after the four sprite packs: what a header puts there is never shown
+    first = (d['C2Scene_VramPartyGfx'] - d['C2Scene_VramObj']) * 2 // slot      # VRAM words -> bytes
+    clobbered = {'scene_obj': set(range(first, first + d['C2Scene_PartyGfxBytes'] // slot))}
     for h in words:
         hb = rom[F(h):F(h) + 0x20]
         for key, table, at, count, total in (
@@ -224,13 +238,23 @@ def derive_packed(rom: bytes, rows: list[dict], root: Path = ROOT) -> tuple[dict
                  d['C2Scene_ObjGfxBytes']),
                 ('scene_bg3', 'C2SceneRom_BgPacks', d['C2Scene_HdrBg3Gfx'], 1, d['C2Scene_PackBytes'])):
             packs = hb[at:at + count]
+            gone = clobbered.get(key, set())
             for k, p in enumerate(packs):
-                if p & 0x80:
-                    continue                    # bit 7: the slot is left as it was
+                if p & 0x80 or k in gone:
+                    continue                    # bit 7: the slot is left as it was; or it is overwritten
                 run = 1
-                while k + run < count and packs[k + run] & 0x80:
+                while k + run < count and packs[k + run] & 0x80 and k + run not in gone:
                     run += 1                    # what overflows into a slot left alone is DMAed too
                 use(table, p, key, min(run * slot, total - k * slot))
+    # the fixed sprite packs: the party's (C2Scene_LoadPartyGfx: character n's $400 B at n x $400, n =
+    # 0-6, then $40 B per character at C2Scene_PartyGfxSrcB, all into C2Scene_PartyGfx, DMAed to the
+    # sprite tiles at $1000) and the extra one (C2Scene_LoadLocExtraGfx: $800 B to sprite tiles)
+    chars = d['Pc_NumChars']
+    party = chars * d['C2Scene_PartyGfxSize']
+    if (d['C2Scene_PartyGfxSrcB'] & 0xFFFF) - (d['C2Scene_DecompBuf'] & 0xFFFF) == party:
+        party += chars * d['C2Scene_PartyGfxBSize']           # the B blocks follow on at once
+    use('C2SceneRom_ObjPacks', d['C2Scene_PartyObjPack'], 'scene_party', party)
+    use('C2SceneRom_ObjPacks', d['C2Scene_ExtraObjPack'], 'scene_extra', d['C2Scene_ExtraObjBytes'])
     out, conflicts = {}, []
     for start, us in uses.items():
         fmts = {PACK_PROOFS[k][0] for k, _ in us}
@@ -260,9 +284,15 @@ PACKED = {
     ('scene_bg3',): {
         '$C4:F7AF': 4096, '$C4:FD72': 1024, '$C5:97F7': 512, '$C5:9848': 256,
     },
+    ('scene_party',): {
+        '$C5:9A56': 7616,
+    },
     ('scene_obj',): {
-        '$C5:B798': 8192, '$C5:CD21': 4096, '$C5:D597': 4096, '$C5:D80B': 4096, '$C5:DA88': 4096,
-        '$C5:E0F7': 4096, '$C5:EAAF': 4096, '$C5:ED14': 4096, '$C6:0000': 4096, '$C6:07B6': 4096,
+        '$C5:B798': 8192, '$C5:CD21': 4096, '$C5:D597': 4096, '$C5:DA88': 4096, '$C5:E0F7': 4096,
+        '$C5:EAAF': 4096, '$C5:ED14': 4096, '$C6:0000': 4096, '$C6:07B6': 4096,
+    },
+    ('scene_extra',): {
+        '$C5:C6ED': 2048,
     },
     ('spr',): {
         '$D2:EE80': 2816, '$D2:F85E': 2176, '$D3:E280': 1600, '$D3:E746': 384, '$D3:E8A9': 608,
@@ -679,18 +709,24 @@ def encode_piece(p: dict, png: bytes, side: str) -> bytes:
     return data
 
 
+def packed_problems(got: dict, conflicts: list[str], packed: dict | None = None) -> list[str]:
+    """What differs between derive_packed's finding and PACKED (the
+    manifest's), and its conflicts."""
+    packed = PACKED if packed is None else packed
+    out = [f'packed graphics: {c}' for c in conflicts]
+    want = {start: (PACK_PROOFS[keys[0]][0], nb, keys) for keys, items in packed.items()
+            for start, nb in items.items()}
+    for start in sorted(set(got) | set(want)):
+        if got.get(start) != want.get(start):
+            out.append(f'packed graphics: {start} is {got.get(start)} by the data, {want.get(start)} in PACKED')
+    return out
+
+
 def check(rom: bytes, quiet: bool = True) -> list[str]:
     import extract_data
     import data_survey
     problems = []
-    got, conflicts = derive_packed(rom, data_survey.read_rows())
-    problems += [f'packed graphics: {c}' for c in conflicts]
-    want = {start: (PACK_PROOFS[keys[0]][0], nb, keys) for keys, items in PACKED.items()
-            for start, nb in items.items()}
-    for start in sorted(set(got) | set(want)):
-        if got.get(start) != want.get(start):
-            problems.append(f'packed graphics: {start} is {got.get(start)} by the data, {want.get(start)} in '
-                            f'PACKED')
+    problems += packed_problems(*derive_packed(rom, data_survey.read_rows()))
     for p in extract_data.read_manifest():
         if p['piece'] not in ('graphics', 'gfxpack'):
             continue

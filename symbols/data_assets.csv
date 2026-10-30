@@ -78,13 +78,13 @@ SceneBgPack_033,$C5:8F5A,$C5:97F6,2205,gfxpack,gfx/SceneBgPack_033.png,lz12 -> 4
 SceneBgPack_034,$C5:97F7,$C5:9847,81,gfxpack,gfx/SceneBgPack_034.png,lz12 -> 512 B; 2bpp 32 tiles
 SceneBgPack_035,$C5:9848,$C5:98AB,100,gfxpack,gfx/SceneBgPack_035.png,lz12 -> 256 B; 2bpp 16 tiles
 SceneBgPack_036,$C5:98AC,$C5:9A55,426,packed,packed_lz/SceneBgPack_036.bin,lz12 -> 656 B
-SceneObjPack_000,$C5:9A56,$C5:B113,5822,packed,packed_lz/SceneObjPack_000.bin,lz12 -> 8192 B
+SceneObjPack_000,$C5:9A56,$C5:B113,5822,gfxpack,gfx/SceneObjPack_000.png,lz12 -> 8192 B; 4bpp 238 tiles + 576 B
 SceneObjPack_001,$C5:B114,$C5:B797,1668,packed,packed_lz/SceneObjPack_001.bin,lz12 -> 4096 B
 SceneObjPack_002,$C5:B798,$C5:C6EC,3925,gfxpack,gfx/SceneObjPack_002.png,lz12 -> 8192 B; 4bpp 256 tiles
-SceneObjPack_003,$C5:C6ED,$C5:CD20,1588,packed,packed_lz/SceneObjPack_003.bin,lz12 -> 2048 B
+SceneObjPack_003,$C5:C6ED,$C5:CD20,1588,gfxpack,gfx/SceneObjPack_003.png,lz12 -> 2048 B; 4bpp 64 tiles
 SceneObjPack_004,$C5:CD21,$C5:D596,2166,gfxpack,gfx/SceneObjPack_004.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneObjPack_005,$C5:D597,$C5:D80A,628,gfxpack,gfx/SceneObjPack_005.png,lz12 -> 4096 B; 4bpp 128 tiles
-SceneObjPack_006,$C5:D80B,$C5:DA87,637,gfxpack,gfx/SceneObjPack_006.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneObjPack_006,$C5:D80B,$C5:DA87,637,packed,packed_lz/SceneObjPack_006.bin,lz12 -> 4096 B
 SceneObjPack_007,$C5:DA88,$C5:E0F6,1647,gfxpack,gfx/SceneObjPack_007.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneObjPack_008,$C5:E0F7,$C5:EAAE,2488,gfxpack,gfx/SceneObjPack_008.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneObjPack_009,$C5:EAAF,$C5:ED13,613,gfxpack,gfx/SceneObjPack_009.png,lz12 -> 4096 B; 4bpp 128 tiles

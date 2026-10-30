@@ -121,7 +121,9 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
         if got != size:
             wrong.append(f'{label}: {got} B, its piece {size} B')
     if wrong:
-        raise BuildError('packs that do not fit their place:\n  ' + '\n  '.join(wrong))
+        raise BuildError('packs that do not fit their place (a pack must come out the size the ROM\'s '
+                         'stream is, since every pointer and placement is fixed: an edit that changes it '
+                         'cannot be built):\n  ' + '\n  '.join(wrong))
     return len(jobs)
 
 

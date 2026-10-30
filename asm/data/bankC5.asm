@@ -110,7 +110,7 @@ SceneBgPack_036:
 ; C2Scene_LoadExtraObjPack, C6Scene_UnpackObjPackA/B.
 org $C59A56
 SceneObjPack_000:
-    incbin "../../build/packs/SceneObjPack_000.lz"          ; lz12 -> 8192 B
+    incbin "../../build/packs/SceneObjPack_000.lz"          ; lz12 -> 8192 B; 4bpp 238 tiles + 576 B (graphics)
 
 ; $C5:B114-$C5:B797 (1,668 B), packed_lz, confirmed: lz12 -> 4096 B: scene sprite graphics
 ; Read by C2Scene_LoadObjGfx, C2Scene_LoadPartyGfx, C2Scene_LoadUnkC800,
@@ -131,7 +131,7 @@ SceneObjPack_002:
 ; C2Scene_LoadExtraObjPack, C6Scene_UnpackObjPackA/B.
 org $C5C6ED
 SceneObjPack_003:
-    incbin "../../build/packs/SceneObjPack_003.lz"          ; lz12 -> 2048 B
+    incbin "../../build/packs/SceneObjPack_003.lz"          ; lz12 -> 2048 B; 4bpp 64 tiles (graphics)
 
 ; $C5:CD21-$C5:D596 (2,166 B), packed_lz, confirmed: lz12 -> 4096 B: scene sprite graphics
 ; Read by C2Scene_LoadObjGfx, C2Scene_LoadPartyGfx, C2Scene_LoadUnkC800,
@@ -152,7 +152,7 @@ SceneObjPack_005:
 ; C2Scene_LoadExtraObjPack, C6Scene_UnpackObjPackA/B.
 org $C5D80B
 SceneObjPack_006:
-    incbin "../../build/packs/SceneObjPack_006.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
+    incbin "../../build/packs/SceneObjPack_006.lz"          ; lz12 -> 4096 B
 
 ; $C5:DA88-$C5:E0F6 (1,647 B), packed_lz, confirmed: lz12 -> 4096 B: scene sprite graphics
 ; Read by C2Scene_LoadObjGfx, C2Scene_LoadPartyGfx, C2Scene_LoadUnkC800,
