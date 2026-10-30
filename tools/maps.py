@@ -9,7 +9,8 @@ No map is ever committed (README, "Legal"): extraction writes them, the
 build assembles them back and packs them (tools/c3pack.py). What this tool
 holds is how the code reads them:
 
-  mapprops   a Map_PropsPtrs pack (LocRom.MapProps): LocLoad_UnkA33B
+  mapprops   a Map_PropsPtrs pack a location record names (LocRom.MapProps;
+             one no record names stays packed, UNNAMED): LocLoad_UnkA33B
              unpacks it to MapProps ($7E:B500) and takes the six header
              bytes (struct MapProps), then Map_UnpackTilePlanes reads the
              rest through the WRAM port:
@@ -29,7 +30,8 @@ holds is how the code reads them:
              of the layer-1 / layer-2 metatile number (Map_WriteRow1/2).
   metatiles  a LocGfx_Meta12Ptrs pack (LocRom.Tileset12; 512 metatiles at
              Map_Meta12TL, $7E:B000) or LocGfx_Meta3Ptrs pack (.Tileset3;
-             256 at Map_Meta3TL, $7E:C000): 8 bytes per metatile, four words
+             256 at Map_Meta3TL, $7E:C000) a location record names (as
+             for the maps): 8 bytes per metatile, four words
              top-left, top-right, bottom-left, bottom-right, which the
              row and column writers (Map_WriteRow1 ...) send unchanged to
              Map_BufC800 and the edge buffers, uploaded to the layers' BG
@@ -43,14 +45,15 @@ The readable forms (build/assets/maps/):
                 cell per layer-1 tile, HHAABB (HiBits, AttrA, AttrB) or
                 -------- where the stream ends. The runs are re-made from
                 the grid (every repeat of two or more is a run of up to 256,
-                as all 201 maps are written): change cells, not runs.
+                as all 197 maps are written): change cells, not runs.
   <label>.meta  @metatiles LABEL N, then N lines: the metatile number and
                 its four words, each TTT/P[p][h][v]: tile number (hex),
                 palette, then priority, horizontal and vertical flip.
 
     python3 tools/maps.py check     extract every map and metatile pack
                                     from the ROM to text and assemble them
-                                    back: byte-exact?
+                                    back: byte-exact? and are they the
+                                    packs the location records name?
 """
 
 import argparse
@@ -75,6 +78,17 @@ SCENE_HDR = {'C2SceneRom_MetatilePacks': 'C2Scene_HdrMetatiles', 'C2SceneRom_Map
 SCENE_MAP_W, SCENE_MAP_H = 96, 64      # C2Scene_MapCols x C2Scene_MapRows, per layer (C2Scene_LayerMaps)
 SCENE_METATILES = 256                  # per layer: C2Scene_LayerMetatiles $3000 and $3800, 8 B each
 META_TABLES = {'LocGfx_Meta12Ptrs': 512, 'LocGfx_Meta3Ptrs': 256}    # metatiles per pack (the RAM tables)
+# A pack is a map or metatiles only when a location record names it (its
+# LocRom.MapProps, .Tileset12 or .Tileset3; derive_named, which check()
+# compares with the manifest): these entries no record names stay plain
+# `packed` pieces. (The 1-B Meta12 packs, 16 and 55-63, are not whole
+# tables and stay packed by their size.)
+UNNAMED = {'Map_PropsPtrs': {10, 30, 141, 172}, 'LocGfx_Meta12Ptrs': {54}, 'LocGfx_Meta3Ptrs': {3}}
+# The LocRom field that names each table's entries, and the value that
+# names none (LocLoad_UnkA33B, LocLoad_Unk09DD, LocLoad_Unk0A14).
+NAMED_BY = {'Map_PropsPtrs': ('MapProps', None), 'LocGfx_Meta12Ptrs': ('Tileset12', 'LocRom_SetNone'),
+            'LocGfx_Meta3Ptrs': ('Tileset3', 'LocRom_SetNone')}
+LOCROM_ROW = '$F6:0000'
 HEADER = ('size1', 'size3', 'move2', 'move3', 'screens', 'colormath')   # struct MapProps, in order
 LAYER3_ON = 0x80                      # MapProps.Size3 bit 7: layer 3's plane is in the stream (Map_Unk0BCA)
 RUN = 0x80                            # an attribute entry's first byte with bit 7: a run (Map_RunFlagMask = $7F)
@@ -434,7 +448,7 @@ def kind_of(notes: str) -> tuple[str, int] | None:
     """('mapprops', 0), ('metatiles', count) or (scene kind, unpacked size)
     for a pack row's notes."""
     m = re.search(r'\bvia ([A-Za-z0-9_]+)\[(\d+)\]', notes)
-    if not m:
+    if not m or int(m.group(2)) in UNNAMED.get(m.group(1), ()):
         return None
     if m.group(1) in SCENE_TABLES:
         return SCENE_TABLES[m.group(1)] if int(m.group(2)) in SCENE_NAMED[m.group(1)] else None
@@ -478,10 +492,61 @@ def meta_count(p: dict) -> int:
     return int(m.group(2)) // 8
 
 
+def derive_named(rom: bytes, rows: list[dict], root: Path = ROOT) -> tuple[set[str], list[str]]:
+    """({survey row start of every map and metatile pack a location record
+    names}, problems): from the LocRom records' MapProps, Tileset12 and
+    Tileset3 fields, as the location load reads them."""
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import battle
+    import data_survey
+    import records
+    d = battle.defines(root)
+    by_table: dict[tuple[str, int], str] = {}
+    for r in rows:
+        m = re.search(r'\bvia ([A-Za-z0-9_]+)\[(\d+)\]', r['notes'])
+        if r['kind'] == 'packed_lz' and m and m.group(1) in NAMED_BY:
+            by_table[(m.group(1), int(m.group(2)))] = r['start']
+    fields, off = {}, 0
+    for name, t in records._struct_fields('LocRom'):
+        fields[name] = (off, records.width(t))
+        off += records.width(t)
+    recs = next((r for r in rows if r['start'] == LOCROM_ROW), None)
+    if recs is None:
+        return set(), [f'no survey row at {LOCROM_ROW} (the LocRom records)']
+    size = d['LocRom_RecSize']
+    base = data_survey.parse_addr(LOCROM_ROW)
+    named, problems = set(), []
+    for k in range(int(recs['size']) // size):
+        for table, (field, none) in NAMED_BY.items():
+            at, w = fields[field]
+            v = int.from_bytes(rom[base + k * size + at:base + k * size + at + w], 'little')
+            if none is not None and v == d[none]:
+                continue
+            start = by_table.get((table, v))
+            if start is None:
+                problems.append(f'location record {k} names {table}[{v}], which no survey pack row is')
+            else:
+                named.add(start)
+    return named, problems
+
+
+def named_problems(rom: bytes, rows: list[dict], pieces: list[dict], root: Path = ROOT) -> list[str]:
+    """What differs between the packs the location records name
+    (derive_named) and the manifest's mapprops and metatiles pieces."""
+    named, problems = derive_named(rom, rows, root)
+    converted = {p['start'] for p in pieces if p['piece'] in ('mapprops', 'metatiles')}
+    for start in sorted(named - converted):
+        problems.append(f'{start}: a location record names it, and the manifest keeps it packed')
+    for start in sorted(converted - named):
+        problems.append(f'{start}: converted in the manifest, and no location record names it')
+    return problems
+
+
 def check(rom: bytes, quiet: bool = True) -> list[str]:
     sys.path.insert(0, str(ROOT / 'tools'))
+    import data_survey
     import extract_data
-    problems = []
+    problems = named_problems(rom, data_survey.read_rows(), extract_data.read_manifest())
     named = scene_named(rom)
     if named != SCENE_NAMED:
         problems.append(f'the scene headers name {named}, not SCENE_NAMED {SCENE_NAMED}')

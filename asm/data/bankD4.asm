@@ -34,21 +34,21 @@ Gfx_D47C40:
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D4FB00
 SprTilesPack_179:
-    incbin "../../build/packs/SprTilesPack_179.lz"          ; lz12 -> 672 B
+    incbin "../../build/packs/SprTilesPack_179.lz"          ; lz12 -> 672 B; 4bpp 21 tiles (graphics)
 
 ; $D4:FCFB-$D4:FDAF (181 B), packed_lz, confirmed: lz12 -> 384 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D4FCFB
 SprTilesPack_180:
-    incbin "../../build/packs/SprTilesPack_180.lz"          ; lz12 -> 384 B
+    incbin "../../build/packs/SprTilesPack_180.lz"          ; lz12 -> 384 B; 4bpp 12 tiles (graphics)
 
 ; $D4:FDB0-$D4:FF72 (451 B), packed_lz, confirmed: lz12 -> 480 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D4FDB0
 SprTilesPack_187:
-    incbin "../../build/packs/SprTilesPack_187.lz"          ; lz12 -> 480 B
+    incbin "../../build/packs/SprTilesPack_187.lz"          ; lz12 -> 480 B; 4bpp 15 tiles (graphics)
 
 ; $D4:FF73-$D4:FFFF (141 B), padding, confirmed: 141 x $00
 org $D4FF73

@@ -69,7 +69,7 @@ MapPropsPack_171:
 ; Read by LocLoad_UnkA33B.
 org $F52AEF
 MapPropsPack_172:
-    incbin "../../build/packs/MapPropsPack_172.lz"          ; lz11 -> 2866 B, location map
+    incbin "../../build/packs/MapPropsPack_172.lz"          ; lz11 -> 2866 B
 
 ; $F5:2ECC-$F5:3C66 (3,483 B), packed_lz, confirmed: lz11 -> 8925 B: location map: MapProps
 ; header + packed tile planes

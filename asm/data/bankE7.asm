@@ -20,133 +20,133 @@
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E70000
 LocGfxPack_049:
-    incbin "../../build/packs/LocGfxPack_049.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_049.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:0C77-$E7:1911 (3,227 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E70C77
 LocGfxPack_050:
-    incbin "../../build/packs/LocGfxPack_050.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_050.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:1912-$E7:241D (2,828 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E71912
 LocGfxPack_051:
-    incbin "../../build/packs/LocGfxPack_051.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_051.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:241E-$E7:2F65 (2,888 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7241E
 LocGfxPack_052:
-    incbin "../../build/packs/LocGfxPack_052.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_052.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:2F66-$E7:3D01 (3,484 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E72F66
 LocGfxPack_053:
-    incbin "../../build/packs/LocGfxPack_053.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_053.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:3D02-$E7:4ACA (3,529 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E73D02
 LocGfxPack_054:
-    incbin "../../build/packs/LocGfxPack_054.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_054.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:4ACB-$E7:5628 (2,910 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E74ACB
 LocGfxPack_055:
-    incbin "../../build/packs/LocGfxPack_055.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_055.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:5629-$E7:6184 (2,908 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E75629
 LocGfxPack_056:
-    incbin "../../build/packs/LocGfxPack_056.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_056.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:6185-$E7:6E05 (3,201 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E76185
 LocGfxPack_057:
-    incbin "../../build/packs/LocGfxPack_057.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_057.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:6E06-$E7:7AC8 (3,267 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E76E06
 LocGfxPack_058:
-    incbin "../../build/packs/LocGfxPack_058.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_058.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:7AC9-$E7:88AF (3,559 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E77AC9
 LocGfxPack_059:
-    incbin "../../build/packs/LocGfxPack_059.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_059.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:88B0-$E7:96C7 (3,608 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E788B0
 LocGfxPack_060:
-    incbin "../../build/packs/LocGfxPack_060.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_060.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:96C8-$E7:A5B0 (3,817 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E796C8
 LocGfxPack_061:
-    incbin "../../build/packs/LocGfxPack_061.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_061.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:A5B1-$E7:B4A8 (3,832 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7A5B1
 LocGfxPack_062:
-    incbin "../../build/packs/LocGfxPack_062.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_062.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:B4A9-$E7:C45D (4,021 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7B4A9
 LocGfxPack_063:
-    incbin "../../build/packs/LocGfxPack_063.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_063.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:C45E-$E7:D32C (3,791 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7C45E
 LocGfxPack_064:
-    incbin "../../build/packs/LocGfxPack_064.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_064.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:D32D-$E7:E12B (3,583 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7D32D
 LocGfxPack_065:
-    incbin "../../build/packs/LocGfxPack_065.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_065.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:E12C-$E7:F1B0 (4,229 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7E12C
 LocGfxPack_066:
-    incbin "../../build/packs/LocGfxPack_066.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_066.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:F1B1-$E7:FF08 (3,416 B), packed_lz, confirmed: lz12 -> 4096 B: location tile graphics
 ; (also battle backgrounds)
 ; Read by LocLoad_UploadPack, LocLoad_UnpackPacks67, LocLoad_Unk6DCF, BattleFx_LoadBgSet.
 org $E7F1B1
 LocGfxPack_067:
-    incbin "../../build/packs/LocGfxPack_067.lz"          ; lz12 -> 4096 B
+    incbin "../../build/packs/LocGfxPack_067.lz"          ; lz12 -> 4096 B; 4bpp 128 tiles (graphics)
 
 ; $E7:FF09-$E7:FFFF (247 B), padding, confirmed: 247 x $00
 org $E7FF09
