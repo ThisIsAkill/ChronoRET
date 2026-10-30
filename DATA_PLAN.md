@@ -818,6 +818,8 @@ below). Each group's bound is re-derived by its tool's `check` and again at extr
     computed from values not traced. This includes the `C2SceneRom_*_Tail` bytes after the scene
     pointer tables.
 
+## Order of work
+
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
    graphics or music are stored here. Describing the data "in source" therefore cannot mean
    committing it. The usual answer in other decompilation projects is an extraction step: a tool
