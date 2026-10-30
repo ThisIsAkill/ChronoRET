@@ -130,12 +130,81 @@ class Metatiles(unittest.TestCase):
             maps.assemble_meta(text.rsplit('\n', 2)[0] + '\n', 'T', 256)
 
 
+class SceneLayers(unittest.TestCase):
+
+    MAPS = bytes((i * 7) & 0xFF for i in range(2 * 96 * 64))
+    META = bytes(range(256)) * 16
+    BG3 = bytes(range(256)) * 16
+
+    def test_round_trips(self):
+        for render, assemble, data in ((maps.render_scene_maps, maps.assemble_scene_maps, self.MAPS),
+                                       (maps.render_scene_meta, maps.assemble_scene_meta, self.META),
+                                       (maps.render_bg3, maps.assemble_bg3, self.BG3),
+                                       (maps.render_bg3, maps.assemble_bg3, self.BG3[:2048])):
+            with self.subTest(render=render.__name__, n=len(data)):
+                self.assertEqual(assemble(render('S', data), 'S'), data)
+
+    def test_size_refused(self):
+        for render, n, why in ((maps.render_scene_maps, 100, 'the two layer maps are 12288'),
+                               (maps.render_scene_meta, 100, 'the two metatile sets are 4096'),
+                               (maps.render_bg3, 100, 'no whole number of 32x32-word screens')):
+            with self.subTest(why=why):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    render('S', bytes(n))
+
+    def test_scene_maps_refusals(self):
+        text = maps.render_scene_maps('S', self.MAPS)
+        row = text.split('@layer1 96x64\n')[1].split('\n')[0]
+        for old, new, why in (('@scenemaps S', '@scenemaps T', 'the first line is @scenemaps S'),
+                              ('@layer2 96x64', '@layer2 96x63', 'expected @layer2 96x64'),
+                              (row + '\n', row + ' 00\n', '97 cells; the row is 96'),
+                              (row + '\n', '', 'needs 64 rows'),
+                              (row, row.replace(row[:2], 'ZZ', 1), "'ZZ' is not 2 hex digits")):
+            with self.subTest(new=new[:20]):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    maps.assemble_scene_maps(text.replace(old, new, 1), 'S')
+        with self.assertRaisesRegex(maps.MapsError, 'a line after layer 2'):
+            maps.assemble_scene_maps(text + '00\n', 'S')
+
+    def test_scene_meta_refusals(self):
+        text = maps.render_scene_meta('S', self.META)
+        for old, new, why in (('@scenemeta S', '@scenemeta T', 'the first line is @scenemeta S'),
+                              ('@layer2 256', '@layer2 255', 'expected @layer2 256'),
+                              ('01: ', '02: ', 'expected 01:')):
+            with self.subTest(new=new):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    maps.assemble_scene_meta(text.replace(old, new, 1), 'S')
+        with self.assertRaisesRegex(maps.MapsError, 'needs 256 metatile lines'):
+            maps.assemble_scene_meta(text.split('@layer2')[0] + '@layer2 256\n00: 000/0 000/0 000/0 000/0\n', 'S')
+        with self.assertRaisesRegex(maps.MapsError, 'a line after layer 2'):
+            maps.assemble_scene_meta(text + '@x\n', 'S')
+
+    def test_bg3_refusals(self):
+        text = maps.render_bg3('S', self.BG3)
+        for old, new, why in (('@bg3map S 2', '@bg3map S 3', 'the first line is @bg3map S 1\\|2'),
+                              ('@screen 1', '@screen 2', 'expected @screen 1')):
+            with self.subTest(new=new):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    maps.assemble_bg3(text.replace(old, new, 1), 'S')
+        first_row = text.split('@screen 0\n')[1].split('\n')[0]
+        with self.assertRaisesRegex(maps.MapsError, '33 words; a row is 32'):
+            maps.assemble_bg3(text.replace(first_row, first_row + ' 000/0', 1), 'S')
+        with self.assertRaisesRegex(maps.MapsError, '2 screens are 66 lines'):
+            maps.assemble_bg3(text + '000/0\n', 'S')
+
+    def test_only_named_scene_packs(self):
+        self.assertEqual(maps.kind_of('via C2SceneRom_Bg3MapPacks[4]; x'), ('scenebg3', 0x1000))
+        self.assertIsNone(maps.kind_of('via C2SceneRom_Bg3MapPacks[5]; x'))     # no header names it
+
+
 class Source(unittest.TestCase):
 
     def test_manifest_pieces(self):
         rows = {r['start']: r for r in data_survey.read_rows()}
-        pieces = [p for p in ed.read_manifest() if p['piece'] in ('mapprops', 'metatiles')]
+        pieces = [p for p in ed.read_manifest() if p['piece'] in maps.PIECES]
         self.assertEqual(sum(p['piece'] == 'mapprops' for p in pieces), 201)
+        scene = [p for p in ed.read_manifest() if p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3')]
+        self.assertEqual(sorted(p['piece'] for p in scene).count('scenebg3'), 5)
         for p in pieces:
             kind = maps.kind_of(rows[p['start']]['notes'])
             self.assertEqual(kind[0], p['piece'])
@@ -152,6 +221,15 @@ class WithRom(unittest.TestCase):
 
     def test_round_trips(self):
         self.assertEqual(maps.check(ed.read_rom()), [])
+
+    def test_scene_packs_are_the_headers(self):
+        self.assertEqual(maps.scene_named(ed.read_rom()), maps.SCENE_NAMED)
+        saved = maps.SCENE_NAMED
+        maps.SCENE_NAMED = dict(saved, C2SceneRom_Bg3MapPacks={0})
+        try:
+            self.assertTrue(any('the scene headers name' in x for x in maps.check(ed.read_rom())))
+        finally:
+            maps.SCENE_NAMED = saved
 
 
 if __name__ == '__main__':

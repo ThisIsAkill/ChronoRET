@@ -61,6 +61,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 PROPS_TABLE = 'Map_PropsPtrs'
+# The scene layer packs: {table: (piece kind, unpacked size)}. Their indexes
+# are the ones the eight scene headers name (SCENE_NAMED; check() derives
+# it from the headers): C2Scene_LoadMetatiles (C2Scene_HdrMetatiles),
+# C2Scene_LoadBgMaps (C2Scene_HdrMaps), C2Scene_LoadBg3Map
+# (C2Scene_HdrBg3Map).
+SCENE_TABLES = {'C2SceneRom_MetatilePacks': ('scenemeta', 0x1000), 'C2SceneRom_MapPacks': ('scenemaps', 0x3000),
+                'C2SceneRom_Bg3MapPacks': ('scenebg3', 0x1000)}
+SCENE_NAMED = {'C2SceneRom_MetatilePacks': {0, 1, 2, 3, 4, 5}, 'C2SceneRom_MapPacks': {0, 1, 2, 3, 4, 5, 6, 7},
+               'C2SceneRom_Bg3MapPacks': {0, 1, 2, 3, 4}}
+SCENE_HDR = {'C2SceneRom_MetatilePacks': 'C2Scene_HdrMetatiles', 'C2SceneRom_MapPacks': 'C2Scene_HdrMaps',
+             'C2SceneRom_Bg3MapPacks': 'C2Scene_HdrBg3Map'}
+SCENE_MAP_W, SCENE_MAP_H = 96, 64      # C2Scene_MapCols x C2Scene_MapRows, per layer (C2Scene_LayerMaps)
+SCENE_METATILES = 256                  # per layer: C2Scene_LayerMetatiles $3000 and $3800, 8 B each
 META_TABLES = {'LocGfx_Meta12Ptrs': 512, 'LocGfx_Meta3Ptrs': 256}    # metatiles per pack (the RAM tables)
 HEADER = ('size1', 'size3', 'move2', 'move3', 'screens', 'colormath')   # struct MapProps, in order
 LAYER3_ON = 0x80                      # MapProps.Size3 bit 7: layer 3's plane is in the stream (Map_Unk0BCA)
@@ -277,13 +290,154 @@ def assemble_meta(text: str, label: str, count: int, name: str = '<meta>') -> by
     return bytes(out)
 
 
+# ── Scene layers ─────────────────────────────────────────────────────────
+
+def render_scene_maps(label: str, data: bytes) -> str:
+    size = 2 * SCENE_MAP_W * SCENE_MAP_H
+    if len(data) != size:
+        raise MapsError(f'{label}: {len(data)} B; the two layer maps are {size}')
+    out = [line.format(label=label, what='a scene\'s BG1 and BG2 metatile maps') for line in HEAD]
+    out.append(f'@scenemaps {label}')
+    for k in range(2):
+        out.append(f'@layer{k + 1} {SCENE_MAP_W}x{SCENE_MAP_H}')
+        base = k * SCENE_MAP_W * SCENE_MAP_H
+        for r in range(SCENE_MAP_H):
+            out.append(' '.join(f'{b:02X}' for b in data[base + r * SCENE_MAP_W:base + (r + 1) * SCENE_MAP_W]))
+    return '\n'.join(out) + '\n'
+
+
+def assemble_scene_maps(text: str, label: str, name: str = '<smap>') -> bytes:
+    lines = [(f'{name}:{no}', w) for no, w in _lines(text)]
+    if not lines or lines[0][1] != ['@scenemaps', label]:
+        raise MapsError(f'{name}: the first line is @scenemaps {label}')
+    out, i = bytearray(), 1
+    for k in range(2):
+        tag = [f'@layer{k + 1}', f'{SCENE_MAP_W}x{SCENE_MAP_H}']
+        where, w = lines[i] if i < len(lines) else (name, ['(end)'])
+        if w != tag:
+            raise MapsError(f'{where}: expected {" ".join(tag)}')
+        rows = lines[i + 1:i + 1 + SCENE_MAP_H]
+        if len(rows) != SCENE_MAP_H or any(r[1][0].startswith('@') for r in rows):
+            raise MapsError(f'{where}: {tag[0]} needs {SCENE_MAP_H} rows')
+        for rw, cells in rows:
+            if len(cells) != SCENE_MAP_W:
+                raise MapsError(f'{rw}: {len(cells)} cells; the row is {SCENE_MAP_W}')
+            out += bytes(_hex(c, rw, 2) for c in cells)
+        i += 1 + SCENE_MAP_H
+    if i != len(lines):
+        raise MapsError(f'{lines[i][0]}: a line after layer 2')
+    return bytes(out)
+
+
+def render_scene_meta(label: str, data: bytes) -> str:
+    size = 2 * 8 * SCENE_METATILES
+    if len(data) != size:
+        raise MapsError(f'{label}: {len(data)} B; the two metatile sets are {size}')
+    out = [line.format(label=label, what='a scene\'s BG1 and BG2 metatiles (four tilemap words each)')
+           for line in HEAD]
+    out.append(f'@scenemeta {label}    ; N: top-left top-right bottom-left bottom-right')
+    for k in range(2):
+        out.append(f'@layer{k + 1} {SCENE_METATILES}')
+        base = k * 8 * SCENE_METATILES
+        for n in range(SCENE_METATILES):
+            words = [data[base + 8 * n + 2 * j] | data[base + 8 * n + 2 * j + 1] << 8 for j in range(4)]
+            out.append(f'{n:02X}: ' + ' '.join(word_text(v) for v in words))
+    return '\n'.join(out) + '\n'
+
+
+def assemble_scene_meta(text: str, label: str, name: str = '<smeta>') -> bytes:
+    lines = [(f'{name}:{no}', w) for no, w in _lines(text)]
+    if not lines or lines[0][1] != ['@scenemeta', label]:
+        raise MapsError(f'{name}: the first line is @scenemeta {label}')
+    out, i = bytearray(), 1
+    for k in range(2):
+        where, w = lines[i] if i < len(lines) else (name, ['(end)'])
+        if w != [f'@layer{k + 1}', str(SCENE_METATILES)]:
+            raise MapsError(f'{where}: expected @layer{k + 1} {SCENE_METATILES}')
+        rows = lines[i + 1:i + 1 + SCENE_METATILES]
+        if len(rows) != SCENE_METATILES:
+            raise MapsError(f'{where}: @layer{k + 1} needs {SCENE_METATILES} metatile lines')
+        for n, (rw, cells) in enumerate(rows):
+            if len(cells) != 5 or cells[0] != f'{n:02X}:':
+                raise MapsError(f'{rw}: expected {n:02X}: and four words')
+            for t in cells[1:]:
+                out += word_value(t, rw).to_bytes(2, 'little')
+        i += 1 + SCENE_METATILES
+    if i != len(lines):
+        raise MapsError(f'{lines[i][0]}: a line after layer 2')
+    return bytes(out)
+
+
+BG3_SCREEN = 32 * 32                   # words per 32x32 screen (BG3SC $7800, 64x32: two screens)
+
+
+def render_bg3(label: str, data: bytes) -> str:
+    if not data or len(data) % (2 * BG3_SCREEN):
+        raise MapsError(f'{label}: {len(data)} B is no whole number of 32x32-word screens')
+    out = [line.format(label=label, what='a scene\'s BG3 tilemap (tilemap words)') for line in HEAD]
+    n = len(data) // (2 * BG3_SCREEN)
+    out.append(f'@bg3map {label} {n}    ; screens of 32 rows of 32 words, TTT/P[p][h][v]')
+    for s in range(n):
+        out.append(f'@screen {s}')
+        for r in range(32):
+            base = 2 * (s * BG3_SCREEN + 32 * r)
+            out.append(' '.join(word_text(data[base + 2 * c] | data[base + 2 * c + 1] << 8) for c in range(32)))
+    return '\n'.join(out) + '\n'
+
+
+def assemble_bg3(text: str, label: str, name: str = '<bg3>') -> bytes:
+    lines = [(f'{name}:{no}', w) for no, w in _lines(text)]
+    if not lines or len(lines[0][1]) != 3 or lines[0][1][:2] != ['@bg3map', label] \
+            or lines[0][1][2] not in ('1', '2'):
+        raise MapsError(f'{name}: the first line is @bg3map {label} 1|2')
+    n = int(lines[0][1][2])
+    if len(lines) != 1 + n * 33:
+        raise MapsError(f'{name}: {n} screens are {n * 33} lines after the first; there are {len(lines) - 1}')
+    out = bytearray()
+    for s in range(n):
+        where, w = lines[1 + 33 * s]
+        if w != ['@screen', str(s)]:
+            raise MapsError(f'{where}: expected @screen {s}')
+        for rw, cells in lines[2 + 33 * s:34 + 33 * s]:
+            if len(cells) != 32:
+                raise MapsError(f'{rw}: {len(cells)} words; a row is 32')
+            for t in cells:
+                out += word_value(t, rw).to_bytes(2, 'little')
+    return bytes(out)
+
+
+def scene_named(rom: bytes, root: Path = ROOT) -> dict[str, set[int]]:
+    """{table: the indexes the eight scene headers name} (SCENE_HDR),
+    from the header table's words up to its first header."""
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import battle
+    d = battle.defines(root)
+    F = lambda a: a - 0xC00000      # noqa: E731
+    tab = d['C2SceneRom_HeaderTable']
+    words, first = [], None
+    while first is None or tab + 2 * len(words) < first:
+        w = (tab & 0xFF0000) | rom[F(tab) + 2 * len(words)] | rom[F(tab) + 2 * len(words) + 1] << 8
+        words.append(w)
+        first = min(first or w, w)
+    out = {t: set() for t in SCENE_HDR}
+    for h in words:
+        for t, field in SCENE_HDR.items():
+            v = rom[F(h) + d[field]]
+            if not v & 0x80:                 # bit 7: nothing loaded
+                out[t].add(v)
+    return out
+
+
 # ── Pieces ───────────────────────────────────────────────────────────────
 
 def kind_of(notes: str) -> tuple[str, int] | None:
-    """('mapprops', 0) or ('metatiles', count) for a pack row's notes."""
-    m = re.search(r'\bvia ([A-Za-z0-9_]+)\[', notes)
+    """('mapprops', 0), ('metatiles', count) or (scene kind, unpacked size)
+    for a pack row's notes."""
+    m = re.search(r'\bvia ([A-Za-z0-9_]+)\[(\d+)\]', notes)
     if not m:
         return None
+    if m.group(1) in SCENE_TABLES:
+        return SCENE_TABLES[m.group(1)] if int(m.group(2)) in SCENE_NAMED[m.group(1)] else None
     if m.group(1) == PROPS_TABLE:
         return 'mapprops', 0
     if m.group(1) in META_TABLES:
@@ -294,13 +448,29 @@ def kind_of(notes: str) -> tuple[str, int] | None:
 def render_piece(p: dict, data: bytes) -> str:
     if p['piece'] == 'mapprops':
         return render_map(p['label'], data)
+    if p['piece'] == 'scenemaps':
+        return render_scene_maps(p['label'], data)
+    if p['piece'] == 'scenemeta':
+        return render_scene_meta(p['label'], data)
+    if p['piece'] == 'scenebg3':
+        return render_bg3(p['label'], data)
     return render_meta(p['label'], data, meta_count(p))
 
 
 def assemble_piece(p: dict, text: str) -> bytes:
     if p['piece'] == 'mapprops':
         return assemble_map(text, p['label'], p['label'])
+    if p['piece'] == 'scenemaps':
+        return assemble_scene_maps(text, p['label'], p['label'])
+    if p['piece'] == 'scenemeta':
+        return assemble_scene_meta(text, p['label'], p['label'])
+    if p['piece'] == 'scenebg3':
+        return assemble_bg3(text, p['label'], p['label'])
     return assemble_meta(text, p['label'], meta_count(p), p['label'])
+
+
+PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3')
+ASSET_EXT = {'mapprops': 'map', 'metatiles': 'meta', 'scenemaps': 'smap', 'scenemeta': 'smeta', 'scenebg3': 'bg3'}
 
 
 def meta_count(p: dict) -> int:
@@ -312,8 +482,11 @@ def check(rom: bytes, quiet: bool = True) -> list[str]:
     sys.path.insert(0, str(ROOT / 'tools'))
     import extract_data
     problems = []
+    named = scene_named(rom)
+    if named != SCENE_NAMED:
+        problems.append(f'the scene headers name {named}, not SCENE_NAMED {SCENE_NAMED}')
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('mapprops', 'metatiles'):
+        if p['piece'] not in PIECES:
             continue
         data, why = extract_data.unpack_piece(rom, p)
         if data is None:
@@ -343,9 +516,10 @@ def main() -> int:
     if problems:
         return 1
     ps = extract_data.read_manifest()
-    n = sum(1 for p in ps if p['piece'] == 'mapprops')
-    k = sum(1 for p in ps if p['piece'] == 'metatiles')
-    print(f'OK: all {n} location maps and {k} metatile packs convert to text and assemble back byte-exact')
+    n = {k: sum(1 for p in ps if p['piece'] == k) for k in PIECES}
+    print(f'OK: all {n["mapprops"]} location maps, {n["metatiles"]} metatile packs and the scene layer packs '
+          f'({n["scenemaps"]} maps, {n["scenemeta"]} metatile sets, {n["scenebg3"]} BG3 tilemaps) convert to '
+          f'text and assemble back byte-exact')
     return 0
 
 

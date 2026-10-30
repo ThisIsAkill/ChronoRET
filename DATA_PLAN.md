@@ -651,8 +651,35 @@ forms in `build/assets/maps/`. The build assembles them to `build/maps/` and pac
   - the ten 1-byte `LocGfx_Meta12Ptrs` packs (16, 55-63), which no location names;
   - `$F5:EE02` (510 B, not a valid pack; Map_PropsPtrs entry 201, unused);
   - `$EF:B168` (`LocGfx_Meta3Ptrs` entries 19-22, which do not unpack and no location selects);
-  - the scene layer data (`C2SceneRom_MapPacks`, `Bg3MapPacks`, `MetatilePacks`), which the
-    scene loaders read in their own layout: not traced here.
+  - `C2SceneRom_Bg3MapPacks` entry 5 (2,048 B), which only a script routine unpacks
+    (`C2Scene_UnpackBg3MapPack`), with no traced reader of the result.
+  - The other small tilemaps:
+    - the battle menu window and command-list maps (`$CC:FA41`-`$FADC`, `$D1:5800`-`$5E0F`); the
+      battle's BG layers are not traced;
+    - `BattleRom_FxMapPtrs` (`$D1:A575`, 16,789 B), built by `BattleCD_BuildFxTilemap` in a layout
+      not traced here;
+    - the battle background map packs (`BattleRom_BgMapPtrs`), queued to VRAM `$6800`, whose layer
+      is not traced;
+    - `MenuRom_NameChoiceMap`.
+
+Second part (`data-maps-2`): the scene layer packs the eight scene headers name
+(`maps.SCENE_NAMED`; `check` derives it from the headers). Their proof is `BankC2_InitHwRegs`:
+mode 1, BG1/BG2 maps at VRAM `$6000`/`$6800`, BG3's at `$7800` (64x32).
+- **Scene metatiles** (`scenemeta`, the 6 `C2SceneRom_MetatilePacks`, 4,096 B):
+  `C2Scene_LoadMetatiles` unpacks one to `C2Scene_Metatiles` (`$7E:3000`). `C2Scene_LayerMetatiles`
+  puts layer 1's set there and layer 2's at `$3800`: 256 metatiles of 8 B each. Each metatile is
+  four tilemap words, which `C2Scene_DrawMetatile` puts into the column buffer that
+  `C2Scene_DrawBgLayer` queues to the layer's tilemap. Text: two lists of 256 metatiles.
+- **Scene maps** (`scenemaps`, the 8 `C2SceneRom_MapPacks`, 12,288 B): `C2Scene_LoadBgMaps`
+  unpacks one to `C2Scene_BgMaps` (`$7E:4000`). It holds layer 1's map, with layer 2's at `$5800`
+  (`C2Scene_LayerMaps`): 96 x 64 metatile numbers each, row by row (`C2Scene_DrawMetatile` reads
+  column + row x 96). Text: two hex grids.
+- **Scene BG3 tilemaps** (`scenebg3`, `C2SceneRom_Bg3MapPacks` 0-4, 4,096 B):
+  `C2Scene_LoadBg3Map` unpacks one to `C2Scene_DecompBuf`, and `C2Scene_LoadVram` DMAs $1000 B of
+  it to VRAM `$7800`, BG3's tilemap (64x32: two 32x32 screens one after the other). Text: two
+  screens of 32 rows of tilemap words.
+- **Results.** 19 packs (24,576 + 98,304 + 20,480 B unpacked) assemble and pack back byte-exact;
+  `tools/verify.py` counts them under "maps".
 
 ## Order of work
 

@@ -58,6 +58,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import c3pack  # noqa: E402
 import extract_data  # noqa: E402
+import maps  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
 
@@ -84,12 +85,12 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('packed', 'events', 'scene', 'mapprops', 'metatiles'):
+        if p['piece'] not in ('packed', 'events', 'scene') + maps.PIECES:
             continue
         mode = int(extract_data.PACK_PARAM.match(p['param']).group(1))
         src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
                else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin' if p['piece'] == 'events'
-               else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in ('mapprops', 'metatiles')
+               else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in maps.PIECES
                else root / extract_data.SCENE_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
@@ -272,7 +273,7 @@ def build_maps(root: Path = ROOT) -> int:
     root = Path(root)
     written = 0
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('mapprops', 'metatiles'):
+        if p['piece'] not in maps.PIECES:
             continue
         try:
             data = maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())

@@ -162,7 +162,7 @@ GFX_PREFIX = '../../build/gfx/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
-          'mapprops', 'metatiles',
+          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
           'graphics')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
@@ -171,7 +171,7 @@ EVENTS_ASSET = re.compile(r'^events/([A-Za-z_][A-Za-z0-9_]*)\.evt$')
 EVENTS_OUT = Path('build/events')      # the assembled (unpacked) event scripts (tools/build_rom.py)
 EVENT_PACK = re.compile(r'\bvia Evt_PackPtrs\[')
 BATTLE_ASSET = re.compile(r'^battle/([a-z]+)\.bscr$')
-MAPS_ASSET = re.compile(r'^maps/([A-Za-z_][A-Za-z0-9_]*)\.(map|meta)$')
+MAPS_ASSET = re.compile(r'^maps/([A-Za-z_][A-Za-z0-9_]*)\.([a-z0-9]+)$')
 SCENE_ASSET = re.compile(r'^scene/([A-Za-z_][A-Za-z0-9_]*)\.scn$')
 SCENE_PACK = re.compile(r'\bvia C2SceneRom_ScriptPacks\[')
 GFX_ASSET = re.compile(r'^gfx/([A-Za-z_][A-Za-z0-9_]*)\.png$')
@@ -359,10 +359,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'events/{label}.evt'
         elif piece == 'scene':
             asset = f'scene/{label}.scn'
-        elif piece == 'mapprops':
-            asset = f'maps/{label}.map'
-        elif piece == 'metatiles':
-            asset = f'maps/{label}.meta'
+        elif piece in maps.PIECES:
+            asset = f'maps/{label}.{maps.ASSET_EXT[piece]}'
         elif piece == 'fx':
             asset = f'fx/{label}.bfx'
         elif piece == 'graphics':
@@ -383,7 +381,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
         elif kind == 'packed_lz':
             m = data_survey.PACK_FORMAT.match(row['format'])
             mk = maps.kind_of(row['notes'])
-            if mk and (mk[0] == 'mapprops' or int(m.group(2)) == 8 * mk[1]):
+            if mk and (mk[0] == 'mapprops' or mk[0] == 'metatiles' and int(m.group(2)) == 8 * mk[1]
+                       or mk[0] not in ('mapprops', 'metatiles') and int(m.group(2)) == mk[1]):
                 add(label, s, e, mk[0], param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
                 continue
             add(label, s, e, 'events' if EVENT_PACK.search(row['notes'])
@@ -487,12 +486,13 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
                 problems.append(f'{where}: an events piece\'s asset is events/<label>.evt and its param '
                                 f'"lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
-        elif p['piece'] in ('mapprops', 'metatiles'):
+        elif p['piece'] in maps.PIECES:
             m = MAPS_ASSET.match(p['asset'])
-            if not m or m.group(1) != p['label'] or m.group(2) != {'mapprops': 'map', 'metatiles': 'meta'}[
-                    p['piece']] or not PACK_PARAM.match(p['param']):
-                problems.append(f'{where}: a {p["piece"]} piece\'s asset is maps/<label>.map or .meta and its '
-                                f'param "lzNN -> N B": {p["asset"]!r}, {p["param"]!r}')
+            if not m or m.group(1) != p['label'] or m.group(2) != maps.ASSET_EXT[p['piece']] \
+                    or not PACK_PARAM.match(p['param']):
+                problems.append(f'{where}: a {p["piece"]} piece\'s asset is maps/<label>.'
+                                f'{maps.ASSET_EXT[p["piece"]]} and its param "lzNN -> N B": {p["asset"]!r}, '
+                                f'{p["param"]!r}')
         elif p['piece'] == 'scene':
             m = SCENE_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or not PACK_PARAM.match(p['param']):
@@ -544,7 +544,7 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSET_PREFIX + p['asset']] = p
-        elif p['piece'] in ('packed', 'events', 'scene', 'mapprops', 'metatiles'):
+        elif p['piece'] in ('packed', 'events', 'scene') + maps.PIECES:
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
         elif p['piece'] == 'fx':
             out[f'{FX_PREFIX}{p["label"]}.bin'] = p
@@ -567,7 +567,7 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSETS / p['asset']] = int(p['size'])
-        elif p['piece'] in ('packed', 'events', 'scene', 'mapprops', 'metatiles'):
+        elif p['piece'] in ('packed', 'events', 'scene') + maps.PIECES:
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
         elif p['piece'] == 'fx':
             out[FX_OUT / f'{p["label"]}.bin'] = int(p['size'])
@@ -728,6 +728,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene script')
         elif p['piece'] == 'mapprops':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, location map')
+        elif p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3'):
+            out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene layer data')
         elif p['piece'] == 'metatiles':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, metatiles')
         elif p['piece'] == 'fx':
@@ -888,7 +890,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('events', 'battle', 'scene', 'fx'):
             continue
-        if p['piece'] in ('mapprops', 'metatiles'):
+        if p['piece'] in maps.PIECES:
             data, why = unpack_piece(rom, p)
             if data is None:
                 problems.append(why)

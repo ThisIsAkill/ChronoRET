@@ -101,115 +101,115 @@ SceneListPack_007:
 ; Read by C2Scene_LoadMetatiles.
 org $C629EC
 SceneMetatilePack_000:
-    incbin "../../build/packs/SceneMetatilePack_000.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneMetatilePack_000.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:3726-$C6:4111 (2,540 B), packed_lz, confirmed: lz11 -> 4096 B: scene metatiles
 ; Read by C2Scene_LoadMetatiles.
 org $C63726
 SceneMetatilePack_001:
-    incbin "../../build/packs/SceneMetatilePack_001.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneMetatilePack_001.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:4112-$C6:4B7C (2,667 B), packed_lz, confirmed: lz11 -> 4096 B: scene metatiles
 ; Read by C2Scene_LoadMetatiles.
 org $C64112
 SceneMetatilePack_002:
-    incbin "../../build/packs/SceneMetatilePack_002.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneMetatilePack_002.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:4B7D-$C6:5666 (2,794 B), packed_lz, confirmed: lz11 -> 4096 B: scene metatiles
 ; Read by C2Scene_LoadMetatiles.
 org $C64B7D
 SceneMetatilePack_003:
-    incbin "../../build/packs/SceneMetatilePack_003.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneMetatilePack_003.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:5667-$C6:60BC (2,646 B), packed_lz, confirmed: lz11 -> 4096 B: scene metatiles
 ; Read by C2Scene_LoadMetatiles.
 org $C65667
 SceneMetatilePack_004:
-    incbin "../../build/packs/SceneMetatilePack_004.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneMetatilePack_004.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:60BD-$C6:6A38 (2,428 B), packed_lz, confirmed: lz11 -> 4096 B: scene metatiles
 ; Read by C2Scene_LoadMetatiles.
 org $C660BD
 SceneMetatilePack_005:
-    incbin "../../build/packs/SceneMetatilePack_005.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneMetatilePack_005.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:6A39-$C6:793E (3,846 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C66A39
 SceneMapPack_000:
-    incbin "../../build/packs/SceneMapPack_000.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_000.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:793F-$C6:88FD (4,031 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C6793F
 SceneMapPack_001:
-    incbin "../../build/packs/SceneMapPack_001.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_001.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:88FE-$C6:90D6 (2,009 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C688FE
 SceneMapPack_002:
-    incbin "../../build/packs/SceneMapPack_002.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_002.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:90D7-$C6:9A88 (2,482 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C690D7
 SceneMapPack_003:
-    incbin "../../build/packs/SceneMapPack_003.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_003.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:9A89-$C6:AB74 (4,332 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C69A89
 SceneMapPack_004:
-    incbin "../../build/packs/SceneMapPack_004.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_004.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:AB75-$C6:BAC4 (3,920 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C6AB75
 SceneMapPack_005:
-    incbin "../../build/packs/SceneMapPack_005.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_005.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:BAC5-$C6:C356 (2,194 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C6BAC5
 SceneMapPack_006:
-    incbin "../../build/packs/SceneMapPack_006.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_006.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:C357-$C6:C7F6 (1,184 B), packed_lz, confirmed: lz11 -> 12288 B: scene BG maps
 ; Read by C2Scene_LoadBgMaps.
 org $C6C357
 SceneMapPack_007:
-    incbin "../../build/packs/SceneMapPack_007.lz"          ; lz11 -> 12288 B
+    incbin "../../build/packs/SceneMapPack_007.lz"          ; lz11 -> 12288 B, scene layer data
 
 ; $C6:C7F7-$C6:C993 (413 B), packed_lz, confirmed: lz11 -> 4096 B: scene BG3 maps
 ; Read by C2Scene_LoadBg3Map, C2Scene_UnpackBg3MapPack.
 org $C6C7F7
 SceneBg3MapPack_000:
-    incbin "../../build/packs/SceneBg3MapPack_000.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneBg3MapPack_000.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:C994-$C6:CC0A (631 B), packed_lz, confirmed: lz11 -> 4096 B: scene BG3 maps
 ; Read by C2Scene_LoadBg3Map, C2Scene_UnpackBg3MapPack.
 org $C6C994
 SceneBg3MapPack_001:
-    incbin "../../build/packs/SceneBg3MapPack_001.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneBg3MapPack_001.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:CC0B-$C6:CD1E (276 B), packed_lz, confirmed: lz11 -> 4096 B: scene BG3 maps
 ; Read by C2Scene_LoadBg3Map, C2Scene_UnpackBg3MapPack.
 org $C6CC0B
 SceneBg3MapPack_002:
-    incbin "../../build/packs/SceneBg3MapPack_002.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneBg3MapPack_002.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:CD1F-$C6:CF71 (595 B), packed_lz, confirmed: lz11 -> 4096 B: scene BG3 maps
 ; Read by C2Scene_LoadBg3Map, C2Scene_UnpackBg3MapPack.
 org $C6CD1F
 SceneBg3MapPack_003:
-    incbin "../../build/packs/SceneBg3MapPack_003.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneBg3MapPack_003.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:CF72-$C6:D2BF (846 B), packed_lz, confirmed: lz11 -> 4096 B: scene BG3 maps
 ; Read by C2Scene_LoadBg3Map, C2Scene_UnpackBg3MapPack.
 org $C6CF72
 SceneBg3MapPack_004:
-    incbin "../../build/packs/SceneBg3MapPack_004.lz"          ; lz11 -> 4096 B
+    incbin "../../build/packs/SceneBg3MapPack_004.lz"          ; lz11 -> 4096 B, scene layer data
 
 ; $C6:D2C0-$C6:D40F (336 B), packed_lz, confirmed: lz11 -> 2048 B: scene BG3 maps
 ; Read by C2Scene_LoadBg3Map, C2Scene_UnpackBg3MapPack.
