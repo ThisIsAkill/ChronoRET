@@ -30,6 +30,11 @@ assets, with no copy of the original.
      in build/scene/ (step 3 packs them), every `fx` piece from
      build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
      tools/scripts.py, every line checked against the handlers.
+  6b. The battle scripts: every unit of `battle` pieces is assembled from
+     its readable file (build/assets/battle/<unit>.bscr) with
+     tools/battle.py, every line checked against the readers, to
+     build/battle/<label>.bin per piece (a file is rewritten only when its
+     bytes change; a piece whose size differs fails the build).
   6c. The graphics: every `graphics` piece is encoded from its PNG and
      sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
      every `gfxpack` piece the same way to its unpacked bytes in
@@ -38,11 +43,6 @@ assets, with no copy of the original.
      its text (build/assets/sprites/<label>.spr) with tools/sprites.py to
      build/sprites/<label>.bin (a file is rewritten only when its bytes
      change; a text that does not make its piece's bytes count fails).
-  6b. The battle scripts: every unit of `battle` pieces is assembled from
-     its readable file (build/assets/battle/<unit>.bscr) with
-     tools/battle.py, every line checked against the readers, to
-     build/battle/<label>.bin per piece (a file is rewritten only when its
-     bytes change; a piece whose size differs fails the build).
   7. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets

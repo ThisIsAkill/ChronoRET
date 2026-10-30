@@ -728,6 +728,15 @@ def wrap(text: str, width: int = 96, prefix: str = '; ') -> list[str]:
     return lines
 
 
+def confidence(p: dict, row: dict) -> str:
+    """A piece's confidence as its comment gives it: the survey row's, and
+    for frame records the note that their extent is inferred (the row's
+    notes say so; tools/sprites.py)."""
+    if p['piece'] == 'sprframes' and 'extent inferred' in row['notes']:
+        return f'{row["confidence"]} (extent inferred)'
+    return row['confidence']
+
+
 def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | None) -> str:
     """One bank's placement. `tables`: {label: entry lines}; None renders no
     entries (the comparison without the ROM)."""
@@ -752,7 +761,7 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
     for p in pieces:
         row = p['row']
         out.append('')
-        head = f'{p["start"]}-{p["end"]} ({int(p["size"]):,} B), {row["kind"]}, {row["confidence"]}: {row["format"]}'
+        head = f'{p["start"]}-{p["end"]} ({int(p["size"]):,} B), {row["kind"]}, {confidence(p, row)}: {row["format"]}'
         out += wrap(head)
         first = p['offset'] == data_survey.parse_addr(row['start'])
         if row['readers'] and first:
