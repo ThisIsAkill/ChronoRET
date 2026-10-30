@@ -3380,7 +3380,9 @@ MainInit:
 ; and $7800 (BG3), OBSEL and SETINI 0, the BG1-BG3 scroll registers 0
 ; (24 bytes the same as MainInit's scroll clears), BG1, BG2 and OBJ on
 ; the main screen, color math adding the sub screen, and the fixed color
-; black. What the layout is used for is not traced.
+; black. It is the field's layout: LocLoad_DrawMap (from Scene_ReloadStep,
+; after each location load and each return from bank $C2) calls it before
+; drawing the map; no other field code writes BG12NBA or BG34NBA.
 ; Callers (1 JSL site): LocLoad_DrawMap ($C0:0A5D).
 ; Callers note: JSL from $C0:0A5D (unmatched; in a routine at $C0:0A50,
 ;   called by JSR from $C0:286F, that

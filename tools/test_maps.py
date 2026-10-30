@@ -8,12 +8,14 @@ text).
 Without the ROM: a synthetic map (16x16 layers, layer 3 on and off, runs
 across row ends, a stream that ends early) and metatile pack through the
 readable forms and back, every refusal of the reader and the assembler,
-and the manifest's map pieces.
+the manifest's map pieces, and which packs the location records name
+(a synthetic ROM and survey; check compares them with the manifest).
 
 With the ROM: every map and metatile pack converts and assembles back
 byte-exact.
 """
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -195,6 +197,56 @@ class SceneLayers(unittest.TestCase):
     def test_only_named_scene_packs(self):
         self.assertEqual(maps.kind_of('via C2SceneRom_Bg3MapPacks[4]; x'), ('scenebg3', 0x1000))
         self.assertIsNone(maps.kind_of('via C2SceneRom_Bg3MapPacks[5]; x'))     # no header names it
+def fake_rows(packs, records=4):
+    """Survey rows for derive_named: the location records and packs
+    ([(table, index)]), the pack k at $E0:k0."""
+    rows = [{'start': '$F6:0000', 'size': str(14 * records), 'kind': 'table', 'format': '', 'notes': ''}]
+    for k, (table, i) in enumerate(packs):
+        rows.append({'start': f'$E0:{k * 16:04X}', 'size': '16', 'kind': 'packed_lz',
+                     'format': 'lz11 -> 4096 B', 'notes': f'via {table}[{i}]; repacks'})
+    return rows
+
+
+def fake_rom(recs):
+    """A ROM of zeros with the location records [(mapprops, tileset12,
+    tileset3)]."""
+    rom = bytearray(ed.ROM_SIZE)
+    for k, (mp, t12, t3) in enumerate(recs):
+        at = 0x360000 + 14 * k
+        rom[at + 1], rom[at + 2] = t12, t3
+        rom[at + 4:at + 6] = mp.to_bytes(2, 'little')
+    return bytes(rom)
+
+
+class Named(unittest.TestCase):
+    """Which packs are maps and metatiles, from the location records that
+    name them (a synthetic ROM and survey)."""
+
+    ROWS = fake_rows([('Map_PropsPtrs', 0), ('Map_PropsPtrs', 258), ('LocGfx_Meta12Ptrs', 0),
+                      ('LocGfx_Meta12Ptrs', 1), ('LocGfx_Meta3Ptrs', 0), ('LocGfx_Meta3Ptrs', 1)])
+    RECS = [(258, 1, 0xFF), (258, 0xFF, 1), (258, 0xFF, 0xFF), (258, 1, 1)]
+
+    def test_records_name_the_packs(self):
+        named, problems = maps.derive_named(fake_rom(self.RECS), self.ROWS)
+        self.assertEqual(problems, [])
+        # MapProps is 16-bit; $FF in Tileset12/Tileset3 names nothing
+        self.assertEqual(named, {'$E0:0010', '$E0:0030', '$E0:0050'})
+
+    def test_a_record_naming_no_pack_row(self):
+        _, problems = maps.derive_named(fake_rom(self.RECS[:3] + [(7, 0xFF, 0xFF)]), self.ROWS)
+        self.assertEqual(problems, ['location record 3 names Map_PropsPtrs[7], which no survey pack row is'])
+
+    def test_manifest_compared_both_ways(self):
+        pieces = [{'start': s, 'piece': 'mapprops'} for s in ('$E0:0000', '$E0:0010')] + \
+                 [{'start': '$E0:0030', 'piece': 'packed'}, {'start': '$E0:0050', 'piece': 'metatiles'}]
+        self.assertEqual(maps.named_problems(fake_rom(self.RECS), self.ROWS, pieces),
+                         ['$E0:0030: a location record names it, and the manifest keeps it packed',
+                          '$E0:0000: converted in the manifest, and no location record names it'])
+
+    def test_check_compares_the_manifest(self):
+        got = maps.check(fake_rom([(10, 0, 0)]))         # Map_PropsPtrs[10], which stays packed, and the rest 0
+        self.assertIn('$F0:3C27: a location record names it, and the manifest keeps it packed', got)
+        self.assertIn('$F0:0050: converted in the manifest, and no location record names it', got)
 
 
 class Source(unittest.TestCase):
@@ -202,9 +254,15 @@ class Source(unittest.TestCase):
     def test_manifest_pieces(self):
         rows = {r['start']: r for r in data_survey.read_rows()}
         pieces = [p for p in ed.read_manifest() if p['piece'] in maps.PIECES]
-        self.assertEqual(sum(p['piece'] == 'mapprops' for p in pieces), 201)
+        self.assertEqual(sum(p['piece'] == 'mapprops' for p in pieces), 197)
+        self.assertEqual(sum(p['piece'] == 'metatiles' for p in pieces), 71)
         scene = [p for p in ed.read_manifest() if p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3')]
         self.assertEqual(sorted(p['piece'] for p in scene).count('scenebg3'), 5)
+        unnamed = {(t, i) for t, ns in maps.UNNAMED.items() for i in ns}
+        via = {p['start']: re.search(r'via (\w+)\[(\d+)\]', rows.get(p['start'], {'notes': ''})['notes']) for p in ed.read_manifest()}
+        kept = [p for p in ed.read_manifest() if via[p['start']]
+                and (via[p['start']].group(1), int(via[p['start']].group(2))) in unnamed]
+        self.assertEqual([p['piece'] for p in kept], ['packed'] * 6)   # no record names them: plain packed pieces
         for p in pieces:
             kind = maps.kind_of(rows[p['start']]['notes'])
             self.assertEqual(kind[0], p['piece'])
