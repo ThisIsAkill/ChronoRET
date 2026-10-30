@@ -554,7 +554,8 @@ $D0:EB00,$D0:ED8A,651,$D0,packed_lz,lz11 -> 2048 B: battle background tile map,B
 $D0:ED8B,$D0:F197,1037,$D0,packed_lz,lz11 -> 2048 B: battle background tile map,BattleFx_LoadBgSet,confirmed,via BattleRom_BgMapPtrs[4]; repacks byte-exact (c3pack)
 $D0:F198,$D0:F98E,2039,$D0,packed_lz,lz11 -> 2048 B: battle background tile map,BattleFx_LoadBgSet,confirmed,via BattleRom_BgMapPtrs[5]; repacks byte-exact (c3pack)
 $D0:F98F,$D0:F9FF,113,$D0,padding,113 x $00,,confirmed,uniform fill; nothing points into it
-$D0:FA00,$D0:FBE1,482,$D0,palette,background sets' palette rows (BattleFx_BgSetPalOfs gives the offsets),BattleFx_LoadBgSet,confirmed,named BattleRom_BgSetPalettes; extent to the next named table (end inferred)
+$D0:FA00,$D0:FBDF,480,$D0,palette,15 rows of 16 colours (BGR555): background sets' BG palette rows 2-4,BattleFx_LoadBgSet,confirmed,named BattleRom_BgSetPalettes; extent: BattleFx_BgSetPalOfs' last offset ($180) + 3 rows
+$D0:FBE0,$D0:FBE1,2,$D0,unknown,2 bytes,,unknown,after the background sets' last palette row (BattleFx_BgSetPalOfs + 3 rows reach $D0:FBDF); no reader found
 $D0:FBE2,$D0:FCFF,286,$D0,palette,"9 sets of 14 colours, $20 apart","BattleFx_FindGradStart, BattleFx_HpGradientTick",confirmed,named BattleRom_GradColours; extent to the next named table (end inferred)
 $D0:FD00,$D0:FD5F,96,$D0,palette,48 colours (BGR555),BattleFx_LoadBgRows2To4,confirmed,BattleRom_BgRows2To4: 48 colours
 $D0:FD60,$D0:FFFF,672,$D0,padding,672 x $FF,,confirmed,uniform fill; nothing points into it
@@ -2165,7 +2166,8 @@ $FF:9CF0,$FF:9DEF,256,$FF,graphics,four 64-B pieces (FieldRom_Unk9CF0); stage 2 
 $FF:9DF0,$FF:9E09,26,$FF,palette,16 colours -> $80-$8F (the first sprite palette),"Menu_LoadGraphics, Menu_MainMenuLoop",confirmed,named MenuRom_ObjPal; extent: the reader's 13 records (tools/records.py); the reader's 32-byte copy takes these 13 colours and the 3 of MenuRom_MainPalC after them
 $FF:9E0A,$FF:9E0F,6,$FF,palette,6 B (MenuRom_MainPalC): to !Battle_PaletteSavedLo + $13A,"Battle_InitScene, Menu_MainIconSprites",confirmed,"named BattleRom_ColoursC, MenuRom_MainPalC; extent: the reader's 3 records (tools/records.py)"
 $FF:9E10,$FF:B20F,5120,$FF,graphics,8 window styles of $280 B (4bpp tiles),"Menu_LoadGraphics, Menu_LoadWindowGfx",confirmed,named MenuRom_WindowGfx; extent to the next named table (end inferred)
-$FF:B210,$FF:B30F,256,$FF,palette,colour sets 16 B apart (window palettes),"Pal_LoadUnkRow0, Menu_LoadWindowPal",confirmed,"named FieldRom_PalRow0Sets, MenuRom_WindowPals; extent to the next named table (end inferred)"
+$FF:B210,$FF:B29F,144,$FF,palette,"window palettes: 8 colours per style 0-7, 16 B apart (and the field reads 15 from style x 16 + 2)","Pal_LoadUnkRow0, Menu_LoadWindowPal",confirmed,"named FieldRom_PalRow0Sets, MenuRom_WindowPals; extent: Pal_LoadUnkRow0's 30 B from style 7 x 16 + 2 end at $FF:B29F"
+$FF:B2A0,$FF:B30F,112,$FF,palette,BGR555 colours,,probable,after the window palettes the readers reach (styles 0-7): no reader found
 $FF:B310,$FF:BD17,2568,$FF,text,"u16 per item id: address of its 9-byte string, then the strings",Menu_DrawInvEntry,confirmed,named MenuRom_ItemTextPtrs; extent to the next named table (end inferred)
 $FF:BD18,$FF:BD2D,22,$FF,table,per command byte: argument bytes - 1 (Menu_RunDrawList),,confirmed,named MenuRom_DrawArgLens; extent to the next named table (end inferred)
 $FF:BD2E,$FF:BD50,35,$FF,table,Menu_RunDrawList draw list (command bytes and arguments),Menu_MainMenuIcons,confirmed,named MenuRom_MainIconList; extent to the next named table (end inferred)

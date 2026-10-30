@@ -185,12 +185,18 @@ org $FF9E10
 MenuRom_WindowGfx:
     incbin "../../build/gfx/MenuRom_WindowGfx.bin"          ; graphics: 4bpp 160 tiles
 
-; $FF:B210-$FF:B30F (256 B), palette, confirmed: colour sets 16 B apart (window palettes)
+; $FF:B210-$FF:B29F (144 B), palette, confirmed: window palettes: 8 colours per style 0-7, 16 B
+; apart (and the field reads 15 from style x 16 + 2)
 ; Read by Pal_LoadUnkRow0, Menu_LoadWindowPal.
 org $FFB210
 FieldRom_PalRow0Sets:
 MenuRom_WindowPals:
-    incbin "../../build/assets/palette/FieldRom_PalRow0Sets.bin"
+    incbin "../../build/records/FieldRom_PalRow0Sets.bin"          ; records: palette 9 x 16 B
+
+; $FF:B2A0-$FF:B30F (112 B), palette, probable: BGR555 colours
+org $FFB2A0
+Palette_FFB2A0:
+    incbin "../../build/assets/palette/Palette_FFB2A0.bin"
 
 ; $FF:B310-$FF:BD17 (2,568 B), text, confirmed: u16 per item id: address of its 9-byte string,
 ; then the strings

@@ -21,14 +21,14 @@ SceneScriptPack_007,$C3:C805,$C3:CE43,1599,scene,scene/SceneScriptPack_007.scn,l
 ScenePalPack_000,$C3:CE44,$C3:CED9,150,packed,packed_lz/ScenePalPack_000.bin,lz11 -> 256 B
 ScenePalPack_001,$C3:CEDA,$C3:CF6B,146,packed,packed_lz/ScenePalPack_001.bin,lz11 -> 160 B
 ScenePalPack_002,$C3:CF6C,$C3:CFF4,137,packed,packed_lz/ScenePalPack_002.bin,lz12 -> 128 B
-ScenePalPack_003,$C3:CFF5,$C3:D01B,39,packed,packed_lz/ScenePalPack_003.bin,lz12 -> 32 B
-ScenePalPack_004,$C3:D01C,$C3:D1EB,464,packed,packed_lz/ScenePalPack_004.bin,lz11 -> 512 B
-ScenePalPack_005,$C3:D1EC,$C3:D35E,371,packed,packed_lz/ScenePalPack_005.bin,lz11 -> 512 B
-ScenePalPack_006,$C3:D35F,$C3:D4D7,377,packed,packed_lz/ScenePalPack_006.bin,lz11 -> 512 B
-ScenePalPack_007,$C3:D4D8,$C3:D644,365,packed,packed_lz/ScenePalPack_007.bin,lz11 -> 512 B
-ScenePalPack_008,$C3:D645,$C3:D7C2,382,packed,packed_lz/ScenePalPack_008.bin,lz11 -> 512 B
-ScenePalPack_009,$C3:D7C3,$C3:D937,373,packed,packed_lz/ScenePalPack_009.bin,lz11 -> 512 B
-ScenePalPack_010,$C3:D938,$C3:DAF1,442,packed,packed_lz/ScenePalPack_010.bin,lz11 -> 512 B
+ScenePalPack_003,$C3:CFF5,$C3:D01B,39,scenepal,maps/ScenePalPack_003.spal,lz12 -> 32 B
+ScenePalPack_004,$C3:D01C,$C3:D1EB,464,scenepal,maps/ScenePalPack_004.spal,lz11 -> 512 B
+ScenePalPack_005,$C3:D1EC,$C3:D35E,371,scenepal,maps/ScenePalPack_005.spal,lz11 -> 512 B
+ScenePalPack_006,$C3:D35F,$C3:D4D7,377,scenepal,maps/ScenePalPack_006.spal,lz11 -> 512 B
+ScenePalPack_007,$C3:D4D8,$C3:D644,365,scenepal,maps/ScenePalPack_007.spal,lz11 -> 512 B
+ScenePalPack_008,$C3:D645,$C3:D7C2,382,scenepal,maps/ScenePalPack_008.spal,lz11 -> 512 B
+ScenePalPack_009,$C3:D7C3,$C3:D937,373,scenepal,maps/ScenePalPack_009.spal,lz11 -> 512 B
+ScenePalPack_010,$C3:D938,$C3:DAF1,442,scenepal,maps/ScenePalPack_010.spal,lz11 -> 512 B
 ScenePalPack_011,$C3:DAF2,$C3:DB98,167,packed,packed_lz/ScenePalPack_011.bin,lz11 -> 352 B
 ScenePalPack_012,$C3:DB99,$C3:DC44,172,packed,packed_lz/ScenePalPack_012.bin,lz11 -> 256 B
 ScenePalPack_013,$C3:DC45,$C3:DCBD,121,packed,packed_lz/ScenePalPack_013.bin,lz11 -> 160 B
@@ -424,7 +424,7 @@ BattleRom_SlotTimes256,$CC:F67C,$CC:F693,24,extracted,table/BattleRom_SlotTimes2
 BattleRom_CellMapEdge,$CC:F694,$CC:F6D3,64,extracted,table/BattleRom_CellMapEdge.bin,
 Table_CCF6D4,$CC:F6D4,$CC:F753,128,extracted,table/Table_CCF6D4.bin,
 BattleRom_FxCycleList,$CC:F754,$CC:F77A,39,extracted,table/BattleRom_FxCycleList.bin,
-BattleRom_FxTintColours,$CC:F77B,$CC:F77E,4,extracted,palette/BattleRom_FxTintColours.bin,
+BattleRom_FxTintColours,$CC:F77B,$CC:F77E,4,records,records/BattleRom_FxTintColours.tsv,palette 1 x 4 B
 Table_CCF77F,$CC:F77F,$CC:F7BF,65,extracted,table/Table_CCF77F.bin,
 BattleRom_ActFrameBase,$CC:F7C0,$CC:F81F,96,extracted,table/BattleRom_ActFrameBase.bin,
 BattleRom_Times16,$CC:F820,$CC:F828,9,extracted,table/BattleRom_Times16.bin,
@@ -556,7 +556,8 @@ BattleBgMapPack_003,$D0:EB00,$D0:ED8A,651,packed,packed_lz/BattleBgMapPack_003.b
 BattleBgMapPack_004,$D0:ED8B,$D0:F197,1037,packed,packed_lz/BattleBgMapPack_004.bin,lz11 -> 2048 B
 BattleBgMapPack_005,$D0:F198,$D0:F98E,2039,packed,packed_lz/BattleBgMapPack_005.bin,lz11 -> 2048 B
 Padding_D0F98F,$D0:F98F,$D0:F9FF,113,fill,,$00
-BattleRom_BgSetPalettes,$D0:FA00,$D0:FBE1,482,extracted,palette/BattleRom_BgSetPalettes.bin,
+BattleRom_BgSetPalettes,$D0:FA00,$D0:FBDF,480,records,records/BattleRom_BgSetPalettes.tsv,palette 15 x 32 B
+Unknown_D0FBE0,$D0:FBE0,$D0:FBE1,2,extracted,unknown/Unknown_D0FBE0.bin,
 BattleRom_GradColours,$D0:FBE2,$D0:FCFF,286,extracted,palette/BattleRom_GradColours.bin,
 Palette_D0FD00,$D0:FD00,$D0:FD5F,96,records,records/Palette_D0FD00.tsv,palette 48 x 2 B
 Padding_D0FD60,$D0:FD60,$D0:FFFF,672,fill,,$FF
@@ -1616,7 +1617,7 @@ Map_PropsPtrs,$F6:1E00,$F6:20FF,768,table,,dl x 256
 LocGfx_Meta12Ptrs,$F6:2100,$F6:21BF,192,table,,dl x 64
 LocGfx_Meta3Ptrs,$F6:21C0,$F6:221F,96,table,,dl x 32
 LocGfx_PackPtrs,$F6:2220,$F6:24BF,672,table,,dl x 224
-LocPal_Rom,$F6:24C0,$F6:6CEF,18480,extracted,palette/LocPal_Rom.bin,
+LocPal_Rom,$F6:24C0,$F6:6CEF,18480,records,records/LocPal_Rom.tsv,palette 616 x 30 B
 Palette_F66CF0,$F6:6CF0,$F6:7B7F,3728,extracted,palette/Palette_F66CF0.bin,
 Padding_F67B80,$F6:7B80,$F6:7FFF,1152,fill,,$00
 LocGfxPack_211,$F6:8000,$F6:8D58,3417,packed,packed_lz/LocGfxPack_211.bin,lz11 -> 5408 B
@@ -2167,7 +2168,8 @@ BattleRom_ObjTilePieces,$FF:9CF0,$FF:9DEF,256,graphics,gfx/BattleRom_ObjTilePiec
 MenuRom_ObjPal,$FF:9DF0,$FF:9E09,26,records,records/MenuRom_ObjPal.tsv,palette 13 x 2 B
 BattleRom_ColoursC,$FF:9E0A,$FF:9E0F,6,records,records/BattleRom_ColoursC.tsv,palette 3 x 2 B
 MenuRom_WindowGfx,$FF:9E10,$FF:B20F,5120,graphics,gfx/MenuRom_WindowGfx.png,4bpp 160 tiles
-FieldRom_PalRow0Sets,$FF:B210,$FF:B30F,256,extracted,palette/FieldRom_PalRow0Sets.bin,
+FieldRom_PalRow0Sets,$FF:B210,$FF:B29F,144,records,records/FieldRom_PalRow0Sets.tsv,palette 9 x 16 B
+Palette_FFB2A0,$FF:B2A0,$FF:B30F,112,extracted,palette/Palette_FFB2A0.bin,
 MenuRom_ItemTextPtrs,$FF:B310,$FF:BD17,2568,extracted,text/MenuRom_ItemTextPtrs.bin,
 MenuRom_DrawArgLens,$FF:BD18,$FF:BD2D,22,extracted,table/MenuRom_DrawArgLens.bin,
 MenuRom_MainIconList,$FF:BD2E,$FF:BD50,35,drawlist,menu/MenuRom_MainIconList.mdl,

@@ -668,7 +668,7 @@ BattleRom_FxCycleList:
 ; Read by Battle_FxOverlay2Tint.
 org $CCF77B
 BattleRom_FxTintColours:
-    incbin "../../build/assets/palette/BattleRom_FxTintColours.bin"
+    incbin "../../build/records/BattleRom_FxTintColours.bin"          ; records: palette 1 x 4 B
 
 ; $CC:F77F-$CC:F7BF (65 B), table, confirmed: 4 B records, ended by a negative status byte
 ; (BattleRom_StatusAnim struct)

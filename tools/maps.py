@@ -66,12 +66,18 @@ PROPS_TABLE = 'Map_PropsPtrs'
 # it from the headers): C2Scene_LoadMetatiles (C2Scene_HdrMetatiles),
 # C2Scene_LoadBgMaps (C2Scene_HdrMaps), C2Scene_LoadBg3Map
 # (C2Scene_HdrBg3Map).
+# The palette packs (C2Scene_LoadPalettes, C2Scene_HdrPalettes) unpack to
+# C2Scene_PaletteStage, which C2Scene_LoadVram DMAs to CGRAM from colour 0
+# (C2Scene_PaletteBytes): their size is any whole number of colours (None).
+# C2Scene_LoadExtraPalette's pack (C2Scene_ExtraPalPack) unpacks into the
+# CGRAM shadow C2Scene_PaletteBuf, which the NMI uploads; scene_named adds it.
 SCENE_TABLES = {'C2SceneRom_MetatilePacks': ('scenemeta', 0x1000), 'C2SceneRom_MapPacks': ('scenemaps', 0x3000),
-                'C2SceneRom_Bg3MapPacks': ('scenebg3', 0x1000)}
+                'C2SceneRom_Bg3MapPacks': ('scenebg3', 0x1000), 'C2SceneRom_PalettePacks': ('scenepal', None)}
 SCENE_NAMED = {'C2SceneRom_MetatilePacks': {0, 1, 2, 3, 4, 5}, 'C2SceneRom_MapPacks': {0, 1, 2, 3, 4, 5, 6, 7},
-               'C2SceneRom_Bg3MapPacks': {0, 1, 2, 3, 4}}
+               'C2SceneRom_Bg3MapPacks': {0, 1, 2, 3, 4}, 'C2SceneRom_PalettePacks': {3, 4, 5, 6, 7, 8, 9, 10}}
 SCENE_HDR = {'C2SceneRom_MetatilePacks': 'C2Scene_HdrMetatiles', 'C2SceneRom_MapPacks': 'C2Scene_HdrMaps',
-             'C2SceneRom_Bg3MapPacks': 'C2Scene_HdrBg3Map'}
+             'C2SceneRom_Bg3MapPacks': 'C2Scene_HdrBg3Map', 'C2SceneRom_PalettePacks': 'C2Scene_HdrPalettes'}
+PAL_ROW = 16                           # colours per CGRAM palette row
 SCENE_MAP_W, SCENE_MAP_H = 96, 64      # C2Scene_MapCols x C2Scene_MapRows, per layer (C2Scene_LayerMaps)
 SCENE_METATILES = 256                  # per layer: C2Scene_LayerMetatiles $3000 and $3800, 8 B each
 META_TABLES = {'LocGfx_Meta12Ptrs': 512, 'LocGfx_Meta3Ptrs': 256}    # metatiles per pack (the RAM tables)
@@ -425,7 +431,54 @@ def scene_named(rom: bytes, root: Path = ROOT) -> dict[str, set[int]]:
             v = rom[F(h) + d[field]]
             if not v & 0x80:                 # bit 7: nothing loaded
                 out[t].add(v)
+    out['C2SceneRom_PalettePacks'].add(d['C2Scene_ExtraPalPack'])
     return out
+
+
+def colour_text(v: int) -> str:
+    """A BGR555 word as R,G,B (0-31 each), with ! for bit 15 (kept as it is)."""
+    return f'{v & 31},{v >> 5 & 31},{v >> 10 & 31}{"!" if v & 0x8000 else ""}'
+
+
+COLOUR = re.compile(r'^(\d{1,2}),(\d{1,2}),(\d{1,2})(!?)$')
+
+
+def colour_value(t: str, where: str) -> int:
+    m = COLOUR.match(t)
+    if not m or not all(int(x) < 32 for x in m.groups()[:3]):
+        raise MapsError(f'{where}: bad colour {t!r} (R,G,B, each 0-31, then ! for bit 15)')
+    r, g, b = (int(x) for x in m.groups()[:3])
+    return r | g << 5 | b << 10 | (0x8000 if m.group(4) else 0)
+
+
+def render_scene_pal(label: str, data: bytes) -> str:
+    if not data or len(data) % 2:
+        raise MapsError(f'{label}: {len(data)} B is no whole number of colours')
+    n = len(data) // 2
+    out = [line.format(label=label, what='scene palette colours (BGR555)') for line in HEAD]
+    out.append(f'@scenepal {label} {n}    ; rows of {PAL_ROW} colours (CGRAM palette rows), R,G,B 0-31')
+    for r in range(0, n, PAL_ROW):
+        cells = [colour_text(data[2 * k] | data[2 * k + 1] << 8) for k in range(r, min(n, r + PAL_ROW))]
+        out.append(f'{r // PAL_ROW:02X}: ' + ' '.join(cells))
+    return '\n'.join(out) + '\n'
+
+
+def assemble_scene_pal(text: str, label: str, size: int, name: str = '<spal>') -> bytes:
+    lines = [(f'{name}:{no}', w) for no, w in _lines(text)]
+    n = size // 2
+    if size % 2 or not lines or lines[0][1] != ['@scenepal', label, str(n)]:
+        raise MapsError(f'{name}: the first line is @scenepal {label} {n}')
+    rows = lines[1:]
+    if len(rows) != -(-n // PAL_ROW):
+        raise MapsError(f'{name}: {n} colours are {-(-n // PAL_ROW)} rows; there are {len(rows)}')
+    out = bytearray()
+    for r, (rw, cells) in enumerate(rows):
+        want = min(PAL_ROW, n - r * PAL_ROW)
+        if not cells or cells[0] != f'{r:02X}:' or len(cells) - 1 != want:
+            raise MapsError(f'{rw}: expected {r:02X}: and {want} colours')
+        for t in cells[1:]:
+            out += colour_value(t, rw).to_bytes(2, 'little')
+    return bytes(out)
 
 
 # ── Pieces ───────────────────────────────────────────────────────────────
@@ -454,6 +507,8 @@ def render_piece(p: dict, data: bytes) -> str:
         return render_scene_meta(p['label'], data)
     if p['piece'] == 'scenebg3':
         return render_bg3(p['label'], data)
+    if p['piece'] == 'scenepal':
+        return render_scene_pal(p['label'], data)
     return render_meta(p['label'], data, meta_count(p))
 
 
@@ -466,11 +521,23 @@ def assemble_piece(p: dict, text: str) -> bytes:
         return assemble_scene_meta(text, p['label'], p['label'])
     if p['piece'] == 'scenebg3':
         return assemble_bg3(text, p['label'], p['label'])
+    if p['piece'] == 'scenepal':
+        return assemble_scene_pal(text, p['label'], int(PACK_PARAM.match(p['param']).group(2)), p['label'])
     return assemble_meta(text, p['label'], meta_count(p), p['label'])
 
 
-PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3')
-ASSET_EXT = {'mapprops': 'map', 'metatiles': 'meta', 'scenemaps': 'smap', 'scenemeta': 'smeta', 'scenebg3': 'bg3'}
+PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal')
+ASSET_EXT = {'mapprops': 'map', 'metatiles': 'meta', 'scenemaps': 'smap', 'scenemeta': 'smeta', 'scenebg3': 'bg3',
+             'scenepal': 'spal'}
+
+
+def size_ok(kind: str, want: int | None, size: int) -> bool:
+    """Whether a pack of `size` unpacked bytes is a piece of `kind`
+    (kind_of's size: exact; None: any whole number of colours)."""
+    if want is not None:
+        return size == want
+    return size % 2 == 0
+PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
 
 
 def meta_count(p: dict) -> int:
@@ -518,7 +585,8 @@ def main() -> int:
     ps = extract_data.read_manifest()
     n = {k: sum(1 for p in ps if p['piece'] == k) for k in PIECES}
     print(f'OK: all {n["mapprops"]} location maps, {n["metatiles"]} metatile packs and the scene layer packs '
-          f'({n["scenemaps"]} maps, {n["scenemeta"]} metatile sets, {n["scenebg3"]} BG3 tilemaps) convert to '
+          f'({n["scenemaps"]} maps, {n["scenemeta"]} metatile sets, {n["scenebg3"]} BG3 tilemaps, '
+          f'{n["scenepal"]} palette packs) convert to '
           f'text and assemble back byte-exact')
     return 0
 

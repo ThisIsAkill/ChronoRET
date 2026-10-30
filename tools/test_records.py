@@ -210,6 +210,27 @@ class Derived(unittest.TestCase):
         rom[F(0xF60000) + 14 * 9 + 1] = 3
         self.assertEqual(records._loc_tilesets(bytes(rom), D), 13)
 
+    def test_loc_palettes(self):
+        rom = bytearray(0x400000)
+        rom[F(0xF60000) + 14 * 300 + 3] = 87
+        self.assertEqual(records._loc_palettes(bytes(rom), D), 7 * 88)
+        self.assertEqual(records._loc_palettes(bytes(rom), dict(D, LocPal_RowBytes=28)), -1)
+        self.assertEqual(records._loc_palettes(bytes(rom), dict(D, LocPal_SetBytes=0xD0)), -1)
+
+    def test_bg_set_rows_from_the_source(self):
+        self.assertEqual(records._bg_set_rows(), 15)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'd1.asm'
+            path.write_text('BattleFx_BgSetPalOfs:\n    dw $0000, $01E0  ; sets\n')
+            self.assertEqual(records._bg_set_rows(path), 18)
+            path.write_text('BattleFx_BgSetPalOfsX:\n    dw $0000\n')
+            with self.assertRaisesRegex(records.RecordsError, 'no BattleFx_BgSetPalOfs'):
+                records._bg_set_rows(path)
+            path.write_text('BattleFx_BgSetPalOfs:\n    db $00\n')
+            with self.assertRaisesRegex(records.RecordsError, 'expected a dw line'):
+                records._bg_set_rows(path)
+
     def test_derived_counts(self):
         rom = ed.read_rom() if HAVE_ROM else None
         if rom is None:
@@ -219,7 +240,8 @@ class Derived(unittest.TestCase):
                                    ('Battle_EnemyPartNone', 254, '$CC:7AC9'), ('Battle_EffectRecSize', 13, '$CC:7AC9'),
                                    ('BattleCD_GfxPartTiles', 16, '$CF:A000'), ('ObjPal_CopyCount', 0x18, '$E4:0000'),
                                    ('SprRec_FirstNpc', 8, '$E4:F000'), ('LocRom_SetNone', 53, '$F6:1C00'),
-                                   ('Battle_ActObjects', 15, '$CE:8870')):
+                                   ('Battle_ActObjects', 15, '$CE:8870'), ('LocPal_RowBytes', 28, '$F6:24C0'),
+                                   ('Pal_Row0SetMask', 8, '$FF:B210'), ('Menu_WinStyleMask', 3, '$FF:B210')):
             got = records.derived_problems(rom, dict(D, **{name: value}), ed.read_manifest())
             self.assertTrue(any(x.startswith(start) for x in got), (name, got))
         no_piece = [p for p in ed.read_manifest() if p['label'] != 'BattleRom_ActObjRec_Lists']

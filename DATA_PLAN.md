@@ -818,6 +818,55 @@ below). Each group's bound is re-derived by its tool's `check` and again at extr
     computed from values not traced. This includes the `C2SceneRom_*_Tail` bytes after the scene
     pointer tables.
 
+## Palettes
+
+On the `data-tables-4` branch. A palette is converted only where its readers prove both how many
+colours it holds and that they reach CGRAM. Each count is re-derived by `check`.
+
+- **Raw palettes as records** (`tools/records.py` `PALETTES`, R/G/B columns with bit 15 kept;
+  19,108 B):
+  - `LocPal_Rom` (`$F6:24C0`, 616 rows of 15 colours). `LocLoad_Unk7084` copies 7 rows of colours
+    1-15 (`LocPal_RowBytes` each) of entry `LocRom.Palette` to `Pal_Buf` rows 1-7.
+    `Pal_LoadUnkRow0` copies `Pal_Buf` to `Pal_CgramBuf`, and `Pal_UploadCgram` DMAs that to CGRAM
+    from colour 0. 88 entries: `LocRom`, this index's only source, names palettes 0-87 (`DERIVED`
+    with `LocPal_SetBytes` = 7 x `LocPal_RowBytes`).
+  - `BattleRom_BgSetPalettes` (`$D0:FA00`, 15 rows of 16). `BattleFx_LoadBgSet` copies 3 rows from
+    `BattleFx_BgSetPalOfs[set]` (sets 0-5, read from the source) to BG palette rows 2-4 of the
+    battle palette, which `$CF` sends to CGRAM in full. The 2 B after the last row are unknown.
+  - The window palettes (`$FF:B210`, 9 x 8 colours). `Menu_LoadWindowPal` copies 8 colours of
+    style 0-7; `Pal_LoadUnkRow0` copies 15 from style x 16 + 2, so it reaches `$FF:B29F`. The 112
+    B after that are reached by no reader: a probable palette row.
+  - `BattleRom_FxTintColours` (2 colours, written by `Battle_FxOverlay2Tint` into live palette
+    bytes 6-9).
+- **Scene palette packs** (`tools/maps.py`, piece `scenepal`; 8 packs, 2,813 B packed, 3,616 B
+  unpacked; text rows of 16 colours as `R,G,B`, `!` for bit 15):
+  - Packs 4-10 are the ones the scene headers name (`C2Scene_HdrPalettes`). `C2Scene_LoadPalettes`
+    unpacks one to `C2Scene_PaletteStage`, which `C2Scene_LoadVram` DMAs to CGRAM from colour 0
+    (`C2Scene_PaletteBytes`, 512 B).
+  - Pack 3 is `C2Scene_ExtraPalPack`, unpacked into the CGRAM shadow `C2Scene_PaletteBuf`.
+  - `scene_named` derives the set and `check` compares it.
+- **Not proven, still bytes:**
+  - `$F6:6CF0` (3,728 B), the palette-animation colours. `PalAnim_*` reads them at offsets from
+    `FieldRom_AnimListB` records; their extent is not traced.
+  - The three `$FE` palettes (1,986 B), read by the `$C3` module, whose code is being matched
+    separately.
+  - `BattleRom_PalSets14`/`PalSets6` (2,038 B): the set number comes from the palette-step records
+    (`$CD:EE23`), which are not proved.
+  - Rows whose readers' byte index reaches past the row:
+    - `BattleRom_SpecialPals` (786 B: opcode `$69`'s operand x 24);
+    - `BattleRom_FxColours` (576 B: a script id x 8);
+    - `MenuRom_MainPalB` (16 B).
+  - `BattleRom_FxCycleColours` (640 B), read through `BattleRom_FxCycleList`'s offsets, whose
+    extent is not proved.
+  - `BattleRom_WeaponColours` (192 B), indexed through `BattleRom_WeaponColourIdx`, which is not
+    proved.
+  - `BattleRom_GradColours` (286 B): 14-colour sets `$20` apart. The 4 B between sets are not read
+    as colours, so the row is not one layout.
+  - `MenuRom_SlotIconPals` (368 B): character x 32 reaches 224 B, but the row is not whole rows.
+  - Scene palette packs 0 (the party pack: only the first 16 B of each character's 32 are read),
+    1, 2 and 11-17 (no header names them; script loads are not traced), and 18
+    (`C2Scene_UnkC600Pack`, whose use is not traced).
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed

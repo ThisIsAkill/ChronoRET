@@ -285,6 +285,15 @@ PALETTES: dict[str, tuple[int, int]] = {
     '$FF:CBC4': (1, 8), '$FF:CBE4': (1, 24), '$FF:CC14': (1, 8), '$FF:CC34': (1, 8),
     '$FF:CC64': (1, 8), '$FF:CC74': (1, 8), '$FF:CDF4': (1, 8), '$FF:CE04': (1, 8),
     '$FF:CE30': (1, 16), '$FF:CE9A': (1, 16),
+    '$F6:24C0': (15, 616),      # LocPal_Rom: LocLoad_Unk7084 copies 7 rows of colours 1-15 (LocPal_RowBytes each) of
+                                # entry LocRom.Palette (x LocPal_SetBytes) to Pal_Buf rows 1-7, which Pal_LoadUnkRow0
+                                # copies to Pal_CgramBuf and Pal_UploadCgram DMAs to CGRAM: 88 entries (DERIVED)
+    '$D0:FA00': (16, 15),       # BattleRom_BgSetPalettes: BattleFx_LoadBgSet copies 3 rows of 16 colours from
+                                # BattleFx_BgSetPalOfs[set] (sets 0-5) to BG palette rows 2-4 (DERIVED)
+    '$FF:B210': (8, 9),         # MenuRom_WindowPals: Menu_LoadWindowPal copies 8 colours of style 0-7 (x 16 B),
+                                # Pal_LoadUnkRow0 15 colours from style x 16 + 2 (styles 0-7): 144 B (DERIVED)
+    '$CC:F77B': (2, 1),         # BattleRom_FxTintColours: Battle_FxOverlay2Tint writes its 4 bytes into live
+                                # palette bytes 6-9 (colours 3-4)
     '$E4:0000': (12, 256),      # the sprite palettes: a sprite record's palette byte x Pal_ObjColorBytes (Obj_PalSrc,
                                 # the field's 24-byte copy of colours 1-12; MenuRom_E4Palettes' offsets the same)
 }
@@ -335,6 +344,31 @@ def _loc_tilesets(rom: bytes, d: dict) -> int:
     return 1 + max(v for v in used if v != d['LocRom_SetNone'])
 
 
+def _loc_palettes(rom: bytes, d: dict) -> int:
+    """Rows of 15 colours in LocPal_Rom the locations name: 7 per entry,
+    1 + the largest LocRom.Palette entries (LocRom's only reader of it is
+    LocLoad_Unk7084)."""
+    if d['LocPal_SetBytes'] != 7 * d['LocPal_RowBytes'] or d['LocPal_RowBytes'] != 30:
+        return -1
+    used = [rom[0xF60000 - 0xC00000 + 14 * k + 3] for k in range(512)]
+    return 7 * (1 + max(used))
+
+
+def _bg_set_rows(path: Path = ROOT / 'asm' / 'bankD1' / 'bankD1.asm') -> int:
+    """Rows of 16 colours BattleFx_LoadBgSet reaches: the source's
+    BattleFx_BgSetPalOfs (one word per background set) + 3 rows."""
+    lines = path.read_text().splitlines()
+    try:
+        i = lines.index('BattleFx_BgSetPalOfs:')
+    except ValueError:
+        raise RecordsError('bankD1.asm: no BattleFx_BgSetPalOfs') from None
+    m = re.match(r'^\s+dw\s+([^;]*)', lines[i + 1])
+    if not m:
+        raise RecordsError('BattleFx_BgSetPalOfs: expected a dw line')
+    ofs = [int(v.strip().lstrip('$'), 16) for v in m.group(1).split(',')]
+    return (max(ofs) + 3 * 32) // 32
+
+
 # Row start -> (what, count(rom, defines)): the reader's bound, re-derived
 # from the source's defines or the ROM by `check` (and the extraction),
 # against the layout's count.
@@ -351,6 +385,11 @@ DERIVED = {
                  else -1),
     '$E4:0000': ('256 palettes of Pal_ObjColorBytes (ObjPal_CopyCount + 1)',
                  lambda rom, d: 256 if d['Pal_ObjColorBytes'] == d['ObjPal_CopyCount'] + 1 == 24 else -1),
+    '$F6:24C0': ('7 rows x (1 + the largest LocRom.Palette)', lambda rom, d: _loc_palettes(rom, d)),
+    '$D0:FA00': ('rows up to the last BattleFx_BgSetPalOfs + 3 rows', lambda rom, d: _bg_set_rows()),
+    '$FF:B210': ('8-colour rows up to style Pal_Row0SetMask x 16 + 2 + 30 B',
+                 lambda rom, d: (d['Pal_Row0SetMask'] * 16 + 2 + 30) // 16
+                 if d['Menu_WinStyleMask'] == d['Pal_Row0SetMask'] else -1),
     '$E4:F000': ('SprRec_FirstNpc + 256 records', lambda rom, d: d['SprRec_FirstNpc'] + 256),
     '$F6:1C00': ('1 + the largest LocRom.Tileset12', _loc_tilesets),
 }

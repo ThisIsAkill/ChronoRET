@@ -70,6 +70,8 @@ How each piece's bytes are made (the manifest's `piece` column):
   metatiles  a metatile pack (LocGfx_Meta12Ptrs / Meta3Ptrs) of a whole
              table: build/assets/maps/<label>.meta, its tilemap words as
              text; built the same way. Counted as "maps".
+  scenemaps, scenemeta, scenebg3, scenepal  the scene layer and palette
+             packs the scene headers name (tools/maps.py), the same way.
   fx         the battle layer-effect scripts with their table
              (tools/scripts.py's FX_ROWS): build/assets/fx/<label>.bfx; the
              build assembles it to build/fx/<label>.bin, which is incbin'd.
@@ -182,7 +184,7 @@ SPRITES_PREFIX = '../../build/sprites/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
-          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
+          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal',
           'graphics', 'sprframes', 'animframes', 'animtimes', 'drawlist')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
@@ -427,7 +429,7 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             m = data_survey.PACK_FORMAT.match(row['format'])
             mk = maps.kind_of(row['notes'])
             if mk and (mk[0] == 'mapprops' or mk[0] == 'metatiles' and int(m.group(2)) == 8 * mk[1]
-                       or mk[0] not in ('mapprops', 'metatiles') and int(m.group(2)) == mk[1]):
+                       or mk[0] not in ('mapprops', 'metatiles') and maps.size_ok(mk[0], mk[1], int(m.group(2)))):
                 add(label, s, e, mk[0], param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
                 continue
             add(label, s, e, 'events' if EVENT_PACK.search(row['notes'])
@@ -797,7 +799,7 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene script')
         elif p['piece'] == 'mapprops':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, location map')
-        elif p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3'):
+        elif p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3', 'scenepal'):
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene layer data')
         elif p['piece'] == 'metatiles':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, metatiles')

@@ -123,56 +123,56 @@ ScenePalPack_002:
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3CFF5
 ScenePalPack_003:
-    incbin "../../build/packs/ScenePalPack_003.lz"          ; lz12 -> 32 B
+    incbin "../../build/packs/ScenePalPack_003.lz"          ; lz12 -> 32 B, scene layer data
 
 ; $C3:D01C-$C3:D1EB (464 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D01C
 ScenePalPack_004:
-    incbin "../../build/packs/ScenePalPack_004.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_004.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:D1EC-$C3:D35E (371 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D1EC
 ScenePalPack_005:
-    incbin "../../build/packs/ScenePalPack_005.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_005.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:D35F-$C3:D4D7 (377 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D35F
 ScenePalPack_006:
-    incbin "../../build/packs/ScenePalPack_006.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_006.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:D4D8-$C3:D644 (365 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D4D8
 ScenePalPack_007:
-    incbin "../../build/packs/ScenePalPack_007.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_007.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:D645-$C3:D7C2 (382 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D645
 ScenePalPack_008:
-    incbin "../../build/packs/ScenePalPack_008.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_008.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:D7C3-$C3:D937 (373 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D7C3
 ScenePalPack_009:
-    incbin "../../build/packs/ScenePalPack_009.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_009.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:D938-$C3:DAF1 (442 B), packed_lz, confirmed: lz11 -> 512 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
 ; C2Scene_LoadExtraPalette, C6Scene_UnpackPalPackA/B.
 org $C3D938
 ScenePalPack_010:
-    incbin "../../build/packs/ScenePalPack_010.lz"          ; lz11 -> 512 B
+    incbin "../../build/packs/ScenePalPack_010.lz"          ; lz11 -> 512 B, scene layer data
 
 ; $C3:DAF2-$C3:DB98 (167 B), packed_lz, confirmed: lz11 -> 352 B: scene palettes
 ; Read by C2Scene_LoadPalettes, C2Scene_LoadUnkC000, C2Scene_LoadUnkC600,
