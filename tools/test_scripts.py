@@ -496,6 +496,78 @@ class Fx(unittest.TestCase):
         self.refused('@bytes 99', '    Page $19', 'nothing reaches')
 
 
+class AnimStub(scripts.AnimLang):
+    """$00 n: next 2 (writes the record byte n); $07: stay."""
+
+    def __init__(self):
+        self.name, self.count, self.timer = 'anim', 8, 0x0E
+        self.names = [f'Op{op:02X}_Stub' for op in range(8)]
+        self.cache, self.specs, self.dirty = {}, {}, False
+        self.labels = {}
+
+    def _trace(self, known, ptr):
+        op = known[ptr]
+        if op == 0x00:
+            return {'reads': [1], 'control': [], 'outs': [('pos', 2, False, (), None, None)], 'opaque': []}
+        if op == 0x07:
+            return {'reads': [], 'control': [], 'outs': [('pos', 0, False, (), None, None)], 'opaque': []}
+        return {'reads': [], 'control': [], 'outs': [('bad', 'not in the stub')], 'opaque': []}
+
+
+class Locks(unittest.TestCase):
+    """The checks behind TRUST's reasons: the static scan at every width,
+    the animation ops' record bytes, the unpackers' room."""
+
+    def test_closure_scans_each_width(self):
+        class Image:
+            image = bytearray(0x400000)
+        lang = Image()
+        lang.image[0x8000:0x800B] = bytes([0xC2, 0x20, 0x20, 0x10, 0x80, 0xE2, 0x20, 0x20, 0x10, 0x80, 0x60])
+        lang.image[0x8010:0x8015] = bytes([0xA9, 0x00, 0x85, 0x58, 0x60])  # M=1: LDA #0, STA $58; M=0: LDA #$8500, CLI
+        got = scripts._code_closure(lang, [(0xC08000, True)])
+        self.assertIn((0xC08010, 'LDA', 'imm_m', 0x8500), got)
+        self.assertIn((0xC08010, 'LDA', 'imm_m', 0x00), got)
+        self.assertIn((0xC08012, 'STA', 'dp', 0x58), got)
+
+    def test_anim_op_naming_a_guarded_byte_refused(self):
+        lang = AnimStub()
+        guard = {5, 6, 7, 8, 9, 0x0E}
+        bad = [('S', {B: 0x00, B + 1: 0x06, B + 2: 0x07}, (B, B + 3), {B})]
+        self.assertEqual(scripts.anim_lock(lang, bad, {0x00}, guard),
+                         ['anim: S $7F0400: Op00_Stub writes task record byte $06'])
+        good = [('S', {B: 0x00, B + 1: 0x26, B + 2: 0x07}, (B, B + 3), {B})]
+        self.assertEqual(scripts.anim_lock(lang, good, {0x00}, guard), [])
+
+    def test_anim_ops_found_by_their_writes(self):
+        writes = {0: lambda v: {v}, 4: lambda v: {0x0E}, 5: lambda v: {7}}
+        named, out = scripts.anim_named_ops(AnimStub(), lambda op, v: writes.get(op, lambda v: set())(v),
+                                            {5, 6, 7, 8, 9, 0x0E})
+        self.assertEqual(named, {0})
+        self.assertEqual(out, ['anim: Op05_Stub writes task record byte(s) [7] whatever its operand'])
+
+    def test_struct_offsets(self):
+        f = scripts.struct_offsets(scripts.ROOT, 'C2Scene_Task')
+        self.assertEqual((f['ScriptReturn'], f['ScriptBank'], f['AnimTimer'], f['OpState'], f['Unk37']),
+                         (0x05, 0x09, 0x0E, 0x32, 0x37))
+        with tempfile.TemporaryDirectory() as tmp:
+            inc = Path(tmp) / 'asm' / 'include'
+            inc.mkdir(parents=True)
+            (inc / 'x.inc').write_text('struct S $7E0000\n.A: skip 1 ; a\n            skip $10\n.B:\n.C: skip 2\n'
+                                       '.D: skip 3\nendstruct\n')
+            self.assertEqual(scripts.struct_offsets(tmp, 'S'), {'A': 0, 'B': 0x11, 'C': 0x11, 'D': 0x13})
+            (inc / 'x.inc').write_text('struct S $7E0000\n.A: skip one\nendstruct\n')
+            with self.assertRaisesRegex(scripts.ScriptsError, 'a line not read'):
+                scripts.struct_offsets(tmp, 'S')
+
+    def test_unpack_must_fit(self):
+        keep = [(B, 0x100, 'the script buffer')]
+        self.assertEqual(scripts.unpack_fit('R', {0xC40000: 4096}, {0x7FF000}, keep), [])
+        self.assertEqual(scripts.unpack_fit('R', {0xC40000: 4097}, {0x7FF000}, keep),
+                         ['unpack: R: the pack at $C40000 (4097 B) runs past the end of bank $7F from $7FF000'])
+        self.assertEqual(scripts.unpack_fit('R', {0xC40000: 0x200}, {0x7F0300}, keep),
+                         ['unpack: R: the pack at $C40000 unpacked at $7F0300 covers the script buffer'])
+
+
 class Source(unittest.TestCase):
 
     def test_manifest_pieces(self):
@@ -525,6 +597,40 @@ class WithSource(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_ROM, 'needs the ROM and asar')
 class WithRom(unittest.TestCase):
+
+    def test_anim_lock_sees_every_script(self):
+        info = []
+        self.assertEqual(scripts.anim_check(ed.read_rom(), info=info), [])
+        self.assertEqual(info, [('C2SceneRom_AnimTable', 161, 708), ('C2Scene_AnimLeaderMarker', 1, 3),
+                                ('C2Scene_AnimObjAMarker', 1, 4), ('C2Scene_Unk8600', 1, 1), ('named', [0, 1, 2])])
+
+    def test_unpack_lock_sees_every_unpacker(self):
+        info = []
+        self.assertEqual(scripts.unpack_check(scripts.SceneLang(), ed.read_rom(), info), [])
+        bufs = [0x7F9000 + 0x1000 * k for k in range(7)]
+        self.assertEqual(info, [
+            ('C2Scene_LoadBgGfx', ['C2SceneRom_BgPacks'], bufs, 4096),
+            ('C2Scene_LoadExtraObjPack', ['C2SceneRom_ObjPacks'], [0x7F9000], 8192),
+            ('C2Scene_LoadUnkC600', ['C2SceneRom_PalettePacks'], [0x7EC600], 608),
+            ('C2Scene_UnpackBg3MapPack', ['C2SceneRom_Bg3MapPacks'], [0x7F9000], 4096),
+            ('C2Scene_UnpackBgPack', ['C2SceneRom_BgPacks'], [0x7F9000], 4096),
+            ('C6Scene_UnpackObjPackA', ['C2SceneRom_ObjPacks'], [0x7F9000], 8192),
+            ('C6Scene_UnpackObjPackB', ['C2SceneRom_ObjPacks'], [0x7F9000], 8192),
+            ('C6Scene_UnpackPalPackA', ['C2SceneRom_PalettePacks'], [0x7F8C00], 608),
+            ('C6Scene_UnpackPalPackB', ['C2SceneRom_PalettePacks'], [0x7F8C00], 608)])
+        self.assertEqual(tuple(r[0] for r in info), scripts.UNPACKERS)
+
+    def test_check_runs_the_locks(self):
+        saved = scripts.anim_check, scripts.unpack_check, scripts.trust_check
+        scripts.anim_check = lambda rom, root=scripts.ROOT, info=None: ['anim lock ran']
+        scripts.unpack_check = lambda lang, rom, info=None: ['unpack lock ran']
+        scripts.trust_check = lambda lang: [f'trust lock ran: {lang.name}']
+        try:
+            got = scripts.check(ed.read_rom())
+        finally:
+            scripts.anim_check, scripts.unpack_check, scripts.trust_check = saved
+        for x in ('anim lock ran', 'unpack lock ran', 'trust lock ran: scene', 'trust lock ran: fx'):
+            self.assertIn(x, got)
 
     def test_round_trips_and_exits(self):
         self.assertEqual(scripts.check(ed.read_rom()), [])

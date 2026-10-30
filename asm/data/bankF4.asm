@@ -41,7 +41,7 @@ MapPropsPack_140:
 ; Read by LocLoad_UnkA33B.
 org $F40A38
 MapPropsPack_141:
-    incbin "../../build/packs/MapPropsPack_141.lz"          ; lz11 -> 1045 B, location map
+    incbin "../../build/packs/MapPropsPack_141.lz"          ; lz11 -> 1045 B
 
 ; $F4:0C94-$F4:0E6C (473 B), packed_lz, confirmed: lz11 -> 1006 B: location map: MapProps header
 ; + packed tile planes

@@ -62,13 +62,14 @@ How each piece's bytes are made (the manifest's `piece` column):
              when written); the build assembles it to build/scene/
              <label>.bin and packs that, which is incbin'd. param as for
              packed. Counted as "scene scripts".
-  mapprops   a location map pack (Map_PropsPtrs): build/assets/maps/
+  mapprops   a location map pack (Map_PropsPtrs) a location record
+             names (tools/maps.py's UNNAMED stay packed): build/assets/maps/
              <label>.map, its header and tile planes as text (tools/maps.py;
              checked to assemble back when written); the build assembles it
              to build/maps/<label>.bin and packs that. param as for packed.
              Counted as "maps".
   metatiles  a metatile pack (LocGfx_Meta12Ptrs / Meta3Ptrs) of a whole
-             table: build/assets/maps/<label>.meta, its tilemap words as
+             table that a location record names: build/assets/maps/<label>.meta, its tilemap words as
              text; built the same way. Counted as "maps".
   scenemaps, scenemeta, scenebg3, scenepal  the scene layer and palette
              packs the scene headers name (tools/maps.py), the same way.
@@ -86,6 +87,12 @@ How each piece's bytes are made (the manifest's `piece` column):
              sidecar); the build encodes them to build/gfx/<label>.bin,
              which is incbin'd. param: "<format> N tiles [+ T B]". Counted
              as "graphics".
+  gfxpack    a Decomp_ToWram stream whose unpacked bytes are tiles in a
+             format the data's uses of it prove (tools/graphics.py's
+             PACKED): the same image and sidecar of the unpacked bytes; the
+             build encodes them to build/gfxpack/<label>.bin and packs that
+             as a packed piece. param: "lzNN -> N B; <format> N tiles
+             [+ T B]". Counted as "packed graphics".
   sprframes  a sprite_layout row of frame records (tools/sprites.py: the
              runs from the set pointers, each with its sprite records'
              record size): build/assets/sprites/<label>.spr, its frames'
@@ -101,7 +108,7 @@ How each piece's bytes are made (the manifest's `piece` column):
              against its readers and to assemble back when written; the
              build assembles them to build/<OUT>/<label>.bin, which is
              incbin'd. No param. Counted under their kinds.
-  records   a table or palette row with a layout in tools/records.py (a
+  records    a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
              encode back when written); the build encodes it to
@@ -173,6 +180,7 @@ SCENE_OUT = Path('build/scene')        # the assembled (unpacked) scene scripts 
 FX_OUT = Path('build/fx')              # the assembled layer-effect scripts (tools/build_rom.py)
 GFX_OUT = Path('build/gfx')            # the encoded graphics pieces (tools/build_rom.py)
 SPRITES_OUT = Path('build/sprites')    # the assembled sprite frame pieces (tools/build_rom.py)
+GFXPACK_OUT = Path('build/gfxpack')    # the encoded (unpacked) graphics packs (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
@@ -189,7 +197,7 @@ SPRITES_PREFIX = '../../build/sprites/'
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
           'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'actframes',
-          'graphics', 'sprframes', 'animframes', 'animtimes', 'drawlist')
+          'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -207,6 +215,16 @@ BATTLE_PARAM = re.compile(r'^([a-z]+)/([a-z]+)$')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
 RECORDS_PARAM = re.compile(r'^(table|palette|map) (\d+) x (\d+) B$')
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
+PACK_MODE = re.compile(r'^lz(11|12) -> (\d+) B(?:$|; )')        # also a gfxpack piece's param
+
+
+def pack_param(param: str) -> tuple[int, int]:
+    """(mode, unpacked size) of a pack's param (packed, events, scene or
+    gfxpack piece)."""
+    m = PACK_MODE.match(param)
+    if not m:
+        raise DataError(f'not a pack param: {param!r}')
+    return int(m.group(1)), int(m.group(2))
 FILL = re.compile(r'^(\d+) x \$([0-9A-F]{2})$')
 
 # Pointer tables written as labels (row start -> entry size). Each is a
@@ -410,7 +428,7 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'{maps.asset_dir(piece)}/{label}.{maps.ASSET_EXT[piece]}'
         elif piece == 'fx':
             asset = f'fx/{label}.bfx'
-        elif piece == 'graphics':
+        elif piece in ('graphics', 'gfxpack'):
             asset = f'gfx/{label}.png'
         elif piece == 'sprframes':
             asset = f'sprites/{label}.spr'
@@ -435,6 +453,11 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             if mk and (mk[0] == 'mapprops' or mk[0] == 'metatiles' and int(m.group(2)) == 8 * mk[1]
                        or mk[0] not in ('mapprops', 'metatiles') and maps.size_ok(mk[0], mk[1], int(m.group(2)))):
                 add(label, s, e, mk[0], param=f'lz{m.group(1)} -> {m.group(2)} B', row=row)
+                continue
+            lay = graphics.packed_layout(row['start'], int(m.group(2)))
+            if lay is not None:
+                add(label, s, e, 'gfxpack', param=f'lz{m.group(1)} -> {m.group(2)} B; {graphics.param_of(*lay)}',
+                    row=row)
                 continue
             add(label, s, e, 'events' if EVENT_PACK.search(row['notes'])
                 else 'scene' if SCENE_PACK.search(row['notes']) else 'packed',
@@ -568,6 +591,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if p['asset'] != f'{t.ASSET_DIR}/{p["label"]}.{t.ASSET_EXT[p["piece"]]}' or p['param']:
                 problems.append(f'{where}: a {p["piece"]} piece\'s asset is {t.ASSET_DIR}/<label>.'
                                 f'{t.ASSET_EXT[p["piece"]]} and it has no param: {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'gfxpack':
+            m, pm = GFX_ASSET.match(p['asset']), graphics.PACKED_PARAM.match(p['param'])
+            if not m or m.group(1) != p['label'] or not pm or not graphics.PARAM.match(pm.group(3)):
+                problems.append(f'{where}: a gfxpack piece\'s asset is gfx/<label>.png and its param '
+                                f'"lzNN -> N B; <format> N tiles [+ T B]": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'fx':
             m = FX_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or p['param']:
@@ -609,7 +637,7 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSET_PREFIX + p['asset']] = p
-        elif p['piece'] in ('packed', 'events', 'scene') + maps.PIECES:
+        elif p['piece'] in ('packed', 'events', 'scene', 'gfxpack') + maps.PIECES:
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
         elif p['piece'] == 'fx':
             out[f'{FX_PREFIX}{p["label"]}.bin'] = p
@@ -636,7 +664,7 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
     for p in pieces:
         if p['piece'] == 'extracted':
             out[ASSETS / p['asset']] = int(p['size'])
-        elif p['piece'] in ('packed', 'events', 'scene') + maps.PIECES:
+        elif p['piece'] in ('packed', 'events', 'scene', 'gfxpack') + maps.PIECES:
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
         elif p['piece'] == 'fx':
             out[FX_OUT / f'{p["label"]}.bin'] = int(p['size'])
@@ -809,6 +837,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, metatiles')
         elif p['piece'] == 'actframes':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, battle action frames')
+        elif p['piece'] == 'gfxpack':
+            out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]} (graphics)')
         elif p['piece'] == 'fx':
             out.append(f'    incbin "{FX_PREFIX}{p["label"]}.bin"          ; layer-effect scripts')
         elif p['piece'] == 'graphics':
@@ -937,7 +967,8 @@ def _stamp_text(key: str, out_dir: Path, pieces: list[dict]) -> str:
     for p in pieces:
         if p['asset'] and p['asset'] not in seen:       # a text unit's file serves several pieces
             seen.add(p['asset'])
-            for a in [p['asset']] + ([graphics.sidecar_path(p['asset'])] if p['piece'] == 'graphics' else []):
+            for a in [p['asset']] + ([graphics.sidecar_path(p['asset'])] if p['piece'] in ('graphics', 'gfxpack')
+                                     else []):
                 f = out_dir / a
                 lines.append(f'{hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else "-"} {a}')
     return '\n'.join(lines) + '\n'
@@ -991,9 +1022,16 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             dest.parent.mkdir(parents=True, exist_ok=True)
             c3pack._write(dest, text_.encode())
             continue
-        if p['piece'] == 'graphics':
+        if p['piece'] in ('graphics', 'gfxpack'):
             fmt, tiles, tail = graphics.parse_param(p['param'])
-            png, t = graphics.to_image(fmt, rom[s:e], tail)
+            if p['piece'] == 'gfxpack':
+                body, why = unpack_piece(rom, p)
+                if body is None:
+                    problems.append(why)
+                    continue
+            else:
+                body = rom[s:e]
+            png, t = graphics.to_image(fmt, body, tail)
             dest = out_dir / p['asset']
             dest.parent.mkdir(parents=True, exist_ok=True)
             c3pack._write(dest, png)
@@ -1005,7 +1043,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
         if p['piece'] == 'extracted':
             c3pack._write(dest, rom[s:e])
             continue
-        mode, size = (int(x) for x in PACK_PARAM.match(p['param']).groups())
+        mode, size = pack_param(p['param'])
         try:
             data, end, got = c3pack.unpack(rom, s)
         except c3pack.PackError as err:
@@ -1028,7 +1066,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
 def unpack_piece(rom: bytes, p: dict) -> tuple[bytes | None, str | None]:
     """(the unpacked bytes of a packed or events piece, or None and why)."""
     import c3pack
-    mode, size = (int(x) for x in PACK_PARAM.match(p['param']).groups())
+    mode, size = pack_param(p['param'])
     try:
         data, end, got = c3pack.unpack(rom, p['offset'])
     except c3pack.PackError as err:
