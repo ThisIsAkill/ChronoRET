@@ -18,7 +18,6 @@ asm/bankC1/bankC1.asm:Battle_BoxHitsBlockedCell UNMATCHED
 asm/bankC1/bankC1.asm:Battle_BoxOverlapsOthers UNMATCHED
 asm/bankC1/bankC1.asm:Battle_CalcBattlerBox UNMATCHED
 asm/bankCF/bankCF.asm:BattleMsg_FormatNumber4Digits UNMATCHED
-asm/bankFD/bankFD.asm:Ppu_SetBgLayout UNMATCHED
 asm/bank00/bank00.asm:BRK_Handler DPDB
 asm/bank00/bank00.asm:NMI_Stub DPDB
 asm/bank00/bank00.asm:Reset DPDB

@@ -383,13 +383,15 @@ def assemble_scene_meta(text: str, label: str, name: str = '<smeta>') -> bytes:
 
 
 BG3_SCREEN = 32 * 32                   # words per 32x32 screen (BG3SC $7800, 64x32: two screens)
+BG3_SCREENS = 2                        # C2Scene_LoadVram always DMAs $1000 B: both screens
 
 
 def render_bg3(label: str, data: bytes) -> str:
-    if not data or len(data) % (2 * BG3_SCREEN):
-        raise MapsError(f'{label}: {len(data)} B is no whole number of 32x32-word screens')
+    if len(data) != 2 * BG3_SCREEN * BG3_SCREENS:
+        raise MapsError(f'{label}: {len(data)} B; BG3\'s tilemap is {2 * BG3_SCREEN * BG3_SCREENS} '
+                        f'({BG3_SCREENS} 32x32-word screens, all of which C2Scene_LoadVram DMAs)')
     out = [line.format(label=label, what='a scene\'s BG3 tilemap (tilemap words)') for line in HEAD]
-    n = len(data) // (2 * BG3_SCREEN)
+    n = BG3_SCREENS
     out.append(f'@bg3map {label} {n}    ; screens of 32 rows of 32 words, TTT/P[p][h][v]')
     for s in range(n):
         out.append(f'@screen {s}')
@@ -402,9 +404,9 @@ def render_bg3(label: str, data: bytes) -> str:
 def assemble_bg3(text: str, label: str, name: str = '<bg3>') -> bytes:
     lines = [(f'{name}:{no}', w) for no, w in _lines(text)]
     if not lines or len(lines[0][1]) != 3 or lines[0][1][:2] != ['@bg3map', label] \
-            or lines[0][1][2] not in ('1', '2'):
-        raise MapsError(f'{name}: the first line is @bg3map {label} 1|2')
-    n = int(lines[0][1][2])
+            or lines[0][1][2] != str(BG3_SCREENS):
+        raise MapsError(f'{name}: the first line is @bg3map {label} {BG3_SCREENS}')
+    n = BG3_SCREENS
     if len(lines) != 1 + n * 33:
         raise MapsError(f'{name}: {n} screens are {n * 33} lines after the first; there are {len(lines) - 1}')
     out = bytearray()
