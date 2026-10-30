@@ -12,9 +12,16 @@ build assembles them back. What this tool holds is how the code reads them:
   pointers, one per sprite set. The field reads the same table (Field_E4Ptr1,
   whose low word Field_InitLoadState takes from RomE4_PtrInit word 1) and so
   does the menu (MenuRom_E4FramePtrs, the same word): Evt_LoadSpriteRec,
-  Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad and
-  Battle_InitScene each take a set number from byte 1 (SprRec_Frames) of a
-  sprite record and the frame pointer from this table.
+  Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite and Menu_SprLoad each
+  take a set number from byte 1 (SprRec_Frames) of a sprite record and the
+  frame pointer from this table, and so does Battle_InitScene for an enemy
+  (BattleRom_EnemySpr.FrameSet, byte 1 of its RomE4_EnemySprRec record).
+  Not for a party member: Battle_InitScene's .pc_sprite loop takes the set
+  number from Pc_CharId itself, and nothing writes that battler's
+  Battler_FrameLayout. That agrees with the records only because
+  RomE4_SprRec records 0-6 (Pc_NumChars) have SprRec_Frames 0-6 and size 0,
+  so character n's set n is 40-B records whichever reader takes it
+  (size_problems checks that).
 
   The record size. Byte 4 (SprRec_Size) bits 0-1 of the same record give
   the frame size, and every reader agrees on it:
@@ -22,13 +29,17 @@ build assembles them back. What this tool holds is how the code reads them:
                Obj_BuildFrame4 / 8 / 12 (Frame4_Bytes $28, Frame8_Bytes $50,
                Frame12_Bytes $78 per frame); size 3 is Spr_LoadLargeObj,
                96 tile words (SprBuf_Tiles) then 24 position pairs at
-               LargeObj_LayoutOfs ($C0): 240 B;
+               LargeObj_LayoutOfs ($C0): 240 B. It reads that one record
+               at Obj_FrameOfs and never steps by frame, and it never
+               reads the size: "size 3" is inferred from its caller at
+               $C0:47E9, which calls it only when the size is 3;
     the menu   Menu_SprLoad: Menu_SprTileCounts[size] (1, 2, 3, 6) units of
                Menu_SprFrameBytes (40, 80, 120, 240 B);
     battle     an enemy's layout is FieldBtlObj.Flags & 7, which is
                Obj_SprSize & ObjSpr_SizeMask (the record's size), and
                Battle_DrawBattlerFrameAnyLayout steps BattleRom_FrameBytes
                (40, 80, 120, 240 B for layouts 0-3) per frame id.
+  Only the menu and battle step 240 B per frame of a size-3 set.
   A frame record holds N tile words (N = 16, 32, 48, 96: two bytes per
   8x8 tile; the builders copy tile (word & SprFrame_TileMask $07FF) and
   mirror it when bit 14, SprFrame_HFlip, is set; Battle_DrawBattlerFrame-
@@ -37,16 +48,17 @@ build assembles them back. What this tool holds is how the code reads them:
   sprite (Obj_BuildFrame4 ..., Spr_LoadLargeObj: SprTileSrc.OfsX
   sign-extended and .OfsY; the battle and menu readers copy the same bytes).
 
-  The extent. The records of a set start at its pointer; frame f is at
-  pointer + f x size. The readers bound neither the number of frames nor a
-  set's end, so the records are taken from each pointer up to the next
-  pointer (sets that share an address are one run), in the five areas the
-  pointers reach (AREAS). Every run between two pointers is a whole number
-  of its set's records; the last run of an area ends at its last non-zero
-  byte, rounded up to a whole record, and the zero bytes after it are
-  padding. A run no sprite record gives a size (no reader of it found) is
-  kept as bytes (the survey's sprite_layout rows that are not frame
-  records).
+  The extent is inferred. The records of a set start at its pointer;
+  frame f is at pointer + f x size. The readers bound neither the number
+  of frames nor a set's end, so the records are taken from each pointer up
+  to the next pointer (sets that share an address are one run), in the
+  five areas the pointers reach (AREAS). Every run between two pointers is
+  a whole number of its set's records (derive refuses one that is not);
+  the last run of an area is taken to end at its last non-zero byte,
+  rounded up to a whole record (refused if that passes the area's end),
+  and the zero bytes after it are probable padding. A run no sprite record
+  gives a size (no reader of it found) is kept as bytes (the survey's
+  sprite_layout rows that are not frame records).
 
 The readable form (build/assets/sprites/<label>.spr):
 
@@ -206,6 +218,9 @@ def derive(rom: bytes, d: dict | None = None, sizes: dict | None = None) -> list
                 used = len(rom[s:e].rstrip(b'\0'))
                 if size:
                     used = -(-used // size) * size
+                if s + used > e:
+                    raise SpritesError(f'the last run of its area, at {addr(s)}, rounded up to whole {size}-B '
+                                       f'records, ends at {addr(s + used)}, past the area\'s end {addr(e)}')
                 runs.append({'start': s, 'stop': s + used, 'bytes': size, 'sets': at[s]})
                 if s + used < e:
                     runs.append({'start': s + used, 'stop': e, 'bytes': 0, 'sets': []})
@@ -335,8 +350,9 @@ def _db(label: str, path: Path) -> list[int]:
 
 
 def size_problems(rom: bytes, d: dict, root: Path = ROOT) -> list[str]:
-    """Where the readers' record sizes are not CLASS_BYTES, or the three
-    readers do not use one pointer table."""
+    """Where the readers' record sizes are not CLASS_BYTES, the three
+    readers do not use one pointer table, or a character's sprite record
+    (RomE4_SprRec 0-6) is not the set and size Battle_InitScene assumes."""
     problems = []
     field = [d['Frame4_Bytes'], d['Frame8_Bytes'], d['Frame12_Bytes'],
              d['LargeObj_LayoutOfs'] + d['LargeObj_LayoutOfs'] // 4]
@@ -361,6 +377,13 @@ def size_problems(rom: bytes, d: dict, root: Path = ROOT) -> list[str]:
             or d['BattleRom_SprFramesPtr'] >> 16 != d['AnimRom'] >> 16:
         problems.append('Field_E4Ptr1 (RomE4_PtrInit word 1) and MenuRom_E4FramePtrs are not '
                         'BattleRom_SprFramesPtr')
+    base, rec = d['RomE4_SprRec'] - 0xC00000, d['SprRec_Bytes']
+    for i in range(d['Pc_NumChars']):
+        r = rom[base + rec * i:base + rec * i + rec]
+        if r[d['SprRec_Frames']] != i or r[d['SprRec_Size']] & d['ObjSpr_SizeMask']:
+            problems.append(f'RomE4_SprRec record {i} is set {r[d["SprRec_Frames"]]}, size '
+                            f'{r[d["SprRec_Size"]] & d["ObjSpr_SizeMask"]}: Battle_InitScene takes character '
+                            f'{i}\'s set from Pc_CharId, so it must be set {i}, size 0')
     return problems
 
 
