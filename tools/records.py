@@ -39,11 +39,14 @@ reader's extent are survey rows of their own (DATA_PLAN.md lists them).
 
 Where the count comes from the source or the ROM rather than a stated
 domain, DERIVED re-derives it and `check` (and the extraction) compare it
-with the layout: the defines that size a record or bound an index
-(Battle_LevelMax, SprRec_FirstNpc, ...), the largest index the only source
-of it holds (LocRom.Tileset12 for LocGfx_Lists), and the object records
-the action object lists cover (obj_lists_extent: BattleAct_IndexObjLists
-run from every object pointer).
+with the layout: the reader itself, run by tools/absint.py once per value
+of its index byte (READERS: each value must read exactly its own record,
+so the record size and the count come from the code), the defines that
+bound an index (Battle_LevelMax, SprRec_FirstNpc, ...), the largest index
+the only source of it holds (LocRom.Tileset12 for LocGfx_Lists), and the
+object records the action object lists cover (obj_lists_extent:
+BattleAct_IndexObjLists run from every object pointer, and
+BattleAct_StepObjAnim's facing blocks inside them).
 
 The readable form, one tab-separated file per piece:
 
@@ -235,8 +238,9 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$FF:CF18': (_f('RecSize'), 5),                           # MenuRom_ItemRecSizesA: item categories 0-4
     '$FF:CF1D': (_f('Table', t='ptr16:CC'), 5),               # MenuRom_ItemTablesB: item categories 0-4
     '$FF:D562': (_f('Tile', t='u16'), 12),                    # MenuRom_CfgIcons: entries 0-11
-    # (data-tables-3) Each count below is the whole domain of the reader's
-    # index, or the bound DERIVED re-derives from the source or the ROM.
+    # (data-tables-3) DERIVED checks each count below: READERS runs the
+    # reader for each index value, or a define, register width or the ROM
+    # gives it (see DERIVED).
     '$CC:4700': ([('Hp', 'u16'), ('Unk3F', 'u8')] + [(f'Unk4C_{k}', 'u8') for k in range(3, 8)]
                  + [(f'Unk64_{k:X}', 'u8') for k in range(12)] + [(f'Unk46_{k}', 'u8') for k in range(3)], 256),
                                                               # BattleRom_EnemyStats: BattleFD_UnkB438, id = a byte of
@@ -253,9 +257,12 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
     '$CE:F28E': (_f('Point', t='u16'), 256),                  # BattleRom_HalfPlaneEdge: BattleCD_FxOpHalfPlane, an angle byte
                                                               # x 2, read 16-bit into BattleCE_LineP1
     '$CF:A000': ([(f'Entry{k}', 'u16') for k in range(32)], 256),
-                                                              # BattleRom_FxGfxLists: BattleCD_ConvertFxGfx, the set (a byte:
-                                                              # Battle_FxTileSet) x 64, BattleCD_GfxPartTiles (32) words
-    '$CF:E000': (_f('Colours', t='u16'), 256),                # BattleRom_FxGfxColours: the same set x 2, read 16-bit
+                                                              # BattleRom_FxGfxLists: BattleCD_ConvertFxGfx, the set
+                                                              # (Battle_FxTileSet) x 64, BattleCD_GfxPartTiles (32) words.
+                                                              # ASSUMED: the set is a byte only with B = 0 at
+                                                              # BattleCD_LoadFxGfx4's TAX, not traced (READERS)
+    '$CF:E000': (_f('Colours', t='u16'), 256),                # BattleRom_FxGfxColours: the same set x 2, read 16-bit (the
+                                                              # same assumption)
     '$E4:2A00': (_f('Offset', t='u16'), 256),                 # MenuRom_E4Palettes' table: Menu_SprLoad, a sprite record's
                                                               # palette byte (byte 2) x 2
     '$E4:F000': (_f('Gfx', 'Frames', 'Pal', 'Anim', 'Size'), 263),
@@ -301,74 +308,150 @@ PALETTES: dict[str, tuple[int, int]] = {
 
 # ── Counts and extents the check re-derives ───────────────────────────────
 
-def obj_lists_extent(rom: bytes, d: dict) -> tuple[int, int]:
-    """[start, stop) (file offsets) of the object records the action
-    object lists cover: every word of BattleRom_PcAttackObjs, TechObjs and
-    EnemyActObjs (one table after the other; Battle_ActObjIdx, a byte x 2,
-    reaches no further from any of them) is an offset in bank $CE, from
-    which BattleAct_IndexObjLists reads Battle_ActObjects lists of 4-byte
-    records: a record whose top three bits (Battle_ActObjRecTypeMask) are
-    1xx or 001 ends a list, 010 is a mark, and the first record of lists
-    1-15 is not tested. Raises when the covered records leave a gap."""
+def obj_lists(rom: bytes, d: dict) -> tuple[set[int], list[tuple[int, int | None]]]:
+    """The object pointers (offsets in bank $CE) and, read from each as
+    BattleAct_IndexObjLists reads them, every list: (its first record, the
+    Battle_ActObjMarkCount it leaves, None when it sets none). The pointers
+    are every word of BattleRom_PcAttackObjs, TechObjs and EnemyActObjs
+    (one table after the other; Battle_ActObjIdx, a byte x 2, reaches no
+    further from any of them) but the words $FFFF (25 in this ROM), taken
+    as unused: IndexObjLists has no test for $FFFF, and obj_lists_extent
+    refuses one that would point into the records the lists cover."""
     ce = (d['BattleRom_ScriptsCE'] - 0xC00000) & 0xFF0000
     lo, hi = d['BattleRom_PcAttackObjs'] - 0xC00000, d['BattleRom_EnemyActObjs'] - 0xC00000 + 2 * 256
-    starts = {rom[a] | rom[a + 1] << 8 for a in range(lo, hi, 2)} - {0xFFFF}
+    starts = {rom[a] | rom[a + 1] << 8 for a in range(lo, hi, 2)}
+    lists = []
+    for x in starts - {0xFFFF}:
+        n, first, start, count, marks = 0, True, x, 0, None
+        while True:
+            t = rom[ce + x] & d['Battle_ActObjRecTypeMask']
+            x += 4
+            count += 1
+            if first and n:
+                first = False
+                continue
+            first = False
+            if t == 0:
+                continue
+            if t & d['Battle_ActObjRecMark'] and not t & 0x80:
+                marks, count = count, 0
+                continue
+            if not t & 0x80:                    # 001: the mark count is 0
+                marks = 0
+            lists.append((start, marks))
+            n += 1
+            if n == d['Battle_ActObjects']:
+                break
+            first, start, count, marks = True, x, 0, None
+    return starts, lists
+
+
+def obj_lists_extent(rom: bytes, d: dict) -> tuple[int, int]:
+    """[start, stop) (file offsets) of the object records the action
+    object lists cover (obj_lists). BattleAct_IndexObjLists reads
+    Battle_ActObjects lists of 4-byte records from each pointer: a record
+    whose top three bits (Battle_ActObjRecTypeMask) are 1xx or 001 ends a
+    list, 010 is a mark, and the first record of lists 1-15 is not tested.
+    BattleAct_StepObjAnim then reads, for each facing 0 to
+    Battle_FacingRight, from the list's first record + facing x the mark
+    count x 4 up to a record with a type: those reads must stay inside
+    what IndexObjLists covers. Raises when the covered records leave a gap,
+    when a list sets no mark count (the count it would leave is another
+    list's, not traced), when StepObjAnim would read outside, or when a
+    $FFFF word would point into the covered records."""
+    ce = (d['BattleRom_ScriptsCE'] - 0xC00000) & 0xFF0000
+    starts, lists = obj_lists(rom, d)
     covered = set()
-    for x in starts:
-        lists, first = 0, True
+    for x in starts - {0xFFFF}:
+        n, first = 0, True
         while True:
             t = rom[ce + x] & d['Battle_ActObjRecTypeMask']
             covered.add(x)
             x += 4
-            if first and lists:
+            if first and n:
                 first = False
                 continue
             first = False
             if t == 0 or t & d['Battle_ActObjRecMark'] and not t & 0x80:
                 continue
-            lists += 1
-            if lists == d['Battle_ActObjects']:
+            n += 1
+            if n == d['Battle_ActObjects']:
                 break
             first = True
     s, e = min(covered), max(covered) + 4
     if len(covered) != (e - s) // 4 or any((x - s) % 4 for x in covered):
         raise RecordsError(f'the object lists leave a gap in ${s:04X}-${e - 1:04X}')
+    if 0xFFFF in starts and s <= 0xFFFF < e:
+        raise RecordsError('a $FFFF object pointer (taken as unused) points into the object records')
+    for start, marks in lists:
+        if marks is None:
+            raise RecordsError(f'the object list at ${start:04X} sets no mark count (StepObjAnim\'s facing blocks '
+                               f'would use another list\'s)')
+        for facing in range(d['Battle_FacingRight'] + 1):
+            y = start + facing * marks * 4
+            while True:
+                if not s <= y < e:
+                    raise RecordsError(f'BattleAct_StepObjAnim reads ${y:04X} for facing {facing} of the list at '
+                                       f'${start:04X}, outside the object records (${s:04X}-${e - 1:04X})')
+                if rom[ce + y] & d['Battle_ActObjRecTypeMask']:
+                    break
+                y += 4
     return ce + s, ce + e
 
 
-LOCROM_ROW = '$F6:0000'       # the LocRom records' survey row (their count: its size / LocRom_RecSize)
+def _struct(name: str) -> tuple[int, dict[str, int], int]:
+    """(base address, {field: offset}, record bytes) of ROM struct `name`
+    (asm/include/*.inc), its `skip` lines read as _struct_fields reads them."""
+    for path in sorted(INCLUDE.glob('*.inc')):
+        lines = path.read_text(errors='replace').splitlines()
+        for i, line in enumerate(lines):
+            m = re.match(rf'^struct\s+{name}\s+\$([0-9A-Fa-f]{{6}})\b', line)
+            if not m:
+                continue
+            fields, off = {}, 0
+            for body in lines[i + 1:]:
+                if body.strip().startswith('endstruct'):
+                    return int(m.group(1), 16), fields, off
+                f = re.match(r'^\s*(?:\.([A-Za-z_][A-Za-z0-9_]*):)?\s*skip\s+(\d+)\b', body)
+                if f:
+                    if f.group(1):
+                        fields[f.group(1)] = off
+                    off += int(f.group(2))
+            raise RecordsError(f'struct {name}: no endstruct')
+    raise RecordsError(f'no struct {name} in asm/include/')
 
 
 def _loc_field(rom: bytes, d: dict, field: str, rows: list[dict] | None = None) -> list[int]:
-    """Every LocRom record's `field`, the record size from LocRom_RecSize,
-    the field's offset and width from struct LocRom, the count from the
-    records' survey row (as maps.derive_named reads them)."""
-    sys.path.insert(0, str(ROOT / 'tools'))
-    import data_survey
-    rows = data_survey.read_rows() if rows is None else rows
-    fields, off = {}, 0
-    for name, t in _struct_fields('LocRom'):
-        fields[name] = (off, width(t))
-        off += width(t)
-    size = d['LocRom_RecSize']
-    if off != size:
-        raise RecordsError(f'struct LocRom is {off} B; LocRom_RecSize is {size}')
-    row = next((r for r in rows if r['start'] == LOCROM_ROW), None)
+    """Every LocRom record's `field`: struct LocRom gives the base, the
+    record size, which must be LocRom_RecSize, and the field's offset and
+    width; the count is the records' survey row's size over the record
+    size (as maps.derive_named reads them)."""
+    base, offsets, size = _struct('LocRom')
+    if size != d['LocRom_RecSize']:
+        raise RecordsError(f'struct LocRom is {size} B, LocRom_RecSize {d["LocRom_RecSize"]}')
+    start = f'${base >> 16:02X}:{base & 0xFFFF:04X}'
+    if STRUCTS.get(start, (None,))[0] != 'LocRom':
+        raise RecordsError(f'struct LocRom is at {start}, which is not its STRUCTS row')
+    if rows is None:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import data_survey
+        rows = data_survey.read_rows()
+    row = next((r for r in rows if r['start'] == start), None)
     if row is None or int(row['size']) % size:
-        raise RecordsError(f'no survey row of whole LocRom records at {LOCROM_ROW}')
-    base = data_survey.parse_addr(LOCROM_ROW)
-    at, w = fields[field]
-    return [int.from_bytes(rom[base + k * size + at:base + k * size + at + w], 'little')
+        raise RecordsError(f'no survey row of whole LocRom records at {start}')
+    at, w = offsets[field], width(dict(_struct_fields('LocRom'))[field])
+    return [int.from_bytes(rom[base - 0xC00000 + k * size + at:base - 0xC00000 + k * size + at + w], 'little')
             for k in range(int(row['size']) // size)]
 
 
-def _loc_tilesets(rom: bytes, d: dict, rows: list[dict] | None = None) -> int:
+def _loc_tilesets(rom: bytes, d: dict, code=None, rows: list[dict] | None = None) -> int:
     """Entries of LocGfx_Lists the locations name: 1 + the largest
-    LocRom.Tileset12 other than LocRom_SetNone."""
+    LocRom.Tileset12 other than LocRom_SetNone, over the LocRom records
+    (_loc_field)."""
     return 1 + max(v for v in _loc_field(rom, d, 'Tileset12', rows) if v != d['LocRom_SetNone'])
 
 
-def _loc_palettes(rom: bytes, d: dict, rows: list[dict] | None = None) -> int:
+def _loc_palettes(rom: bytes, d: dict, code=None, rows: list[dict] | None = None) -> int:
     """Rows of 15 colours in LocPal_Rom the locations name: 7 per entry,
     1 + the largest LocRom.Palette entries (LocRom's only reader of it is
     LocLoad_Unk7084)."""
@@ -392,33 +475,353 @@ def _bg_set_rows(path: Path = ROOT / 'asm' / 'bankD1' / 'bankD1.asm') -> int:
     return (max(ofs) + 3 * 32) // 32
 
 
-# Row start -> (what, count(rom, defines)): the reader's bound, re-derived
-# from the source's defines or the ROM by `check` (and the extraction),
-# against the layout's count.
-DERIVED = {
-    '$CE:8870': ('the records the object lists cover', lambda rom, d: (lambda se: (se[1] - se[0]) // 4)(
-        obj_lists_extent(rom, d))),
-    '$CC:4700': ('256 ids; 3 + Battle_EnemyRec4FBytes + Rec64Bytes + Rec46Bytes = 23 B',
-                 lambda rom, d: 256 if 3 + d['Battle_EnemyRec4FBytes'] + d['Battle_EnemyRec64Bytes']
-                 + d['Battle_EnemyRec46Bytes'] == 23 else -1),
-    '$CC:7AC9': ('part numbers below Battle_EnemyPartNone, Battle_EffectRecSize B',
-                 lambda rom, d: d['Battle_EnemyPartNone'] if d['Battle_EffectRecSize'] == 12 else -1),
-    '$CC:2632': ('levels 0-Battle_LevelMax', lambda rom, d: d['Battle_LevelMax'] + 1),
-    '$CF:A000': ('256 sets of BattleCD_GfxPartTiles words', lambda rom, d: 256 if d['BattleCD_GfxPartTiles'] == 32
-                 else -1),
-    '$E4:0000': ('256 palettes of Pal_ObjColorBytes (ObjPal_CopyCount + 1)',
-                 lambda rom, d: 256 if d['Pal_ObjColorBytes'] == d['ObjPal_CopyCount'] + 1 == 24 else -1),
-    '$F6:24C0': ('7 rows x (1 + the largest LocRom.Palette)', lambda rom, d: _loc_palettes(rom, d)),
-    '$D0:FA00': ('rows up to the last BattleFx_BgSetPalOfs + 3 rows', lambda rom, d: _bg_set_rows()),
-    '$FF:B210': ('8-colour rows up to style Pal_Row0SetMask x 16 + 2 + 30 B',
-                 lambda rom, d: (d['Pal_Row0SetMask'] * 16 + 2 + 30) // 16
-                 if d['Menu_WinStyleMask'] == d['Pal_Row0SetMask'] else -1),
-    '$E4:F000': ('SprRec_FirstNpc + 256 records', lambda rom, d: d['SprRec_FirstNpc'] + 256),
-    '$F6:1C00': ('1 + the largest LocRom.Tileset12', _loc_tilesets),
+
+# ── Bounds from the readers' code ───────────────────────────────────────────
+#
+# For the rows in READERS the count is not taken from a comment: the reader
+# is run (tools/absint.py, on the code the source assembles to) once for
+# each of the 256 values of the index byte it is given, with the table's
+# bytes known and everything else unknown (B too, unless a run says
+# otherwise). Where the code did not clear or mask the index's high byte,
+# the address is unknown and the run reads nothing from the table. Each
+# value must read exactly its own record (value x the layout's record size,
+# that many bytes), and the count is the values that read one: all of
+# 0..count-1 (but `skip`), none above. Each run below says what it is given
+# and why.
+
+class _Reach:
+    """A run per index value v: the routine (`entry` label), the RAM it is
+    given (`ram(v, defines, labels)`, {address: byte}), ROM bytes it is given
+    besides the row's (`known`, the same shape; `also`: (name, bytes) ranges
+    from the ROM), its registers (`regs`; 'v' stands for the value), DP
+    (`dp`, a define name or 0), where a path stops (`stop` labels;
+    `after_load`: also after every LDA long,X of the table), the values
+    that read no record (`skip`), and tools/absint.py's limits
+    (`callee_steps`; `widen_after`, the visits of a branch before a loop's
+    states are joined). `vary(defines)`: RAM bytes the index's value must
+    not depend on (a high byte the code masks off): tools/absint.py knows a
+    word only whole, so each value is run with them $00 and with them $FF,
+    and both runs must read the same."""
+
+    def __init__(self, entry, ram, known=None, regs=None, stop=(), after_load=False, skip=(), dp=0, also=(),
+                 callee_steps=3000, widen_after=48, vary=None):
+        self.entry, self.ram, self.known = entry, ram, known or (lambda v, d, L: {})
+        self.regs, self.stop, self.after_load, self.skip = regs or {}, stop, after_load, set(skip)
+        self.dp, self.also, self.callee_steps, self.widen_after = dp, also, callee_steps, widen_after
+        self.vary = vary
+
+
+def _w(d: dict, name: str, k: int = 0) -> int:
+    """The WRAM address of RAM define `name` (+ k)."""
+    return 0x7E0000 | (d[name] + k) & 0xFFFF
+
+
+def _dp(d: dict, name: str, k: int = 0) -> int:
+    """The address of direct-page define `name` (+ k) with DP = 0."""
+    return 0x7E0000 | (d[name] + k) & 0xFF
+
+
+_FX_OPERANDS = 0x7EF000       # scratch WRAM holding the three operand bytes a run of FxOpHalfPlane is given
+
+
+def _enemy_act(kind: int, act_id: int, table: str) -> '_Reach':
+    """BattleAct_LoadScript for an enemy caster (the first enemy slot, its
+    Battler_Unk984D value 0) with Battle_ActKind `kind` and Battle_ActId
+    `act_id`: its record (record 0 of `table`) holds v in every byte."""
+    return _Reach('BattleAct_LoadScript', lambda v, d, L: {
+        _w(d, 'Battle_ActKind'): kind, _w(d, 'Battle_ActCaster'): d['Battle_FirstEnemySlot'],
+        _w(d, 'Battle_ActId'): act_id, _w(d, 'Battler_Unk984D', 2 * d['Battle_FirstEnemySlot']): 0,
+        _w(d, 'Battler_Unk984D', 2 * d['Battle_FirstEnemySlot'] + 1): 0},
+        known=lambda v, d, L: {L[table] + k: v for k in range(7)},
+        regs={'b': 0}, stop=('BattleAct_LoadCommon',), after_load=True)
+
+
+def _fx_gfx(other: str, size: int, stop: tuple = ()) -> '_Reach':
+    """BattleCD_ConvertFxGfx with X = the set v and DP $67 =
+    BattleCD_GfxPartTiles (what BattleCD_LoadFxGfx4 passes); the other of
+    its two tables given too (`other`, `size` B)."""
+    return _Reach('BattleCD_ConvertFxGfx', lambda v, d, L: {
+        _dp(d, 'BattleCD_Tmp67'): d['BattleCD_GfxPartTiles'] & 0xFF,
+        _dp(d, 'BattleCD_Tmp67', 1): d['BattleCD_GfxPartTiles'] >> 8},
+        regs={'x': 'v'}, also=((other, size),), stop=stop, callee_steps=20000, widen_after=1000)
+
+
+READERS: dict[str, list[_Reach]] = {
+    # BattleFD_UnkB438 for enemy entry 0 (X and DP $02), its id byte in
+    # Battler_UnkAF0A. B unknown: the TDC at the entry clears it.
+    '$CC:4700': [_Reach('BattleFD_UnkB438', lambda v, d, L: {
+        _w(d, 'Battler_UnkAF0A', d['Battle_FirstEnemySlot']): v, 0x7E0002: 0, 0x7E0003: 0}, regs={'x': 0})],
+    # BattleSys_UnkD7C4 for action record 0, whose part number (byte 3 of
+    # its BattleRom_UnkCC6FCB record) is v, the other bytes 0; stopped at
+    # the end of the copy. B unknown: the TDC before the TAX clears it.
+    # Part number $FF (Battle_EnemyPartNone) is skipped and reads nothing.
+    '$CC:7AC9': [_Reach('BattleSys_UnkD7C4', lambda v, d, L: {_w(d, 'Battle_UnkB18C'): 0},
+                        known=lambda v, d, L: {**{d['BattleRom_UnkCC6FCB'] - 1 + k: 0 for k in range(11)},
+                                               d['BattleRom_UnkCC6FCB'] + 3: v},
+                        stop=('BattleSys_CopyEffectBytes78', 'BattleSys_UnkD7C4_after_part'), skip=(0xFF,))],
+    # BattleAct_LoadScript, kind 1 (Battle_ActId 0: EnemyAttackAct, 1:
+    # EnemyAttack2Act) and kind 2 (EnemyTechAct). B = 0 at the entry, for
+    # the dispatch's TAX (as BattleAct_BuildBattlerList leaves it; see the
+    # loaders' banner); the index is the 16-bit read of Battle_ActObjIdx,
+    # whose high byte the parameter block's clear at the entry zeroes.
+    '$CD:666E': [_enemy_act(1, 0, 'BattleRom_EnemyAttackAct'), _enemy_act(1, 1, 'BattleRom_EnemyAttack2Act'),
+                 _enemy_act(2, 0, 'BattleRom_EnemyTechAct')],
+    # BattleCD_FxOpHalfPlane for channel 0 (DP $43), its register byte v,
+    # the step and flags operands 0 (the angle = v + 0, a byte add). B
+    # unknown: the TDC at the entry clears it.
+    '$CE:F28E': [_Reach('BattleCD_FxOpHalfPlane', lambda v, d, L: {
+        _dp(d, 'BattleCD_FxScriptPtr'): _FX_OPERANDS & 0xFF,
+        _dp(d, 'BattleCD_FxScriptPtr', 1): _FX_OPERANDS >> 8 & 0xFF,
+        _dp(d, 'BattleCD_FxScriptPtr', 2): _FX_OPERANDS >> 16,
+        _dp(d, 'BattleFx_RecOfs'): 0, _dp(d, 'BattleFx_RecOfs', 1): 0,
+        _FX_OPERANDS: 0, _FX_OPERANDS + 1: 0, _FX_OPERANDS + 2: 0,
+        _w(d, 'Battle_FxChanReg'): v}, stop=('BattleCD_FxLineDeltas',))],
+    # BattleCD_ConvertFxGfx for each set byte. That X is a byte rests on B
+    # = 0 at BattleCD_LoadFxGfx4's 8-bit LDA / 16-bit TAX of
+    # Battle_FxTileSet, which is ASSUMED, not traced: before the first part
+    # BattleCD_WaitFrameRefresh runs the battle menu's refresh, before the
+    # later ones BattleCD_QueueVramDma's waits.
+    '$CF:A000': [_fx_gfx('BattleRom_FxGfxColours', 0x200)],
+    '$CF:E000': [_fx_gfx('BattleRom_FxGfxLists', 0x4000, stop=('BattleCD_ConvertFxGfx_tile',))],   # (read before .tile)
+    # Menu_SprLoad from .pointers (the definition is in Menu_SprScratch and
+    # byte 0 is not $FF): byte 2 = v, byte 4 = 0 (no alternate palette) and
+    # byte 5 = 0 (as the STZ before .pointers leaves it), byte 1 unknown;
+    # byte 3, the high byte of the 16-bit read of byte 2, $00 and $FF (the
+    # AND Eng_LowByteMask clears it: `vary`); A 8-bit = byte 0, B unknown;
+    # DP = an object page. The
+    # table's address is the word at MenuRom_E4Palettes (RomE4_PtrInit),
+    # given from the ROM. Stopped at .palette (or .done).
+    '$E4:2A00': [_Reach('Menu_SprLoad_pointers', lambda v, d, L: {
+        _w(d, 'Menu_SprScratch', 2): v, _w(d, 'Menu_SprScratch', 4): 0, _w(d, 'Menu_SprScratch', 5): 0},
+        regs={'a': 0, 'm': True, 'xf': True}, stop=('Menu_SprLoad_palette', 'Menu_SprLoad_done'), dp='Menu_SprPages',
+        vary=lambda d: [_w(d, 'Menu_SprScratch', 3)],
+        also=(('RomE4_PtrInit', 0x20),))],
 }
 
 
-def derived_problems(rom: bytes, d: dict | None = None, pieces: list[dict] | None = None) -> list[str]:
+def _code():
+    """(image, emitted mask, labels) of the source's code: tools/events.py's
+    code image (cached in build/events/)."""
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import events
+    return events.code_image(ROOT)
+
+
+REACH_DIR = ROOT / 'build' / 'records-reach'      # the runs' results, by what they depend on
+
+
+class _Seen(dict):
+    """The defines, recording which are read."""
+
+    def __init__(self, d: dict):
+        super().__init__(d)
+        self.seen: dict = {}
+
+    def __getitem__(self, k):
+        self.seen[k] = super().__getitem__(k)
+        return self.seen[k]
+
+    def get(self, k, default=None):
+        return self[k] if k in self else default
+
+
+def _reach_key(rom: bytes, d: dict, start: str, image: bytes, mask, labels: dict, values) -> str:
+    """What the runs of row `start` depend on: this tool and tools/absint.py
+    (READERS and the interpreter), the code image, the labels and defines,
+    the ROM bytes given, the values run."""
+    import hashlib
+    h = hashlib.sha256()
+    for f in ('records.py', 'absint.py', 'disasm.py'):
+        h.update((ROOT / 'tools' / f).read_bytes())
+    h.update(image + bytes(mask))
+    used = _Seen(d)                             # only the defines the runs are given
+    for r in READERS[start]:
+        r.ram(0, used, labels)
+        r.known(0, used, labels)
+        for name in [r.dp] * isinstance(r.dp, str) + [n for n, _ in r.also]:
+            used.get(name)
+        if r.vary:
+            r.vary(used)
+    h.update(repr((sorted(used.seen.items()), sorted(labels.items()), start, list(values))).encode())
+    lay = layout_for(start, 'palette' if start in PALETTES else 'table')
+    bank, low = (int(x, 16) for x in start[1:].split(':'))
+    o = (bank << 16 | low) - 0xC00000
+    h.update(rom[o:o + (lay.count + 8) * lay.size])
+    for r in READERS[start]:
+        for name, n in r.also:
+            a = (d[name] if name in d else labels.get(name, 0xC00000)) - 0xC00000
+            h.update(rom[a:a + n])
+    return h.hexdigest()
+
+
+def reader_reads(rom: bytes, d: dict, start: str, code=None, values=range(256)) -> list[dict]:
+    """Per READERS run of row `start`: {index value: the row offsets read}
+    (a string where the run could not be followed). The results are kept
+    in build/records-reach/ by a hash of everything they depend on (and
+    of themselves: a file changed by hand is run again), but not for a
+    `code` image passed in (the tests')."""
+    import hashlib
+    import json
+    image, mask, labels = code if code is not None else _code()
+    key = _reach_key(rom, d, start, image, mask, labels, values)
+    cache = REACH_DIR / (start[1:].replace(':', '') + '.json')
+    if code is None and cache.exists():
+        try:
+            saved = json.loads(cache.read_text())
+            body = json.dumps(saved['runs'], sort_keys=True)
+            if saved['key'] == key and saved['sha'] == hashlib.sha256(body.encode()).hexdigest():
+                return [{int(v): x for v, x in run.items()} for run in saved['runs']]
+        except (ValueError, KeyError, TypeError):
+            pass
+    out = _run_readers(rom, d, start, image, mask, labels, values)
+    if code is None:
+        runs = json.loads(json.dumps(out))         # (the values' keys as strings, as read back)
+        body = json.dumps(runs, sort_keys=True)
+        REACH_DIR.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({'key': key, 'sha': hashlib.sha256(body.encode()).hexdigest(), 'runs': runs}))
+    return out
+
+
+def _run_readers(rom: bytes, d: dict, start: str, image: bytes, mask, labels: dict, values) -> list[dict]:
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import absint
+    import disasm
+    bank, low = (int(x, 16) for x in start[1:].split(':'))
+    table = bank << 16 | low
+    lay = layout_for(start, 'palette' if start in PALETTES else 'table')
+    span = (lay.count + 8) * lay.size          # reads past the count are seen too
+    out = []
+    for r in READERS[start]:
+        try:
+            stops = {labels[n] for n in r.stop}
+            entry = labels[r.entry]
+        except KeyError as err:
+            raise RecordsError(f'{start}: no label {err} in the source') from None
+        if r.after_load:
+            op = bytes([0xBF, table & 0xFF, table >> 8 & 0xFF, table >> 16])
+            k = image.find(op)
+            while k >= 0:
+                if all(mask[k:k + 4]):
+                    b, lo = disasm.file_to_snes(k + 4)
+                    stops.add(b << 16 | lo)
+                k = image.find(op, k + 1)
+
+        class Machine(absint.Machine):
+            def step(self, s, base_depth):
+                if s.pc in stops:
+                    return ('stop', None)
+                return super().step(s, base_depth)
+
+        m = Machine(image, mask, max_steps=400000, callee_steps=r.callee_steps)
+        m.widen_after = r.widen_after           # (a loop the run must follow to its end: no joining)
+        given = {table + k: rom[table - 0xC00000 + k] for k in range(span)}
+        others = set()
+        for name, n in r.also:
+            a = d[name] if name in d else labels[name]
+            given.update({a + k: rom[a - 0xC00000 + k] for k in range(n)})
+            others.update(range(a, a + n))
+        got = {}
+        for v in values:
+            runs = []
+            for fill in (0x00, 0xFF) if r.vary else (None,):
+                s = absint.State()
+                s.pc = entry
+                regs = {'a': None, 'b': None, 'x': None, 'y': None, 'm': True, 'xf': False}
+                regs.update({k: (v if x == 'v' else x) for k, x in r.regs.items()})
+                s.a, s.b, s.x, s.y, s.m, s.xf = (regs[k] for k in ('a', 'b', 'x', 'y', 'm', 'xf'))
+                s.d, s.db = (d[r.dp] if isinstance(r.dp, str) else r.dp), 0x7E
+                s.c = s.z = s.n = s.v = None
+                s.sp, s.spt, s.memt = [], [], {}
+                s.mem = r.ram(v, d, labels)
+                if fill is not None:
+                    s.mem.update({a: fill for a in r.vary(d)})
+                s.at = s.xt = s.yt = s.ft = absint.E
+                s.depth = 0
+                known = dict(given)
+                known.update(r.known(v, d, labels))
+                try:
+                    m.run(s, known)
+                except absint.Unresolved as err:
+                    runs.append(str(err))
+                    continue
+                runs.append(sorted(a - table for a in m.reads if table <= a < table + span and a not in others))
+            if any(x != runs[0] for x in runs):
+                runs = ['the reads change with the bytes at ' + ', '.join(f'${a:06X}' for a in r.vary(d))
+                        + ' ($00 or $FF), which do not fix the index']
+            got[v] = runs[0]
+        out.append(got)
+    return out
+
+
+def reader_count(rom: bytes, d: dict, start: str, code=None, values=range(256)) -> int:
+    """The record count READERS' runs of row `start` give (see above);
+    raises RecordsError where a value reads other than its record, or
+    where values below the count read none (of `values`, those run)."""
+    lay = layout_for(start, 'palette' if start in PALETTES else 'table')
+    counts = []
+    for r, got in zip(READERS[start], reader_reads(rom, d, start, code, values)):
+        read = []
+        for v, offs in sorted(got.items()):
+            if isinstance(offs, str):
+                raise RecordsError(f'{r.entry} with index {v} cannot be followed: {offs}')
+            if offs and offs != list(range(v * lay.size, (v + 1) * lay.size)):
+                raise RecordsError(f'{r.entry} with index {v} reads offsets {offs[0]}-{offs[-1]} '
+                                   f'({len(offs)} B), not record {v} ({lay.size} B)')
+            if offs:
+                read.append(v)
+        n = max(read) + 1 if read else 0
+        missing = [v for v in values if v < n and v not in read and v not in r.skip]
+        if missing or not read:
+            raise RecordsError(f'{r.entry} reads no record for index {missing[0] if missing else 0} '
+                               f'(the index\'s high byte not cleared?)')
+        counts.append(n)
+    if len(set(counts)) != 1:
+        raise RecordsError(f'the runs of {start}\'s readers give {counts} records')
+    return counts[0]
+
+
+def _reader(start: str):
+    return lambda rom, d, code=None: reader_count(rom, d, start, code)
+
+
+# Row start -> (what, count(rom, defines, code)): the bound, re-derived by
+# `check` (and the extraction) against the layout's count. Three kinds:
+# the readers' own runs (READERS); a define the reader bounds the index by
+# (Battle_LevelMax, SprRec_FirstNpc, Menu_SramUnk05F3Mask) or a register's
+# width (the palette byte, an 8-bit WRMPYA operand), with the record size
+# the defines give checked against the layout's; data (the object lists,
+# LocRom.Tileset12).
+DERIVED = {
+    '$CE:8870': ('the records the object lists cover', lambda rom, d, code=None: (lambda se: (se[1] - se[0]) // 4)(
+        obj_lists_extent(rom, d))),
+    '$CC:4700': ('BattleFD_UnkB438 run for each id byte', _reader('$CC:4700')),
+    '$CC:7AC9': ('BattleSys_UnkD7C4 run for each part number', _reader('$CC:7AC9')),
+    '$CC:2632': ('levels 0-Battle_LevelMax', lambda rom, d, code=None: d['Battle_LevelMax'] + 1),
+    '$CD:666E': ('BattleAct_LoadScript run for each object index', _reader('$CD:666E')),
+    '$CE:F28E': ('BattleCD_FxOpHalfPlane run for each angle byte', _reader('$CE:F28E')),
+    '$CF:A000': ('BattleCD_ConvertFxGfx run for each set byte (B = 0 assumed at the caller\'s TAX)',
+                 _reader('$CF:A000')),
+    '$CF:E000': ('BattleCD_ConvertFxGfx run for each set byte (B = 0 assumed at the caller\'s TAX)',
+                 _reader('$CF:E000')),
+    '$E4:0000': ('the palette byte\'s 256 values (an 8-bit WRMPYA operand) x Pal_ObjColorBytes, which must be '
+                 'ObjPal_CopyCount + 1 and the layout\'s record size',
+                 lambda rom, d, code=None: 256 if d['Pal_ObjColorBytes'] == d['ObjPal_CopyCount'] + 1
+                 == layout_for('$E4:0000', 'palette').size else -1),
+    '$E4:2A00': ('Menu_SprLoad run for each palette byte', _reader('$E4:2A00')),
+    '$E4:F000': ('SprRec_FirstNpc + 256 records', lambda rom, d, code=None: d['SprRec_FirstNpc'] + 256),
+    '$F6:1C00': ('1 + the largest LocRom.Tileset12', _loc_tilesets),
+    '$F6:24C0': ('7 rows x (1 + the largest LocRom.Palette)', _loc_palettes),
+    '$D0:FA00': ('rows up to the last BattleFx_BgSetPalOfs + 3 rows', lambda rom, d, code=None: _bg_set_rows()),
+    '$FF:B210': ('8-colour rows up to style Pal_Row0SetMask x 16 + 2 + 30 B',
+                 lambda rom, d, code=None: (d['Pal_Row0SetMask'] * 16 + 2 + 30) // 16
+                 if d['Menu_WinStyleMask'] == d['Pal_Row0SetMask'] else -1),
+    '$FF:D296': ('the location word (Menu_ReadSlotSummary: AND Menu_SramUnk05F3Mask) / 2',
+                 lambda rom, d, code=None: (d['Menu_SramUnk05F3Mask'] + 1) // 2),
+}
+
+
+def derived_problems(rom: bytes, d: dict | None = None, pieces: list[dict] | None = None,
+                     code=None) -> list[str]:
     """Where a DERIVED count is not the layout's, or the object records'
     piece does not start where the lists do."""
     if d is None:
@@ -430,7 +833,7 @@ def derived_problems(rom: bytes, d: dict | None = None, pieces: list[dict] | Non
         kind = 'palette' if start in PALETTES else 'table'
         lay = layout_for(start, kind)
         try:
-            n = count(rom, d)
+            n = count(rom, d, code)
         except RecordsError as err:
             problems.append(f'{start}: {err}')
             continue

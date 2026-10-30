@@ -30,8 +30,15 @@ assets, with no copy of the original.
      in build/scene/ (step 3 packs them), every `fx` piece from
      build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
      tools/scripts.py, every line checked against the handlers.
+  6b. The battle scripts: every unit of `battle` pieces is assembled from
+     its readable file (build/assets/battle/<unit>.bscr) with
+     tools/battle.py, every line checked against the readers, to
+     build/battle/<label>.bin per piece (a file is rewritten only when its
+     bytes change; a piece whose size differs fails the build).
   6c. The graphics: every `graphics` piece is encoded from its PNG and
-     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/.
+     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
+     every `gfxpack` piece the same way to its unpacked bytes in
+     build/gfxpack/, before step 3 packs them.
   6e. The text tools' pieces (extract_data.TEXT_TOOLS: the sprite
      animation lists, tools/anims.py, and the menu draw lists,
      tools/drawlists.py): each is assembled from its text by its tool to
@@ -40,11 +47,6 @@ assets, with no copy of the original.
      its text (build/assets/sprites/<label>.spr) with tools/sprites.py to
      build/sprites/<label>.bin (a file is rewritten only when its bytes
      change; a text that does not make its piece's bytes count fails).
-  6b. The battle scripts: every unit of `battle` pieces is assembled from
-     its readable file (build/assets/battle/<unit>.bscr) with
-     tools/battle.py, every line checked against the readers, to
-     build/battle/<label>.bin per piece (a file is rewritten only when its
-     bytes change; a piece whose size differs fails the build).
   7. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets
@@ -93,12 +95,13 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('packed', 'events', 'scene') + maps.PIECES:
+        if p['piece'] not in ('packed', 'events', 'scene', 'gfxpack') + maps.PIECES:
             continue
-        mode = int(extract_data.PACK_PARAM.match(p['param']).group(1))
+        mode = extract_data.pack_param(p['param'])[0]
         src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
                else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin' if p['piece'] == 'events'
                else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in maps.PIECES
+               else root / extract_data.GFXPACK_OUT / f'{p["label"]}.bin' if p['piece'] == 'gfxpack'
                else root / extract_data.SCENE_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
@@ -128,7 +131,9 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
         if got != size:
             wrong.append(f'{label}: {got} B, its piece {size} B')
     if wrong:
-        raise BuildError('packs that do not fit their place:\n  ' + '\n  '.join(wrong))
+        raise BuildError('packs that do not fit their place (a pack must come out the size the ROM\'s '
+                         'stream is, since every pointer and placement is fixed: an edit that changes it '
+                         'cannot be built):\n  ' + '\n  '.join(wrong))
     return len(jobs)
 
 
@@ -248,14 +253,15 @@ def build_scripts(root: Path = ROOT) -> int:
 
 def build_graphics(root: Path = ROOT) -> int:
     """Encode every `graphics` piece from its PNG and sidecar
-    (build/assets/gfx/, tools/graphics.py) to build/gfx/<label>.bin;
-    returns how many files were written. A PNG that is not what the
-    format can hold fails the build."""
+    (build/assets/gfx/, tools/graphics.py) to build/gfx/<label>.bin, and
+    every `gfxpack` piece to its unpacked bytes in build/gfxpack/ (which
+    build_packs packs); returns how many files were written. A PNG that
+    is not what the format can hold fails the build."""
     import graphics
     root = Path(root)
     written = 0
     for p in extract_data.read_manifest():
-        if p['piece'] != 'graphics':
+        if p['piece'] not in ('graphics', 'gfxpack'):
             continue
         src = root / extract_data.ASSETS / p['asset']
         side = root / extract_data.ASSETS / graphics.sidecar_path(p['asset'])
@@ -263,7 +269,7 @@ def build_graphics(root: Path = ROOT) -> int:
             data = graphics.encode_piece(p, src.read_bytes(), side.read_text())
         except (OSError, graphics.GraphicsError) as e:
             raise BuildError(f'graphics: {e}') from None
-        out_dir = root / extract_data.GFX_OUT
+        out_dir = root / (extract_data.GFX_OUT if p['piece'] == 'graphics' else extract_data.GFXPACK_OUT)
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{p["label"]}.bin'
         if not path.exists() or path.read_bytes() != data:
@@ -319,10 +325,11 @@ def build_text_tools(root: Path = ROOT) -> int:
 
 
 def build_maps(root: Path = ROOT) -> int:
-    """Assemble every `mapprops` and `metatiles` piece from its text
+    """Assemble every maps piece (maps.PIECES) from its text
     (build/assets/maps/, tools/maps.py) to its unpacked bytes in
     build/maps/, which build_packs packs; returns how many files were
-    written."""
+    written. A text that assembles to another size than its piece's
+    unpacked size (its param) fails."""
     import maps
     root = Path(root)
     written = 0
@@ -333,6 +340,10 @@ def build_maps(root: Path = ROOT) -> int:
             data = maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
         except (OSError, maps.MapsError) as e:
             raise BuildError(f'maps: {e}') from None
+        size = extract_data.pack_param(p['param'])[1]
+        if len(data) != size:            # the pack would not be the one the reader unpacks
+            raise BuildError(f'maps: {p["label"]}: its text assembles to {len(data)} B; the piece unpacks to '
+                             f'{size} B ({p["param"]})')
         out_dir = root / extract_data.MAPS_OUT
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{p["label"]}.bin'
@@ -442,11 +453,11 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_events(root)
     build_scripts(root)
     build_maps(root)
+    build_graphics(root)
     build_packs(root, quiet=quiet)
     build_text(root)
     build_records(root)
     build_battle(root)
-    build_graphics(root)
     build_sprites(root)
     build_text_tools(root)
     out = root / out

@@ -142,6 +142,7 @@ class Codec(unittest.TestCase):
 
 
 import battle  # noqa: E402
+import disasm  # noqa: E402
 
 D = battle.defines(ed.ROOT)
 F = lambda a: a - 0xC00000      # noqa: E731
@@ -168,11 +169,25 @@ END, MARK, STOP = 0x80, 0x40, 0x20        # 1xx ends a list, 010 is a mark, 001 
 
 
 def lists_of(n_ends):
-    """16 lists: records of type 0, each list ended by an end record."""
+    """16 lists: records of type 0, each list ended by a 001 record (which
+    sets the mark count, to 0)."""
     out = []
     for k in range(16):
-        out += [0x01] * n_ends + [END if k % 2 else STOP]
+        out += [0x01] * n_ends + [STOP]
     return out
+
+
+def patched(code, label, find, new, within=0x200):
+    """The code image with the first `find` bytes at or after `label`
+    (within `within` bytes) replaced by `new`."""
+    image, mask, labels = code
+    a = labels[label]
+    off = disasm.snes_to_file(a >> 16, a & 0xFFFF)
+    k = image.find(bytes(find), off, off + within)
+    assert k >= 0, (label, find)
+    out = bytearray(image)
+    out[k:k + len(new)] = bytes(new)
+    return bytes(out), mask, labels
 
 
 class Derived(unittest.TestCase):
@@ -186,13 +201,13 @@ class Derived(unittest.TestCase):
         self.assertEqual(records.obj_lists_extent(bytes(rom), D)[1], F(0xCE9000) + 4 * len(marks))
 
     def test_first_record_of_lists_1_to_15_untested(self):
-        recs = [END] + [END, END] * 15             # each later list's first record is skipped, its second ends it
+        recs = [STOP] + [END, STOP] * 15           # each later list's first record is skipped, its second ends it
         rom = obj_rom([(0x9000, recs)])
         self.assertEqual(records.obj_lists_extent(bytes(rom), D)[1], F(0xCE9000) + 4 * 31)
 
     def test_overlapping_and_gaps(self):
         recs = lists_of(1)
-        rom = obj_rom([(0x9000, recs), (0x9008, recs[2:] + [0x01, END])])
+        rom = obj_rom([(0x9000, recs), (0x9008, recs[2:] + [0x01, STOP])])
         s, e = records.obj_lists_extent(bytes(rom), D)
         self.assertEqual(s, F(0xCE9000))
         rom = obj_rom([(0x9000, recs), (0x9000 + 4 * len(recs) + 4, recs)])
@@ -202,13 +217,53 @@ class Derived(unittest.TestCase):
         with self.assertRaisesRegex(records.RecordsError, 'leave a gap'):
             records.obj_lists_extent(bytes(rom), D)
 
+    def test_unused_pointers(self):
+        # obj_rom fills the unused words with $FFFF: taken as unused while
+        # $CE:FFFF is outside the records, refused once it is inside
+        recs = lists_of(1)
+        rom = obj_rom([(0xFF80, recs)])                       # the records run to $CE:FFFF and past
+        with self.assertRaisesRegex(records.RecordsError, r'\$FFFF object pointer'):
+            records.obj_lists_extent(bytes(rom), D)
+        rom = obj_rom([(0xFF80 - 4 * len(recs), recs)])       # they end at $CE:FF7F
+        self.assertEqual(records.obj_lists_extent(bytes(rom), D)[1], F(0xCEFF80))
+
+    def test_facing_blocks(self):
+        # list 15 marked after 2 records: StepObjAnim's facing 2 block starts
+        # 16 B on, past the last record
+        recs = lists_of(1)[:-2] + [0x01, MARK, END]
+        rom = obj_rom([(0x9000, recs)])
+        with self.assertRaisesRegex(records.RecordsError, 'StepObjAnim reads .* for facing 2'):
+            records.obj_lists_extent(bytes(rom), D)
+        four = lists_of(1)[:-2] + [0x01, MARK] + [0x01] * 5 + [END]   # 4 facing blocks of 2 records
+        rom = obj_rom([(0x9000, four)])
+        self.assertEqual(records.obj_lists_extent(bytes(rom), D)[1], F(0xCE9000) + 4 * len(four))
+        # a list ended by 1xx with no mark leaves another list's count
+        rom = obj_rom([(0x9000, lists_of(1)[:-2] + [0x01, END])])
+        with self.assertRaisesRegex(records.RecordsError, 'sets no mark count'):
+            records.obj_lists_extent(bytes(rom), D)
+
     def test_loc_tilesets(self):
+        base, fields, size = records._struct('LocRom')
+        self.assertEqual((base, fields['Tileset12'], size), (0xF60000, 1, D['LocRom_RecSize']))
         rom = bytearray(0x400000)
         for k in range(512):
-            rom[F(0xF60000) + 14 * k + 1] = D['LocRom_SetNone']
-        rom[F(0xF60000) + 14 * 7 + 1] = 12
-        rom[F(0xF60000) + 14 * 9 + 1] = 3
+            rom[F(base) + size * k + 1] = D['LocRom_SetNone']
+        rom[F(base) + size * 7 + 1] = 12
+        rom[F(base) + size * 9 + 1] = 3
         self.assertEqual(records._loc_tilesets(bytes(rom), D), 13)
+        with self.assertRaisesRegex(records.RecordsError, 'struct LocRom is 14 B'):
+            records._loc_tilesets(bytes(rom), dict(D, LocRom_RecSize=15))
+        saved = records._struct
+        records._struct = lambda name: (base + 0x10, fields, size)        # the struct moved
+        try:
+            with self.assertRaisesRegex(records.RecordsError, 'not its STRUCTS row'):
+                records._loc_tilesets(bytes(rom), D)
+        finally:
+            records._struct = saved
+
+    def test_every_counted_row_is_derived(self):
+        self.assertEqual(set(records.READERS) - set(records.DERIVED), set())
+        self.assertEqual(len(records.DERIVED), 16)
 
     def test_loc_palettes(self):
         rom = bytearray(0x400000)
@@ -223,16 +278,16 @@ class Derived(unittest.TestCase):
         rom[F(0xF60000) + 14 * 3 + 3] = 5                                   # record 3's Palette (struct offset 3)
         rom[F(0xF60000) + 14 * 4 + 3] = 9                                   # past the survey's records
         rom[F(0xF60000) + 14 * 3 + 1] = 6                                   # record 3's Tileset12
-        self.assertEqual(records._loc_palettes(bytes(rom), D, rows), 7 * 6)
-        self.assertEqual(records._loc_tilesets(bytes(rom), D, rows), 7)
+        self.assertEqual(records._loc_palettes(bytes(rom), D, rows=rows), 7 * 6)
+        self.assertEqual(records._loc_tilesets(bytes(rom), D, rows=rows), 7)
         rom[F(0xF60000) + 14 * 2 + 4:F(0xF60000) + 14 * 2 + 6] = bytes([0x02, 0x01])   # MapProps: u16 at 4
         self.assertEqual(records._loc_field(bytes(rom), D, 'MapProps', rows), [0, 0, 0x102, 0])
-        with self.assertRaisesRegex(records.RecordsError, 'struct LocRom is 14 B; LocRom_RecSize is 16'):
-            records._loc_palettes(bytes(rom), dict(D, LocRom_RecSize=16), rows)
+        with self.assertRaisesRegex(records.RecordsError, 'struct LocRom is 14 B, LocRom_RecSize 16'):
+            records._loc_palettes(bytes(rom), dict(D, LocRom_RecSize=16), rows=rows)
         with self.assertRaisesRegex(records.RecordsError, 'no survey row of whole LocRom records'):
-            records._loc_palettes(bytes(rom), D, [{'start': '$F6:0000', 'size': '15'}])
+            records._loc_palettes(bytes(rom), D, rows=[{'start': '$F6:0000', 'size': '15'}])
         with self.assertRaisesRegex(records.RecordsError, 'no survey row of whole LocRom records'):
-            records._loc_palettes(bytes(rom), D, [])
+            records._loc_palettes(bytes(rom), D, rows=[])
 
     def test_bg_set_rows_from_the_source(self):
         self.assertEqual(records._bg_set_rows(), 15)
@@ -253,11 +308,12 @@ class Derived(unittest.TestCase):
         if rom is None:
             self.skipTest('needs the ROM')
         self.assertEqual(records.derived_problems(rom, D, ed.read_manifest()), [])
-        for name, value, start in (('Battle_LevelMax', 98, '$CC:2632'), ('Battle_EnemyRec46Bytes', 4, '$CC:4700'),
-                                   ('Battle_EnemyPartNone', 254, '$CC:7AC9'), ('Battle_EffectRecSize', 13, '$CC:7AC9'),
-                                   ('BattleCD_GfxPartTiles', 16, '$CF:A000'), ('ObjPal_CopyCount', 0x18, '$E4:0000'),
+        for name, value, start in (('Battle_LevelMax', 98, '$CC:2632'), ('ObjPal_CopyCount', 0x18, '$E4:0000'),
+                                   ('Pal_ObjColorBytes', 22, '$E4:0000'),
                                    ('SprRec_FirstNpc', 8, '$E4:F000'), ('LocRom_SetNone', 53, '$F6:1C00'),
-                                   ('Battle_ActObjects', 15, '$CE:8870'), ('LocPal_RowBytes', 28, '$F6:24C0'),
+                                   ('LocRom_RecSize', 15, '$F6:1C00'), ('Menu_SramUnk05F3Mask', 0x3FF, '$FF:D296'),
+                                   ('Battle_ActObjects', 15, '$CE:8870'), ('Battle_FacingRight', 30, '$CE:8870'),
+                                   ('LocPal_RowBytes', 28, '$F6:24C0'),
                                    ('Pal_Row0SetMask', 8, '$FF:B210'), ('Menu_WinStyleMask', 3, '$FF:B210')):
             got = records.derived_problems(rom, dict(D, **{name: value}), ed.read_manifest())
             self.assertTrue(any(x.startswith(start) for x in got), (name, got))
@@ -268,17 +324,52 @@ class Derived(unittest.TestCase):
         bad[F(D['BattleRom_EnemyActObjs'])] ^= 0x02                 # an object pointer moved off a record
         self.assertTrue(any(x.startswith('$CE:8870') for x in records.derived_problems(bytes(bad), D)))
         saved = records.DERIVED
-        records.DERIVED = dict(saved, **{'$CC:0000': ('nothing', lambda r, d: 1)})
+        records.DERIVED = dict(saved, **{'$CC:0000': ('nothing', lambda r, d, code=None: 1)})
         try:
             self.assertTrue(any(x.startswith('$CC:0000') for x in records.derived_problems(rom, D)))
         finally:
             records.DERIVED = saved
 
+    def test_readers_runs(self):
+        # each reader's run broken where it bounds the index: the count is
+        # refused (a few values run, not all 256)
+        if not HAVE_ROM:
+            self.skipTest('needs the ROM')
+        rom, code = ed.read_rom(), records._code()
+        some = (0, 1, 2, 254, 255)
+        for start in records.READERS:
+            n = records.layout_for(start, 'table').count
+            self.assertEqual(records.reader_count(rom, D, start, code, some), n, start)
+        TDC, NOP = 0x7B, 0xEA
+        for start, label, find, new, why in (
+                ('$CC:4700', 'BattleFD_UnkB438', [TDC], [NOP], 'reads no record'),            # B not cleared
+                ('$CC:7AC9', 'BattleSys_UnkD7C4', [0xC9, 0xFF], [0xC9, 0xFE], 'no record for index 254'),
+                ('$CD:666E', 'BattleAct_LoadScript', [0x9E], [NOP] * 3, 'reads no record'),  # no clear
+                ('$CE:F28E', 'BattleCD_FxOpHalfPlane', [TDC], [NOP], 'reads no record'),       # B not cleared
+                ('$CF:A000', 'BattleCD_ConvertFxGfx', [0x85, 0x57, 0x0A], [0x85, 0x57, NOP], 'not record 1'),
+                ('$CF:E000', 'BattleCD_ConvertFxGfx', [0x8A, 0x0A], [0x8A, NOP], 'not record 1'),
+                ('$E4:2A00', 'Menu_SprLoad_pointers',
+                 [0xAD, (D['Menu_SprScratch'] + 2) & 0xFF, (D['Menu_SprScratch'] + 2) >> 8 & 0xFF, 0x29],
+                 [0xAD, (D['Menu_SprScratch'] + 2) & 0xFF, (D['Menu_SprScratch'] + 2) >> 8 & 0xFF] + [NOP] * 3,
+                 'the reads change with the bytes')):                                         # no AND $00FF
+            with self.subTest(start=start):
+                with self.assertRaisesRegex(records.RecordsError, why):
+                    records.reader_count(rom, D, start, patched(code, label, find, new), some)
+        # a value reading past its record
+        with self.assertRaisesRegex(records.RecordsError, 'not record'):
+            saved = records.layout_for
+            records.layout_for = lambda s, k: (lambda lay: records.Layout(lay.fields[:-1], lay.count, lay.source))(
+                saved(s, k))
+            try:
+                records.reader_count(rom, D, '$CC:4700', code, some)
+            finally:
+                records.layout_for = saved
+
     def test_extraction_refuses_a_wrong_count(self):
         if not HAVE_ROM:
             self.skipTest('needs the ROM')
         saved = records.DERIVED
-        records.DERIVED = dict(saved, **{'$CC:2632': ('levels', lambda r, d: 99)})
+        records.DERIVED = dict(saved, **{'$CC:2632': ('levels', lambda r, d, code=None: 99)})
         try:
             with self.assertRaisesRegex(records.RecordsError, '\\$CC:2632: levels give 99 records'):
                 records.extract_all(ed.read_rom(), ed.read_manifest())

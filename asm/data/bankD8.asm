@@ -20,91 +20,91 @@
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D80000
 SprTilesPack_086:
-    incbin "../../build/packs/SprTilesPack_086.lz"          ; lz12 -> 8704 B
+    incbin "../../build/packs/SprTilesPack_086.lz"          ; lz12 -> 8704 B; 4bpp 272 tiles (graphics)
 
 ; $D8:1808-$D8:3485 (7,294 B), packed_lz, confirmed: lz12 -> 8160 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D81808
 SprTilesPack_088:
-    incbin "../../build/packs/SprTilesPack_088.lz"          ; lz12 -> 8160 B
+    incbin "../../build/packs/SprTilesPack_088.lz"          ; lz12 -> 8160 B; 4bpp 255 tiles (graphics)
 
 ; $D8:3486-$D8:4147 (3,266 B), packed_lz, confirmed: lz12 -> 3808 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D83486
 SprTilesPack_079:
-    incbin "../../build/packs/SprTilesPack_079.lz"          ; lz12 -> 3808 B
+    incbin "../../build/packs/SprTilesPack_079.lz"          ; lz12 -> 3808 B; 4bpp 119 tiles (graphics)
 
 ; $D8:4148-$D8:6E82 (11,579 B), packed_lz, confirmed: lz12 -> 13888 B: object sprite tile
 ; graphics (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D84148
 SprTilesPack_080:
-    incbin "../../build/packs/SprTilesPack_080.lz"          ; lz12 -> 13888 B
+    incbin "../../build/packs/SprTilesPack_080.lz"          ; lz12 -> 13888 B; 4bpp 434 tiles (graphics)
 
 ; $D8:6E83-$D8:8BD2 (7,504 B), packed_lz, confirmed: lz12 -> 9472 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D86E83
 SprTilesPack_082:
-    incbin "../../build/packs/SprTilesPack_082.lz"          ; lz12 -> 9472 B
+    incbin "../../build/packs/SprTilesPack_082.lz"          ; lz12 -> 9472 B; 4bpp 296 tiles (graphics)
 
 ; $D8:8BD3-$D8:A951 (7,551 B), packed_lz, confirmed: lz12 -> 9248 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D88BD3
 SprTilesPack_084:
-    incbin "../../build/packs/SprTilesPack_084.lz"          ; lz12 -> 9248 B
+    incbin "../../build/packs/SprTilesPack_084.lz"          ; lz12 -> 9248 B; 4bpp 289 tiles (graphics)
 
 ; $D8:A952-$D8:B80E (3,773 B), packed_lz, confirmed: lz12 -> 8192 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8A952
 SprTilesPack_085:
-    incbin "../../build/packs/SprTilesPack_085.lz"          ; lz12 -> 8192 B
+    incbin "../../build/packs/SprTilesPack_085.lz"          ; lz12 -> 8192 B; 4bpp 256 tiles (graphics)
 
 ; $D8:B80F-$D8:C2E9 (2,779 B), packed_lz, confirmed: lz12 -> 3296 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8B80F
 SprTilesPack_242:
-    incbin "../../build/packs/SprTilesPack_242.lz"          ; lz12 -> 3296 B
+    incbin "../../build/packs/SprTilesPack_242.lz"          ; lz12 -> 3296 B; 4bpp 103 tiles (graphics)
 
 ; $D8:C2EA-$D8:C628 (831 B), packed_lz, confirmed: lz12 -> 960 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8C2EA
 SprTilesPack_243:
-    incbin "../../build/packs/SprTilesPack_243.lz"          ; lz12 -> 960 B
+    incbin "../../build/packs/SprTilesPack_243.lz"          ; lz12 -> 960 B; 4bpp 30 tiles (graphics)
 
 ; $D8:C629-$D8:C895 (621 B), packed_lz, confirmed: lz12 -> 864 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8C629
 SprTilesPack_244:
-    incbin "../../build/packs/SprTilesPack_244.lz"          ; lz12 -> 864 B
+    incbin "../../build/packs/SprTilesPack_244.lz"          ; lz12 -> 864 B; 4bpp 27 tiles (graphics)
 
 ; $D8:C896-$D8:CB1C (647 B), packed_lz, confirmed: lz12 -> 864 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8C896
 SprTilesPack_245:
-    incbin "../../build/packs/SprTilesPack_245.lz"          ; lz12 -> 864 B
+    incbin "../../build/packs/SprTilesPack_245.lz"          ; lz12 -> 864 B; 4bpp 27 tiles (graphics)
 
 ; $D8:CB1D-$D8:CDDB (703 B), packed_lz, confirmed: lz12 -> 864 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8CB1D
 SprTilesPack_246:
-    incbin "../../build/packs/SprTilesPack_246.lz"          ; lz12 -> 864 B
+    incbin "../../build/packs/SprTilesPack_246.lz"          ; lz12 -> 864 B; 4bpp 27 tiles (graphics)
 
 ; $D8:CDDC-$D8:CF67 (396 B), packed_lz, confirmed: lz12 -> 416 B: object sprite tile graphics
 ; (4bpp)
 ; Read by Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad, Battle_InitScene.
 org $D8CDDC
 SprTilesPack_247:
-    incbin "../../build/packs/SprTilesPack_247.lz"          ; lz12 -> 416 B
+    incbin "../../build/packs/SprTilesPack_247.lz"          ; lz12 -> 416 B; 4bpp 13 tiles (graphics)
 
 ; $D8:CF68-$D8:CFFF (152 B), padding, confirmed: 152 x $00
 org $D8CF68

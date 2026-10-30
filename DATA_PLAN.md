@@ -544,13 +544,39 @@ source.
     action data, so they are kept as data: probably scripts no longer used.
   - The routines trusted without being followed (`TRUST`), with the opcodes that call them:
     `C2Anim_Run` (scene `$31`, `$39`, `$3F`, `$40`: the animation script's handlers, by an
-    opcode in other data; ops 0-2 can write any task record byte their operand names, which an
-    animation script could aim at the script pointer's record copy: not checked); through
-    `$34`/`$4E`, the scene routines that unpack with `Decomp_ToWram` (its destination given and
-    length the pack's: a pack longer than the room to the bank's end is not ruled out), that build
-    window tables with the `$C3` window routines, and `C2Scene_ZoneSoundAtEntry` (the audio
-    driver's wait on the APU); fx `$8B` (`BattleCD_FxOpDrawShape`, the shape handler from RAM)
-    and `$B5` (`BattleCE_RunCopyWords`, the copy entry from DP `$4B`).
+    opcode in other data); through `$34`/`$4E`, the scene routines that unpack with
+    `Decomp_ToWram`, that build window tables with the `$C3` window routines, and
+    `C2Scene_ZoneSoundAtEntry` (the audio driver's wait on the APU); fx `$8B`
+    (`BattleCD_FxOpDrawShape`, the shape handler from RAM) and `$B5` (`BattleCE_RunCopyWords`,
+    the copy entry from DP `$4B`). `check` now locks three of their reasons:
+    - **Animation ops.** The animation scripts are read with the same interpreter (`AnimLang`,
+      `C2Anim_OpTable`; `.AnimTimer` taken as 0 when an op starts, as `C2Scene_SetAnim` and the
+      timed ops leave it, so a 0 duration holds). They are the 161 that `C2SceneRom_AnimTable`
+      names, the two in bank `$C2` (`C2Scene_AnimLeaderMarker`, `C2Scene_AnimObjAMarker`), and
+      the one in RAM at `C2Scene_Unk8600`.
+      - Running each handler with several operands shows which ops write the record byte
+        their operand names (ops 0-2).
+      - None of them, in any reachable script, names `.ScriptReturn`-`.ScriptBank`
+        (`+$05`-`$09`) or `.AnimTimer` (`+$0E`): they name only `+$26`. No op writes those bytes
+        at a fixed offset.
+      - The RAM script is checked as `C2Scene_Unk5775` builds it from `C2Scene_Unk8600Init`
+        (one `ShowFrame` of the frame after it, duration 0: it holds). A later write to that RAM
+        is not traced.
+      - Two things the interpreter takes as they are, neither touching the lock:
+        - op `$03` (JumpBack) reads a 16-bit word from its operand and masks it, so its stay
+          and jump paths read one byte past it;
+        - `$04` (ShowFrame) with duration 0 holds forever.
+      - `check`'s own test asserts what the lock sees: 4 sources, 161, 1, 1 and 1 entries,
+        708, 3, 4 and 1 opcodes. For the unpackers it asserts the 9 routines with their tables,
+        destinations and largest packs. Struct offsets come from `asm/include` (hex and unlabelled
+        `skip`s counted).
+    - **Unpackers.** Each one's code (followed statically) reads one pack table, and its
+      destinations are traced from its entry with a scene header of zeros. Every pack in that
+      table fits before its bank's end (`C2Scene_LoadBgGfx`'s last slot, `$7F:F000`, takes the
+      largest BG pack, 4,096 B, exactly). None covers `C2Script_Ptr`, the task records,
+      `C2Scene_MemberWords` or the script buffer.
+    - **The static scan** visits an address once for each M and X width it is reached at, so a
+      routine reached at both widths is read both ways.
   - The fx opcodes with no handler (`$FA`-`$FE`) and scene opcodes above `$52` would jump through
     the code after their tables. None is reached; the interpreter refuses them.
 
@@ -613,13 +639,71 @@ addresses are refused too.
   graphics, battle backgrounds) are the second part. Edits to any extracted asset are lost when
   extraction runs again (as for the text and scripts); the encoder itself takes edited PNGs.
 
+## Graphics as images (step 8, second part: packed tiles)
+
+On the `data-graphics-2` branch. A pack whose unpacked bytes are tiles becomes a `gfxpack`
+piece: extraction writes the image and sidecar of the unpacked bytes to `build/assets/gfx/`, and
+the build encodes them to `build/gfxpack/` and packs that (`tools/c3pack.py`) back to the ROM's
+stream. `tools/verify.py` counts them as "packed graphics". The palette is grey, as in part 1.
+An edited image builds only if its pack still packs to the size of the ROM's stream. Every
+pointer and placement is fixed, so the build refuses a pack of another size and says so.
+
+- **How a pack's format is proved:** from each use the data makes of it, and what the reader
+  does with that use (`graphics.PACK_PROOFS`; `derive_packed` finds them, and `check` asserts
+  they are `graphics.PACKED`). Uses that disagree leave a pack unproved; none do here.
+  - **Location tiles** (`LocGfx_PackPtrs`). The field draws in BG mode 1 (`NmiHandler` writes
+    `Nmi_BgMode` every frame), with BG1/BG2 tiles at VRAM $1000 and BG3 tiles at $5000.
+    `Ppu_SetBgLayout` sets those bases. `LocLoad_DrawMap` calls it from `Scene_ReloadStep` after
+    every location load and every return from bank $C2, before it draws the map. No other field
+    code writes BG12NBA or BG34NBA: the `$C3` module's programs and the mode-7 scenes do, and they
+    load no location pack.
+    - Packs 0-5 of a location's `LocGfx_Lists` entry (`LocRom.Tileset12`) are uploaded to
+      $2000-$4FBF (`LocLoad_Unk0960`, `LocLoad_UploadPack`): BG1/BG2 tiles, 4bpp. Pack 5 sends
+      $0F80 B, so 18 packs used only there keep their last $80 B as bytes.
+    - The `LocRom.Tileset3` pack goes to $5000 (`LocLoad_Unk6DCF`): BG3 tiles, 2bpp.
+    - Packs 6 and 7 of a list go to `$7F:6000`/`$7F:7000`, which nothing traced reads.
+    - The battle backgrounds (`BattleFx_BgSetPacks`) name only packs the field proves.
+  - **Sprite tiles** (`BattleRom_SprTilesPtr`, which `Field_E4Ptr0` and `MenuRom_E4GfxPtrs` also
+    read): `Evt_Op82_InitWramSprite`/`Evt_Op83_InitEnemySprite` unpack them to bank $7F and
+    `Menu_SprLoad` to `Menu_SprUnpackBuf`. The sprite tile builders read them 32 B per tile
+    (`Spr_CopyTile7F`) into the sprite tiles: 4bpp.
+  - **Scene graphics** (`BankC2_InitHwRegs`: mode 1, sprite tiles at $0000, BG1/BG2 tiles at
+    $2000, BG3 tiles at $7000). In the eight scene headers:
+    - the `C2Scene_HdrBgGfx` packs go to VRAM $2000 (4bpp);
+    - the `C2Scene_HdrBg3Gfx` pack goes to $7000 (2bpp);
+    - the `C2Scene_HdrObjGfx` packs go to $0000 (4bpp). Sprite slot 2 is left out:
+      `C2Scene_LoadVram` then DMAs `C2Scene_PartyGfx` over it, so what a header puts there is
+      never shown.
+
+    Each is unpacked $1000 B apart in `C2Scene_DecompBuf`. A pack longer than its slot is read
+    on only into slots the header leaves alone (and not into slot 2).
+    - Two more sprite packs are read in a fixed way:
+      - The party's (`C2Scene_PartyObjPack`): `C2Scene_LoadPartyGfx` copies character n's
+        $400 B from n x $400 (n = 0-6) and its $40-B blocks from `C2Scene_PartyGfxSrcB` (right
+        after them) into `C2Scene_PartyGfx`, sent to sprite VRAM $1000. Its first $1DC0 B are
+        read whole; its last $240 B stay as bytes (its second $40-B blocks lie in them).
+      - The extra one (`C2Scene_ExtraObjPack`): `C2Scene_LoadLocExtraGfx` DMAs its $800 B to
+        sprite VRAM $0C00 or $0000.
+- **Results.** 484 packs (1,248,141 B packed, 1,675,104 B unpacked) pack back byte-exact:
+  241 sprite tile sets, 178 location tile packs (4bpp) and 18 (2bpp), 32 scene BG packs, 4 BG3
+  packs and 11 scene sprite packs. 2,880 B past the tiles the readers read stay as bytes.
+- **Not proven, still packed as bytes:**
+  - Location packs 19-24 (only in list slot 6) and 3, 31 and 211 (named by no location).
+  - Scene BG pack 36 and sprite packs 1, 6 and 13:
+    - pack 6 is named only in sprite slot 2, which the party graphics overwrite;
+    - pack 1 only `C2Scene_LoadUnkC800` unpacks (to `$7E:C800`, no traced reader);
+    - packs 13 and 36 only the script routines unpack, with no traced reader of the result.
+  - The `$C3` module's packs (`C3Rom_PackPtrs`, each read by its own module code), the dial packs
+    (mode 7), `MenuRom_ScreenGfx` (`BankFF_BuildScreenMap`), the scene `Unk7000`/`Unk7200` packs,
+    and the ten packs no pointer names.
+
 ## Location maps as text
 
 On the `data-maps` branch. `tools/maps.py` gives the location maps and their metatiles readable
 forms in `build/assets/maps/`. The build assembles them to `build/maps/` and packs them as before
 (`tools/c3pack.py`). `tools/verify.py` counts them as "maps".
 
-- **Maps** (`mapprops` pieces: the 201 `Map_PropsPtrs` packs, `LocRom.MapProps`).
+- **Maps** (`mapprops` pieces: the 197 `Map_PropsPtrs` packs a `LocRom.MapProps` names).
   `LocLoad_UnkA33B` unpacks one to `MapProps` (`$7E:B500`) and reads its six header bytes (struct
   `MapProps`). `Map_UnpackTilePlanes` reads the rest through the WRAM port:
   - layer 1's and layer 2's metatile numbers, row by row, and layer 3's when `Size3` bit 7 is set
@@ -629,14 +713,14 @@ forms in `build/assets/maps/`. The build assembles them to `build/maps/` and pac
     ends.
 
   `Map_WriteRow1`/`2` make bits 0/1 of HiBits bit 8 of the layer-1/2 metatile number. The text holds
-  the header, a hex grid per layer, and a grid of the attribute triples. All 201 maps write their
+  the header, a hex grid per layer, and a grid of the attribute triples. All 197 maps write their
   runs the same way: every repeat of two or more is a run of up to 256 tiles. So the assembler
   re-makes the runs from the grid, and extraction refuses a map written otherwise. Five maps'
   streams end before the attribute plane is full (`MapPropsPack_029`, `_058`, `_098`, `_191`, `_193`:
   13-135 tiles short). The game then reads whatever follows the unpacked bytes in WRAM; the text
   marks those cells `--------`.
-- **Metatiles** (`metatiles` pieces: the 54 `LocGfx_Meta12Ptrs` packs of 512 and the 19
-  `LocGfx_Meta3Ptrs` packs of 256). Each metatile is four words, top-left, top-right,
+- **Metatiles** (`metatiles` pieces: the 53 `LocGfx_Meta12Ptrs` packs of 512 and the 18
+  `LocGfx_Meta3Ptrs` packs of 256 that a `LocRom.Tileset12` / `.Tileset3` names). Each metatile is four words, top-left, top-right,
   bottom-left, bottom-right. The row and column writers send them unchanged to `Map_BufC800` and
   the edge buffers, which go to the layers' BG tilemaps, so they are SNES tilemap words. The text
   writes each word as `TTT/P` plus `p`, `h` and `v` (tile, palette, priority, flips).
@@ -644,11 +728,17 @@ forms in `build/assets/maps/`. The build assembles them to `build/maps/` and pac
   - `ExitRom` (814 x 7 B): `Map_LoadExitTiles` reads them through `ExitRom_LocOfs`, whose
     end entry gives the count;
   - `TreasureRom` (249 x 4 B; `Tile` and `Contents` read 16-bit by `Field_CheckTileInFront`).
-- **Results.** 201 maps (384,096 B packed, 1,003,373 B unpacked) and 73 metatile packs
-  (176,112 B packed, 260,096 B unpacked) assemble and pack back byte-exact. 6,694 B of exit and
+- **Which packs.** A pack is a map or metatiles only when a location record names it, as for
+  the packed graphics: `tools/maps.py`'s `derive_named` reads the 512 `LocRom` records'
+  `MapProps`, `Tileset12` and `Tileset3` (`$FF` names no metatiles), and `check` compares the
+  packs they name with the manifest's `mapprops` and `metatiles` pieces, both ways.
+- **Results.** 197 maps (380,613 B packed, 995,296 B unpacked) and 71 metatile packs
+  (174,649 B packed, 253,952 B unpacked) assemble and pack back byte-exact. 6,694 B of exit and
   treasure records encode back too.
 - **Not done here, kept as bytes:**
-  - the ten 1-byte `LocGfx_Meta12Ptrs` packs (16, 55-63), which no location names;
+  - six whole packs no location record names (`packed` pieces): `Map_PropsPtrs` 10, 30, 141
+    and 172 (3,483 B packed), `LocGfx_Meta12Ptrs` 54 and `LocGfx_Meta3Ptrs` 3 (1,463 B);
+  - the ten 1-byte `LocGfx_Meta12Ptrs` packs (16, 55-63), which no location names either;
   - `$F5:EE02` (510 B, not a valid pack; Map_PropsPtrs entry 201, unused);
   - `$EF:B168` (`LocGfx_Meta3Ptrs` entries 19-22, which do not unpack and no location selects);
   - `C2SceneRom_Bg3MapPacks` entry 5 (2,048 B), which only a script routine unpacks
@@ -691,19 +781,28 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
 - **The pointers.** `BattleRom_SprFramesPtr` (`$E4:2300`) holds one long pointer per sprite set.
   The field reads the same table through `Field_E4Ptr1`, whose low word comes from
   `RomE4_PtrInit` word 1, and the menu through `MenuRom_E4FramePtrs`, the same word; `check`
-  tests that. Every reader takes the set number from byte 1 (`SprRec_Frames`) of a sprite record
-  (`RomE4_SprRec`, 5 B, or the first five bytes of a `RomE4_EnemySprRec` record):
-  `Evt_LoadSpriteRec`, `Evt_Op82_InitWramSprite`, `Evt_Op83_InitEnemySprite`, `Menu_SprLoad`,
-  `Battle_InitScene`.
+  tests that. `Evt_LoadSpriteRec`, `Evt_Op82_InitWramSprite`, `Evt_Op83_InitEnemySprite` and
+  `Menu_SprLoad` take the set number from byte 1 (`SprRec_Frames`) of a sprite record
+  (`RomE4_SprRec`, 5 B, or the first five bytes of a `RomE4_EnemySprRec` record), and so does
+  `Battle_InitScene` for an enemy (`BattleRom_EnemySpr.FrameSet`, the same byte of its
+  `RomE4_EnemySprRec` record). For a party member it does not: its `.pc_sprite` loop uses
+  `Pc_CharId` itself as the set number, and nothing writes that battler's `Battler_FrameLayout`.
+  That agrees with the records only because `RomE4_SprRec` records 0-6 (`Pc_NumChars`) have
+  `SprRec_Frames` 0-6 and size 0, so character n's set n is 40-B records whichever reader takes
+  it; `sprites.size_problems` checks that.
 - **The record size** is byte 4 (`SprRec_Size`) bits 0-1 of the same record, and all three readers
   agree on it (`sprites.size_problems` checks each against `CLASS_BYTES`):
   - the field: `Obj_BuildSpriteFrameStep` sends size 0/1/2 to `Obj_BuildFrame4/8/12`, at
     `Frame4/8/12_Bytes` (40, 80, 120 B) per frame; size 3 is `Spr_LoadLargeObj`, 96 tile words
-    (`SprBuf_Tiles`) then 24 pairs at `LargeObj_LayoutOfs`, so 240 B;
+    (`SprBuf_Tiles`) then 24 pairs at `LargeObj_LayoutOfs`, so 240 B. It reads that one record at
+    `Obj_FrameOfs` and never steps by frame, and it never reads the size: its "size 3" is
+    inferred from its caller at `$C0:47E9`, which calls it only when the size is 3;
   - the menu: `Menu_SprTileCounts[size]` units of `Menu_SprFrameBytes` (40, 80, 120, 240 B);
   - battle: an enemy's layout is `FieldBtlObj.Flags & 7`, which holds `Obj_SprSize &
     ObjSpr_SizeMask`, and `Battle_DrawBattlerFrameAnyLayout` steps `BattleRom_FrameBytes` (40, 80,
     120, 240 B for layouts 0-3) per frame id.
+
+  Only the menu and battle step 240 B per frame of a size-3 set.
 - **The record.** N tile words (N = 16, 32, 48, 96), then N/4 position pairs. Each word gives a
   tile in bits 0-10 (`SprFrame_TileMask`), copied by `Spr_CopyTile`, with bit 14
   (`SprFrame_HFlip`) mirrored; the battle reader draws tile 0 blank. No reader tests bits 11-13
@@ -713,13 +812,15 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
 - **The extent is inferred.** Frame f of a set is at pointer + f x size, and no reader bounds f.
   So a run is taken from each pointer up to the next one; sets that share an address are one
   run. All 220 runs that end at another pointer are a whole number of their records. The last
-  run of each of the five areas ends at its last non-zero byte, rounded up to a whole record;
-  those five are where the old "remainder" bytes were. The zero bytes after it (13,672 B in
-  five rows) are padding, marked probable because a frame id could still reach them.
+  run of each of the five areas ends at its last non-zero byte, rounded up to a whole record
+  (refused if that passes the area's end); those five are where the old "remainder" bytes were.
+  The zero bytes after it (13,672 B in five rows) are padding, marked probable because a frame
+  id could still reach them.
 - **Results.** 4,745 frame records in 225 runs (237,320 B, nine pieces) assemble back byte-exact.
   `check` derives the runs from the ROM and refuses pieces that are not those runs, a pointer
-  outside the five areas, an area no set starts, a run with two record sizes, or an inner run
-  that is not whole records.
+  outside the five areas, an area no set starts, a run with two record sizes, an inner run
+  that is not whole records, a last run that rounds past its area, or a character's sprite
+  record that is not its own set at size 0.
 - **Not proven, still extracted** (2,960 B, four `sprite_layout` rows): the runs of sets 8, 9 and
   10 (`$DD:B900`, 1,840 B), 197 (`$DE:B068`), 140 (`$E3:42E0`, 960 B) and 216 (`$E3:E858`). No
   sprite record names these sets, so no reader gives their record size.
@@ -733,10 +834,11 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
 
 ## Tables, part 2: readers' extents
 
-On the `data-tables-3` branch. Of the 157,019 B of tables still raw in 212 pieces, 95,257 B now
-have readable forms whose layout and extent come from the code that reads them. 11,703 B turned
-out to be zero fill and 659 B are split off as unknown. 49,400 B in 143 pieces stay bytes (listed
-below). Each group's bound is re-derived by its tool's `check` and again at extraction.
+On the `data-tables-3` branch. Of the 157,019 B of tables still raw in 212 pieces, 96,025 B now
+have readable forms whose layout and extent come from the code that reads them (with the 768 B
+pointer table `BattleRom_SprFramesPtr`). 11,703 B turned out to be zero fill and 659 B are split
+off as unknown. 48,632 B in 142 pieces stay bytes (listed below). Each group's bound is
+re-derived by its tool's `check` and again at extraction; how, for each record table, is below.
 
 - **Sprite animation lists** (`tools/anims.py`; pieces `animframes`, `animtimes`; 39,495 B):
   `AnimRom_FrameLists` (`$E4:3000`, 30,192 B) and `AnimRom_TimeLists` (`$E4:A800`, 9,303 B), for
@@ -746,7 +848,10 @@ below). Each group's bound is re-derived by its tool's `check` and again at extr
   - Facing f starts at + f x stride, and row r at + 4r (`Obj_AnimFrameLookup`,
     `Battle_TickPcSlots`, `Menu_SprAnimate`). So a frame-id list's extent is the readers'.
   - Durations are rows of 4 at + 4r (`Obj_AnimTickAndQueue` and the same two). No reader bounds the
-    row count, so each list ends at the next offset (inferred, as for the sprite frames).
+    row count, so each list ends at the next offset (inferred, as for the sprite frames). The
+    readers support it: they take the row count from the frame lists' next - this, and
+    `Battle_InitScene` also computes next - this for the duration offsets (for PCs and enemies,
+    into DP $84 and $86; what reads that difference is not traced).
   - `check` derives both lists from the offsets. It also checks that the field and the menu read
     the same two tables (`RomE4_PtrInit` words 2/3, `MenuRom_E4AnimFrames`/`AnimTimes`), and that
     the lists start at `RomE4_PtrInit` words 5/6.
@@ -762,18 +867,48 @@ below). Each group's bound is re-derived by its tool's `check` and again at extr
     with no draw list after it.
   - The bytes after the end of `MenuRom_XchgListA` (14 B) and of `MenuRom_TechMembersList`
     (11 B) are list-shaped, but no reader is known: unknown rows.
-- **Records** (`tools/records.py`; 13 pieces, 54,490 B, including `$E4:2A00`'s offsets; `DERIVED`
-  re-derives each bound):
+- **Records** (`tools/records.py`; 13 pieces, 54,490 B, including `$E4:2A00`'s offsets). `DERIVED`
+  holds a check of each of the 13 counts, of three kinds:
+  - *The reader run* (`READERS`; 7 tables): the reader is run by `tools/absint.py` on the assembled
+    code once for each of the 256 values of its index byte, with B and all other state unknown
+    unless stated. Each value must read exactly its own record, so the record size and the count
+    both come from the code, and a high byte the code did not clear would leave the address
+    unknown and the run without reads. `BattleRom_EnemyStats` (`BattleFD_UnkB438`, its TDC
+    clears B), `EnemyEffectRecA` (`BattleSys_UnkD7C4`; part number $FF reads nothing),
+    `EnemyActObjs` (`BattleAct_LoadScript` for enemy attacks, both record sets, and techs: the
+    index is a 16-bit read of `Battle_ActObjIdx`, whose high byte the parameter block's clear
+    zeroes; B = 0 is given at the entry for the dispatch's TAX, as the loaders' banner says),
+    `HalfPlaneEdge` (`BattleCD_FxOpHalfPlane`, its first TDC), `FxGfxLists` and `FxGfxColours`
+    (`BattleCD_ConvertFxGfx`, see below) and `MenuRom_E4PalOffsets` (`Menu_SprLoad`, the AND
+    `Eng_LowByteMask` of the palette byte). The runs are kept in `build/records-reach/`.
+  - *A define or a register width* (4 tables): `ExpToLevel` (levels 0-`Battle_LevelMax`, which
+    `BattleSys_ApplyExpStep` clamps to), `RomE4_SprRec` (`SprRec_FirstNpc` + a byte),
+    `MenuRom_SlotEraNibbles` (the location word is `Menu_SramUnk05F3Mask` = $1FF wide, as
+    `Menu_ReadSlotSummary` masks it, and `Menu_UnkD36C` halves it; not run, so that the word is
+    still that wide when read rests on the summary block being written only there), and
+    `AnimRom_Palettes` (the palette byte is an 8-bit `WRMPYA` operand: 256 values; checked:
+    `Pal_ObjColorBytes` = `ObjPal_CopyCount` + 1 = the layout's record size).
+  - *Data* (2 tables): the object lists' extent and `LocGfx_Lists` (both below).
   - Action object records (`BattleRom_ActObjRec_Lists`, `$CE:8870`, 4,691 x 4 B). Every word of
     the three `*Objs` tables is an object pointer: `Battle_ActObjIdx` is a byte x 2, so it reaches
     no further than these tables.
+    - The 25 words $FFFF are taken as unused. `BattleAct_IndexObjLists` has no $FFFF test, so
+      `obj_lists_extent` refuses one that would point into the records the lists cover; $CE:FFFF
+      is past them.
     - `BattleAct_IndexObjLists` reads 16 lists from each pointer: 1xx/001 ends a list, 010 marks
       it, and the first record of lists 1-15 is untested.
+    - `BattleAct_StepObjAnim` reads each list from its start + facing x the mark count x 4, for
+      facings 0-3 (`Battle_FacingRight`), up to a record with a type. Every list sets its mark
+      count (one that did not would leave another list's), and every such read stays inside the
+      covered records.
     - Together they cover `$CE:8870`-`$D1BB` with no gap (`obj_lists_extent`). The 620 B after
       that are reached by none: an unknown row.
   - Domain bounds:
     - `BattleRom_FxGfxLists` (`$CF:A000`, 256 sets x 32 words) and `FxGfxColours`: the set is a
-      byte (`Battle_FxTileSet`).
+      byte (`Battle_FxTileSet`) **only if B = 0** at `BattleCD_LoadFxGfx4`'s 8-bit LDA / 16-bit
+      TAX of it. That is assumed, not traced: before the first part `BattleCD_WaitFrameRefresh`
+      runs the battle menu's refresh, before the later ones `BattleCD_QueueVramDma` waits. The run
+      starts at `BattleCD_ConvertFxGfx` with X = the set.
     - `BattleRom_EnemyStats` (`$CC:4700`, 256 x 23 B, the fields as `BattleFD_UnkB438` copies
       them).
     - `BattleRom_EnemyEffectRecA` (255 x 12 B; part number $FF is skipped, and its 12 B are split
@@ -783,13 +918,17 @@ below). Each group's bound is re-derived by its tool's `check` and again at extr
       `MenuRom_SlotEraNibbles` (a 9-bit location / 2).
     - The sprite palettes `AnimRom_Palettes` (`$E4:0000`, 256 x 12 colours: a palette byte x
       `Pal_ObjColorBytes`) and their offsets `MenuRom_E4PalOffsets` (`$E4:2A00`).
+    - Not proved: the menu's alternate palettes. `Menu_SprLoad` adds $200 to the palette's
+      offset when definition byte 4 has bit 4 set. No `RomE4_SprRec` record (kinds 0 and 1) sets
+      it; where it would take kind 2's definitions (`RomE4_EnemySprRec`, an index not bounded) is
+      not traced.
     - `RomE4_SprRec`, now 263 records: `Evt_Op82_InitWramSprite` reads `SprRec_FirstNpc` + a byte,
       so the last record's size byte is the old padding's first byte.
   - Data bound: `LocGfx_Lists` holds 54 entries. Its index's only source is `LocRom.Tileset12`,
     whose values reach 53. Entries 54-63 (80 B) stay bytes.
 - **Pointer table**: `BattleRom_SprFramesPtr` (`$E4:2300`) is now written as labels into the sprite
   frame pieces.
-- **Still raw** (49,400 B in 143 pieces), by reader:
+- **Still raw** (48,632 B in 142 pieces), by reader:
   - **Battle action loaders** (`BattleAct_*`, 25 pieces, 11,418 B): `BattleRom_PcAttackAct`,
     `PcTechAct`, `EnemyAttackAct`, `EnemyAttack2Act`, `EnemyTechAct`, `ActObjInit`, the palette
     steps (`$CD:EE23`), `TechObjs` and the other palette and object tables. Some indexes are read
@@ -806,17 +945,17 @@ below). Each group's bound is re-derived by its tool's `check` and again at extr
     - the area and item records at `$CC:0000`, the tech records, the equipment records;
     - `BattleRom_UnkCC6FCB`, the effect records B;
     - all indexed by values from other unproved tables.
-  - **No reader found** (6 pieces, 2,756 B): `$CD:F188`, `$F8:AF6F`, `$CC:FC2C`, `$CC:F383`,
-    `MenuRom_DrawArgLens` (indexed by any command byte below $80, while the commands stop at $14),
-    and `LocGfx_Lists`' tail.
+  - **No reader found** (5 pieces, 2,734 B): `$CD:F188`, `$F8:AF6F`, `$CC:FC2C`, `$CC:F383` and
+    `LocGfx_Lists`' tail.
   - **HDMA sets** (`BattleRom_HdmaSetRecs`/`SetOfs`, 2,738 B): records, then tables at the
     offsets the records hold; not traced.
   - **`RomE4_EnemySprRec`** (2,528 B): battle's index is an enemy id x 10, which reaches into
     `RomE4_PtrInit`.
-  - **Small menu, battle-menu, battle-sprite and scene tables** (75 pieces, 4,887 B): their
+  - **Small menu, battle-menu, battle-sprite and scene tables** (75 pieces, 4,141 B): their
     readers' indexes reach past the row (a slot or row number wider than the table), or are
-    computed from values not traced. This includes the `C2SceneRom_*_Tail` bytes after the scene
-    pointer tables.
+    computed from values not traced. This includes `MenuRom_DrawArgLens` (`Menu_RunDrawList`
+    indexes it by any command byte below $80, while the commands stop at $14) and the
+    `C2SceneRom_*_Tail` bytes after the scene pointer tables.
 
 ## Palettes
 

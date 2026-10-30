@@ -207,6 +207,7 @@ MenuRom_ItemTextPtrs:
 
 ; $FF:BD18-$FF:BD2D (22 B), table, confirmed: per command byte: argument bytes - 1
 ; (Menu_RunDrawList)
+; Read by Menu_RunDrawList.
 org $FFBD18
 MenuRom_DrawArgLens:
     incbin "../../build/assets/table/MenuRom_DrawArgLens.bin"
