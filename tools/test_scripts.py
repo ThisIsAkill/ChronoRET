@@ -508,7 +508,9 @@ class Source(unittest.TestCase):
             self.assertEqual(p['asset'], f'scene/{p["label"]}.scn')
 
 
-@unittest.skipUnless(HAVE_ASAR, 'needs asar (the code image is assembled from the source)')
+# The code image is the source assembled with the packed $C3 module, whose source incbins
+# the ROM's bytes it does not cover: it needs the ROM as well as asar.
+@unittest.skipUnless(HAVE_ROM, 'needs the ROM and asar (the code image is assembled from the source and the module)')
 class WithSource(unittest.TestCase):
 
     def test_trusted_routines_from_their_code(self):
