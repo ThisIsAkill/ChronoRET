@@ -336,22 +336,45 @@ def obj_lists_extent(rom: bytes, d: dict) -> tuple[int, int]:
     return ce + s, ce + e
 
 
-def _loc_tilesets(rom: bytes, d: dict) -> int:
+LOCROM_ROW = '$F6:0000'       # the LocRom records' survey row (their count: its size / LocRom_RecSize)
+
+
+def _loc_field(rom: bytes, d: dict, field: str, rows: list[dict] | None = None) -> list[int]:
+    """Every LocRom record's `field`, the record size from LocRom_RecSize,
+    the field's offset and width from struct LocRom, the count from the
+    records' survey row (as maps.derive_named reads them)."""
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import data_survey
+    rows = data_survey.read_rows() if rows is None else rows
+    fields, off = {}, 0
+    for name, t in _struct_fields('LocRom'):
+        fields[name] = (off, width(t))
+        off += width(t)
+    size = d['LocRom_RecSize']
+    if off != size:
+        raise RecordsError(f'struct LocRom is {off} B; LocRom_RecSize is {size}')
+    row = next((r for r in rows if r['start'] == LOCROM_ROW), None)
+    if row is None or int(row['size']) % size:
+        raise RecordsError(f'no survey row of whole LocRom records at {LOCROM_ROW}')
+    base = data_survey.parse_addr(LOCROM_ROW)
+    at, w = fields[field]
+    return [int.from_bytes(rom[base + k * size + at:base + k * size + at + w], 'little')
+            for k in range(int(row['size']) // size)]
+
+
+def _loc_tilesets(rom: bytes, d: dict, rows: list[dict] | None = None) -> int:
     """Entries of LocGfx_Lists the locations name: 1 + the largest
     LocRom.Tileset12 other than LocRom_SetNone."""
-    base = d['LocRom'] if 'LocRom' in d else 0xF60000
-    used = [rom[base - 0xC00000 + 14 * k + 1] for k in range(512)]
-    return 1 + max(v for v in used if v != d['LocRom_SetNone'])
+    return 1 + max(v for v in _loc_field(rom, d, 'Tileset12', rows) if v != d['LocRom_SetNone'])
 
 
-def _loc_palettes(rom: bytes, d: dict) -> int:
+def _loc_palettes(rom: bytes, d: dict, rows: list[dict] | None = None) -> int:
     """Rows of 15 colours in LocPal_Rom the locations name: 7 per entry,
     1 + the largest LocRom.Palette entries (LocRom's only reader of it is
     LocLoad_Unk7084)."""
     if d['LocPal_SetBytes'] != 7 * d['LocPal_RowBytes'] or d['LocPal_RowBytes'] != 30:
         return -1
-    used = [rom[0xF60000 - 0xC00000 + 14 * k + 3] for k in range(512)]
-    return 7 * (1 + max(used))
+    return 7 * (1 + max(_loc_field(rom, d, 'Palette', rows)))
 
 
 def _bg_set_rows(path: Path = ROOT / 'asm' / 'bankD1' / 'bankD1.asm') -> int:

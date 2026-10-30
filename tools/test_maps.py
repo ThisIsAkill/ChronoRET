@@ -225,6 +225,26 @@ class SceneLayers(unittest.TestCase):
         self.assertIsNone(maps.kind_of('via C2SceneRom_Bg3MapPacks[5]; x'))     # no header names it
 
 
+class ActFramesPieces(unittest.TestCase):
+    """The actframes pieces go through maps' piece functions, which give
+    tools/actframes.py's refusals as MapsError (build_maps and check catch
+    only that)."""
+
+    P = {'label': 'A', 'piece': 'actframes', 'asset': 'maps/A.afr', 'param': 'lz11 -> 4 B'}
+
+    def test_round_trip(self):
+        data = bytes([0x01, 0x80, 0x12, 0x34, 0x00, 0x00])        # one frame: one row, one sprite, the skip
+        self.assertEqual(maps.assemble_piece(self.P, maps.render_piece(self.P, data)), data)
+
+    def test_render_refusal_is_maps_error(self):
+        with self.assertRaisesRegex(maps.MapsError, 'A: byte 0: a 0 header ends the frames'):
+            maps.render_piece(self.P, bytes([0, 0]))
+
+    def test_assemble_refusal_is_maps_error(self):
+        with self.assertRaisesRegex(maps.MapsError, 'A: the first line must be @actframes A N'):
+            maps.assemble_piece(self.P, '@actframes B 0\n')
+
+
 class Source(unittest.TestCase):
 
     def test_manifest_pieces(self):

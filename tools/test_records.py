@@ -217,6 +217,23 @@ class Derived(unittest.TestCase):
         self.assertEqual(records._loc_palettes(bytes(rom), dict(D, LocPal_RowBytes=28)), -1)
         self.assertEqual(records._loc_palettes(bytes(rom), dict(D, LocPal_SetBytes=0xD0)), -1)
 
+    def test_loc_fields_from_the_struct_and_survey(self):
+        rom = bytearray(0x400000)
+        rows = [{'start': '$F6:0000', 'size': str(14 * 4)}]                # four records
+        rom[F(0xF60000) + 14 * 3 + 3] = 5                                   # record 3's Palette (struct offset 3)
+        rom[F(0xF60000) + 14 * 4 + 3] = 9                                   # past the survey's records
+        rom[F(0xF60000) + 14 * 3 + 1] = 6                                   # record 3's Tileset12
+        self.assertEqual(records._loc_palettes(bytes(rom), D, rows), 7 * 6)
+        self.assertEqual(records._loc_tilesets(bytes(rom), D, rows), 7)
+        rom[F(0xF60000) + 14 * 2 + 4:F(0xF60000) + 14 * 2 + 6] = bytes([0x02, 0x01])   # MapProps: u16 at 4
+        self.assertEqual(records._loc_field(bytes(rom), D, 'MapProps', rows), [0, 0, 0x102, 0])
+        with self.assertRaisesRegex(records.RecordsError, 'struct LocRom is 14 B; LocRom_RecSize is 16'):
+            records._loc_palettes(bytes(rom), dict(D, LocRom_RecSize=16), rows)
+        with self.assertRaisesRegex(records.RecordsError, 'no survey row of whole LocRom records'):
+            records._loc_palettes(bytes(rom), D, [{'start': '$F6:0000', 'size': '15'}])
+        with self.assertRaisesRegex(records.RecordsError, 'no survey row of whole LocRom records'):
+            records._loc_palettes(bytes(rom), D, [])
+
     def test_bg_set_rows_from_the_source(self):
         self.assertEqual(records._bg_set_rows(), 15)
         import tempfile
