@@ -30,6 +30,11 @@ assets, with no copy of the original.
      in build/scene/ (step 3 packs them), every `fx` piece from
      build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
      tools/scripts.py, every line checked against the handlers.
+  6b. The battle scripts: every unit of `battle` pieces is assembled from
+     its readable file (build/assets/battle/<unit>.bscr) with
+     tools/battle.py, every line checked against the readers, to
+     build/battle/<label>.bin per piece (a file is rewritten only when its
+     bytes change; a piece whose size differs fails the build).
   6c. The graphics: every `graphics` piece is encoded from its PNG and
      sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
      every `gfxpack` piece the same way to its unpacked bytes in
@@ -42,11 +47,6 @@ assets, with no copy of the original.
      its text (build/assets/sprites/<label>.spr) with tools/sprites.py to
      build/sprites/<label>.bin (a file is rewritten only when its bytes
      change; a text that does not make its piece's bytes count fails).
-  6b. The battle scripts: every unit of `battle` pieces is assembled from
-     its readable file (build/assets/battle/<unit>.bscr) with
-     tools/battle.py, every line checked against the readers, to
-     build/battle/<label>.bin per piece (a file is rewritten only when its
-     bytes change; a piece whose size differs fails the build).
   7. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets
@@ -325,10 +325,11 @@ def build_text_tools(root: Path = ROOT) -> int:
 
 
 def build_maps(root: Path = ROOT) -> int:
-    """Assemble every `mapprops` and `metatiles` piece from its text
+    """Assemble every maps piece (maps.PIECES) from its text
     (build/assets/maps/, tools/maps.py) to its unpacked bytes in
     build/maps/, which build_packs packs; returns how many files were
-    written."""
+    written. A text that assembles to another size than its piece's
+    unpacked size (its param) fails."""
     import maps
     root = Path(root)
     written = 0
@@ -339,6 +340,10 @@ def build_maps(root: Path = ROOT) -> int:
             data = maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
         except (OSError, maps.MapsError) as e:
             raise BuildError(f'maps: {e}') from None
+        size = extract_data.pack_param(p['param'])[1]
+        if len(data) != size:            # the pack would not be the one the reader unpacks
+            raise BuildError(f'maps: {p["label"]}: its text assembles to {len(data)} B; the piece unpacks to '
+                             f'{size} B ({p["param"]})')
         out_dir = root / extract_data.MAPS_OUT
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{p["label"]}.bin'

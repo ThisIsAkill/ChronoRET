@@ -781,19 +781,28 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
 - **The pointers.** `BattleRom_SprFramesPtr` (`$E4:2300`) holds one long pointer per sprite set.
   The field reads the same table through `Field_E4Ptr1`, whose low word comes from
   `RomE4_PtrInit` word 1, and the menu through `MenuRom_E4FramePtrs`, the same word; `check`
-  tests that. Every reader takes the set number from byte 1 (`SprRec_Frames`) of a sprite record
-  (`RomE4_SprRec`, 5 B, or the first five bytes of a `RomE4_EnemySprRec` record):
-  `Evt_LoadSpriteRec`, `Evt_Op82_InitWramSprite`, `Evt_Op83_InitEnemySprite`, `Menu_SprLoad`,
-  `Battle_InitScene`.
+  tests that. `Evt_LoadSpriteRec`, `Evt_Op82_InitWramSprite`, `Evt_Op83_InitEnemySprite` and
+  `Menu_SprLoad` take the set number from byte 1 (`SprRec_Frames`) of a sprite record
+  (`RomE4_SprRec`, 5 B, or the first five bytes of a `RomE4_EnemySprRec` record), and so does
+  `Battle_InitScene` for an enemy (`BattleRom_EnemySpr.FrameSet`, the same byte of its
+  `RomE4_EnemySprRec` record). For a party member it does not: its `.pc_sprite` loop uses
+  `Pc_CharId` itself as the set number, and nothing writes that battler's `Battler_FrameLayout`.
+  That agrees with the records only because `RomE4_SprRec` records 0-6 (`Pc_NumChars`) have
+  `SprRec_Frames` 0-6 and size 0, so character n's set n is 40-B records whichever reader takes
+  it; `sprites.size_problems` checks that.
 - **The record size** is byte 4 (`SprRec_Size`) bits 0-1 of the same record, and all three readers
   agree on it (`sprites.size_problems` checks each against `CLASS_BYTES`):
   - the field: `Obj_BuildSpriteFrameStep` sends size 0/1/2 to `Obj_BuildFrame4/8/12`, at
     `Frame4/8/12_Bytes` (40, 80, 120 B) per frame; size 3 is `Spr_LoadLargeObj`, 96 tile words
-    (`SprBuf_Tiles`) then 24 pairs at `LargeObj_LayoutOfs`, so 240 B;
+    (`SprBuf_Tiles`) then 24 pairs at `LargeObj_LayoutOfs`, so 240 B. It reads that one record at
+    `Obj_FrameOfs` and never steps by frame, and it never reads the size: its "size 3" is
+    inferred from its caller at `$C0:47E9`, which calls it only when the size is 3;
   - the menu: `Menu_SprTileCounts[size]` units of `Menu_SprFrameBytes` (40, 80, 120, 240 B);
   - battle: an enemy's layout is `FieldBtlObj.Flags & 7`, which holds `Obj_SprSize &
     ObjSpr_SizeMask`, and `Battle_DrawBattlerFrameAnyLayout` steps `BattleRom_FrameBytes` (40, 80,
     120, 240 B for layouts 0-3) per frame id.
+
+  Only the menu and battle step 240 B per frame of a size-3 set.
 - **The record.** N tile words (N = 16, 32, 48, 96), then N/4 position pairs. Each word gives a
   tile in bits 0-10 (`SprFrame_TileMask`), copied by `Spr_CopyTile`, with bit 14
   (`SprFrame_HFlip`) mirrored; the battle reader draws tile 0 blank. No reader tests bits 11-13
@@ -803,13 +812,15 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
 - **The extent is inferred.** Frame f of a set is at pointer + f x size, and no reader bounds f.
   So a run is taken from each pointer up to the next one; sets that share an address are one
   run. All 220 runs that end at another pointer are a whole number of their records. The last
-  run of each of the five areas ends at its last non-zero byte, rounded up to a whole record;
-  those five are where the old "remainder" bytes were. The zero bytes after it (13,672 B in
-  five rows) are padding, marked probable because a frame id could still reach them.
+  run of each of the five areas ends at its last non-zero byte, rounded up to a whole record
+  (refused if that passes the area's end); those five are where the old "remainder" bytes were.
+  The zero bytes after it (13,672 B in five rows) are padding, marked probable because a frame
+  id could still reach them.
 - **Results.** 4,745 frame records in 225 runs (237,320 B, nine pieces) assemble back byte-exact.
   `check` derives the runs from the ROM and refuses pieces that are not those runs, a pointer
-  outside the five areas, an area no set starts, a run with two record sizes, or an inner run
-  that is not whole records.
+  outside the five areas, an area no set starts, a run with two record sizes, an inner run
+  that is not whole records, a last run that rounds past its area, or a character's sprite
+  record that is not its own set at size 0.
 - **Not proven, still extracted** (2,960 B, four `sprite_layout` rows): the runs of sets 8, 9 and
   10 (`$DD:B900`, 1,840 B), 197 (`$DE:B068`), 140 (`$E3:42E0`, 960 B) and 216 (`$E3:E858`). No
   sprite record names these sets, so no reader gives their record size.
