@@ -7523,7 +7523,8 @@ LocLoad_Unk092B:
 ; $3800, $4000 ($1000 bytes each) and $4800 ($0F80 bytes). The tail jump
 ; to LocLoad_UnpackPacks67 then unpacks packs 6 and 7 into bank $7F.
 ; "Graphics" rests on the VRAM targets below the tilemaps at $6000
-; (Map_VramTilemap1); the BG character bases are not traced.
+; (Map_VramTilemap1) and on the BG1/BG2 character base $1000 that
+; Ppu_SetBgLayout sets when LocLoad_DrawMap draws the map: 4bpp tiles.
 ; The pointer is stepped with an 8-bit INC: the entries are 8-byte
 ; aligned, so the low byte never carries.
 ; Callers (2 JSR sites): LoadLocation ($C0:00FA) and Field_RestoreState ($C0:01C3).

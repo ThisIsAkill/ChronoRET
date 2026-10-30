@@ -209,7 +209,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
-               'graphics_bytes': 0}
+               'graphics_bytes': 0, 'gfxpack_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -234,20 +234,21 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         extract_data.extract()
         build_rom.build_events()
         build_rom.build_scripts()
+        build_rom.build_graphics()
         build_rom.build_packs()
         build_rom.build_text()
         build_rom.build_records()
         build_rom.build_battle()
-        build_rom.build_graphics()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
         return figures, problems
     for p in pieces:
         if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
-                              'graphics'):
+                              'graphics', 'gfxpack'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
-                else extract_data.PACKS / f'{p["label"]}.lz' if p['piece'] in ('packed', 'events', 'scene')
+                else extract_data.PACKS / f'{p["label"]}.lz'
+                if p['piece'] in ('packed', 'events', 'scene', 'gfxpack')
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
                 else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
@@ -288,13 +289,14 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     figures['scripts_split'] = ssplit
     # The graphics: bytes in tiles, and tail bytes kept as they are.
     import graphics
-    gsplit = {'tiles': 0, 'tail': 0, 'regions': 0}
+    gsplit = {'tiles': 0, 'tail': 0, 'regions': 0, 'pack_tiles': 0, 'pack_tail': 0, 'packs': 0}
     for p in pieces:
-        if p['piece'] == 'graphics':
+        if p['piece'] in ('graphics', 'gfxpack'):
             fmt, tiles, tail = graphics.parse_param(p['param'])
-            gsplit['tiles'] += tiles * graphics.TILE_BYTES[fmt]
-            gsplit['tail'] += tail
-            gsplit['regions'] += 1
+            pre = '' if p['piece'] == 'graphics' else 'pack_'
+            gsplit[pre + 'tiles'] += tiles * graphics.TILE_BYTES[fmt]
+            gsplit[pre + 'tail'] += tail
+            gsplit['regions' if p['piece'] == 'graphics' else 'packs'] += 1
     figures['graphics_split'] = gsplit
     return figures, problems
 
@@ -411,6 +413,10 @@ def main() -> int:
               f'encoded by the build from indexed images extracted from the ROM (build/assets/gfx/ -> '
               f'build/gfx/, incbin): {gs["tiles"]:,} B in tiles, {gs["tail"]:,} B past the last tile kept '
               f'as bytes')
+        print(f'  {"packed graphics":<16} {data["gfxpack_bytes"]:>9,} bytes of {gs["packs"]} graphics packs packed '
+              f'by the build from indexed images of their unpacked bytes (build/assets/gfx/ -> '
+              f'build/gfxpack/ -> build/packs/, incbin): unpacked, {gs["pack_tiles"]:,} B in tiles, '
+              f'{gs["pack_tail"]:,} B past the tiles the readers read kept as bytes')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')
