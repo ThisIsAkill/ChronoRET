@@ -681,6 +681,55 @@ mode 1, BG1/BG2 maps at VRAM `$6000`/`$6800`, BG3's at `$7800` (64x32).
 - **Results.** 19 packs (24,576 + 98,304 + 20,480 B unpacked) assemble and pack back byte-exact;
   `tools/verify.py` counts them under "maps".
 
+## Sprite frame records as text
+
+On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records of banks `$DC`,
+`$DD`, `$DE`, `$E1` and `$E3` (the 253,952 B of `sprite_layout` rows) a readable form in
+`build/assets/sprites/`. The build assembles it to `build/sprites/`, which is incbin'd;
+`tools/verify.py` counts it as "sprite frames".
+
+- **The pointers.** `BattleRom_SprFramesPtr` (`$E4:2300`) holds one long pointer per sprite set.
+  The field reads the same table through `Field_E4Ptr1`, whose low word comes from
+  `RomE4_PtrInit` word 1, and the menu through `MenuRom_E4FramePtrs`, the same word; `check`
+  tests that. Every reader takes the set number from byte 1 (`SprRec_Frames`) of a sprite record
+  (`RomE4_SprRec`, 5 B, or the first five bytes of a `RomE4_EnemySprRec` record):
+  `Evt_LoadSpriteRec`, `Evt_Op82_InitWramSprite`, `Evt_Op83_InitEnemySprite`, `Menu_SprLoad`,
+  `Battle_InitScene`.
+- **The record size** is byte 4 (`SprRec_Size`) bits 0-1 of the same record, and all three readers
+  agree on it (`sprites.size_problems` checks each against `CLASS_BYTES`):
+  - the field: `Obj_BuildSpriteFrameStep` sends size 0/1/2 to `Obj_BuildFrame4/8/12`, at
+    `Frame4/8/12_Bytes` (40, 80, 120 B) per frame; size 3 is `Spr_LoadLargeObj`, 96 tile words
+    (`SprBuf_Tiles`) then 24 pairs at `LargeObj_LayoutOfs`, so 240 B;
+  - the menu: `Menu_SprTileCounts[size]` units of `Menu_SprFrameBytes` (40, 80, 120, 240 B);
+  - battle: an enemy's layout is `FieldBtlObj.Flags & 7`, which holds `Obj_SprSize &
+    ObjSpr_SizeMask`, and `Battle_DrawBattlerFrameAnyLayout` steps `BattleRom_FrameBytes` (40, 80,
+    120, 240 B for layouts 0-3) per frame id.
+- **The record.** N tile words (N = 16, 32, 48, 96), then N/4 position pairs. Each word gives a
+  tile in bits 0-10 (`SprFrame_TileMask`), copied by `Spr_CopyTile`, with bit 14
+  (`SprFrame_HFlip`) mirrored; the battle reader draws tile 0 blank. No reader tests bits 11-13
+  or 15. Each pair is the signed OfsX, OfsY of one 16x16 sprite (`SprTileSrc`; the battle and menu
+  readers copy the same bytes). The text writes a frame as its words (`TTT`, then `h`, `v`, `^n`
+  for the bits no reader tests) and an `@` line of pairs.
+- **The extent is inferred.** Frame f of a set is at pointer + f x size, and no reader bounds f.
+  So a run is taken from each pointer up to the next one; sets that share an address are one
+  run. All 220 runs that end at another pointer are a whole number of their records. The last
+  run of each of the five areas ends at its last non-zero byte, rounded up to a whole record;
+  those five are where the old "remainder" bytes were. The zero bytes after it (13,672 B in
+  five rows) are padding, marked probable because a frame id could still reach them.
+- **Results.** 4,745 frame records in 225 runs (237,320 B, nine pieces) assemble back byte-exact.
+  `check` derives the runs from the ROM and refuses pieces that are not those runs, a pointer
+  outside the five areas, an area no set starts, a run with two record sizes, or an inner run
+  that is not whole records.
+- **Not proven, still extracted** (2,960 B, four `sprite_layout` rows): the runs of sets 8, 9 and
+  10 (`$DD:B900`, 1,840 B), 197 (`$DE:B068`), 140 (`$E3:42E0`, 960 B) and 216 (`$E3:E858`). No
+  sprite record names these sets, so no reader gives their record size.
+- **Not settled:**
+  - Which frames are really shown. The frame-id lists at `$E4:3000` are no bound: in 12 runs
+    they name ids past the run. In four of these the next run's records are a different size,
+    and set 228's ids would read past `$DE:C000` into the message tables. Those animation rows
+    are probably never played.
+  - The battle-action frames (`$D1`), and `$E4:0000`-`$1FFF`, are separate tables, not done here.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
@@ -733,7 +782,8 @@ stop the copying of bytes. Uncertainties, largest first:
   make the source text harder to edit (it still round-trips).
 - **Table ends.** 40% of the table bytes (70,780 of 177,310) run to the next named table only
   by inference; each has to be settled from its reader (step 6 settled the ones below).
-- **Sprite frames and the character tile blocks**: format and ends not decoded yet.
+- **The character tile blocks**: ends not decoded yet (the sprite frame records are done: see
+  "Sprite frame records as text"; their per-set ends stay inferred).
 - **Probable and unknown rows** (33 KB): these are stale data or a reader the survey missed; a
   missed reader would change a row's kind, not the plan.
 - **The asset decision** (step 0) changes steps 2-4 in kind, not in size.
@@ -777,4 +827,5 @@ None found beyond what is already known:
   bytes split off the text rows in step 5, 17 the bytes past their readers' reach split off
   tables and palettes in step 6): stale bytes beside unused pointer
   entries, four single bytes of the same value right after a run of packs, and small gaps.
-- The internal layout of the sprite frame records and of `$E4:0000`-`$1FFF`.
+- The internal layout of `$E4:0000`-`$1FFF` (the sprite frame records: "Sprite frame records as
+  text").

@@ -80,7 +80,14 @@ How each piece's bytes are made (the manifest's `piece` column):
              sidecar); the build encodes them to build/gfx/<label>.bin,
              which is incbin'd. param: "<format> N tiles [+ T B]". Counted
              as "graphics".
-  records    a table or palette row with a layout in tools/records.py (a
+  sprframes  a sprite_layout row of frame records (tools/sprites.py: the
+             runs from the set pointers, each with its sprite records'
+             record size): build/assets/sprites/<label>.spr, its frames'
+             tile words and position pairs as text (checked to assemble
+             back when written, after the rows are checked against the
+             runs); the build assembles it to build/sprites/<label>.bin,
+             which is incbin'd. No param. Counted as "sprite frames".
+  records   a table or palette row with a layout in tools/records.py (a
              ROM struct, the reader's element width, BGR555 colours): its
              records go to build/assets/records/<label>.tsv (checked to
              encode back when written); the build encodes it to
@@ -131,6 +138,7 @@ import battle  # noqa: E402
 import maps  # noqa: E402
 import graphics  # noqa: E402
 import scripts  # noqa: E402
+import sprites  # noqa: E402
 import data_survey  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
@@ -148,6 +156,7 @@ MAPS_OUT = Path('build/maps')          # the assembled (unpacked) maps and metat
 SCENE_OUT = Path('build/scene')        # the assembled (unpacked) scene scripts (tools/build_rom.py)
 FX_OUT = Path('build/fx')              # the assembled layer-effect scripts (tools/build_rom.py)
 GFX_OUT = Path('build/gfx')            # the encoded graphics pieces (tools/build_rom.py)
+SPRITES_OUT = Path('build/sprites')    # the assembled sprite frame pieces (tools/build_rom.py)
 STAMP_NAME = '.extracted'
 ROM_SIZE = 0x400000
 
@@ -159,11 +168,12 @@ RECORDS_PREFIX = '../../build/records/'
 BATTLE_PREFIX = '../../build/battle/'
 FX_PREFIX = '../../build/fx/'
 GFX_PREFIX = '../../build/gfx/'
+SPRITES_PREFIX = '../../build/sprites/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
           'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
-          'graphics')
+          'graphics', 'sprframes')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -175,6 +185,7 @@ MAPS_ASSET = re.compile(r'^maps/([A-Za-z_][A-Za-z0-9_]*)\.([a-z0-9]+)$')
 SCENE_ASSET = re.compile(r'^scene/([A-Za-z_][A-Za-z0-9_]*)\.scn$')
 SCENE_PACK = re.compile(r'\bvia C2SceneRom_ScriptPacks\[')
 GFX_ASSET = re.compile(r'^gfx/([A-Za-z_][A-Za-z0-9_]*)\.png$')
+SPRITES_ASSET = re.compile(r'^sprites/([A-Za-z_][A-Za-z0-9_]*)\.spr$')
 FX_ASSET = re.compile(r'^fx/([A-Za-z_][A-Za-z0-9_]*)\.bfx$')
 BATTLE_PARAM = re.compile(r'^([a-z]+)/([a-z]+)$')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
@@ -365,6 +376,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'fx/{label}.bfx'
         elif piece == 'graphics':
             asset = f'gfx/{label}.png'
+        elif piece == 'sprframes':
+            asset = f'sprites/{label}.spr'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
@@ -391,6 +404,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
         elif kind == 'graphics' and graphics.layout_for(row['start'], e - s) is not None:
             add(label, s, e, 'graphics', param=graphics.param_of(*graphics.layout_for(row['start'], e - s)),
                 row=row)
+        elif sprites.is_piece_row(row):
+            add(label, s, e, 'sprframes', row=row)
         elif row['start'] in scripts.FX_ROWS:
             if kind != 'battle_script':
                 raise DataError(f'{row["start"]}: a {kind} row cannot be the layer-effect scripts')
@@ -503,6 +518,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or not graphics.PARAM.match(p['param']):
                 problems.append(f'{where}: a graphics piece\'s asset is gfx/<label>.png and its param '
                                 f'"<format> N tiles [+ T B]": {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'sprframes':
+            m = SPRITES_ASSET.match(p['asset'])
+            if not m or m.group(1) != p['label'] or p['param']:
+                problems.append(f'{where}: a sprframes piece\'s asset is sprites/<label>.spr and it has no '
+                                f'param: {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'fx':
             m = FX_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or p['param']:
@@ -550,6 +570,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{FX_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'graphics':
             out[f'{GFX_PREFIX}{p["label"]}.bin'] = p
+        elif p['piece'] == 'sprframes':
+            out[f'{SPRITES_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'text':
             out[f'{TEXT_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'records':
@@ -573,6 +595,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[FX_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'graphics':
             out[GFX_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif p['piece'] == 'sprframes':
+            out[SPRITES_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'text':
             out[TEXT_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'records':
@@ -736,6 +760,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{FX_PREFIX}{p["label"]}.bin"          ; layer-effect scripts')
         elif p['piece'] == 'graphics':
             out.append(f'    incbin "{GFX_PREFIX}{p["label"]}.bin"          ; graphics: {p["param"]}')
+        elif p['piece'] == 'sprframes':
+            out.append(f'    incbin "{SPRITES_PREFIX}{p["label"]}.bin"          ; sprite frame records')
         elif p['piece'] == 'records':
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'battle':
@@ -842,7 +868,8 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(__file__).read_bytes())
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
-    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'absint.py', 'disasm.py'):
+    for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'sprites.py', 'absint.py',
+                 'disasm.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
@@ -879,6 +906,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     problems += extract_events(rom, out_dir, pieces, root, quiet)
     problems += extract_battle(rom, out_dir, pieces, root)
     problems += extract_scripts(rom, out_dir, pieces, root)
+    problems += extract_sprites(rom, out_dir, pieces)
     for p in pieces:
         s, e = p['offset'], p['stop']
         if p['piece'] == 'fill':
@@ -888,7 +916,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('table', 'text', 'records'):
             continue
-        if p['piece'] in ('events', 'battle', 'scene', 'fx'):
+        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'sprframes'):
             continue
         if p['piece'] in maps.PIECES:
             data, why = unpack_piece(rom, p)
@@ -1046,6 +1074,37 @@ def extract_scripts(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = 
     import c3pack
     problems = []
     for p, text_ in scripts.extract_all(rom, pieces, Path(root), problems):
+        dest = out_dir / p['asset']
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        c3pack._write(dest, text_.encode())
+    return problems
+
+
+def extract_sprites(rom: bytes, out_dir: Path, pieces: list[dict]) -> list[str]:
+    """Write the readable file of every sprframes piece (tools/sprites.py),
+    each checked to assemble back to the ROM's bytes, after the readers'
+    record sizes and the pieces are checked against the runs the set
+    pointers make; the problems."""
+    import c3pack
+    if not any(p['piece'] == 'sprframes' for p in pieces):
+        return []
+    d = battle.defines(ROOT)
+    problems = sprites.size_problems(rom, d)
+    try:
+        runs = sprites.derive(rom, d)
+    except sprites.SpritesError as err:
+        return problems + [f'sprites: {err}']
+    problems += sprites.layout_problems(runs, pieces)
+    if problems:
+        return problems
+    for p in pieces:
+        if p['piece'] != 'sprframes':
+            continue
+        try:
+            text_ = sprites.piece_text(p, rom, runs)
+        except sprites.SpritesError as err:
+            problems.append(str(err))
+            continue
         dest = out_dir / p['asset']
         dest.parent.mkdir(parents=True, exist_ok=True)
         c3pack._write(dest, text_.encode())

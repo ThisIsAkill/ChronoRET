@@ -15,13 +15,37 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $DE:0000-$DE:BFFF (49,152 B), sprite_layout, confirmed: per sprite set: frame records of
-; sprite tiles (tile, attributes, offsets)
-; Read by Battle_InitScene (BattleRom_SprFramesPtr), Evt_LoadSpriteRec / Spr_Load*
-; (Field_E4Ptr1), Menu_SprLoad (MenuRom_E4FramePtrs).
+; $DE:0000-$DE:B067 (45,160 B), sprite_layout, confirmed: frame records: N tile words (tile in
+; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
+; 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
 org $DE0000
 SprLayout_DE0000:
-    incbin "../../build/assets/sprite_layout/SprLayout_DE0000.bin"
+    incbin "../../build/sprites/SprLayout_DE0000.bin"          ; sprite frame records
+
+; $DE:B068-$DE:B0B7 (80 B), sprite_layout, probable: per sprite set: frame records of unknown
+; record size
+org $DEB068
+SprLayout_DEB068:
+    incbin "../../build/assets/sprite_layout/SprLayout_DEB068.bin"
+
+; $DE:B0B8-$DE:BF8F (3,800 B), sprite_layout, confirmed: frame records: N tile words (tile in
+; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
+; 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
+org $DEB0B8
+SprLayout_DEB0B8:
+    incbin "../../build/sprites/SprLayout_DEB0B8.bin"          ; sprite frame records
+
+; $DE:BF90-$DE:BFFF (112 B), padding, probable: 112 x $00
+org $DEBF90
+Padding_DEBF90:
+    fillbyte $00
+    fill 112
 
 ; $DE:C000-$DE:E2B0 (8,881 B), text, confirmed: u16 string pointers (same bank), then strings:
 ; $A0-$FF glyphs, $21-$9F dictionary, $00-$20 codes, $00 ends

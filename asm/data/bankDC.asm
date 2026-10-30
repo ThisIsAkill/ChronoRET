@@ -15,10 +15,18 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $DC:0000-$DC:FFFF (65,536 B), sprite_layout, confirmed: per sprite set: frame records of
-; sprite tiles (tile, attributes, offsets)
-; Read by Battle_InitScene (BattleRom_SprFramesPtr), Evt_LoadSpriteRec / Spr_Load*
-; (Field_E4Ptr1), Menu_SprLoad (MenuRom_E4FramePtrs).
+; $DC:0000-$DC:DF97 (57,240 B), sprite_layout, confirmed: frame records: N tile words (tile in
+; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
+; 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
 org $DC0000
 SprLayout_DC0000:
-    incbin "../../build/assets/sprite_layout/SprLayout_DC0000.bin"
+    incbin "../../build/sprites/SprLayout_DC0000.bin"          ; sprite frame records
+
+; $DC:DF98-$DC:FFFF (8,296 B), padding, probable: 8296 x $00
+org $DCDF98
+Padding_DCDF98:
+    fillbyte $00
+    fill 8296

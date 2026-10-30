@@ -135,10 +135,18 @@ Padding_E1DF7B:
     fillbyte $00
     fill 133
 
-; $E1:E000-$E1:FFFF (8,192 B), sprite_layout, confirmed: per sprite set: frame records of sprite
-; tiles (tile, attributes, offsets)
-; Read by Battle_InitScene (BattleRom_SprFramesPtr), Evt_LoadSpriteRec / Spr_Load*
-; (Field_E4Ptr1), Menu_SprLoad (MenuRom_E4FramePtrs).
+; $E1:E000-$E1:F517 (5,400 B), sprite_layout, confirmed: frame records: N tile words (tile in
+; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
+; 16/32/48/96) by the set's sprite record size
+; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
+; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
+; (MenuRom_E4FramePtrs).
 org $E1E000
 SprLayout_E1E000:
-    incbin "../../build/assets/sprite_layout/SprLayout_E1E000.bin"
+    incbin "../../build/sprites/SprLayout_E1E000.bin"          ; sprite frame records
+
+; $E1:F518-$E1:FFFF (2,792 B), padding, probable: 2792 x $00
+org $E1F518
+Padding_E1F518:
+    fillbyte $00
+    fill 2792
