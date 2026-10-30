@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:0960,LocLoad_Unk0960,2026-10-30,rev203a,approved,6052693f3923,"New claim checked: LocLoad_DrawMap JSLs Ppu_SetBgLayout at $C0:0A5D (BG12NBA $11: BG1/BG2 tiles at $1000; mode 1, which NmiHandler keeps via Nmi_BgMode $09: 4bpp); uploads $2000-$4FBF."
+$FD:C0D7,Ppu_SetBgLayout,2026-10-30,rev203a,approved,81d1ece10bb1,"Writers of BG12NBA/BG34NBA in the source: only this, MainInit, M7Scene_InitPpu, BankC2_InitHwRegs, Menu_InitPpuAndRam and the C3 module; stale 'unmatched' note fixed in this branch."
