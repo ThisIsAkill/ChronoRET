@@ -90,7 +90,7 @@ LocMeta12Pack_053:
 ; Read by LocLoad_Unk09DD.
 org $EF7AB5
 LocMeta12Pack_054:
-    incbin "../../build/packs/LocMeta12Pack_054.lz"          ; lz11 -> 4096 B, metatiles
+    incbin "../../build/packs/LocMeta12Pack_054.lz"          ; lz11 -> 4096 B
 
 ; $EF:7EF9-$EF:7F00 (8 B), packed_lz, confirmed: lz11 -> 1 B: layer 1/2 metatile tile maps
 ; Read by LocLoad_Unk09DD.
@@ -168,7 +168,7 @@ LocMeta3Pack_002:
 ; Read by LocLoad_Unk0A14.
 org $EF8722
 LocMeta3Pack_003:
-    incbin "../../build/packs/LocMeta3Pack_003.lz"          ; lz11 -> 2048 B, metatiles
+    incbin "../../build/packs/LocMeta3Pack_003.lz"          ; lz11 -> 2048 B
 
 ; $EF:8895-$EF:8A86 (498 B), packed_lz, confirmed: lz11 -> 2048 B: layer 3 metatile tile maps
 ; Read by LocLoad_Unk0A14.

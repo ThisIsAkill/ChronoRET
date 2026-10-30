@@ -62,13 +62,14 @@ How each piece's bytes are made (the manifest's `piece` column):
              when written); the build assembles it to build/scene/
              <label>.bin and packs that, which is incbin'd. param as for
              packed. Counted as "scene scripts".
-  mapprops   a location map pack (Map_PropsPtrs): build/assets/maps/
+  mapprops   a location map pack (Map_PropsPtrs) a location record
+             names (tools/maps.py's UNNAMED stay packed): build/assets/maps/
              <label>.map, its header and tile planes as text (tools/maps.py;
              checked to assemble back when written); the build assembles it
              to build/maps/<label>.bin and packs that. param as for packed.
              Counted as "maps".
   metatiles  a metatile pack (LocGfx_Meta12Ptrs / Meta3Ptrs) of a whole
-             table: build/assets/maps/<label>.meta, its tilemap words as
+             table that a location record names: build/assets/maps/<label>.meta, its tilemap words as
              text; built the same way. Counted as "maps".
   fx         the battle layer-effect scripts with their table
              (tools/scripts.py's FX_ROWS): build/assets/fx/<label>.bfx; the

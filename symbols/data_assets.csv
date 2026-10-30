@@ -1336,7 +1336,7 @@ LocMeta12Pack_050,$EF:4BBE,$EF:58F2,3381,metatiles,maps/LocMeta12Pack_050.meta,l
 LocMeta12Pack_051,$EF:58F3,$EF:64A6,2996,metatiles,maps/LocMeta12Pack_051.meta,lz11 -> 4096 B
 LocMeta12Pack_052,$EF:64A7,$EF:723A,3476,metatiles,maps/LocMeta12Pack_052.meta,lz11 -> 4096 B
 LocMeta12Pack_053,$EF:723B,$EF:7AB4,2170,metatiles,maps/LocMeta12Pack_053.meta,lz11 -> 4096 B
-LocMeta12Pack_054,$EF:7AB5,$EF:7EF8,1092,metatiles,maps/LocMeta12Pack_054.meta,lz11 -> 4096 B
+LocMeta12Pack_054,$EF:7AB5,$EF:7EF8,1092,packed,packed_lz/LocMeta12Pack_054.bin,lz11 -> 4096 B
 LocMeta12Pack_055,$EF:7EF9,$EF:7F00,8,packed,packed_lz/LocMeta12Pack_055.bin,lz11 -> 1 B
 LocMeta12Pack_056,$EF:7F01,$EF:7F08,8,packed,packed_lz/LocMeta12Pack_056.bin,lz11 -> 1 B
 LocMeta12Pack_057,$EF:7F09,$EF:7F10,8,packed,packed_lz/LocMeta12Pack_057.bin,lz11 -> 1 B
@@ -1349,7 +1349,7 @@ LocMeta12Pack_063,$EF:7F39,$EF:7F40,8,packed,packed_lz/LocMeta12Pack_063.bin,lz1
 LocMeta3Pack_000,$EF:7F41,$EF:8459,1305,metatiles,maps/LocMeta3Pack_000.meta,lz11 -> 2048 B
 LocMeta3Pack_001,$EF:845A,$EF:85BD,356,metatiles,maps/LocMeta3Pack_001.meta,lz11 -> 2048 B
 LocMeta3Pack_002,$EF:85BE,$EF:8721,356,metatiles,maps/LocMeta3Pack_002.meta,lz11 -> 2048 B
-LocMeta3Pack_003,$EF:8722,$EF:8894,371,metatiles,maps/LocMeta3Pack_003.meta,lz11 -> 2048 B
+LocMeta3Pack_003,$EF:8722,$EF:8894,371,packed,packed_lz/LocMeta3Pack_003.bin,lz11 -> 2048 B
 LocMeta3Pack_004,$EF:8895,$EF:8A86,498,metatiles,maps/LocMeta3Pack_004.meta,lz11 -> 2048 B
 LocMeta3Pack_005,$EF:8A87,$EF:8C4B,453,metatiles,maps/LocMeta3Pack_005.meta,lz11 -> 2048 B
 LocMeta3Pack_006,$EF:8C4C,$EF:8F47,764,metatiles,maps/LocMeta3Pack_006.meta,lz11 -> 2048 B
@@ -1387,7 +1387,7 @@ MapPropsPack_006,$F0:0FEE,$F0:13DE,1009,mapprops,maps/MapPropsPack_006.map,lz11 
 MapPropsPack_007,$F0:13DF,$F0:1808,1066,mapprops,maps/MapPropsPack_007.map,lz11 -> 3116 B
 MapPropsPack_008,$F0:1809,$F0:23F7,3055,mapprops,maps/MapPropsPack_008.map,lz11 -> 9030 B
 MapPropsPack_009,$F0:23F8,$F0:3C26,6191,mapprops,maps/MapPropsPack_009.map,lz11 -> 12187 B
-MapPropsPack_010,$F0:3C27,$F0:42C4,1694,mapprops,maps/MapPropsPack_010.map,lz11 -> 3644 B
+MapPropsPack_010,$F0:3C27,$F0:42C4,1694,packed,packed_lz/MapPropsPack_010.bin,lz11 -> 3644 B
 MapPropsPack_011,$F0:42C5,$F0:4C18,2388,mapprops,maps/MapPropsPack_011.map,lz11 -> 6089 B
 MapPropsPack_012,$F0:4C19,$F0:4FE6,974,mapprops,maps/MapPropsPack_012.map,lz11 -> 2295 B
 MapPropsPack_013,$F0:4FE7,$F0:55F7,1553,mapprops,maps/MapPropsPack_013.map,lz11 -> 4244 B
@@ -1407,7 +1407,7 @@ MapPropsPack_026,$F0:851A,$F0:883C,803,mapprops,maps/MapPropsPack_026.map,lz11 -
 MapPropsPack_027,$F0:883D,$F0:8AA3,615,mapprops,maps/MapPropsPack_027.map,lz11 -> 854 B
 MapPropsPack_028,$F0:8AA4,$F0:8C7C,473,mapprops,maps/MapPropsPack_028.map,lz11 -> 842 B
 MapPropsPack_029,$F0:8C7D,$F0:8D9A,286,mapprops,maps/MapPropsPack_029.map,lz11 -> 722 B
-MapPropsPack_030,$F0:8D9B,$F0:8E5E,196,mapprops,maps/MapPropsPack_030.map,lz11 -> 522 B
+MapPropsPack_030,$F0:8D9B,$F0:8E5E,196,packed,packed_lz/MapPropsPack_030.bin,lz11 -> 522 B
 MapPropsPack_031,$F0:8E5F,$F0:8E8F,49,mapprops,maps/MapPropsPack_031.map,lz11 -> 522 B
 MapPropsPack_032,$F0:8E90,$F0:9011,386,mapprops,maps/MapPropsPack_032.map,lz11 -> 1102 B
 MapPropsPack_033,$F0:9012,$F0:930A,761,mapprops,maps/MapPropsPack_033.map,lz11 -> 2503 B
@@ -1522,7 +1522,7 @@ Padding_F3FDFB,$F3:FDFB,$F3:FFFF,517,fill,,$00
 MapPropsPack_138,$F4:0000,$F4:0237,568,mapprops,maps/MapPropsPack_138.map,lz11 -> 939 B
 MapPropsPack_139,$F4:0238,$F4:03C4,397,mapprops,maps/MapPropsPack_139.map,lz11 -> 646 B
 MapPropsPack_140,$F4:03C5,$F4:0A37,1651,mapprops,maps/MapPropsPack_140.map,lz11 -> 5026 B
-MapPropsPack_141,$F4:0A38,$F4:0C93,604,mapprops,maps/MapPropsPack_141.map,lz11 -> 1045 B
+MapPropsPack_141,$F4:0A38,$F4:0C93,604,packed,packed_lz/MapPropsPack_141.bin,lz11 -> 1045 B
 MapPropsPack_142,$F4:0C94,$F4:0E6C,473,mapprops,maps/MapPropsPack_142.map,lz11 -> 1006 B
 MapPropsPack_143,$F4:0E6D,$F4:1617,1963,mapprops,maps/MapPropsPack_143.map,lz11 -> 4393 B
 MapPropsPack_144,$F4:1618,$F4:1909,754,mapprops,maps/MapPropsPack_144.map,lz11 -> 1909 B
@@ -1554,7 +1554,7 @@ MapPropsPack_168,$F5:0F1A,$F5:1980,2663,mapprops,maps/MapPropsPack_168.map,lz11 
 MapPropsPack_169,$F5:1981,$F5:239B,2587,mapprops,maps/MapPropsPack_169.map,lz11 -> 15125 B
 MapPropsPack_170,$F5:239C,$F5:2638,669,mapprops,maps/MapPropsPack_170.map,lz11 -> 2376 B
 MapPropsPack_171,$F5:2639,$F5:2AEE,1206,mapprops,maps/MapPropsPack_171.map,lz11 -> 4451 B
-MapPropsPack_172,$F5:2AEF,$F5:2ECB,989,mapprops,maps/MapPropsPack_172.map,lz11 -> 2866 B
+MapPropsPack_172,$F5:2AEF,$F5:2ECB,989,packed,packed_lz/MapPropsPack_172.bin,lz11 -> 2866 B
 MapPropsPack_173,$F5:2ECC,$F5:3C66,3483,mapprops,maps/MapPropsPack_173.map,lz11 -> 8925 B
 MapPropsPack_174,$F5:3C67,$F5:411C,1206,mapprops,maps/MapPropsPack_174.map,lz11 -> 2999 B
 MapPropsPack_175,$F5:411D,$F5:4565,1097,mapprops,maps/MapPropsPack_175.map,lz11 -> 5081 B
