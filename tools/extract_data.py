@@ -178,6 +178,7 @@ BATTLE_OUT = Path('build/battle')      # the assembled battle script pieces (too
 MAPS_OUT = Path('build/maps')          # the assembled (unpacked) maps and metatiles (tools/build_rom.py)
 SCENE_OUT = Path('build/scene')        # the assembled (unpacked) scene scripts (tools/build_rom.py)
 FX_OUT = Path('build/fx')              # the assembled layer-effect scripts (tools/build_rom.py)
+ANIM_OUT = Path('build/anim')          # the assembled animation scripts (tools/build_rom.py)
 GFX_OUT = Path('build/gfx')            # the encoded graphics pieces (tools/build_rom.py)
 SPRITES_OUT = Path('build/sprites')    # the assembled sprite frame pieces (tools/build_rom.py)
 GFXPACK_OUT = Path('build/gfxpack')    # the encoded (unpacked) graphics packs (tools/build_rom.py)
@@ -195,7 +196,7 @@ GFX_PREFIX = '../../build/gfx/'
 SPRITES_PREFIX = '../../build/sprites/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
-PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
+PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx', 'anim',
           'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'actframes',
           'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
@@ -428,6 +429,8 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'{maps.asset_dir(piece)}/{label}.{maps.ASSET_EXT[piece]}'
         elif piece == 'fx':
             asset = f'fx/{label}.bfx'
+        elif piece == 'anim':
+            asset = f'anim/{label}.ban'
         elif piece in ('graphics', 'gfxpack'):
             asset = f'gfx/{label}.png'
         elif piece == 'sprframes':
@@ -469,6 +472,10 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             add(label, s, e, 'sprframes', row=row)
         elif any(t.is_piece_row(row) for t in TEXT_TOOLS):
             add(label, s, e, next(t.is_piece_row(row) for t in TEXT_TOOLS if t.is_piece_row(row)), row=row)
+        elif row['start'] in scripts.ANIM_ROWS:
+            if kind != 'event_script':
+                raise DataError(f'{row["start"]}: a {kind} row cannot be the animation scripts')
+            add(label, s, e, 'anim', row=row)
         elif row['start'] in scripts.FX_ROWS:
             if kind != 'battle_script':
                 raise DataError(f'{row["start"]}: a {kind} row cannot be the layer-effect scripts')
@@ -601,6 +608,10 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
             if not m or m.group(1) != p['label'] or p['param']:
                 problems.append(f'{where}: an fx piece\'s asset is fx/<label>.bfx and it has no param: '
                                 f'{p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'anim':
+            if p['asset'] != f'anim/{p["label"]}.ban' or p['param']:
+                problems.append(f'{where}: an anim piece\'s asset is anim/<label>.ban and it has no param: '
+                                f'{p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'battle':
             m, mp = BATTLE_ASSET.match(p['asset']), BATTLE_PARAM.match(p['param'])
             if not m or not mp or m.group(1) != mp.group(1) or m.group(1) not in battle.UNITS \
@@ -641,6 +652,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{PACK_PREFIX}{p["label"]}.lz'] = p
         elif p['piece'] == 'fx':
             out[f'{FX_PREFIX}{p["label"]}.bin'] = p
+        elif p['piece'] == 'anim':
+            out[f'../../{ANIM_OUT}/{p["label"]}.bin'] = p
         elif p['piece'] == 'graphics':
             out[f'{GFX_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'sprframes':
@@ -668,6 +681,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[PACKS / f'{p["label"]}.lz'] = int(p['size'])
         elif p['piece'] == 'fx':
             out[FX_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif p['piece'] == 'anim':
+            out[ANIM_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'graphics':
             out[GFX_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'sprframes':
@@ -841,6 +856,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]} (graphics)')
         elif p['piece'] == 'fx':
             out.append(f'    incbin "{FX_PREFIX}{p["label"]}.bin"          ; layer-effect scripts')
+        elif p['piece'] == 'anim':
+            out.append(f'    incbin "../../{ANIM_OUT}/{p["label"]}.bin"          ; animation scripts')
         elif p['piece'] == 'graphics':
             out.append(f'    incbin "{GFX_PREFIX}{p["label"]}.bin"          ; graphics: {p["param"]}')
         elif p['piece'] == 'sprframes':
@@ -1003,7 +1020,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('table', 'text', 'records'):
             continue
-        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'sprframes') or text_tool(p['piece']):
+        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'anim', 'sprframes') or text_tool(p['piece']):
             continue
         if p['piece'] in maps.PIECES:
             data, why = unpack_piece(rom, p)

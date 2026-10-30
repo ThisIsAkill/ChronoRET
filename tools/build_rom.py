@@ -216,11 +216,12 @@ def build_scripts(root: Path = ROOT) -> int:
     handlers; returns how many files were written."""
     import scripts
     root = Path(root)
-    pieces = [p for p in extract_data.read_manifest() if p['piece'] in ('scene', 'fx')]
+    pieces = [p for p in extract_data.read_manifest() if p['piece'] in ('scene', 'fx', 'anim')]
     if not pieces:
         return 0
     try:
         scene, fx = scripts.langs(root)
+        anim = scripts.anim_lang(root)
         pairs = scripts.scene_pairs_built(root)
     except scripts.ScriptsError as e:
         raise BuildError(f'scripts: {e}') from None
@@ -229,7 +230,7 @@ def build_scripts(root: Path = ROOT) -> int:
         for p in pieces:
             text_ = (root / extract_data.ASSETS / p['asset']).read_text()
             try:
-                data = scripts.assemble_piece(scene if p['piece'] == 'scene' else fx, text_, p, pairs)
+                data = scripts.assemble_piece(scripts.lang_of(p, scene, fx, anim), text_, p, pairs)
             except scripts.ScriptsError as e:
                 raise BuildError(f'scripts: {e}') from None
             size = (int(extract_data.PACK_PARAM.match(p['param']).group(2)) if p['piece'] == 'scene'
@@ -237,7 +238,8 @@ def build_scripts(root: Path = ROOT) -> int:
             if len(data) != size:
                 wrong.append(f'{p["label"]}: {len(data)} B, its piece {size} B')
                 continue
-            out_dir = root / (extract_data.SCENE_OUT if p['piece'] == 'scene' else extract_data.FX_OUT)
+            out_dir = root / (extract_data.SCENE_OUT if p['piece'] == 'scene' else extract_data.ANIM_OUT
+                              if p['piece'] == 'anim' else extract_data.FX_OUT)
             out_dir.mkdir(parents=True, exist_ok=True)
             path = out_dir / f'{p["label"]}.bin'
             if not path.exists() or path.read_bytes() != data:
@@ -246,6 +248,7 @@ def build_scripts(root: Path = ROOT) -> int:
     finally:
         scene.save(root)
         fx.save(root)
+        anim.save(root)
     if wrong:
         raise BuildError('scripts that do not fit their place:\n  ' + '\n  '.join(wrong))
     return written

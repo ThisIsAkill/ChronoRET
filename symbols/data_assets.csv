@@ -38,7 +38,7 @@ ScenePalPack_016,$C3:DD85,$C3:DEB1,301,packed,packed_lz/ScenePalPack_016.bin,lz1
 ScenePalPack_017,$C3:DEB2,$C3:DF3D,140,packed,packed_lz/ScenePalPack_017.bin,lz11 -> 256 B
 ScenePalPack_018,$C3:DF3E,$C3:DFE0,163,packed,packed_lz/ScenePalPack_018.bin,lz11 -> 224 B
 Padding_C3DFE1,$C3:DFE1,$C3:DFFF,31,fill,,$00
-C2SceneRom_AnimTable,$C3:E000,$C3:FF09,7946,extracted,event_script/C2SceneRom_AnimTable.bin,
+C2SceneRom_AnimTable,$C3:E000,$C3:FF09,7946,anim,anim/C2SceneRom_AnimTable.ban,
 Padding_C3FF0A,$C3:FF0A,$C3:FFFF,246,fill,,$00
 SceneBgPack_000,$C4:0000,$C4:0EB7,3768,gfxpack,gfx/SceneBgPack_000.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneBgPack_001,$C4:0EB8,$C4:1D39,3714,gfxpack,gfx/SceneBgPack_001.png,lz12 -> 4096 B; 4bpp 128 tiles

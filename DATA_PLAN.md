@@ -981,6 +981,33 @@ On the `data-tables-4` branch, second commit. `tools/actframes.py` gives the 128
 - **The text:** per frame its row count and the header's high nibble, per row `column=tile/attr`
   (or `-`), and the skipped bytes.
 
+## Scene animation scripts
+
+On the `data-tables-5` branch. `C2SceneRom_AnimTable` (`$C3:E000`, 7,946 B: 166 pointers, then
+the scripts) is now a piece of `tools/scripts.py` (piece `anim`, `build/assets/anim/<label>.ban`),
+disassembled by `AnimLang`, the interpreter `check()` already used for its lock on the record
+bytes.
+
+- **The reader.** `C2Scene_SetAnim` puts entry A of the table in `.AnimPtr`, and `C2Anim_Run` runs
+  the script from there through `C2Anim_OpTable`. Each handler is traced: it returns the bytes to
+  advance, or stops. `AnimLang.head()` runs `C2Scene_SetAnim` and finds that the script starts at
+  the entry itself (offset 0).
+  - Some entries point inside another script's opcode; the text names them by their `@inner`
+    labels.
+  - `EXITS['anim']` locks the opcode classes (none returns, reads a position from RAM, or ends a
+    task). An animation op that needed a trusted callee would be reported: none does.
+- **The sprite frames.** `C2Anim_OpShowFrame` names a frame by its operand bytes 1-2, an address in
+  the script's bank. `C2Scene_SprDrawNode` reads a frame as a count byte, then that many 4-byte
+  pieces: signed X and Y, then a tile word.
+  - The frames the reached ShowFrame ops name are written as `@frame X,Y:TTTT ...` lines (264
+    frames).
+  - A frame stays `@bytes` if it lies on the opcodes, runs past the piece, has a count of 0, or
+    overlaps another frame.
+  - The assembler refuses a frame a ShowFrame names that is written as bytes, and an `@frame` no
+    ShowFrame names.
+- **Results.** The piece assembles back byte-exact: 663 opcode lines, 264 frames, 421 B that
+  nothing reaches (the tails of overlapping opcodes, and frames no reached op shows).
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
