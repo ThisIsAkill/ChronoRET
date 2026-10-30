@@ -212,7 +212,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
-               'graphics_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
+               'graphics_bytes': 0, 'gfxpack_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
                'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'sprframes_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
@@ -239,11 +239,11 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         build_rom.build_events()
         build_rom.build_scripts()
         build_rom.build_maps()
+        build_rom.build_graphics()
         build_rom.build_packs()
         build_rom.build_text()
         build_rom.build_records()
         build_rom.build_battle()
-        build_rom.build_graphics()
         build_rom.build_sprites()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
@@ -251,12 +251,12 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     for p in pieces:
         if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
                               'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
-                              'graphics', 'sprframes'):
+                              'graphics', 'gfxpack', 'sprframes'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz'
                 if p['piece'] in ('packed', 'events', 'scene', 'mapprops', 'metatiles', 'scenemaps', 'scenemeta',
-                                  'scenebg3')
+                                  'scenebg3', 'gfxpack')
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
                 else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.SPRITES_OUT / f'{p["label"]}.bin' if p['piece'] == 'sprframes'
@@ -298,13 +298,14 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     figures['scripts_split'] = ssplit
     # The graphics: bytes in tiles, and tail bytes kept as they are.
     import graphics
-    gsplit = {'tiles': 0, 'tail': 0, 'regions': 0}
+    gsplit = {'tiles': 0, 'tail': 0, 'regions': 0, 'pack_tiles': 0, 'pack_tail': 0, 'packs': 0}
     for p in pieces:
-        if p['piece'] == 'graphics':
+        if p['piece'] in ('graphics', 'gfxpack'):
             fmt, tiles, tail = graphics.parse_param(p['param'])
-            gsplit['tiles'] += tiles * graphics.TILE_BYTES[fmt]
-            gsplit['tail'] += tail
-            gsplit['regions'] += 1
+            pre = '' if p['piece'] == 'graphics' else 'pack_'
+            gsplit[pre + 'tiles'] += tiles * graphics.TILE_BYTES[fmt]
+            gsplit[pre + 'tail'] += tail
+            gsplit['regions' if p['piece'] == 'graphics' else 'packs'] += 1
     figures['graphics_split'] = gsplit
     # The maps: their pieces and unpacked bytes.
     msplit = {'maps': 0, 'metas': 0, 'scene': 0, 'unpacked': 0}
@@ -438,6 +439,10 @@ def main() -> int:
               f'encoded by the build from indexed images extracted from the ROM (build/assets/gfx/ -> '
               f'build/gfx/, incbin): {gs["tiles"]:,} B in tiles, {gs["tail"]:,} B past the last tile kept '
               f'as bytes')
+        print(f'  {"packed graphics":<16} {data["gfxpack_bytes"]:>9,} bytes of {gs["packs"]} graphics packs packed '
+              f'by the build from indexed images of their unpacked bytes (build/assets/gfx/ -> '
+              f'build/gfxpack/ -> build/packs/, incbin): unpacked, {gs["pack_tiles"]:,} B in tiles, '
+              f'{gs["pack_tail"]:,} B past the tiles the readers read kept as bytes')
         ms = data['maps_split']
         mb = sum(data[k + '_bytes'] for k in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3'))
         print(f'  {"maps":<16} {mb:>9,} bytes of {ms["maps"]} location maps, {ms["metas"]} metatile packs and '
