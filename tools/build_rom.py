@@ -31,7 +31,9 @@ assets, with no copy of the original.
      build/assets/fx/<label>.bfx to build/fx/<label>.bin, with
      tools/scripts.py, every line checked against the handlers.
   6c. The graphics: every `graphics` piece is encoded from its PNG and
-     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/.
+     sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
+     every `gfxpack` piece the same way to its unpacked bytes in
+     build/gfxpack/, before step 3 packs them.
   6b. The battle scripts: every unit of `battle` pieces is assembled from
      its readable file (build/assets/battle/<unit>.bscr) with
      tools/battle.py, every line checked against the readers, to
@@ -84,12 +86,13 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     jobs, sizes = [], {}
     for p in extract_data.read_manifest():
-        if p['piece'] not in ('packed', 'events', 'scene', 'mapprops', 'metatiles'):
+        if p['piece'] not in ('packed', 'events', 'scene', 'mapprops', 'metatiles', 'gfxpack'):
             continue
-        mode = int(extract_data.PACK_PARAM.match(p['param']).group(1))
+        mode = extract_data.pack_param(p['param'])[0]
         src = (root / extract_data.ASSETS / p['asset'] if p['piece'] == 'packed'
                else root / extract_data.EVENTS_OUT / f'{p["label"]}.bin' if p['piece'] == 'events'
                else root / extract_data.MAPS_OUT / f'{p["label"]}.bin' if p['piece'] in ('mapprops', 'metatiles')
+               else root / extract_data.GFXPACK_OUT / f'{p["label"]}.bin' if p['piece'] == 'gfxpack'
                else root / extract_data.SCENE_OUT / f'{p["label"]}.bin')
         key = hashlib.sha256(f'{packer}\0{mode}\0'.encode() + src.read_bytes()).hexdigest()
         out, stamp = out_dir / f'{p["label"]}.lz', out_dir / f'{p["label"]}.key'
@@ -119,7 +122,9 @@ def build_packs(root: Path = ROOT, quiet: bool = True) -> int:
         if got != size:
             wrong.append(f'{label}: {got} B, its piece {size} B')
     if wrong:
-        raise BuildError('packs that do not fit their place:\n  ' + '\n  '.join(wrong))
+        raise BuildError('packs that do not fit their place (a pack must come out the size the ROM\'s '
+                         'stream is, since every pointer and placement is fixed: an edit that changes it '
+                         'cannot be built):\n  ' + '\n  '.join(wrong))
     return len(jobs)
 
 
@@ -239,14 +244,15 @@ def build_scripts(root: Path = ROOT) -> int:
 
 def build_graphics(root: Path = ROOT) -> int:
     """Encode every `graphics` piece from its PNG and sidecar
-    (build/assets/gfx/, tools/graphics.py) to build/gfx/<label>.bin;
-    returns how many files were written. A PNG that is not what the
-    format can hold fails the build."""
+    (build/assets/gfx/, tools/graphics.py) to build/gfx/<label>.bin, and
+    every `gfxpack` piece to its unpacked bytes in build/gfxpack/ (which
+    build_packs packs); returns how many files were written. A PNG that
+    is not what the format can hold fails the build."""
     import graphics
     root = Path(root)
     written = 0
     for p in extract_data.read_manifest():
-        if p['piece'] != 'graphics':
+        if p['piece'] not in ('graphics', 'gfxpack'):
             continue
         src = root / extract_data.ASSETS / p['asset']
         side = root / extract_data.ASSETS / graphics.sidecar_path(p['asset'])
@@ -254,7 +260,7 @@ def build_graphics(root: Path = ROOT) -> int:
             data = graphics.encode_piece(p, src.read_bytes(), side.read_text())
         except (OSError, graphics.GraphicsError) as e:
             raise BuildError(f'graphics: {e}') from None
-        out_dir = root / extract_data.GFX_OUT
+        out_dir = root / (extract_data.GFX_OUT if p['piece'] == 'graphics' else extract_data.GFXPACK_OUT)
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f'{p["label"]}.bin'
         if not path.exists() or path.read_bytes() != data:
@@ -387,11 +393,11 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_events(root)
     build_scripts(root)
     build_maps(root)
+    build_graphics(root)
     build_packs(root, quiet=quiet)
     build_text(root)
     build_records(root)
     build_battle(root)
-    build_graphics(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp:

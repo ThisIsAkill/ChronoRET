@@ -40,58 +40,58 @@ ScenePalPack_018,$C3:DF3E,$C3:DFE0,163,packed,packed_lz/ScenePalPack_018.bin,lz1
 Padding_C3DFE1,$C3:DFE1,$C3:DFFF,31,fill,,$00
 C2SceneRom_AnimTable,$C3:E000,$C3:FF09,7946,extracted,event_script/C2SceneRom_AnimTable.bin,
 Padding_C3FF0A,$C3:FF0A,$C3:FFFF,246,fill,,$00
-SceneBgPack_000,$C4:0000,$C4:0EB7,3768,packed,packed_lz/SceneBgPack_000.bin,lz12 -> 4096 B
-SceneBgPack_001,$C4:0EB8,$C4:1D39,3714,packed,packed_lz/SceneBgPack_001.bin,lz12 -> 4096 B
-SceneBgPack_002,$C4:1D3A,$C4:2C31,3832,packed,packed_lz/SceneBgPack_002.bin,lz12 -> 4096 B
-SceneBgPack_003,$C4:2C32,$C4:3A9F,3694,packed,packed_lz/SceneBgPack_003.bin,lz12 -> 4096 B
-SceneBgPack_004,$C4:3AA0,$C4:4838,3481,packed,packed_lz/SceneBgPack_004.bin,lz12 -> 4096 B
-SceneBgPack_005,$C4:4839,$C4:55D6,3486,packed,packed_lz/SceneBgPack_005.bin,lz12 -> 4096 B
-SceneBgPack_006,$C4:55D7,$C4:6422,3660,packed,packed_lz/SceneBgPack_006.bin,lz12 -> 4096 B
-SceneBgPack_007,$C4:6423,$C4:72C1,3743,packed,packed_lz/SceneBgPack_007.bin,lz12 -> 4096 B
-SceneBgPack_008,$C4:72C2,$C4:804E,3469,packed,packed_lz/SceneBgPack_008.bin,lz12 -> 4096 B
-SceneBgPack_009,$C4:804F,$C4:8C46,3064,packed,packed_lz/SceneBgPack_009.bin,lz12 -> 4096 B
-SceneBgPack_010,$C4:8C47,$C4:8E32,492,packed,packed_lz/SceneBgPack_010.bin,lz12 -> 4096 B
-SceneBgPack_011,$C4:8E33,$C4:9E44,4114,packed,packed_lz/SceneBgPack_011.bin,lz12 -> 4096 B
-SceneBgPack_012,$C4:9E45,$C4:AD55,3857,packed,packed_lz/SceneBgPack_012.bin,lz12 -> 4096 B
-SceneBgPack_013,$C4:AD56,$C4:BD48,4083,packed,packed_lz/SceneBgPack_013.bin,lz12 -> 4096 B
-SceneBgPack_014,$C4:BD49,$C4:C703,2491,packed,packed_lz/SceneBgPack_014.bin,lz12 -> 4096 B
-SceneBgPack_015,$C4:C704,$C4:D3FE,3323,packed,packed_lz/SceneBgPack_015.bin,lz12 -> 4096 B
-SceneBgPack_016,$C4:D3FF,$C4:D944,1350,packed,packed_lz/SceneBgPack_016.bin,lz12 -> 4096 B
-SceneBgPack_017,$C4:D945,$C4:DB30,492,packed,packed_lz/SceneBgPack_017.bin,lz12 -> 4096 B
-SceneBgPack_018,$C4:DB31,$C4:E881,3409,packed,packed_lz/SceneBgPack_018.bin,lz12 -> 4096 B
-SceneBgPack_019,$C4:E882,$C4:F7AE,3885,packed,packed_lz/SceneBgPack_019.bin,lz12 -> 4096 B
-SceneBgPack_020,$C4:F7AF,$C4:FD71,1475,packed,packed_lz/SceneBgPack_020.bin,lz12 -> 4096 B
-SceneBgPack_021,$C4:FD72,$C4:FFC1,592,packed,packed_lz/SceneBgPack_021.bin,lz12 -> 1024 B
+SceneBgPack_000,$C4:0000,$C4:0EB7,3768,gfxpack,gfx/SceneBgPack_000.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_001,$C4:0EB8,$C4:1D39,3714,gfxpack,gfx/SceneBgPack_001.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_002,$C4:1D3A,$C4:2C31,3832,gfxpack,gfx/SceneBgPack_002.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_003,$C4:2C32,$C4:3A9F,3694,gfxpack,gfx/SceneBgPack_003.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_004,$C4:3AA0,$C4:4838,3481,gfxpack,gfx/SceneBgPack_004.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_005,$C4:4839,$C4:55D6,3486,gfxpack,gfx/SceneBgPack_005.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_006,$C4:55D7,$C4:6422,3660,gfxpack,gfx/SceneBgPack_006.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_007,$C4:6423,$C4:72C1,3743,gfxpack,gfx/SceneBgPack_007.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_008,$C4:72C2,$C4:804E,3469,gfxpack,gfx/SceneBgPack_008.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_009,$C4:804F,$C4:8C46,3064,gfxpack,gfx/SceneBgPack_009.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_010,$C4:8C47,$C4:8E32,492,gfxpack,gfx/SceneBgPack_010.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_011,$C4:8E33,$C4:9E44,4114,gfxpack,gfx/SceneBgPack_011.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_012,$C4:9E45,$C4:AD55,3857,gfxpack,gfx/SceneBgPack_012.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_013,$C4:AD56,$C4:BD48,4083,gfxpack,gfx/SceneBgPack_013.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_014,$C4:BD49,$C4:C703,2491,gfxpack,gfx/SceneBgPack_014.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_015,$C4:C704,$C4:D3FE,3323,gfxpack,gfx/SceneBgPack_015.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_016,$C4:D3FF,$C4:D944,1350,gfxpack,gfx/SceneBgPack_016.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_017,$C4:D945,$C4:DB30,492,gfxpack,gfx/SceneBgPack_017.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_018,$C4:DB31,$C4:E881,3409,gfxpack,gfx/SceneBgPack_018.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_019,$C4:E882,$C4:F7AE,3885,gfxpack,gfx/SceneBgPack_019.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_020,$C4:F7AF,$C4:FD71,1475,gfxpack,gfx/SceneBgPack_020.png,lz12 -> 4096 B; 2bpp 256 tiles
+SceneBgPack_021,$C4:FD72,$C4:FFC1,592,gfxpack,gfx/SceneBgPack_021.png,lz12 -> 1024 B; 2bpp 64 tiles
 Padding_C4FFC2,$C4:FFC2,$C4:FFFF,62,fill,,$00
-SceneBgPack_022,$C5:0000,$C5:0EE7,3816,packed,packed_lz/SceneBgPack_022.bin,lz12 -> 4096 B
-SceneBgPack_023,$C5:0EE8,$C5:1E25,3902,packed,packed_lz/SceneBgPack_023.bin,lz12 -> 4096 B
-SceneBgPack_024,$C5:1E26,$C5:2E1B,4086,packed,packed_lz/SceneBgPack_024.bin,lz12 -> 4096 B
-SceneBgPack_025,$C5:2E1C,$C5:3CC8,3757,packed,packed_lz/SceneBgPack_025.bin,lz12 -> 4096 B
-SceneBgPack_026,$C5:3CC9,$C5:4A9A,3538,packed,packed_lz/SceneBgPack_026.bin,lz12 -> 4096 B
-SceneBgPack_027,$C5:4A9B,$C5:5A47,4013,packed,packed_lz/SceneBgPack_027.bin,lz12 -> 4096 B
-SceneBgPack_028,$C5:5A48,$C5:65A4,2909,packed,packed_lz/SceneBgPack_028.bin,lz12 -> 4096 B
-SceneBgPack_029,$C5:65A5,$C5:7150,2988,packed,packed_lz/SceneBgPack_029.bin,lz12 -> 4096 B
-SceneBgPack_030,$C5:7151,$C5:7FFF,3759,packed,packed_lz/SceneBgPack_030.bin,lz12 -> 4096 B
-SceneBgPack_031,$C5:8000,$C5:8B01,2818,packed,packed_lz/SceneBgPack_031.bin,lz12 -> 4096 B
-SceneBgPack_032,$C5:8B02,$C5:8F59,1112,packed,packed_lz/SceneBgPack_032.bin,lz12 -> 4096 B
-SceneBgPack_033,$C5:8F5A,$C5:97F6,2205,packed,packed_lz/SceneBgPack_033.bin,lz12 -> 4096 B
-SceneBgPack_034,$C5:97F7,$C5:9847,81,packed,packed_lz/SceneBgPack_034.bin,lz12 -> 512 B
-SceneBgPack_035,$C5:9848,$C5:98AB,100,packed,packed_lz/SceneBgPack_035.bin,lz12 -> 256 B
+SceneBgPack_022,$C5:0000,$C5:0EE7,3816,gfxpack,gfx/SceneBgPack_022.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_023,$C5:0EE8,$C5:1E25,3902,gfxpack,gfx/SceneBgPack_023.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_024,$C5:1E26,$C5:2E1B,4086,gfxpack,gfx/SceneBgPack_024.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_025,$C5:2E1C,$C5:3CC8,3757,gfxpack,gfx/SceneBgPack_025.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_026,$C5:3CC9,$C5:4A9A,3538,gfxpack,gfx/SceneBgPack_026.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_027,$C5:4A9B,$C5:5A47,4013,gfxpack,gfx/SceneBgPack_027.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_028,$C5:5A48,$C5:65A4,2909,gfxpack,gfx/SceneBgPack_028.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_029,$C5:65A5,$C5:7150,2988,gfxpack,gfx/SceneBgPack_029.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_030,$C5:7151,$C5:7FFF,3759,gfxpack,gfx/SceneBgPack_030.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_031,$C5:8000,$C5:8B01,2818,gfxpack,gfx/SceneBgPack_031.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_032,$C5:8B02,$C5:8F59,1112,gfxpack,gfx/SceneBgPack_032.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_033,$C5:8F5A,$C5:97F6,2205,gfxpack,gfx/SceneBgPack_033.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneBgPack_034,$C5:97F7,$C5:9847,81,gfxpack,gfx/SceneBgPack_034.png,lz12 -> 512 B; 2bpp 32 tiles
+SceneBgPack_035,$C5:9848,$C5:98AB,100,gfxpack,gfx/SceneBgPack_035.png,lz12 -> 256 B; 2bpp 16 tiles
 SceneBgPack_036,$C5:98AC,$C5:9A55,426,packed,packed_lz/SceneBgPack_036.bin,lz12 -> 656 B
-SceneObjPack_000,$C5:9A56,$C5:B113,5822,packed,packed_lz/SceneObjPack_000.bin,lz12 -> 8192 B
+SceneObjPack_000,$C5:9A56,$C5:B113,5822,gfxpack,gfx/SceneObjPack_000.png,lz12 -> 8192 B; 4bpp 238 tiles + 576 B
 SceneObjPack_001,$C5:B114,$C5:B797,1668,packed,packed_lz/SceneObjPack_001.bin,lz12 -> 4096 B
-SceneObjPack_002,$C5:B798,$C5:C6EC,3925,packed,packed_lz/SceneObjPack_002.bin,lz12 -> 8192 B
-SceneObjPack_003,$C5:C6ED,$C5:CD20,1588,packed,packed_lz/SceneObjPack_003.bin,lz12 -> 2048 B
-SceneObjPack_004,$C5:CD21,$C5:D596,2166,packed,packed_lz/SceneObjPack_004.bin,lz12 -> 4096 B
-SceneObjPack_005,$C5:D597,$C5:D80A,628,packed,packed_lz/SceneObjPack_005.bin,lz12 -> 4096 B
+SceneObjPack_002,$C5:B798,$C5:C6EC,3925,gfxpack,gfx/SceneObjPack_002.png,lz12 -> 8192 B; 4bpp 256 tiles
+SceneObjPack_003,$C5:C6ED,$C5:CD20,1588,gfxpack,gfx/SceneObjPack_003.png,lz12 -> 2048 B; 4bpp 64 tiles
+SceneObjPack_004,$C5:CD21,$C5:D596,2166,gfxpack,gfx/SceneObjPack_004.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneObjPack_005,$C5:D597,$C5:D80A,628,gfxpack,gfx/SceneObjPack_005.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneObjPack_006,$C5:D80B,$C5:DA87,637,packed,packed_lz/SceneObjPack_006.bin,lz12 -> 4096 B
-SceneObjPack_007,$C5:DA88,$C5:E0F6,1647,packed,packed_lz/SceneObjPack_007.bin,lz12 -> 4096 B
-SceneObjPack_008,$C5:E0F7,$C5:EAAE,2488,packed,packed_lz/SceneObjPack_008.bin,lz12 -> 4096 B
-SceneObjPack_009,$C5:EAAF,$C5:ED13,613,packed,packed_lz/SceneObjPack_009.bin,lz12 -> 4096 B
-SceneObjPack_010,$C5:ED14,$C5:F364,1617,packed,packed_lz/SceneObjPack_010.bin,lz12 -> 4096 B
+SceneObjPack_007,$C5:DA88,$C5:E0F6,1647,gfxpack,gfx/SceneObjPack_007.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneObjPack_008,$C5:E0F7,$C5:EAAE,2488,gfxpack,gfx/SceneObjPack_008.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneObjPack_009,$C5:EAAF,$C5:ED13,613,gfxpack,gfx/SceneObjPack_009.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneObjPack_010,$C5:ED14,$C5:F364,1617,gfxpack,gfx/SceneObjPack_010.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_C5F365,$C5:F365,$C5:FFFF,3227,fill,,$00
-SceneObjPack_011,$C6:0000,$C6:07B5,1974,packed,packed_lz/SceneObjPack_011.bin,lz12 -> 4096 B
-SceneObjPack_012,$C6:07B6,$C6:0E99,1764,packed,packed_lz/SceneObjPack_012.bin,lz12 -> 4096 B
+SceneObjPack_011,$C6:0000,$C6:07B5,1974,gfxpack,gfx/SceneObjPack_011.png,lz12 -> 4096 B; 4bpp 128 tiles
+SceneObjPack_012,$C6:07B6,$C6:0E99,1764,gfxpack,gfx/SceneObjPack_012.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneObjPack_013,$C6:0E9A,$C6:1E70,4055,packed,packed_lz/SceneObjPack_013.bin,lz12 -> 6144 B
 Padding_C61E71,$C6:1E71,$C6:1FFF,399,fill,,$00
 SceneDialPack_002,$C6:2000,$C6:2410,1041,packed,packed_lz/SceneDialPack_002.bin,lz12 -> 8192 B
@@ -724,222 +724,222 @@ BattleRom_FxRecords,$D1:A233,$D1:A574,834,extracted,table/BattleRom_FxRecords.bi
 BattleRom_FxMapPtrs,$D1:A575,$D1:E709,16789,extracted,tilemap/BattleRom_FxMapPtrs.bin,
 Gfx_D20000,$D2:0000,$D2:72BF,29376,graphics,gfx/Gfx_D20000.png,4bpp 918 tiles
 Gfx_D272C0,$D2:72C0,$D2:EE7F,31680,graphics,gfx/Gfx_D272C0.png,4bpp 990 tiles
-SprTilesPack_236,$D2:EE80,$D2:F85D,2526,packed,packed_lz/SprTilesPack_236.bin,lz12 -> 2816 B
-SprTilesPack_227,$D2:F85E,$D2:FF93,1846,packed,packed_lz/SprTilesPack_227.bin,lz12 -> 2176 B
+SprTilesPack_236,$D2:EE80,$D2:F85D,2526,gfxpack,gfx/SprTilesPack_236.png,lz12 -> 2816 B; 4bpp 88 tiles
+SprTilesPack_227,$D2:F85E,$D2:FF93,1846,gfxpack,gfx/SprTilesPack_227.png,lz12 -> 2176 B; 4bpp 68 tiles
 Padding_D2FF94,$D2:FF94,$D2:FFFF,108,fill,,$00
 Gfx_D30000,$D3:0000,$D3:6B3F,27456,graphics,gfx/Gfx_D30000.png,4bpp 858 tiles
 Gfx_D36B40,$D3:6B40,$D3:E27F,30528,graphics,gfx/Gfx_D36B40.png,4bpp 954 tiles
-SprTilesPack_189,$D3:E280,$D3:E745,1222,packed,packed_lz/SprTilesPack_189.bin,lz12 -> 1600 B
-SprTilesPack_190,$D3:E746,$D3:E8A8,355,packed,packed_lz/SprTilesPack_190.bin,lz12 -> 384 B
-SprTilesPack_191,$D3:E8A9,$D3:EA5A,434,packed,packed_lz/SprTilesPack_191.bin,lz12 -> 608 B
-SprTilesPack_194,$D3:EA5B,$D3:EE13,953,packed,packed_lz/SprTilesPack_194.bin,lz12 -> 960 B
-SprTilesPack_195,$D3:EE14,$D3:EEAF,156,packed,packed_lz/SprTilesPack_195.bin,lz12 -> 160 B
-SprTilesPack_196,$D3:EEB0,$D3:F049,410,packed,packed_lz/SprTilesPack_196.bin,lz12 -> 448 B
-SprTilesPack_198,$D3:F04A,$D3:F0AB,98,packed,packed_lz/SprTilesPack_198.bin,lz12 -> 192 B
-SprTilesPack_199,$D3:F0AC,$D3:F19C,241,packed,packed_lz/SprTilesPack_199.bin,lz12 -> 288 B
-SprTilesPack_200,$D3:F19D,$D3:F2A6,266,packed,packed_lz/SprTilesPack_200.bin,lz12 -> 320 B
-SprTilesPack_201,$D3:F2A7,$D3:F3CB,293,packed,packed_lz/SprTilesPack_201.bin,lz12 -> 352 B
-SprTilesPack_202,$D3:F3CC,$D3:F5BC,497,packed,packed_lz/SprTilesPack_202.bin,lz12 -> 544 B
-SprTilesPack_204,$D3:F5BD,$D3:F638,124,packed,packed_lz/SprTilesPack_204.bin,lz12 -> 160 B
-SprTilesPack_215,$D3:F639,$D3:F670,56,packed,packed_lz/SprTilesPack_215.bin,lz12 -> 160 B
-SprTilesPack_218,$D3:F671,$D3:F70A,154,packed,packed_lz/SprTilesPack_218.bin,lz12 -> 288 B
-SprTilesPack_221,$D3:F70B,$D3:F7A6,156,packed,packed_lz/SprTilesPack_221.bin,lz12 -> 160 B
-SprTilesPack_222,$D3:F7A7,$D3:F995,495,packed,packed_lz/SprTilesPack_222.bin,lz12 -> 640 B
-SprTilesPack_210,$D3:F996,$D3:FB9D,520,packed,packed_lz/SprTilesPack_210.bin,lz12 -> 608 B
-SprTilesPack_212,$D3:FB9E,$D3:FC55,184,packed,packed_lz/SprTilesPack_212.bin,lz12 -> 320 B
-SprTilesPack_047,$D3:FC56,$D3:FDBA,357,packed,packed_lz/SprTilesPack_047.bin,lz12 -> 416 B
-SprTilesPack_240,$D3:FDBB,$D3:FE36,124,packed,packed_lz/SprTilesPack_240.bin,lz12 -> 160 B
-SprTilesPack_239,$D3:FE37,$D3:FEC8,146,packed,packed_lz/SprTilesPack_239.bin,lz12 -> 320 B
-SprTilesPack_241,$D3:FEC9,$D3:FFD7,271,packed,packed_lz/SprTilesPack_241.bin,lz12 -> 416 B
+SprTilesPack_189,$D3:E280,$D3:E745,1222,gfxpack,gfx/SprTilesPack_189.png,lz12 -> 1600 B; 4bpp 50 tiles
+SprTilesPack_190,$D3:E746,$D3:E8A8,355,gfxpack,gfx/SprTilesPack_190.png,lz12 -> 384 B; 4bpp 12 tiles
+SprTilesPack_191,$D3:E8A9,$D3:EA5A,434,gfxpack,gfx/SprTilesPack_191.png,lz12 -> 608 B; 4bpp 19 tiles
+SprTilesPack_194,$D3:EA5B,$D3:EE13,953,gfxpack,gfx/SprTilesPack_194.png,lz12 -> 960 B; 4bpp 30 tiles
+SprTilesPack_195,$D3:EE14,$D3:EEAF,156,gfxpack,gfx/SprTilesPack_195.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_196,$D3:EEB0,$D3:F049,410,gfxpack,gfx/SprTilesPack_196.png,lz12 -> 448 B; 4bpp 14 tiles
+SprTilesPack_198,$D3:F04A,$D3:F0AB,98,gfxpack,gfx/SprTilesPack_198.png,lz12 -> 192 B; 4bpp 6 tiles
+SprTilesPack_199,$D3:F0AC,$D3:F19C,241,gfxpack,gfx/SprTilesPack_199.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_200,$D3:F19D,$D3:F2A6,266,gfxpack,gfx/SprTilesPack_200.png,lz12 -> 320 B; 4bpp 10 tiles
+SprTilesPack_201,$D3:F2A7,$D3:F3CB,293,gfxpack,gfx/SprTilesPack_201.png,lz12 -> 352 B; 4bpp 11 tiles
+SprTilesPack_202,$D3:F3CC,$D3:F5BC,497,gfxpack,gfx/SprTilesPack_202.png,lz12 -> 544 B; 4bpp 17 tiles
+SprTilesPack_204,$D3:F5BD,$D3:F638,124,gfxpack,gfx/SprTilesPack_204.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_215,$D3:F639,$D3:F670,56,gfxpack,gfx/SprTilesPack_215.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_218,$D3:F671,$D3:F70A,154,gfxpack,gfx/SprTilesPack_218.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_221,$D3:F70B,$D3:F7A6,156,gfxpack,gfx/SprTilesPack_221.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_222,$D3:F7A7,$D3:F995,495,gfxpack,gfx/SprTilesPack_222.png,lz12 -> 640 B; 4bpp 20 tiles
+SprTilesPack_210,$D3:F996,$D3:FB9D,520,gfxpack,gfx/SprTilesPack_210.png,lz12 -> 608 B; 4bpp 19 tiles
+SprTilesPack_212,$D3:FB9E,$D3:FC55,184,gfxpack,gfx/SprTilesPack_212.png,lz12 -> 320 B; 4bpp 10 tiles
+SprTilesPack_047,$D3:FC56,$D3:FDBA,357,gfxpack,gfx/SprTilesPack_047.png,lz12 -> 416 B; 4bpp 13 tiles
+SprTilesPack_240,$D3:FDBB,$D3:FE36,124,gfxpack,gfx/SprTilesPack_240.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_239,$D3:FE37,$D3:FEC8,146,gfxpack,gfx/SprTilesPack_239.png,lz12 -> 320 B; 4bpp 10 tiles
+SprTilesPack_241,$D3:FEC9,$D3:FFD7,271,gfxpack,gfx/SprTilesPack_241.png,lz12 -> 416 B; 4bpp 13 tiles
 Padding_D3FFD8,$D3:FFD8,$D3:FFFF,40,fill,,$00
 Gfx_D40000,$D4:0000,$D4:7C3F,31808,graphics,gfx/Gfx_D40000.png,4bpp 994 tiles
 Gfx_D47C40,$D4:7C40,$D4:FAFF,32448,graphics,gfx/Gfx_D47C40.png,4bpp 1014 tiles
-SprTilesPack_179,$D4:FB00,$D4:FCFA,507,packed,packed_lz/SprTilesPack_179.bin,lz12 -> 672 B
-SprTilesPack_180,$D4:FCFB,$D4:FDAF,181,packed,packed_lz/SprTilesPack_180.bin,lz12 -> 384 B
-SprTilesPack_187,$D4:FDB0,$D4:FF72,451,packed,packed_lz/SprTilesPack_187.bin,lz12 -> 480 B
+SprTilesPack_179,$D4:FB00,$D4:FCFA,507,gfxpack,gfx/SprTilesPack_179.png,lz12 -> 672 B; 4bpp 21 tiles
+SprTilesPack_180,$D4:FCFB,$D4:FDAF,181,gfxpack,gfx/SprTilesPack_180.png,lz12 -> 384 B; 4bpp 12 tiles
+SprTilesPack_187,$D4:FDB0,$D4:FF72,451,gfxpack,gfx/SprTilesPack_187.png,lz12 -> 480 B; 4bpp 15 tiles
 Padding_D4FF73,$D4:FF73,$D4:FFFF,141,fill,,$00
 Gfx_D50000,$D5:0000,$D5:8BFF,35840,graphics,gfx/Gfx_D50000.png,4bpp 1120 tiles
-SprTilesPack_155,$D5:8C00,$D5:A03F,5184,packed,packed_lz/SprTilesPack_155.bin,lz12 -> 8192 B
-SprTilesPack_164,$D5:A040,$D5:B298,4697,packed,packed_lz/SprTilesPack_164.bin,lz12 -> 6368 B
-SprTilesPack_165,$D5:B299,$D5:E177,11999,packed,packed_lz/SprTilesPack_165.bin,lz12 -> 15712 B
-SprTilesPack_167,$D5:E178,$D5:E1B4,61,packed,packed_lz/SprTilesPack_167.bin,lz12 -> 448 B
-SprTilesPack_089,$D5:E1B5,$D5:F8F6,5954,packed,packed_lz/SprTilesPack_089.bin,lz12 -> 8192 B
-SprTilesPack_105,$D5:F8F7,$D5:FFF9,1795,packed,packed_lz/SprTilesPack_105.bin,lz12 -> 2368 B
+SprTilesPack_155,$D5:8C00,$D5:A03F,5184,gfxpack,gfx/SprTilesPack_155.png,lz12 -> 8192 B; 4bpp 256 tiles
+SprTilesPack_164,$D5:A040,$D5:B298,4697,gfxpack,gfx/SprTilesPack_164.png,lz12 -> 6368 B; 4bpp 199 tiles
+SprTilesPack_165,$D5:B299,$D5:E177,11999,gfxpack,gfx/SprTilesPack_165.png,lz12 -> 15712 B; 4bpp 491 tiles
+SprTilesPack_167,$D5:E178,$D5:E1B4,61,gfxpack,gfx/SprTilesPack_167.png,lz12 -> 448 B; 4bpp 14 tiles
+SprTilesPack_089,$D5:E1B5,$D5:F8F6,5954,gfxpack,gfx/SprTilesPack_089.png,lz12 -> 8192 B; 4bpp 256 tiles
+SprTilesPack_105,$D5:F8F7,$D5:FFF9,1795,gfxpack,gfx/SprTilesPack_105.png,lz12 -> 2368 B; 4bpp 74 tiles
 Padding_D5FFFA,$D5:FFFA,$D5:FFFF,6,fill,,$00
-SprTilesPack_090,$D6:0000,$D6:14EE,5359,packed,packed_lz/SprTilesPack_090.bin,lz12 -> 5824 B
-SprTilesPack_094,$D6:14EF,$D6:2961,5235,packed,packed_lz/SprTilesPack_094.bin,lz12 -> 7328 B
-SprTilesPack_114,$D6:2962,$D6:45F2,7313,packed,packed_lz/SprTilesPack_114.bin,lz12 -> 9312 B
-SprTilesPack_081,$D6:45F3,$D6:4CB9,1735,packed,packed_lz/SprTilesPack_081.bin,lz12 -> 3104 B
-SprTilesPack_097,$D6:4CBA,$D6:601D,4964,packed,packed_lz/SprTilesPack_097.bin,lz12 -> 6144 B
-SprTilesPack_098,$D6:601E,$D6:6A11,2548,packed,packed_lz/SprTilesPack_098.bin,lz12 -> 3488 B
-SprTilesPack_099,$D6:6A12,$D6:7FB5,5540,packed,packed_lz/SprTilesPack_099.bin,lz12 -> 6720 B
-SprTilesPack_100,$D6:7FB6,$D6:8BA2,3053,packed,packed_lz/SprTilesPack_100.bin,lz12 -> 3680 B
-SprTilesPack_101,$D6:8BA3,$D6:9789,3047,packed,packed_lz/SprTilesPack_101.bin,lz12 -> 4064 B
-SprTilesPack_102,$D6:978A,$D6:A28C,2819,packed,packed_lz/SprTilesPack_102.bin,lz12 -> 3616 B
-SprTilesPack_106,$D6:A28D,$D6:A939,1709,packed,packed_lz/SprTilesPack_106.bin,lz12 -> 3168 B
-SprTilesPack_108,$D6:A93A,$D6:B7D8,3743,packed,packed_lz/SprTilesPack_108.bin,lz12 -> 5504 B
-SprTilesPack_173,$D6:B7D9,$D6:C77D,4005,packed,packed_lz/SprTilesPack_173.bin,lz12 -> 5984 B
-SprTilesPack_087,$D6:C77E,$D6:EE09,9868,packed,packed_lz/SprTilesPack_087.bin,lz12 -> 12288 B
-SprTilesPack_104,$D6:EE0A,$D6:F3DD,1492,packed,packed_lz/SprTilesPack_104.bin,lz12 -> 1952 B
-SprTilesPack_093,$D6:F3DE,$D6:F9F7,1562,packed,packed_lz/SprTilesPack_093.bin,lz12 -> 2176 B
+SprTilesPack_090,$D6:0000,$D6:14EE,5359,gfxpack,gfx/SprTilesPack_090.png,lz12 -> 5824 B; 4bpp 182 tiles
+SprTilesPack_094,$D6:14EF,$D6:2961,5235,gfxpack,gfx/SprTilesPack_094.png,lz12 -> 7328 B; 4bpp 229 tiles
+SprTilesPack_114,$D6:2962,$D6:45F2,7313,gfxpack,gfx/SprTilesPack_114.png,lz12 -> 9312 B; 4bpp 291 tiles
+SprTilesPack_081,$D6:45F3,$D6:4CB9,1735,gfxpack,gfx/SprTilesPack_081.png,lz12 -> 3104 B; 4bpp 97 tiles
+SprTilesPack_097,$D6:4CBA,$D6:601D,4964,gfxpack,gfx/SprTilesPack_097.png,lz12 -> 6144 B; 4bpp 192 tiles
+SprTilesPack_098,$D6:601E,$D6:6A11,2548,gfxpack,gfx/SprTilesPack_098.png,lz12 -> 3488 B; 4bpp 109 tiles
+SprTilesPack_099,$D6:6A12,$D6:7FB5,5540,gfxpack,gfx/SprTilesPack_099.png,lz12 -> 6720 B; 4bpp 210 tiles
+SprTilesPack_100,$D6:7FB6,$D6:8BA2,3053,gfxpack,gfx/SprTilesPack_100.png,lz12 -> 3680 B; 4bpp 115 tiles
+SprTilesPack_101,$D6:8BA3,$D6:9789,3047,gfxpack,gfx/SprTilesPack_101.png,lz12 -> 4064 B; 4bpp 127 tiles
+SprTilesPack_102,$D6:978A,$D6:A28C,2819,gfxpack,gfx/SprTilesPack_102.png,lz12 -> 3616 B; 4bpp 113 tiles
+SprTilesPack_106,$D6:A28D,$D6:A939,1709,gfxpack,gfx/SprTilesPack_106.png,lz12 -> 3168 B; 4bpp 99 tiles
+SprTilesPack_108,$D6:A93A,$D6:B7D8,3743,gfxpack,gfx/SprTilesPack_108.png,lz12 -> 5504 B; 4bpp 172 tiles
+SprTilesPack_173,$D6:B7D9,$D6:C77D,4005,gfxpack,gfx/SprTilesPack_173.png,lz12 -> 5984 B; 4bpp 187 tiles
+SprTilesPack_087,$D6:C77E,$D6:EE09,9868,gfxpack,gfx/SprTilesPack_087.png,lz12 -> 12288 B; 4bpp 384 tiles
+SprTilesPack_104,$D6:EE0A,$D6:F3DD,1492,gfxpack,gfx/SprTilesPack_104.png,lz12 -> 1952 B; 4bpp 61 tiles
+SprTilesPack_093,$D6:F3DE,$D6:F9F7,1562,gfxpack,gfx/SprTilesPack_093.png,lz12 -> 2176 B; 4bpp 68 tiles
 Padding_D6F9F8,$D6:F9F8,$D6:FFFF,1544,fill,,$00
-SprTilesPack_103,$D7:0000,$D7:0500,1281,packed,packed_lz/SprTilesPack_103.bin,lz12 -> 1760 B
-SprTilesPack_110,$D7:0501,$D7:0D17,2071,packed,packed_lz/SprTilesPack_110.bin,lz12 -> 2720 B
-SprTilesPack_111,$D7:0D18,$D7:2AD7,7616,packed,packed_lz/SprTilesPack_111.bin,lz12 -> 10112 B
-SprTilesPack_112,$D7:2AD8,$D7:34F5,2590,packed,packed_lz/SprTilesPack_112.bin,lz12 -> 4096 B
-SprTilesPack_113,$D7:34F6,$D7:4EEE,6649,packed,packed_lz/SprTilesPack_113.bin,lz12 -> 8672 B
-SprTilesPack_096,$D7:4EEF,$D7:5410,1314,packed,packed_lz/SprTilesPack_096.bin,lz12 -> 1856 B
-SprTilesPack_095,$D7:5411,$D7:59BB,1451,packed,packed_lz/SprTilesPack_095.bin,lz12 -> 1728 B
-SprTilesPack_115,$D7:59BC,$D7:7EFF,9540,packed,packed_lz/SprTilesPack_115.bin,lz12 -> 12800 B
-SprTilesPack_091,$D7:7F00,$D7:8813,2324,packed,packed_lz/SprTilesPack_091.bin,lz12 -> 2432 B
-SprTilesPack_092,$D7:8814,$D7:934E,2875,packed,packed_lz/SprTilesPack_092.bin,lz12 -> 3648 B
-SprTilesPack_107,$D7:934F,$D7:9E72,2852,packed,packed_lz/SprTilesPack_107.bin,lz12 -> 3744 B
-SprTilesPack_083,$D7:9E73,$D7:BBB5,7491,packed,packed_lz/SprTilesPack_083.bin,lz12 -> 8928 B
-SprTilesPack_205,$D7:BBB6,$D7:BD32,381,packed,packed_lz/SprTilesPack_205.bin,lz12 -> 416 B
-SprTilesPack_206,$D7:BD33,$D7:C92F,3069,packed,packed_lz/SprTilesPack_206.bin,lz12 -> 3488 B
-SprTilesPack_207,$D7:C930,$D7:D52C,3069,packed,packed_lz/SprTilesPack_207.bin,lz12 -> 3488 B
-SprTilesPack_109,$D7:D52D,$D7:E896,4970,packed,packed_lz/SprTilesPack_109.bin,lz12 -> 8192 B
-SprTilesPack_078,$D7:E897,$D7:FEED,5719,packed,packed_lz/SprTilesPack_078.bin,lz12 -> 7104 B
+SprTilesPack_103,$D7:0000,$D7:0500,1281,gfxpack,gfx/SprTilesPack_103.png,lz12 -> 1760 B; 4bpp 55 tiles
+SprTilesPack_110,$D7:0501,$D7:0D17,2071,gfxpack,gfx/SprTilesPack_110.png,lz12 -> 2720 B; 4bpp 85 tiles
+SprTilesPack_111,$D7:0D18,$D7:2AD7,7616,gfxpack,gfx/SprTilesPack_111.png,lz12 -> 10112 B; 4bpp 316 tiles
+SprTilesPack_112,$D7:2AD8,$D7:34F5,2590,gfxpack,gfx/SprTilesPack_112.png,lz12 -> 4096 B; 4bpp 128 tiles
+SprTilesPack_113,$D7:34F6,$D7:4EEE,6649,gfxpack,gfx/SprTilesPack_113.png,lz12 -> 8672 B; 4bpp 271 tiles
+SprTilesPack_096,$D7:4EEF,$D7:5410,1314,gfxpack,gfx/SprTilesPack_096.png,lz12 -> 1856 B; 4bpp 58 tiles
+SprTilesPack_095,$D7:5411,$D7:59BB,1451,gfxpack,gfx/SprTilesPack_095.png,lz12 -> 1728 B; 4bpp 54 tiles
+SprTilesPack_115,$D7:59BC,$D7:7EFF,9540,gfxpack,gfx/SprTilesPack_115.png,lz12 -> 12800 B; 4bpp 400 tiles
+SprTilesPack_091,$D7:7F00,$D7:8813,2324,gfxpack,gfx/SprTilesPack_091.png,lz12 -> 2432 B; 4bpp 76 tiles
+SprTilesPack_092,$D7:8814,$D7:934E,2875,gfxpack,gfx/SprTilesPack_092.png,lz12 -> 3648 B; 4bpp 114 tiles
+SprTilesPack_107,$D7:934F,$D7:9E72,2852,gfxpack,gfx/SprTilesPack_107.png,lz12 -> 3744 B; 4bpp 117 tiles
+SprTilesPack_083,$D7:9E73,$D7:BBB5,7491,gfxpack,gfx/SprTilesPack_083.png,lz12 -> 8928 B; 4bpp 279 tiles
+SprTilesPack_205,$D7:BBB6,$D7:BD32,381,gfxpack,gfx/SprTilesPack_205.png,lz12 -> 416 B; 4bpp 13 tiles
+SprTilesPack_206,$D7:BD33,$D7:C92F,3069,gfxpack,gfx/SprTilesPack_206.png,lz12 -> 3488 B; 4bpp 109 tiles
+SprTilesPack_207,$D7:C930,$D7:D52C,3069,gfxpack,gfx/SprTilesPack_207.png,lz12 -> 3488 B; 4bpp 109 tiles
+SprTilesPack_109,$D7:D52D,$D7:E896,4970,gfxpack,gfx/SprTilesPack_109.png,lz12 -> 8192 B; 4bpp 256 tiles
+SprTilesPack_078,$D7:E897,$D7:FEED,5719,gfxpack,gfx/SprTilesPack_078.png,lz12 -> 7104 B; 4bpp 222 tiles
 Padding_D7FEEE,$D7:FEEE,$D7:FFFF,274,fill,,$00
-SprTilesPack_086,$D8:0000,$D8:1807,6152,packed,packed_lz/SprTilesPack_086.bin,lz12 -> 8704 B
-SprTilesPack_088,$D8:1808,$D8:3485,7294,packed,packed_lz/SprTilesPack_088.bin,lz12 -> 8160 B
-SprTilesPack_079,$D8:3486,$D8:4147,3266,packed,packed_lz/SprTilesPack_079.bin,lz12 -> 3808 B
-SprTilesPack_080,$D8:4148,$D8:6E82,11579,packed,packed_lz/SprTilesPack_080.bin,lz12 -> 13888 B
-SprTilesPack_082,$D8:6E83,$D8:8BD2,7504,packed,packed_lz/SprTilesPack_082.bin,lz12 -> 9472 B
-SprTilesPack_084,$D8:8BD3,$D8:A951,7551,packed,packed_lz/SprTilesPack_084.bin,lz12 -> 9248 B
-SprTilesPack_085,$D8:A952,$D8:B80E,3773,packed,packed_lz/SprTilesPack_085.bin,lz12 -> 8192 B
-SprTilesPack_242,$D8:B80F,$D8:C2E9,2779,packed,packed_lz/SprTilesPack_242.bin,lz12 -> 3296 B
-SprTilesPack_243,$D8:C2EA,$D8:C628,831,packed,packed_lz/SprTilesPack_243.bin,lz12 -> 960 B
-SprTilesPack_244,$D8:C629,$D8:C895,621,packed,packed_lz/SprTilesPack_244.bin,lz12 -> 864 B
-SprTilesPack_245,$D8:C896,$D8:CB1C,647,packed,packed_lz/SprTilesPack_245.bin,lz12 -> 864 B
-SprTilesPack_246,$D8:CB1D,$D8:CDDB,703,packed,packed_lz/SprTilesPack_246.bin,lz12 -> 864 B
-SprTilesPack_247,$D8:CDDC,$D8:CF67,396,packed,packed_lz/SprTilesPack_247.bin,lz12 -> 416 B
+SprTilesPack_086,$D8:0000,$D8:1807,6152,gfxpack,gfx/SprTilesPack_086.png,lz12 -> 8704 B; 4bpp 272 tiles
+SprTilesPack_088,$D8:1808,$D8:3485,7294,gfxpack,gfx/SprTilesPack_088.png,lz12 -> 8160 B; 4bpp 255 tiles
+SprTilesPack_079,$D8:3486,$D8:4147,3266,gfxpack,gfx/SprTilesPack_079.png,lz12 -> 3808 B; 4bpp 119 tiles
+SprTilesPack_080,$D8:4148,$D8:6E82,11579,gfxpack,gfx/SprTilesPack_080.png,lz12 -> 13888 B; 4bpp 434 tiles
+SprTilesPack_082,$D8:6E83,$D8:8BD2,7504,gfxpack,gfx/SprTilesPack_082.png,lz12 -> 9472 B; 4bpp 296 tiles
+SprTilesPack_084,$D8:8BD3,$D8:A951,7551,gfxpack,gfx/SprTilesPack_084.png,lz12 -> 9248 B; 4bpp 289 tiles
+SprTilesPack_085,$D8:A952,$D8:B80E,3773,gfxpack,gfx/SprTilesPack_085.png,lz12 -> 8192 B; 4bpp 256 tiles
+SprTilesPack_242,$D8:B80F,$D8:C2E9,2779,gfxpack,gfx/SprTilesPack_242.png,lz12 -> 3296 B; 4bpp 103 tiles
+SprTilesPack_243,$D8:C2EA,$D8:C628,831,gfxpack,gfx/SprTilesPack_243.png,lz12 -> 960 B; 4bpp 30 tiles
+SprTilesPack_244,$D8:C629,$D8:C895,621,gfxpack,gfx/SprTilesPack_244.png,lz12 -> 864 B; 4bpp 27 tiles
+SprTilesPack_245,$D8:C896,$D8:CB1C,647,gfxpack,gfx/SprTilesPack_245.png,lz12 -> 864 B; 4bpp 27 tiles
+SprTilesPack_246,$D8:CB1D,$D8:CDDB,703,gfxpack,gfx/SprTilesPack_246.png,lz12 -> 864 B; 4bpp 27 tiles
+SprTilesPack_247,$D8:CDDC,$D8:CF67,396,gfxpack,gfx/SprTilesPack_247.png,lz12 -> 416 B; 4bpp 13 tiles
 Padding_D8CF68,$D8:CF68,$D8:CFFF,152,fill,,$00
 MsgTable_D8D000,$D8:D000,$D8:DD26,3367,text,text/Messages_D8D000.txt,strtable
 Padding_D8DD27,$D8:DD27,$D8:DD7F,89,fill,,$00
 MsgTable_D8DD80,$D8:DD80,$D8:FFBD,8766,text,text/Messages_D8DD80.txt,strtable
 Padding_D8FFBE,$D8:FFBE,$D8:FFFF,66,fill,,$00
-SprTilesPack_007,$D9:0000,$D9:0726,1831,packed,packed_lz/SprTilesPack_007.bin,lz12 -> 2464 B
-SprTilesPack_008,$D9:0727,$D9:0DE5,1727,packed,packed_lz/SprTilesPack_008.bin,lz12 -> 2336 B
-SprTilesPack_009,$D9:0DE6,$D9:1330,1355,packed,packed_lz/SprTilesPack_009.bin,lz12 -> 2336 B
-SprTilesPack_010,$D9:1331,$D9:181D,1261,packed,packed_lz/SprTilesPack_010.bin,lz12 -> 2336 B
-SprTilesPack_011,$D9:181E,$D9:1DE1,1476,packed,packed_lz/SprTilesPack_011.bin,lz12 -> 2336 B
-SprTilesPack_012,$D9:1DE2,$D9:2391,1456,packed,packed_lz/SprTilesPack_012.bin,lz12 -> 2336 B
-SprTilesPack_013,$D9:2392,$D9:2979,1512,packed,packed_lz/SprTilesPack_013.bin,lz12 -> 2336 B
-SprTilesPack_014,$D9:297A,$D9:30E6,1901,packed,packed_lz/SprTilesPack_014.bin,lz12 -> 2336 B
-SprTilesPack_015,$D9:30E7,$D9:36B0,1482,packed,packed_lz/SprTilesPack_015.bin,lz12 -> 2336 B
-SprTilesPack_016,$D9:36B1,$D9:3D13,1635,packed,packed_lz/SprTilesPack_016.bin,lz12 -> 2336 B
-SprTilesPack_017,$D9:3D14,$D9:4384,1649,packed,packed_lz/SprTilesPack_017.bin,lz12 -> 2336 B
-SprTilesPack_018,$D9:4385,$D9:4A57,1747,packed,packed_lz/SprTilesPack_018.bin,lz12 -> 2336 B
-SprTilesPack_019,$D9:4A58,$D9:51FF,1960,packed,packed_lz/SprTilesPack_019.bin,lz12 -> 2336 B
-SprTilesPack_125,$D9:5200,$D9:5A9B,2204,packed,packed_lz/SprTilesPack_125.bin,lz12 -> 2656 B
-SprTilesPack_126,$D9:5A9C,$D9:61D2,1847,packed,packed_lz/SprTilesPack_126.bin,lz12 -> 2336 B
-SprTilesPack_138,$D9:61D3,$D9:6921,1871,packed,packed_lz/SprTilesPack_138.bin,lz12 -> 2464 B
-SprTilesPack_020,$D9:6922,$D9:6D62,1089,packed,packed_lz/SprTilesPack_020.bin,lz12 -> 1312 B
-SprTilesPack_021,$D9:6D63,$D9:7161,1023,packed,packed_lz/SprTilesPack_021.bin,lz12 -> 1312 B
-SprTilesPack_022,$D9:7162,$D9:7512,945,packed,packed_lz/SprTilesPack_022.bin,lz12 -> 1312 B
-SprTilesPack_023,$D9:7513,$D9:7946,1076,packed,packed_lz/SprTilesPack_023.bin,lz12 -> 1312 B
-SprTilesPack_024,$D9:7947,$D9:8207,2241,packed,packed_lz/SprTilesPack_024.bin,lz12 -> 2752 B
-SprTilesPack_025,$D9:8208,$D9:8B62,2395,packed,packed_lz/SprTilesPack_025.bin,lz12 -> 2560 B
-SprTilesPack_230,$D9:8B63,$D9:8DE2,640,packed,packed_lz/SprTilesPack_230.bin,lz12 -> 768 B
-SprTilesPack_027,$D9:8DE3,$D9:99DE,3068,packed,packed_lz/SprTilesPack_027.bin,lz12 -> 3904 B
-SprTilesPack_028,$D9:99DF,$D9:A29F,2241,packed,packed_lz/SprTilesPack_028.bin,lz12 -> 2592 B
-SprTilesPack_029,$D9:A2A0,$D9:B007,3432,packed,packed_lz/SprTilesPack_029.bin,lz12 -> 6656 B
-SprTilesPack_030,$D9:B008,$D9:B88D,2182,packed,packed_lz/SprTilesPack_030.bin,lz12 -> 3072 B
-SprTilesPack_039,$D9:B88E,$D9:C114,2183,packed,packed_lz/SprTilesPack_039.bin,lz12 -> 2560 B
-SprTilesPack_127,$D9:C115,$D9:C7C9,1717,packed,packed_lz/SprTilesPack_127.bin,lz12 -> 1728 B
-SprTilesPack_035,$D9:C7CA,$D9:D2BB,2802,packed,packed_lz/SprTilesPack_035.bin,lz12 -> 3936 B
-SprTilesPack_036,$D9:D2BC,$D9:DB65,2218,packed,packed_lz/SprTilesPack_036.bin,lz12 -> 2848 B
-SprTilesPack_026,$D9:DB66,$D9:E2CD,1896,packed,packed_lz/SprTilesPack_026.bin,lz12 -> 2400 B
-SprTilesPack_038,$D9:E2CE,$D9:EC5C,2447,packed,packed_lz/SprTilesPack_038.bin,lz12 -> 2528 B
-SprTilesPack_238,$D9:EC5D,$D9:FC5A,4094,packed,packed_lz/SprTilesPack_238.bin,lz12 -> 5024 B
+SprTilesPack_007,$D9:0000,$D9:0726,1831,gfxpack,gfx/SprTilesPack_007.png,lz12 -> 2464 B; 4bpp 77 tiles
+SprTilesPack_008,$D9:0727,$D9:0DE5,1727,gfxpack,gfx/SprTilesPack_008.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_009,$D9:0DE6,$D9:1330,1355,gfxpack,gfx/SprTilesPack_009.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_010,$D9:1331,$D9:181D,1261,gfxpack,gfx/SprTilesPack_010.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_011,$D9:181E,$D9:1DE1,1476,gfxpack,gfx/SprTilesPack_011.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_012,$D9:1DE2,$D9:2391,1456,gfxpack,gfx/SprTilesPack_012.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_013,$D9:2392,$D9:2979,1512,gfxpack,gfx/SprTilesPack_013.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_014,$D9:297A,$D9:30E6,1901,gfxpack,gfx/SprTilesPack_014.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_015,$D9:30E7,$D9:36B0,1482,gfxpack,gfx/SprTilesPack_015.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_016,$D9:36B1,$D9:3D13,1635,gfxpack,gfx/SprTilesPack_016.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_017,$D9:3D14,$D9:4384,1649,gfxpack,gfx/SprTilesPack_017.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_018,$D9:4385,$D9:4A57,1747,gfxpack,gfx/SprTilesPack_018.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_019,$D9:4A58,$D9:51FF,1960,gfxpack,gfx/SprTilesPack_019.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_125,$D9:5200,$D9:5A9B,2204,gfxpack,gfx/SprTilesPack_125.png,lz12 -> 2656 B; 4bpp 83 tiles
+SprTilesPack_126,$D9:5A9C,$D9:61D2,1847,gfxpack,gfx/SprTilesPack_126.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_138,$D9:61D3,$D9:6921,1871,gfxpack,gfx/SprTilesPack_138.png,lz12 -> 2464 B; 4bpp 77 tiles
+SprTilesPack_020,$D9:6922,$D9:6D62,1089,gfxpack,gfx/SprTilesPack_020.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_021,$D9:6D63,$D9:7161,1023,gfxpack,gfx/SprTilesPack_021.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_022,$D9:7162,$D9:7512,945,gfxpack,gfx/SprTilesPack_022.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_023,$D9:7513,$D9:7946,1076,gfxpack,gfx/SprTilesPack_023.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_024,$D9:7947,$D9:8207,2241,gfxpack,gfx/SprTilesPack_024.png,lz12 -> 2752 B; 4bpp 86 tiles
+SprTilesPack_025,$D9:8208,$D9:8B62,2395,gfxpack,gfx/SprTilesPack_025.png,lz12 -> 2560 B; 4bpp 80 tiles
+SprTilesPack_230,$D9:8B63,$D9:8DE2,640,gfxpack,gfx/SprTilesPack_230.png,lz12 -> 768 B; 4bpp 24 tiles
+SprTilesPack_027,$D9:8DE3,$D9:99DE,3068,gfxpack,gfx/SprTilesPack_027.png,lz12 -> 3904 B; 4bpp 122 tiles
+SprTilesPack_028,$D9:99DF,$D9:A29F,2241,gfxpack,gfx/SprTilesPack_028.png,lz12 -> 2592 B; 4bpp 81 tiles
+SprTilesPack_029,$D9:A2A0,$D9:B007,3432,gfxpack,gfx/SprTilesPack_029.png,lz12 -> 6656 B; 4bpp 208 tiles
+SprTilesPack_030,$D9:B008,$D9:B88D,2182,gfxpack,gfx/SprTilesPack_030.png,lz12 -> 3072 B; 4bpp 96 tiles
+SprTilesPack_039,$D9:B88E,$D9:C114,2183,gfxpack,gfx/SprTilesPack_039.png,lz12 -> 2560 B; 4bpp 80 tiles
+SprTilesPack_127,$D9:C115,$D9:C7C9,1717,gfxpack,gfx/SprTilesPack_127.png,lz12 -> 1728 B; 4bpp 54 tiles
+SprTilesPack_035,$D9:C7CA,$D9:D2BB,2802,gfxpack,gfx/SprTilesPack_035.png,lz12 -> 3936 B; 4bpp 123 tiles
+SprTilesPack_036,$D9:D2BC,$D9:DB65,2218,gfxpack,gfx/SprTilesPack_036.png,lz12 -> 2848 B; 4bpp 89 tiles
+SprTilesPack_026,$D9:DB66,$D9:E2CD,1896,gfxpack,gfx/SprTilesPack_026.png,lz12 -> 2400 B; 4bpp 75 tiles
+SprTilesPack_038,$D9:E2CE,$D9:EC5C,2447,gfxpack,gfx/SprTilesPack_038.png,lz12 -> 2528 B; 4bpp 79 tiles
+SprTilesPack_238,$D9:EC5D,$D9:FC5A,4094,gfxpack,gfx/SprTilesPack_238.png,lz12 -> 5024 B; 4bpp 157 tiles
 Padding_D9FC5B,$D9:FC5B,$D9:FFFF,933,fill,,$00
-SprTilesPack_033,$DA:0000,$DA:0BB8,3001,packed,packed_lz/SprTilesPack_033.bin,lz12 -> 3968 B
-SprTilesPack_032,$DA:0BB9,$DA:158C,2516,packed,packed_lz/SprTilesPack_032.bin,lz12 -> 3232 B
-SprTilesPack_043,$DA:158D,$DA:1837,683,packed,packed_lz/SprTilesPack_043.bin,lz12 -> 960 B
-SprTilesPack_077,$DA:1838,$DA:1921,234,packed,packed_lz/SprTilesPack_077.bin,lz12 -> 288 B
-SprTilesPack_116,$DA:1922,$DA:1988,103,packed,packed_lz/SprTilesPack_116.bin,lz12 -> 320 B
-SprTilesPack_117,$DA:1989,$DA:1C15,653,packed,packed_lz/SprTilesPack_117.bin,lz12 -> 768 B
-SprTilesPack_118,$DA:1C16,$DA:1CA4,143,packed,packed_lz/SprTilesPack_118.bin,lz12 -> 288 B
-SprTilesPack_119,$DA:1CA5,$DA:1D5C,184,packed,packed_lz/SprTilesPack_119.bin,lz12 -> 288 B
-SprTilesPack_120,$DA:1D5D,$DA:21B3,1111,packed,packed_lz/SprTilesPack_120.bin,lz12 -> 1344 B
-SprTilesPack_121,$DA:21B4,$DA:2337,388,packed,packed_lz/SprTilesPack_121.bin,lz12 -> 704 B
-SprTilesPack_122,$DA:2338,$DA:23EC,181,packed,packed_lz/SprTilesPack_122.bin,lz12 -> 448 B
-SprTilesPack_048,$DA:23ED,$DA:24A4,184,packed,packed_lz/SprTilesPack_048.bin,lz12 -> 224 B
-SprTilesPack_049,$DA:24A5,$DA:24E8,68,packed,packed_lz/SprTilesPack_049.bin,lz12 -> 160 B
-SprTilesPack_050,$DA:24E9,$DA:2603,283,packed,packed_lz/SprTilesPack_050.bin,lz12 -> 416 B
-SprTilesPack_051,$DA:2604,$DA:2670,109,packed,packed_lz/SprTilesPack_051.bin,lz12 -> 128 B
-SprTilesPack_052,$DA:2671,$DA:27F9,393,packed,packed_lz/SprTilesPack_052.bin,lz12 -> 480 B
-SprTilesPack_053,$DA:27FA,$DA:2AD1,728,packed,packed_lz/SprTilesPack_053.bin,lz12 -> 800 B
-SprTilesPack_054,$DA:2AD2,$DA:2B4A,121,packed,packed_lz/SprTilesPack_054.bin,lz12 -> 288 B
-SprTilesPack_055,$DA:2B4B,$DA:2C91,327,packed,packed_lz/SprTilesPack_055.bin,lz12 -> 480 B
-SprTilesPack_056,$DA:2C92,$DA:2D63,210,packed,packed_lz/SprTilesPack_056.bin,lz12 -> 352 B
-SprTilesPack_057,$DA:2D64,$DA:2F72,527,packed,packed_lz/SprTilesPack_057.bin,lz12 -> 992 B
-SprTilesPack_228,$DA:2F73,$DA:3207,661,packed,packed_lz/SprTilesPack_228.bin,lz12 -> 896 B
-SprTilesPack_058,$DA:3208,$DA:350A,771,packed,packed_lz/SprTilesPack_058.bin,lz12 -> 1024 B
-SprTilesPack_059,$DA:350B,$DA:35D1,199,packed,packed_lz/SprTilesPack_059.bin,lz12 -> 416 B
-SprTilesPack_060,$DA:35D2,$DA:39C3,1010,packed,packed_lz/SprTilesPack_060.bin,lz12 -> 1280 B
-SprTilesPack_061,$DA:39C4,$DA:3C81,702,packed,packed_lz/SprTilesPack_061.bin,lz12 -> 1376 B
-SprTilesPack_062,$DA:3C82,$DA:3D50,207,packed,packed_lz/SprTilesPack_062.bin,lz12 -> 416 B
-SprTilesPack_063,$DA:3D51,$DA:3DF7,167,packed,packed_lz/SprTilesPack_063.bin,lz12 -> 288 B
-SprTilesPack_064,$DA:3DF8,$DA:3E2A,51,packed,packed_lz/SprTilesPack_064.bin,lz12 -> 224 B
-SprTilesPack_065,$DA:3E2B,$DA:3EB1,135,packed,packed_lz/SprTilesPack_065.bin,lz12 -> 160 B
-SprTilesPack_066,$DA:3EB2,$DA:3F33,130,packed,packed_lz/SprTilesPack_066.bin,lz12 -> 288 B
-SprTilesPack_067,$DA:3F34,$DA:3F79,70,packed,packed_lz/SprTilesPack_067.bin,lz12 -> 160 B
-SprTilesPack_068,$DA:3F7A,$DA:3FD2,89,packed,packed_lz/SprTilesPack_068.bin,lz12 -> 160 B
-SprTilesPack_069,$DA:3FD3,$DA:405F,141,packed,packed_lz/SprTilesPack_069.bin,lz12 -> 160 B
-SprTilesPack_070,$DA:4060,$DA:40ED,142,packed,packed_lz/SprTilesPack_070.bin,lz12 -> 160 B
-SprTilesPack_071,$DA:40EE,$DA:4174,135,packed,packed_lz/SprTilesPack_071.bin,lz12 -> 160 B
-SprTilesPack_072,$DA:4175,$DA:41D8,100,packed,packed_lz/SprTilesPack_072.bin,lz12 -> 160 B
-SprTilesPack_073,$DA:41D9,$DA:42C1,233,packed,packed_lz/SprTilesPack_073.bin,lz12 -> 288 B
-SprTilesPack_074,$DA:42C2,$DA:434F,142,packed,packed_lz/SprTilesPack_074.bin,lz12 -> 160 B
-SprTilesPack_075,$DA:4350,$DA:43D0,129,packed,packed_lz/SprTilesPack_075.bin,lz12 -> 160 B
-SprTilesPack_076,$DA:43D1,$DA:4452,130,packed,packed_lz/SprTilesPack_076.bin,lz12 -> 160 B
-SprTilesPack_044,$DA:4453,$DA:47F9,935,packed,packed_lz/SprTilesPack_044.bin,lz12 -> 1184 B
-SprTilesPack_045,$DA:47FA,$DA:4AED,756,packed,packed_lz/SprTilesPack_045.bin,lz12 -> 800 B
-SprTilesPack_031,$DA:4AEE,$DA:50CF,1506,packed,packed_lz/SprTilesPack_031.bin,lz12 -> 1600 B
-SprTilesPack_128,$DA:50D0,$DA:58A3,2004,packed,packed_lz/SprTilesPack_128.bin,lz12 -> 2304 B
-SprTilesPack_040,$DA:58A4,$DA:617F,2268,packed,packed_lz/SprTilesPack_040.bin,lz12 -> 2432 B
-SprTilesPack_041,$DA:6180,$DA:66C3,1348,packed,packed_lz/SprTilesPack_041.bin,lz12 -> 1504 B
-SprTilesPack_129,$DA:66C4,$DA:68A0,477,packed,packed_lz/SprTilesPack_129.bin,lz12 -> 576 B
-SprTilesPack_046,$DA:68A1,$DA:6932,146,packed,packed_lz/SprTilesPack_046.bin,lz12 -> 256 B
-SprTilesPack_042,$DA:6933,$DA:6DD6,1188,packed,packed_lz/SprTilesPack_042.bin,lz12 -> 1376 B
-SprTilesPack_130,$DA:6DD7,$DA:7654,2174,packed,packed_lz/SprTilesPack_130.bin,lz12 -> 2496 B
-SprTilesPack_131,$DA:7655,$DA:7D2E,1754,packed,packed_lz/SprTilesPack_131.bin,lz12 -> 2016 B
-SprTilesPack_132,$DA:7D2F,$DA:8063,821,packed,packed_lz/SprTilesPack_132.bin,lz12 -> 1088 B
-SprTilesPack_134,$DA:8064,$DA:8455,1010,packed,packed_lz/SprTilesPack_134.bin,lz12 -> 1760 B
-SprTilesPack_136,$DA:8456,$DA:8A9F,1610,packed,packed_lz/SprTilesPack_136.bin,lz12 -> 1952 B
-SprTilesPack_135,$DA:8AA0,$DA:9255,1974,packed,packed_lz/SprTilesPack_135.bin,lz12 -> 2336 B
-SprTilesPack_037,$DA:9256,$DA:A107,3762,packed,packed_lz/SprTilesPack_037.bin,lz12 -> 4480 B
-SprTilesPack_137,$DA:A108,$DA:A5D2,1227,packed,packed_lz/SprTilesPack_137.bin,lz12 -> 1312 B
-SprTilesPack_147,$DA:A5D3,$DA:A97E,940,packed,packed_lz/SprTilesPack_147.bin,lz12 -> 928 B
-SprTilesPack_148,$DA:A97F,$DA:BA14,4246,packed,packed_lz/SprTilesPack_148.bin,lz12 -> 4992 B
-SprTilesPack_149,$DA:BA15,$DA:BAAC,152,packed,packed_lz/SprTilesPack_149.bin,lz12 -> 160 B
-SprTilesPack_150,$DA:BAAD,$DA:BE52,934,packed,packed_lz/SprTilesPack_150.bin,lz12 -> 1152 B
-SprTilesPack_151,$DA:BE53,$DA:BF4F,253,packed,packed_lz/SprTilesPack_151.bin,lz12 -> 288 B
-SprTilesPack_152,$DA:BF50,$DA:BFF0,161,packed,packed_lz/SprTilesPack_152.bin,lz12 -> 288 B
-SprTilesPack_157,$DA:BFF1,$DA:C1BD,461,packed,packed_lz/SprTilesPack_157.bin,lz12 -> 512 B
-SprTilesPack_153,$DA:C1BE,$DA:C266,169,packed,packed_lz/SprTilesPack_153.bin,lz12 -> 288 B
-SprTilesPack_156,$DA:C267,$DA:C322,188,packed,packed_lz/SprTilesPack_156.bin,lz12 -> 608 B
-SprTilesPack_158,$DA:C323,$DA:CF28,3078,packed,packed_lz/SprTilesPack_158.bin,lz12 -> 4096 B
-SprTilesPack_159,$DA:CF29,$DA:D037,271,packed,packed_lz/SprTilesPack_159.bin,lz12 -> 576 B
-SprTilesPack_160,$DA:D038,$DA:D0C2,139,packed,packed_lz/SprTilesPack_160.bin,lz12 -> 160 B
-SprTilesPack_168,$DA:D0C3,$DA:D28B,457,packed,packed_lz/SprTilesPack_168.bin,lz12 -> 960 B
-SprTilesPack_174,$DA:D28C,$DA:D2B2,39,packed,packed_lz/SprTilesPack_174.bin,lz12 -> 128 B
-SprTilesPack_169,$DA:D2B3,$DA:D36F,189,packed,packed_lz/SprTilesPack_169.bin,lz12 -> 224 B
-SprTilesPack_175,$DA:D370,$DA:D6DD,878,packed,packed_lz/SprTilesPack_175.bin,lz12 -> 1216 B
-SprTilesPack_178,$DA:D6DE,$DA:D806,297,packed,packed_lz/SprTilesPack_178.bin,lz12 -> 448 B
-SprTilesPack_186,$DA:D807,$DA:D859,83,packed,packed_lz/SprTilesPack_186.bin,lz12 -> 160 B
-SprTilesPack_188,$DA:D85A,$DA:D8A6,77,packed,packed_lz/SprTilesPack_188.bin,lz12 -> 192 B
-SprTilesPack_211,$DA:D8A7,$DA:DC27,897,packed,packed_lz/SprTilesPack_211.bin,lz12 -> 1312 B
-SprTilesPack_226,$DA:DC28,$DA:E04D,1062,packed,packed_lz/SprTilesPack_226.bin,lz12 -> 1312 B
-SprTilesPack_163,$DA:E04E,$DA:E532,1253,packed,packed_lz/SprTilesPack_163.bin,lz12 -> 1664 B
-SprTilesPack_224,$DA:E533,$DA:E877,837,packed,packed_lz/SprTilesPack_224.bin,lz12 -> 1216 B
-SprTilesPack_225,$DA:E878,$DA:F75A,3811,packed,packed_lz/SprTilesPack_225.bin,lz12 -> 5440 B
-SprTilesPack_231,$DA:F75B,$DA:F7AA,80,packed,packed_lz/SprTilesPack_231.bin,lz12 -> 160 B
-SprTilesPack_232,$DA:F7AB,$DA:F847,157,packed,packed_lz/SprTilesPack_232.bin,lz12 -> 256 B
-SprTilesPack_234,$DA:F848,$DA:FA68,545,packed,packed_lz/SprTilesPack_234.bin,lz12 -> 736 B
-SprTilesPack_237,$DA:FA69,$DA:FC28,448,packed,packed_lz/SprTilesPack_237.bin,lz12 -> 544 B
+SprTilesPack_033,$DA:0000,$DA:0BB8,3001,gfxpack,gfx/SprTilesPack_033.png,lz12 -> 3968 B; 4bpp 124 tiles
+SprTilesPack_032,$DA:0BB9,$DA:158C,2516,gfxpack,gfx/SprTilesPack_032.png,lz12 -> 3232 B; 4bpp 101 tiles
+SprTilesPack_043,$DA:158D,$DA:1837,683,gfxpack,gfx/SprTilesPack_043.png,lz12 -> 960 B; 4bpp 30 tiles
+SprTilesPack_077,$DA:1838,$DA:1921,234,gfxpack,gfx/SprTilesPack_077.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_116,$DA:1922,$DA:1988,103,gfxpack,gfx/SprTilesPack_116.png,lz12 -> 320 B; 4bpp 10 tiles
+SprTilesPack_117,$DA:1989,$DA:1C15,653,gfxpack,gfx/SprTilesPack_117.png,lz12 -> 768 B; 4bpp 24 tiles
+SprTilesPack_118,$DA:1C16,$DA:1CA4,143,gfxpack,gfx/SprTilesPack_118.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_119,$DA:1CA5,$DA:1D5C,184,gfxpack,gfx/SprTilesPack_119.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_120,$DA:1D5D,$DA:21B3,1111,gfxpack,gfx/SprTilesPack_120.png,lz12 -> 1344 B; 4bpp 42 tiles
+SprTilesPack_121,$DA:21B4,$DA:2337,388,gfxpack,gfx/SprTilesPack_121.png,lz12 -> 704 B; 4bpp 22 tiles
+SprTilesPack_122,$DA:2338,$DA:23EC,181,gfxpack,gfx/SprTilesPack_122.png,lz12 -> 448 B; 4bpp 14 tiles
+SprTilesPack_048,$DA:23ED,$DA:24A4,184,gfxpack,gfx/SprTilesPack_048.png,lz12 -> 224 B; 4bpp 7 tiles
+SprTilesPack_049,$DA:24A5,$DA:24E8,68,gfxpack,gfx/SprTilesPack_049.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_050,$DA:24E9,$DA:2603,283,gfxpack,gfx/SprTilesPack_050.png,lz12 -> 416 B; 4bpp 13 tiles
+SprTilesPack_051,$DA:2604,$DA:2670,109,gfxpack,gfx/SprTilesPack_051.png,lz12 -> 128 B; 4bpp 4 tiles
+SprTilesPack_052,$DA:2671,$DA:27F9,393,gfxpack,gfx/SprTilesPack_052.png,lz12 -> 480 B; 4bpp 15 tiles
+SprTilesPack_053,$DA:27FA,$DA:2AD1,728,gfxpack,gfx/SprTilesPack_053.png,lz12 -> 800 B; 4bpp 25 tiles
+SprTilesPack_054,$DA:2AD2,$DA:2B4A,121,gfxpack,gfx/SprTilesPack_054.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_055,$DA:2B4B,$DA:2C91,327,gfxpack,gfx/SprTilesPack_055.png,lz12 -> 480 B; 4bpp 15 tiles
+SprTilesPack_056,$DA:2C92,$DA:2D63,210,gfxpack,gfx/SprTilesPack_056.png,lz12 -> 352 B; 4bpp 11 tiles
+SprTilesPack_057,$DA:2D64,$DA:2F72,527,gfxpack,gfx/SprTilesPack_057.png,lz12 -> 992 B; 4bpp 31 tiles
+SprTilesPack_228,$DA:2F73,$DA:3207,661,gfxpack,gfx/SprTilesPack_228.png,lz12 -> 896 B; 4bpp 28 tiles
+SprTilesPack_058,$DA:3208,$DA:350A,771,gfxpack,gfx/SprTilesPack_058.png,lz12 -> 1024 B; 4bpp 32 tiles
+SprTilesPack_059,$DA:350B,$DA:35D1,199,gfxpack,gfx/SprTilesPack_059.png,lz12 -> 416 B; 4bpp 13 tiles
+SprTilesPack_060,$DA:35D2,$DA:39C3,1010,gfxpack,gfx/SprTilesPack_060.png,lz12 -> 1280 B; 4bpp 40 tiles
+SprTilesPack_061,$DA:39C4,$DA:3C81,702,gfxpack,gfx/SprTilesPack_061.png,lz12 -> 1376 B; 4bpp 43 tiles
+SprTilesPack_062,$DA:3C82,$DA:3D50,207,gfxpack,gfx/SprTilesPack_062.png,lz12 -> 416 B; 4bpp 13 tiles
+SprTilesPack_063,$DA:3D51,$DA:3DF7,167,gfxpack,gfx/SprTilesPack_063.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_064,$DA:3DF8,$DA:3E2A,51,gfxpack,gfx/SprTilesPack_064.png,lz12 -> 224 B; 4bpp 7 tiles
+SprTilesPack_065,$DA:3E2B,$DA:3EB1,135,gfxpack,gfx/SprTilesPack_065.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_066,$DA:3EB2,$DA:3F33,130,gfxpack,gfx/SprTilesPack_066.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_067,$DA:3F34,$DA:3F79,70,gfxpack,gfx/SprTilesPack_067.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_068,$DA:3F7A,$DA:3FD2,89,gfxpack,gfx/SprTilesPack_068.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_069,$DA:3FD3,$DA:405F,141,gfxpack,gfx/SprTilesPack_069.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_070,$DA:4060,$DA:40ED,142,gfxpack,gfx/SprTilesPack_070.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_071,$DA:40EE,$DA:4174,135,gfxpack,gfx/SprTilesPack_071.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_072,$DA:4175,$DA:41D8,100,gfxpack,gfx/SprTilesPack_072.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_073,$DA:41D9,$DA:42C1,233,gfxpack,gfx/SprTilesPack_073.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_074,$DA:42C2,$DA:434F,142,gfxpack,gfx/SprTilesPack_074.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_075,$DA:4350,$DA:43D0,129,gfxpack,gfx/SprTilesPack_075.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_076,$DA:43D1,$DA:4452,130,gfxpack,gfx/SprTilesPack_076.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_044,$DA:4453,$DA:47F9,935,gfxpack,gfx/SprTilesPack_044.png,lz12 -> 1184 B; 4bpp 37 tiles
+SprTilesPack_045,$DA:47FA,$DA:4AED,756,gfxpack,gfx/SprTilesPack_045.png,lz12 -> 800 B; 4bpp 25 tiles
+SprTilesPack_031,$DA:4AEE,$DA:50CF,1506,gfxpack,gfx/SprTilesPack_031.png,lz12 -> 1600 B; 4bpp 50 tiles
+SprTilesPack_128,$DA:50D0,$DA:58A3,2004,gfxpack,gfx/SprTilesPack_128.png,lz12 -> 2304 B; 4bpp 72 tiles
+SprTilesPack_040,$DA:58A4,$DA:617F,2268,gfxpack,gfx/SprTilesPack_040.png,lz12 -> 2432 B; 4bpp 76 tiles
+SprTilesPack_041,$DA:6180,$DA:66C3,1348,gfxpack,gfx/SprTilesPack_041.png,lz12 -> 1504 B; 4bpp 47 tiles
+SprTilesPack_129,$DA:66C4,$DA:68A0,477,gfxpack,gfx/SprTilesPack_129.png,lz12 -> 576 B; 4bpp 18 tiles
+SprTilesPack_046,$DA:68A1,$DA:6932,146,gfxpack,gfx/SprTilesPack_046.png,lz12 -> 256 B; 4bpp 8 tiles
+SprTilesPack_042,$DA:6933,$DA:6DD6,1188,gfxpack,gfx/SprTilesPack_042.png,lz12 -> 1376 B; 4bpp 43 tiles
+SprTilesPack_130,$DA:6DD7,$DA:7654,2174,gfxpack,gfx/SprTilesPack_130.png,lz12 -> 2496 B; 4bpp 78 tiles
+SprTilesPack_131,$DA:7655,$DA:7D2E,1754,gfxpack,gfx/SprTilesPack_131.png,lz12 -> 2016 B; 4bpp 63 tiles
+SprTilesPack_132,$DA:7D2F,$DA:8063,821,gfxpack,gfx/SprTilesPack_132.png,lz12 -> 1088 B; 4bpp 34 tiles
+SprTilesPack_134,$DA:8064,$DA:8455,1010,gfxpack,gfx/SprTilesPack_134.png,lz12 -> 1760 B; 4bpp 55 tiles
+SprTilesPack_136,$DA:8456,$DA:8A9F,1610,gfxpack,gfx/SprTilesPack_136.png,lz12 -> 1952 B; 4bpp 61 tiles
+SprTilesPack_135,$DA:8AA0,$DA:9255,1974,gfxpack,gfx/SprTilesPack_135.png,lz12 -> 2336 B; 4bpp 73 tiles
+SprTilesPack_037,$DA:9256,$DA:A107,3762,gfxpack,gfx/SprTilesPack_037.png,lz12 -> 4480 B; 4bpp 140 tiles
+SprTilesPack_137,$DA:A108,$DA:A5D2,1227,gfxpack,gfx/SprTilesPack_137.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_147,$DA:A5D3,$DA:A97E,940,gfxpack,gfx/SprTilesPack_147.png,lz12 -> 928 B; 4bpp 29 tiles
+SprTilesPack_148,$DA:A97F,$DA:BA14,4246,gfxpack,gfx/SprTilesPack_148.png,lz12 -> 4992 B; 4bpp 156 tiles
+SprTilesPack_149,$DA:BA15,$DA:BAAC,152,gfxpack,gfx/SprTilesPack_149.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_150,$DA:BAAD,$DA:BE52,934,gfxpack,gfx/SprTilesPack_150.png,lz12 -> 1152 B; 4bpp 36 tiles
+SprTilesPack_151,$DA:BE53,$DA:BF4F,253,gfxpack,gfx/SprTilesPack_151.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_152,$DA:BF50,$DA:BFF0,161,gfxpack,gfx/SprTilesPack_152.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_157,$DA:BFF1,$DA:C1BD,461,gfxpack,gfx/SprTilesPack_157.png,lz12 -> 512 B; 4bpp 16 tiles
+SprTilesPack_153,$DA:C1BE,$DA:C266,169,gfxpack,gfx/SprTilesPack_153.png,lz12 -> 288 B; 4bpp 9 tiles
+SprTilesPack_156,$DA:C267,$DA:C322,188,gfxpack,gfx/SprTilesPack_156.png,lz12 -> 608 B; 4bpp 19 tiles
+SprTilesPack_158,$DA:C323,$DA:CF28,3078,gfxpack,gfx/SprTilesPack_158.png,lz12 -> 4096 B; 4bpp 128 tiles
+SprTilesPack_159,$DA:CF29,$DA:D037,271,gfxpack,gfx/SprTilesPack_159.png,lz12 -> 576 B; 4bpp 18 tiles
+SprTilesPack_160,$DA:D038,$DA:D0C2,139,gfxpack,gfx/SprTilesPack_160.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_168,$DA:D0C3,$DA:D28B,457,gfxpack,gfx/SprTilesPack_168.png,lz12 -> 960 B; 4bpp 30 tiles
+SprTilesPack_174,$DA:D28C,$DA:D2B2,39,gfxpack,gfx/SprTilesPack_174.png,lz12 -> 128 B; 4bpp 4 tiles
+SprTilesPack_169,$DA:D2B3,$DA:D36F,189,gfxpack,gfx/SprTilesPack_169.png,lz12 -> 224 B; 4bpp 7 tiles
+SprTilesPack_175,$DA:D370,$DA:D6DD,878,gfxpack,gfx/SprTilesPack_175.png,lz12 -> 1216 B; 4bpp 38 tiles
+SprTilesPack_178,$DA:D6DE,$DA:D806,297,gfxpack,gfx/SprTilesPack_178.png,lz12 -> 448 B; 4bpp 14 tiles
+SprTilesPack_186,$DA:D807,$DA:D859,83,gfxpack,gfx/SprTilesPack_186.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_188,$DA:D85A,$DA:D8A6,77,gfxpack,gfx/SprTilesPack_188.png,lz12 -> 192 B; 4bpp 6 tiles
+SprTilesPack_211,$DA:D8A7,$DA:DC27,897,gfxpack,gfx/SprTilesPack_211.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_226,$DA:DC28,$DA:E04D,1062,gfxpack,gfx/SprTilesPack_226.png,lz12 -> 1312 B; 4bpp 41 tiles
+SprTilesPack_163,$DA:E04E,$DA:E532,1253,gfxpack,gfx/SprTilesPack_163.png,lz12 -> 1664 B; 4bpp 52 tiles
+SprTilesPack_224,$DA:E533,$DA:E877,837,gfxpack,gfx/SprTilesPack_224.png,lz12 -> 1216 B; 4bpp 38 tiles
+SprTilesPack_225,$DA:E878,$DA:F75A,3811,gfxpack,gfx/SprTilesPack_225.png,lz12 -> 5440 B; 4bpp 170 tiles
+SprTilesPack_231,$DA:F75B,$DA:F7AA,80,gfxpack,gfx/SprTilesPack_231.png,lz12 -> 160 B; 4bpp 5 tiles
+SprTilesPack_232,$DA:F7AB,$DA:F847,157,gfxpack,gfx/SprTilesPack_232.png,lz12 -> 256 B; 4bpp 8 tiles
+SprTilesPack_234,$DA:F848,$DA:FA68,545,gfxpack,gfx/SprTilesPack_234.png,lz12 -> 736 B; 4bpp 23 tiles
+SprTilesPack_237,$DA:FA69,$DA:FC28,448,gfxpack,gfx/SprTilesPack_237.png,lz12 -> 544 B; 4bpp 17 tiles
 Padding_DAFC29,$DA:FC29,$DA:FFFF,983,fill,,$00
 EvtPack_023,$DB:0000,$DB:00DA,219,events,events/EvtPack_023.evt,lz11 -> 243 B
 EvtPack_024,$DB:00DB,$DB:00FD,35,events,events/EvtPack_024.evt,lz11 -> 109 B
@@ -1009,54 +1009,54 @@ Text_DEFB00,$DE:FB00,$DE:FD00,513,text,text/Dictionary.txt,dict
 Padding_DEFD01,$DE:FD01,$DE:FEFF,511,fill,,$00
 Text_DEFF00,$DE:FF00,$DE:FF52,83,text,text/TreasureMessages.txt,strtable
 Padding_DEFF53,$DE:FF53,$DE:FFFF,173,fill,,$00
-SprTilesPack_123,$DF:0000,$DF:2032,8243,packed,packed_lz/SprTilesPack_123.bin,lz12 -> 11392 B
-SprTilesPack_124,$DF:2033,$DF:2922,2288,packed,packed_lz/SprTilesPack_124.bin,lz12 -> 2944 B
-SprTilesPack_133,$DF:2923,$DF:4463,6977,packed,packed_lz/SprTilesPack_133.bin,lz12 -> 8512 B
-SprTilesPack_139,$DF:4464,$DF:6612,8623,packed,packed_lz/SprTilesPack_139.bin,lz12 -> 10528 B
-SprTilesPack_140,$DF:6613,$DF:853A,7976,packed,packed_lz/SprTilesPack_140.bin,lz12 -> 8832 B
-SprTilesPack_141,$DF:853B,$DF:9670,4406,packed,packed_lz/SprTilesPack_141.bin,lz12 -> 4768 B
-SprTilesPack_142,$DF:9671,$DF:A7FF,4495,packed,packed_lz/SprTilesPack_142.bin,lz12 -> 5664 B
-SprTilesPack_143,$DF:A800,$DF:BE58,5721,packed,packed_lz/SprTilesPack_143.bin,lz12 -> 6656 B
-SprTilesPack_144,$DF:BE59,$DF:BFF5,413,packed,packed_lz/SprTilesPack_144.bin,lz12 -> 512 B
-SprTilesPack_145,$DF:BFF6,$DF:C2C9,724,packed,packed_lz/SprTilesPack_145.bin,lz12 -> 1056 B
-SprTilesPack_146,$DF:C2CA,$DF:CE52,2953,packed,packed_lz/SprTilesPack_146.bin,lz12 -> 4096 B
-SprTilesPack_154,$DF:CE53,$DF:EA2C,7130,packed,packed_lz/SprTilesPack_154.bin,lz12 -> 9280 B
-SprTilesPack_182,$DF:EA2D,$DF:F75C,3376,packed,packed_lz/SprTilesPack_182.bin,lz12 -> 4320 B
-SprTilesPack_176,$DF:F75D,$DF:F912,438,packed,packed_lz/SprTilesPack_176.bin,lz12 -> 544 B
-SprTilesPack_223,$DF:F913,$DF:FB30,542,packed,packed_lz/SprTilesPack_223.bin,lz12 -> 768 B
-SprTilesPack_183,$DF:FB31,$DF:FF74,1092,packed,packed_lz/SprTilesPack_183.bin,lz12 -> 1728 B
+SprTilesPack_123,$DF:0000,$DF:2032,8243,gfxpack,gfx/SprTilesPack_123.png,lz12 -> 11392 B; 4bpp 356 tiles
+SprTilesPack_124,$DF:2033,$DF:2922,2288,gfxpack,gfx/SprTilesPack_124.png,lz12 -> 2944 B; 4bpp 92 tiles
+SprTilesPack_133,$DF:2923,$DF:4463,6977,gfxpack,gfx/SprTilesPack_133.png,lz12 -> 8512 B; 4bpp 266 tiles
+SprTilesPack_139,$DF:4464,$DF:6612,8623,gfxpack,gfx/SprTilesPack_139.png,lz12 -> 10528 B; 4bpp 329 tiles
+SprTilesPack_140,$DF:6613,$DF:853A,7976,gfxpack,gfx/SprTilesPack_140.png,lz12 -> 8832 B; 4bpp 276 tiles
+SprTilesPack_141,$DF:853B,$DF:9670,4406,gfxpack,gfx/SprTilesPack_141.png,lz12 -> 4768 B; 4bpp 149 tiles
+SprTilesPack_142,$DF:9671,$DF:A7FF,4495,gfxpack,gfx/SprTilesPack_142.png,lz12 -> 5664 B; 4bpp 177 tiles
+SprTilesPack_143,$DF:A800,$DF:BE58,5721,gfxpack,gfx/SprTilesPack_143.png,lz12 -> 6656 B; 4bpp 208 tiles
+SprTilesPack_144,$DF:BE59,$DF:BFF5,413,gfxpack,gfx/SprTilesPack_144.png,lz12 -> 512 B; 4bpp 16 tiles
+SprTilesPack_145,$DF:BFF6,$DF:C2C9,724,gfxpack,gfx/SprTilesPack_145.png,lz12 -> 1056 B; 4bpp 33 tiles
+SprTilesPack_146,$DF:C2CA,$DF:CE52,2953,gfxpack,gfx/SprTilesPack_146.png,lz12 -> 4096 B; 4bpp 128 tiles
+SprTilesPack_154,$DF:CE53,$DF:EA2C,7130,gfxpack,gfx/SprTilesPack_154.png,lz12 -> 9280 B; 4bpp 290 tiles
+SprTilesPack_182,$DF:EA2D,$DF:F75C,3376,gfxpack,gfx/SprTilesPack_182.png,lz12 -> 4320 B; 4bpp 135 tiles
+SprTilesPack_176,$DF:F75D,$DF:F912,438,gfxpack,gfx/SprTilesPack_176.png,lz12 -> 544 B; 4bpp 17 tiles
+SprTilesPack_223,$DF:F913,$DF:FB30,542,gfxpack,gfx/SprTilesPack_223.png,lz12 -> 768 B; 4bpp 24 tiles
+SprTilesPack_183,$DF:FB31,$DF:FF74,1092,gfxpack,gfx/SprTilesPack_183.png,lz12 -> 1728 B; 4bpp 54 tiles
 Unknown_DFFF75,$DF:FF75,$DF:FF75,1,extracted,unknown/Unknown_DFFF75.bin,
 Padding_DFFF76,$DF:FF76,$DF:FFFF,138,fill,,$00
-SprTilesPack_170,$E0:0000,$E0:0EBC,3773,packed,packed_lz/SprTilesPack_170.bin,lz12 -> 5024 B
-SprTilesPack_171,$E0:0EBD,$E0:1E2D,3953,packed,packed_lz/SprTilesPack_171.bin,lz12 -> 4384 B
-SprTilesPack_172,$E0:1E2E,$E0:2187,858,packed,packed_lz/SprTilesPack_172.bin,lz12 -> 1216 B
-SprTilesPack_161,$E0:2188,$E0:2564,989,packed,packed_lz/SprTilesPack_161.bin,lz12 -> 1248 B
-SprTilesPack_162,$E0:2565,$E0:332B,3527,packed,packed_lz/SprTilesPack_162.bin,lz12 -> 4992 B
+SprTilesPack_170,$E0:0000,$E0:0EBC,3773,gfxpack,gfx/SprTilesPack_170.png,lz12 -> 5024 B; 4bpp 157 tiles
+SprTilesPack_171,$E0:0EBD,$E0:1E2D,3953,gfxpack,gfx/SprTilesPack_171.png,lz12 -> 4384 B; 4bpp 137 tiles
+SprTilesPack_172,$E0:1E2E,$E0:2187,858,gfxpack,gfx/SprTilesPack_172.png,lz12 -> 1216 B; 4bpp 38 tiles
+SprTilesPack_161,$E0:2188,$E0:2564,989,gfxpack,gfx/SprTilesPack_161.png,lz12 -> 1248 B; 4bpp 39 tiles
+SprTilesPack_162,$E0:2565,$E0:332B,3527,gfxpack,gfx/SprTilesPack_162.png,lz12 -> 4992 B; 4bpp 156 tiles
 Pack_E0332C,$E0:332C,$E0:34E1,438,packed,packed_lz/Pack_E0332C.bin,lz12 -> 544 B
-SprTilesPack_177,$E0:34E2,$E0:3E6E,2445,packed,packed_lz/SprTilesPack_177.bin,lz12 -> 2624 B
-SprTilesPack_181,$E0:3E6F,$E0:60EC,8830,packed,packed_lz/SprTilesPack_181.bin,lz12 -> 10976 B
-SprTilesPack_166,$E0:60ED,$E0:847D,9105,packed,packed_lz/SprTilesPack_166.bin,lz12 -> 12384 B
-SprTilesPack_184,$E0:847E,$E0:8D73,2294,packed,packed_lz/SprTilesPack_184.bin,lz12 -> 3200 B
-SprTilesPack_185,$E0:8D74,$E0:A3FC,5769,packed,packed_lz/SprTilesPack_185.bin,lz12 -> 7296 B
-SprTilesPack_192,$E0:A3FD,$E0:CECB,10959,packed,packed_lz/SprTilesPack_192.bin,lz12 -> 11968 B
-SprTilesPack_197,$E0:CECC,$E0:D084,441,packed,packed_lz/SprTilesPack_197.bin,lz12 -> 640 B
-SprTilesPack_203,$E0:D085,$E0:F359,8917,packed,packed_lz/SprTilesPack_203.bin,lz12 -> 12288 B
-SprTilesPack_216,$E0:F35A,$E0:FD92,2617,packed,packed_lz/SprTilesPack_216.bin,lz12 -> 3264 B
+SprTilesPack_177,$E0:34E2,$E0:3E6E,2445,gfxpack,gfx/SprTilesPack_177.png,lz12 -> 2624 B; 4bpp 82 tiles
+SprTilesPack_181,$E0:3E6F,$E0:60EC,8830,gfxpack,gfx/SprTilesPack_181.png,lz12 -> 10976 B; 4bpp 343 tiles
+SprTilesPack_166,$E0:60ED,$E0:847D,9105,gfxpack,gfx/SprTilesPack_166.png,lz12 -> 12384 B; 4bpp 387 tiles
+SprTilesPack_184,$E0:847E,$E0:8D73,2294,gfxpack,gfx/SprTilesPack_184.png,lz12 -> 3200 B; 4bpp 100 tiles
+SprTilesPack_185,$E0:8D74,$E0:A3FC,5769,gfxpack,gfx/SprTilesPack_185.png,lz12 -> 7296 B; 4bpp 228 tiles
+SprTilesPack_192,$E0:A3FD,$E0:CECB,10959,gfxpack,gfx/SprTilesPack_192.png,lz12 -> 11968 B; 4bpp 374 tiles
+SprTilesPack_197,$E0:CECC,$E0:D084,441,gfxpack,gfx/SprTilesPack_197.png,lz12 -> 640 B; 4bpp 20 tiles
+SprTilesPack_203,$E0:D085,$E0:F359,8917,gfxpack,gfx/SprTilesPack_203.png,lz12 -> 12288 B; 4bpp 384 tiles
+SprTilesPack_216,$E0:F35A,$E0:FD92,2617,gfxpack,gfx/SprTilesPack_216.png,lz12 -> 3264 B; 4bpp 102 tiles
 Pack_E0FD93,$E0:FD93,$E0:FF4B,441,packed,packed_lz/Pack_E0FD93.bin,lz12 -> 640 B
 Unknown_E0FF4C,$E0:FF4C,$E0:FF4C,1,extracted,unknown/Unknown_E0FF4C.bin,
 Padding_E0FF4D,$E0:FF4D,$E0:FFFF,179,fill,,$00
-SprTilesPack_229,$E1:0000,$E1:00A9,170,packed,packed_lz/SprTilesPack_229.bin,lz12 -> 192 B
-SprTilesPack_208,$E1:00AA,$E1:25D7,9518,packed,packed_lz/SprTilesPack_208.bin,lz12 -> 11296 B
-SprTilesPack_209,$E1:25D8,$E1:4AF6,9503,packed,packed_lz/SprTilesPack_209.bin,lz12 -> 11296 B
-SprTilesPack_214,$E1:4AF7,$E1:9318,18466,packed,packed_lz/SprTilesPack_214.bin,lz12 -> 23776 B
-SprTilesPack_193,$E1:9319,$E1:9994,1660,packed,packed_lz/SprTilesPack_193.bin,lz12 -> 2176 B
-SprTilesPack_034,$E1:9995,$E1:B7AB,7703,packed,packed_lz/SprTilesPack_034.bin,lz12 -> 10080 B
-SprTilesPack_213,$E1:B7AC,$E1:BF3D,1938,packed,packed_lz/SprTilesPack_213.bin,lz12 -> 2048 B
-SprTilesPack_217,$E1:BF3E,$E1:C12E,497,packed,packed_lz/SprTilesPack_217.bin,lz12 -> 608 B
-SprTilesPack_219,$E1:C12F,$E1:C4D8,938,packed,packed_lz/SprTilesPack_219.bin,lz12 -> 1184 B
-SprTilesPack_220,$E1:C4D9,$E1:C711,569,packed,packed_lz/SprTilesPack_220.bin,lz12 -> 832 B
-SprTilesPack_233,$E1:C712,$E1:D320,3087,packed,packed_lz/SprTilesPack_233.bin,lz12 -> 3552 B
-SprTilesPack_235,$E1:D321,$E1:DDB1,2705,packed,packed_lz/SprTilesPack_235.bin,lz12 -> 3104 B
+SprTilesPack_229,$E1:0000,$E1:00A9,170,gfxpack,gfx/SprTilesPack_229.png,lz12 -> 192 B; 4bpp 6 tiles
+SprTilesPack_208,$E1:00AA,$E1:25D7,9518,gfxpack,gfx/SprTilesPack_208.png,lz12 -> 11296 B; 4bpp 353 tiles
+SprTilesPack_209,$E1:25D8,$E1:4AF6,9503,gfxpack,gfx/SprTilesPack_209.png,lz12 -> 11296 B; 4bpp 353 tiles
+SprTilesPack_214,$E1:4AF7,$E1:9318,18466,gfxpack,gfx/SprTilesPack_214.png,lz12 -> 23776 B; 4bpp 743 tiles
+SprTilesPack_193,$E1:9319,$E1:9994,1660,gfxpack,gfx/SprTilesPack_193.png,lz12 -> 2176 B; 4bpp 68 tiles
+SprTilesPack_034,$E1:9995,$E1:B7AB,7703,gfxpack,gfx/SprTilesPack_034.png,lz12 -> 10080 B; 4bpp 315 tiles
+SprTilesPack_213,$E1:B7AC,$E1:BF3D,1938,gfxpack,gfx/SprTilesPack_213.png,lz12 -> 2048 B; 4bpp 64 tiles
+SprTilesPack_217,$E1:BF3E,$E1:C12E,497,gfxpack,gfx/SprTilesPack_217.png,lz12 -> 608 B; 4bpp 19 tiles
+SprTilesPack_219,$E1:C12F,$E1:C4D8,938,gfxpack,gfx/SprTilesPack_219.png,lz12 -> 1184 B; 4bpp 37 tiles
+SprTilesPack_220,$E1:C4D9,$E1:C711,569,gfxpack,gfx/SprTilesPack_220.png,lz12 -> 832 B; 4bpp 26 tiles
+SprTilesPack_233,$E1:C712,$E1:D320,3087,gfxpack,gfx/SprTilesPack_233.png,lz12 -> 3552 B; 4bpp 111 tiles
+SprTilesPack_235,$E1:D321,$E1:DDB1,2705,gfxpack,gfx/SprTilesPack_235.png,lz12 -> 3104 B; 4bpp 97 tiles
 Unknown_E1DDB2,$E1:DDB2,$E1:DDB2,1,extracted,unknown/Unknown_E1DDB2.bin,
 Padding_E1DDB3,$E1:DDB3,$E1:DDFF,77,fill,,$00
 BattleRom_EnemyKindList,$E1:DE00,$E1:DE2B,44,extracted,table/BattleRom_EnemyKindList.bin,
@@ -1064,25 +1064,25 @@ Padding_E1DE2C,$E1:DE2C,$E1:DE7F,84,fill,,$00
 BattleRom_UnkE1DE80,$E1:DE80,$E1:DF7A,251,extracted,table/BattleRom_UnkE1DE80.bin,
 Padding_E1DF7B,$E1:DF7B,$E1:DFFF,133,fill,,$00
 SprLayout_E1E000,$E1:E000,$E1:FFFF,8192,extracted,sprite_layout/SprLayout_E1E000.bin,
-LocGfxPack_181,$E2:0000,$E2:0C1D,3102,packed,packed_lz/LocGfxPack_181.bin,lz12 -> 4096 B
-LocGfxPack_182,$E2:0C1E,$E2:17E9,3020,packed,packed_lz/LocGfxPack_182.bin,lz12 -> 4096 B
-LocGfxPack_183,$E2:17EA,$E2:2581,3480,packed,packed_lz/LocGfxPack_183.bin,lz12 -> 4096 B
-LocGfxPack_184,$E2:2582,$E2:3403,3714,packed,packed_lz/LocGfxPack_184.bin,lz12 -> 4096 B
-LocGfxPack_185,$E2:3404,$E2:4078,3189,packed,packed_lz/LocGfxPack_185.bin,lz12 -> 4096 B
-LocGfxPack_186,$E2:4079,$E2:4B98,2848,packed,packed_lz/LocGfxPack_186.bin,lz12 -> 4096 B
-LocGfxPack_187,$E2:4B99,$E2:5844,3244,packed,packed_lz/LocGfxPack_187.bin,lz12 -> 4096 B
-LocGfxPack_188,$E2:5845,$E2:66E0,3740,packed,packed_lz/LocGfxPack_188.bin,lz12 -> 4096 B
-LocGfxPack_189,$E2:66E1,$E2:74B0,3536,packed,packed_lz/LocGfxPack_189.bin,lz12 -> 4096 B
-LocGfxPack_190,$E2:74B1,$E2:84DE,4142,packed,packed_lz/LocGfxPack_190.bin,lz12 -> 4096 B
-LocGfxPack_191,$E2:84DF,$E2:92C6,3560,packed,packed_lz/LocGfxPack_191.bin,lz12 -> 4096 B
-LocGfxPack_192,$E2:92C7,$E2:A1D9,3859,packed,packed_lz/LocGfxPack_192.bin,lz12 -> 4096 B
-LocGfxPack_193,$E2:A1DA,$E2:B003,3626,packed,packed_lz/LocGfxPack_193.bin,lz12 -> 4096 B
-LocGfxPack_194,$E2:B004,$E2:BDD8,3541,packed,packed_lz/LocGfxPack_194.bin,lz12 -> 4096 B
-LocGfxPack_195,$E2:BDD9,$E2:CB39,3425,packed,packed_lz/LocGfxPack_195.bin,lz12 -> 4096 B
-LocGfxPack_196,$E2:CB3A,$E2:D737,3070,packed,packed_lz/LocGfxPack_196.bin,lz12 -> 4096 B
-LocGfxPack_197,$E2:D738,$E2:E753,4124,packed,packed_lz/LocGfxPack_197.bin,lz12 -> 4096 B
-LocGfxPack_198,$E2:E754,$E2:F261,2830,packed,packed_lz/LocGfxPack_198.bin,lz12 -> 4096 B
-LocGfxPack_199,$E2:F262,$E2:FE45,3044,packed,packed_lz/LocGfxPack_199.bin,lz12 -> 4096 B
+LocGfxPack_181,$E2:0000,$E2:0C1D,3102,gfxpack,gfx/LocGfxPack_181.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_182,$E2:0C1E,$E2:17E9,3020,gfxpack,gfx/LocGfxPack_182.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_183,$E2:17EA,$E2:2581,3480,gfxpack,gfx/LocGfxPack_183.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_184,$E2:2582,$E2:3403,3714,gfxpack,gfx/LocGfxPack_184.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_185,$E2:3404,$E2:4078,3189,gfxpack,gfx/LocGfxPack_185.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_186,$E2:4079,$E2:4B98,2848,gfxpack,gfx/LocGfxPack_186.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_187,$E2:4B99,$E2:5844,3244,gfxpack,gfx/LocGfxPack_187.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_188,$E2:5845,$E2:66E0,3740,gfxpack,gfx/LocGfxPack_188.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_189,$E2:66E1,$E2:74B0,3536,gfxpack,gfx/LocGfxPack_189.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_190,$E2:74B1,$E2:84DE,4142,gfxpack,gfx/LocGfxPack_190.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_191,$E2:84DF,$E2:92C6,3560,gfxpack,gfx/LocGfxPack_191.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_192,$E2:92C7,$E2:A1D9,3859,gfxpack,gfx/LocGfxPack_192.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_193,$E2:A1DA,$E2:B003,3626,gfxpack,gfx/LocGfxPack_193.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_194,$E2:B004,$E2:BDD8,3541,gfxpack,gfx/LocGfxPack_194.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_195,$E2:BDD9,$E2:CB39,3425,gfxpack,gfx/LocGfxPack_195.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_196,$E2:CB3A,$E2:D737,3070,gfxpack,gfx/LocGfxPack_196.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_197,$E2:D738,$E2:E753,4124,gfxpack,gfx/LocGfxPack_197.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_198,$E2:E754,$E2:F261,2830,gfxpack,gfx/LocGfxPack_198.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_199,$E2:F262,$E2:FE45,3044,gfxpack,gfx/LocGfxPack_199.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E2FE46,$E2:FE46,$E2:FFFF,442,fill,,$00
 SprLayout_E30000,$E3:0000,$E3:FFFF,65536,extracted,sprite_layout/SprLayout_E30000.bin,
 Table_E40000,$E4:0000,$E4:1FFF,8192,extracted,table/Table_E40000.bin,
@@ -1101,184 +1101,184 @@ Padding_E4FFEE,$E4:FFEE,$E4:FFFF,18,fill,,$00
 ExitRom_LocOfs,$E5:0000,$E5:0401,1026,records,records/ExitRom_LocOfs.tsv,table 513 x 2 B
 MapData_E50402,$E5:0402,$E5:1A43,5698,records,records/MapData_E50402.tsv,map 814 x 7 B
 Padding_E51A44,$E5:1A44,$E5:1FFF,1468,fill,,$00
-LocGfxPack_000,$E5:2000,$E5:2361,866,packed,packed_lz/LocGfxPack_000.bin,lz12 -> 3968 B
-LocGfxPack_001,$E5:2362,$E5:26B8,855,packed,packed_lz/LocGfxPack_001.bin,lz12 -> 3968 B
-LocGfxPack_002,$E5:26B9,$E5:2A1A,866,packed,packed_lz/LocGfxPack_002.bin,lz12 -> 3968 B
+LocGfxPack_000,$E5:2000,$E5:2361,866,gfxpack,gfx/LocGfxPack_000.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_001,$E5:2362,$E5:26B8,855,gfxpack,gfx/LocGfxPack_001.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_002,$E5:26B9,$E5:2A1A,866,gfxpack,gfx/LocGfxPack_002.png,lz12 -> 3968 B; 2bpp 248 tiles
 LocGfxPack_003,$E5:2A1B,$E5:2D12,760,packed,packed_lz/LocGfxPack_003.bin,lz12 -> 3072 B
-LocGfxPack_004,$E5:2D13,$E5:3226,1300,packed,packed_lz/LocGfxPack_004.bin,lz12 -> 3072 B
-LocGfxPack_005,$E5:3227,$E5:36BC,1174,packed,packed_lz/LocGfxPack_005.bin,lz12 -> 3968 B
-LocGfxPack_006,$E5:36BD,$E5:3C20,1380,packed,packed_lz/LocGfxPack_006.bin,lz12 -> 3072 B
-LocGfxPack_007,$E5:3C21,$E5:452E,2318,packed,packed_lz/LocGfxPack_007.bin,lz12 -> 3968 B
-LocGfxPack_008,$E5:452F,$E5:49DB,1197,packed,packed_lz/LocGfxPack_008.bin,lz12 -> 3072 B
-LocGfxPack_009,$E5:49DC,$E5:4D0D,818,packed,packed_lz/LocGfxPack_009.bin,lz12 -> 3968 B
-LocGfxPack_010,$E5:4D0E,$E5:4F45,568,packed,packed_lz/LocGfxPack_010.bin,lz12 -> 3968 B
-LocGfxPack_011,$E5:4F46,$E5:5272,813,packed,packed_lz/LocGfxPack_011.bin,lz12 -> 3968 B
-LocGfxPack_012,$E5:5273,$E5:5A3B,1993,packed,packed_lz/LocGfxPack_012.bin,lz12 -> 3072 B
-LocGfxPack_013,$E5:5A3C,$E5:6103,1736,packed,packed_lz/LocGfxPack_013.bin,lz12 -> 3968 B
-LocGfxPack_014,$E5:6104,$E5:6155,82,packed,packed_lz/LocGfxPack_014.bin,lz12 -> 256 B
-LocGfxPack_015,$E5:6156,$E5:66EB,1430,packed,packed_lz/LocGfxPack_015.bin,lz12 -> 3968 B
-LocGfxPack_016,$E5:66EC,$E5:69BF,724,packed,packed_lz/LocGfxPack_016.bin,lz12 -> 3968 B
-LocGfxPack_017,$E5:69C0,$E5:6F48,1417,packed,packed_lz/LocGfxPack_017.bin,lz12 -> 3968 B
-LocGfxPack_018,$E5:6F49,$E5:7CBE,3446,packed,packed_lz/LocGfxPack_018.bin,lz12 -> 3968 B
+LocGfxPack_004,$E5:2D13,$E5:3226,1300,gfxpack,gfx/LocGfxPack_004.png,lz12 -> 3072 B; 2bpp 192 tiles
+LocGfxPack_005,$E5:3227,$E5:36BC,1174,gfxpack,gfx/LocGfxPack_005.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_006,$E5:36BD,$E5:3C20,1380,gfxpack,gfx/LocGfxPack_006.png,lz12 -> 3072 B; 2bpp 192 tiles
+LocGfxPack_007,$E5:3C21,$E5:452E,2318,gfxpack,gfx/LocGfxPack_007.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_008,$E5:452F,$E5:49DB,1197,gfxpack,gfx/LocGfxPack_008.png,lz12 -> 3072 B; 2bpp 192 tiles
+LocGfxPack_009,$E5:49DC,$E5:4D0D,818,gfxpack,gfx/LocGfxPack_009.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_010,$E5:4D0E,$E5:4F45,568,gfxpack,gfx/LocGfxPack_010.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_011,$E5:4F46,$E5:5272,813,gfxpack,gfx/LocGfxPack_011.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_012,$E5:5273,$E5:5A3B,1993,gfxpack,gfx/LocGfxPack_012.png,lz12 -> 3072 B; 2bpp 192 tiles
+LocGfxPack_013,$E5:5A3C,$E5:6103,1736,gfxpack,gfx/LocGfxPack_013.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_014,$E5:6104,$E5:6155,82,gfxpack,gfx/LocGfxPack_014.png,lz12 -> 256 B; 2bpp 16 tiles
+LocGfxPack_015,$E5:6156,$E5:66EB,1430,gfxpack,gfx/LocGfxPack_015.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_016,$E5:66EC,$E5:69BF,724,gfxpack,gfx/LocGfxPack_016.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_017,$E5:69C0,$E5:6F48,1417,gfxpack,gfx/LocGfxPack_017.png,lz12 -> 3968 B; 2bpp 248 tiles
+LocGfxPack_018,$E5:6F49,$E5:7CBE,3446,gfxpack,gfx/LocGfxPack_018.png,lz12 -> 3968 B; 2bpp 248 tiles
 LocGfxPack_019,$E5:7CBF,$E5:9596,6360,packed,packed_lz/LocGfxPack_019.bin,lz12 -> 8192 B
 LocGfxPack_020,$E5:9597,$E5:9935,927,packed,packed_lz/LocGfxPack_020.bin,lz12 -> 4096 B
 LocGfxPack_021,$E5:9936,$E5:AB41,4620,packed,packed_lz/LocGfxPack_021.bin,lz12 -> 8192 B
 LocGfxPack_022,$E5:AB42,$E5:B8D6,3477,packed,packed_lz/LocGfxPack_022.bin,lz12 -> 8192 B
 LocGfxPack_023,$E5:B8D7,$E5:CC22,4940,packed,packed_lz/LocGfxPack_023.bin,lz12 -> 8192 B
 LocGfxPack_024,$E5:CC23,$E5:D3A7,1925,packed,packed_lz/LocGfxPack_024.bin,lz12 -> 8192 B
-LocGfxPack_025,$E5:D3A8,$E5:DE38,2705,packed,packed_lz/LocGfxPack_025.bin,lz12 -> 4096 B
-LocGfxPack_026,$E5:DE39,$E5:EB9B,3427,packed,packed_lz/LocGfxPack_026.bin,lz12 -> 4096 B
-LocGfxPack_027,$E5:EB9C,$E5:F9B3,3608,packed,packed_lz/LocGfxPack_027.bin,lz12 -> 4096 B
-LocGfxPack_028,$E5:F9B4,$E5:FB9F,492,packed,packed_lz/LocGfxPack_028.bin,lz12 -> 4096 B
+LocGfxPack_025,$E5:D3A8,$E5:DE38,2705,gfxpack,gfx/LocGfxPack_025.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_026,$E5:DE39,$E5:EB9B,3427,gfxpack,gfx/LocGfxPack_026.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_027,$E5:EB9C,$E5:F9B3,3608,gfxpack,gfx/LocGfxPack_027.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_028,$E5:F9B4,$E5:FB9F,492,gfxpack,gfx/LocGfxPack_028.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E5FBA0,$E5:FBA0,$E5:FFFF,1120,fill,,$00
-LocGfxPack_029,$E6:0000,$E6:0C85,3206,packed,packed_lz/LocGfxPack_029.bin,lz12 -> 4096 B
-LocGfxPack_030,$E6:0C86,$E6:1501,2172,packed,packed_lz/LocGfxPack_030.bin,lz12 -> 4096 B
+LocGfxPack_029,$E6:0000,$E6:0C85,3206,gfxpack,gfx/LocGfxPack_029.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_030,$E6:0C86,$E6:1501,2172,gfxpack,gfx/LocGfxPack_030.png,lz12 -> 4096 B; 4bpp 128 tiles
 LocGfxPack_031,$E6:1502,$E6:2081,2944,packed,packed_lz/LocGfxPack_031.bin,lz12 -> 4096 B
-LocGfxPack_032,$E6:2082,$E6:29C8,2375,packed,packed_lz/LocGfxPack_032.bin,lz12 -> 4096 B
-LocGfxPack_033,$E6:29C9,$E6:360E,3142,packed,packed_lz/LocGfxPack_033.bin,lz12 -> 4096 B
-LocGfxPack_034,$E6:360F,$E6:45A2,3988,packed,packed_lz/LocGfxPack_034.bin,lz12 -> 4096 B
-LocGfxPack_035,$E6:45A3,$E6:553A,3992,packed,packed_lz/LocGfxPack_035.bin,lz12 -> 4096 B
-LocGfxPack_036,$E6:553B,$E6:62CE,3476,packed,packed_lz/LocGfxPack_036.bin,lz12 -> 4096 B
-LocGfxPack_037,$E6:62CF,$E6:6B76,2216,packed,packed_lz/LocGfxPack_037.bin,lz12 -> 4096 B
-LocGfxPack_038,$E6:6B77,$E6:77F1,3195,packed,packed_lz/LocGfxPack_038.bin,lz12 -> 4096 B
-LocGfxPack_039,$E6:77F2,$E6:86D3,3810,packed,packed_lz/LocGfxPack_039.bin,lz12 -> 4096 B
-LocGfxPack_040,$E6:86D4,$E6:9340,3181,packed,packed_lz/LocGfxPack_040.bin,lz12 -> 4096 B
-LocGfxPack_041,$E6:9341,$E6:A257,3863,packed,packed_lz/LocGfxPack_041.bin,lz12 -> 4096 B
-LocGfxPack_042,$E6:A258,$E6:AF6A,3347,packed,packed_lz/LocGfxPack_042.bin,lz12 -> 4096 B
-LocGfxPack_043,$E6:AF6B,$E6:BE35,3787,packed,packed_lz/LocGfxPack_043.bin,lz12 -> 4096 B
-LocGfxPack_044,$E6:BE36,$E6:CBA7,3442,packed,packed_lz/LocGfxPack_044.bin,lz12 -> 4096 B
-LocGfxPack_045,$E6:CBA8,$E6:DAF9,3922,packed,packed_lz/LocGfxPack_045.bin,lz12 -> 4096 B
-LocGfxPack_046,$E6:DAFA,$E6:EA90,3991,packed,packed_lz/LocGfxPack_046.bin,lz12 -> 4096 B
-LocGfxPack_047,$E6:EA91,$E6:F7C5,3381,packed,packed_lz/LocGfxPack_047.bin,lz12 -> 4096 B
-LocGfxPack_048,$E6:F7C6,$E6:FEF8,1843,packed,packed_lz/LocGfxPack_048.bin,lz12 -> 4096 B
+LocGfxPack_032,$E6:2082,$E6:29C8,2375,gfxpack,gfx/LocGfxPack_032.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_033,$E6:29C9,$E6:360E,3142,gfxpack,gfx/LocGfxPack_033.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_034,$E6:360F,$E6:45A2,3988,gfxpack,gfx/LocGfxPack_034.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_035,$E6:45A3,$E6:553A,3992,gfxpack,gfx/LocGfxPack_035.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_036,$E6:553B,$E6:62CE,3476,gfxpack,gfx/LocGfxPack_036.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_037,$E6:62CF,$E6:6B76,2216,gfxpack,gfx/LocGfxPack_037.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_038,$E6:6B77,$E6:77F1,3195,gfxpack,gfx/LocGfxPack_038.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_039,$E6:77F2,$E6:86D3,3810,gfxpack,gfx/LocGfxPack_039.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_040,$E6:86D4,$E6:9340,3181,gfxpack,gfx/LocGfxPack_040.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_041,$E6:9341,$E6:A257,3863,gfxpack,gfx/LocGfxPack_041.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_042,$E6:A258,$E6:AF6A,3347,gfxpack,gfx/LocGfxPack_042.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_043,$E6:AF6B,$E6:BE35,3787,gfxpack,gfx/LocGfxPack_043.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_044,$E6:BE36,$E6:CBA7,3442,gfxpack,gfx/LocGfxPack_044.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_045,$E6:CBA8,$E6:DAF9,3922,gfxpack,gfx/LocGfxPack_045.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_046,$E6:DAFA,$E6:EA90,3991,gfxpack,gfx/LocGfxPack_046.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_047,$E6:EA91,$E6:F7C5,3381,gfxpack,gfx/LocGfxPack_047.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_048,$E6:F7C6,$E6:FEF8,1843,gfxpack,gfx/LocGfxPack_048.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E6FEF9,$E6:FEF9,$E6:FFFF,263,fill,,$00
-LocGfxPack_049,$E7:0000,$E7:0C76,3191,packed,packed_lz/LocGfxPack_049.bin,lz12 -> 4096 B
-LocGfxPack_050,$E7:0C77,$E7:1911,3227,packed,packed_lz/LocGfxPack_050.bin,lz12 -> 4096 B
-LocGfxPack_051,$E7:1912,$E7:241D,2828,packed,packed_lz/LocGfxPack_051.bin,lz12 -> 4096 B
-LocGfxPack_052,$E7:241E,$E7:2F65,2888,packed,packed_lz/LocGfxPack_052.bin,lz12 -> 4096 B
-LocGfxPack_053,$E7:2F66,$E7:3D01,3484,packed,packed_lz/LocGfxPack_053.bin,lz12 -> 4096 B
-LocGfxPack_054,$E7:3D02,$E7:4ACA,3529,packed,packed_lz/LocGfxPack_054.bin,lz12 -> 4096 B
-LocGfxPack_055,$E7:4ACB,$E7:5628,2910,packed,packed_lz/LocGfxPack_055.bin,lz12 -> 4096 B
-LocGfxPack_056,$E7:5629,$E7:6184,2908,packed,packed_lz/LocGfxPack_056.bin,lz12 -> 4096 B
-LocGfxPack_057,$E7:6185,$E7:6E05,3201,packed,packed_lz/LocGfxPack_057.bin,lz12 -> 4096 B
-LocGfxPack_058,$E7:6E06,$E7:7AC8,3267,packed,packed_lz/LocGfxPack_058.bin,lz12 -> 4096 B
-LocGfxPack_059,$E7:7AC9,$E7:88AF,3559,packed,packed_lz/LocGfxPack_059.bin,lz12 -> 4096 B
-LocGfxPack_060,$E7:88B0,$E7:96C7,3608,packed,packed_lz/LocGfxPack_060.bin,lz12 -> 4096 B
-LocGfxPack_061,$E7:96C8,$E7:A5B0,3817,packed,packed_lz/LocGfxPack_061.bin,lz12 -> 4096 B
-LocGfxPack_062,$E7:A5B1,$E7:B4A8,3832,packed,packed_lz/LocGfxPack_062.bin,lz12 -> 4096 B
-LocGfxPack_063,$E7:B4A9,$E7:C45D,4021,packed,packed_lz/LocGfxPack_063.bin,lz12 -> 4096 B
-LocGfxPack_064,$E7:C45E,$E7:D32C,3791,packed,packed_lz/LocGfxPack_064.bin,lz12 -> 4096 B
-LocGfxPack_065,$E7:D32D,$E7:E12B,3583,packed,packed_lz/LocGfxPack_065.bin,lz12 -> 4096 B
-LocGfxPack_066,$E7:E12C,$E7:F1B0,4229,packed,packed_lz/LocGfxPack_066.bin,lz12 -> 4096 B
-LocGfxPack_067,$E7:F1B1,$E7:FF08,3416,packed,packed_lz/LocGfxPack_067.bin,lz12 -> 4096 B
+LocGfxPack_049,$E7:0000,$E7:0C76,3191,gfxpack,gfx/LocGfxPack_049.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_050,$E7:0C77,$E7:1911,3227,gfxpack,gfx/LocGfxPack_050.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_051,$E7:1912,$E7:241D,2828,gfxpack,gfx/LocGfxPack_051.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_052,$E7:241E,$E7:2F65,2888,gfxpack,gfx/LocGfxPack_052.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_053,$E7:2F66,$E7:3D01,3484,gfxpack,gfx/LocGfxPack_053.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_054,$E7:3D02,$E7:4ACA,3529,gfxpack,gfx/LocGfxPack_054.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_055,$E7:4ACB,$E7:5628,2910,gfxpack,gfx/LocGfxPack_055.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_056,$E7:5629,$E7:6184,2908,gfxpack,gfx/LocGfxPack_056.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_057,$E7:6185,$E7:6E05,3201,gfxpack,gfx/LocGfxPack_057.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_058,$E7:6E06,$E7:7AC8,3267,gfxpack,gfx/LocGfxPack_058.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_059,$E7:7AC9,$E7:88AF,3559,gfxpack,gfx/LocGfxPack_059.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_060,$E7:88B0,$E7:96C7,3608,gfxpack,gfx/LocGfxPack_060.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_061,$E7:96C8,$E7:A5B0,3817,gfxpack,gfx/LocGfxPack_061.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_062,$E7:A5B1,$E7:B4A8,3832,gfxpack,gfx/LocGfxPack_062.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_063,$E7:B4A9,$E7:C45D,4021,gfxpack,gfx/LocGfxPack_063.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_064,$E7:C45E,$E7:D32C,3791,gfxpack,gfx/LocGfxPack_064.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_065,$E7:D32D,$E7:E12B,3583,gfxpack,gfx/LocGfxPack_065.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_066,$E7:E12C,$E7:F1B0,4229,gfxpack,gfx/LocGfxPack_066.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_067,$E7:F1B1,$E7:FF08,3416,gfxpack,gfx/LocGfxPack_067.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E7FF09,$E7:FF09,$E7:FFFF,247,fill,,$00
-LocGfxPack_068,$E8:0000,$E8:1016,4119,packed,packed_lz/LocGfxPack_068.bin,lz12 -> 4096 B
-LocGfxPack_069,$E8:1017,$E8:1B9D,2951,packed,packed_lz/LocGfxPack_069.bin,lz12 -> 4096 B
-LocGfxPack_070,$E8:1B9E,$E8:298F,3570,packed,packed_lz/LocGfxPack_070.bin,lz12 -> 4096 B
-LocGfxPack_071,$E8:2990,$E8:3745,3510,packed,packed_lz/LocGfxPack_071.bin,lz12 -> 4096 B
-LocGfxPack_072,$E8:3746,$E8:41A4,2655,packed,packed_lz/LocGfxPack_072.bin,lz12 -> 4096 B
-LocGfxPack_073,$E8:41A5,$E8:4DDA,3126,packed,packed_lz/LocGfxPack_073.bin,lz12 -> 4096 B
-LocGfxPack_074,$E8:4DDB,$E8:5D76,3996,packed,packed_lz/LocGfxPack_074.bin,lz12 -> 4096 B
-LocGfxPack_075,$E8:5D77,$E8:6D28,4018,packed,packed_lz/LocGfxPack_075.bin,lz12 -> 4096 B
-LocGfxPack_076,$E8:6D29,$E8:7C54,3884,packed,packed_lz/LocGfxPack_076.bin,lz12 -> 4096 B
-LocGfxPack_077,$E8:7C55,$E8:8B92,3902,packed,packed_lz/LocGfxPack_077.bin,lz12 -> 4096 B
-LocGfxPack_078,$E8:8B93,$E8:9A7F,3821,packed,packed_lz/LocGfxPack_078.bin,lz12 -> 4096 B
-LocGfxPack_079,$E8:9A80,$E8:A711,3218,packed,packed_lz/LocGfxPack_079.bin,lz12 -> 4096 B
-LocGfxPack_080,$E8:A712,$E8:B304,3059,packed,packed_lz/LocGfxPack_080.bin,lz12 -> 4096 B
-LocGfxPack_081,$E8:B305,$E8:BEEB,3047,packed,packed_lz/LocGfxPack_081.bin,lz12 -> 4096 B
-LocGfxPack_082,$E8:BEEC,$E8:CB32,3143,packed,packed_lz/LocGfxPack_082.bin,lz12 -> 4096 B
-LocGfxPack_083,$E8:CB33,$E8:D897,3429,packed,packed_lz/LocGfxPack_083.bin,lz12 -> 4096 B
-LocGfxPack_084,$E8:D898,$E8:E7D7,3904,packed,packed_lz/LocGfxPack_084.bin,lz12 -> 4096 B
-LocGfxPack_085,$E8:E7D8,$E8:F6BD,3814,packed,packed_lz/LocGfxPack_085.bin,lz12 -> 4096 B
-LocGfxPack_086,$E8:F6BE,$E8:FF02,2117,packed,packed_lz/LocGfxPack_086.bin,lz12 -> 4096 B
+LocGfxPack_068,$E8:0000,$E8:1016,4119,gfxpack,gfx/LocGfxPack_068.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_069,$E8:1017,$E8:1B9D,2951,gfxpack,gfx/LocGfxPack_069.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_070,$E8:1B9E,$E8:298F,3570,gfxpack,gfx/LocGfxPack_070.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_071,$E8:2990,$E8:3745,3510,gfxpack,gfx/LocGfxPack_071.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_072,$E8:3746,$E8:41A4,2655,gfxpack,gfx/LocGfxPack_072.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_073,$E8:41A5,$E8:4DDA,3126,gfxpack,gfx/LocGfxPack_073.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_074,$E8:4DDB,$E8:5D76,3996,gfxpack,gfx/LocGfxPack_074.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_075,$E8:5D77,$E8:6D28,4018,gfxpack,gfx/LocGfxPack_075.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_076,$E8:6D29,$E8:7C54,3884,gfxpack,gfx/LocGfxPack_076.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_077,$E8:7C55,$E8:8B92,3902,gfxpack,gfx/LocGfxPack_077.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_078,$E8:8B93,$E8:9A7F,3821,gfxpack,gfx/LocGfxPack_078.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_079,$E8:9A80,$E8:A711,3218,gfxpack,gfx/LocGfxPack_079.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_080,$E8:A712,$E8:B304,3059,gfxpack,gfx/LocGfxPack_080.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_081,$E8:B305,$E8:BEEB,3047,gfxpack,gfx/LocGfxPack_081.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_082,$E8:BEEC,$E8:CB32,3143,gfxpack,gfx/LocGfxPack_082.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_083,$E8:CB33,$E8:D897,3429,gfxpack,gfx/LocGfxPack_083.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_084,$E8:D898,$E8:E7D7,3904,gfxpack,gfx/LocGfxPack_084.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_085,$E8:E7D8,$E8:F6BD,3814,gfxpack,gfx/LocGfxPack_085.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_086,$E8:F6BE,$E8:FF02,2117,gfxpack,gfx/LocGfxPack_086.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E8FF03,$E8:FF03,$E8:FFFF,253,fill,,$00
-LocGfxPack_087,$E9:0000,$E9:0B57,2904,packed,packed_lz/LocGfxPack_087.bin,lz12 -> 4096 B
-LocGfxPack_088,$E9:0B58,$E9:1847,3312,packed,packed_lz/LocGfxPack_088.bin,lz12 -> 4096 B
-LocGfxPack_089,$E9:1848,$E9:2765,3870,packed,packed_lz/LocGfxPack_089.bin,lz12 -> 4096 B
-LocGfxPack_090,$E9:2766,$E9:3216,2737,packed,packed_lz/LocGfxPack_090.bin,lz12 -> 4096 B
-LocGfxPack_091,$E9:3217,$E9:405F,3657,packed,packed_lz/LocGfxPack_091.bin,lz12 -> 4096 B
-LocGfxPack_092,$E9:4060,$E9:4CC7,3176,packed,packed_lz/LocGfxPack_092.bin,lz12 -> 4096 B
-LocGfxPack_093,$E9:4CC8,$E9:5A86,3519,packed,packed_lz/LocGfxPack_093.bin,lz12 -> 4096 B
-LocGfxPack_094,$E9:5A87,$E9:68E9,3683,packed,packed_lz/LocGfxPack_094.bin,lz12 -> 4096 B
-LocGfxPack_095,$E9:68EA,$E9:756E,3205,packed,packed_lz/LocGfxPack_095.bin,lz12 -> 4096 B
-LocGfxPack_096,$E9:756F,$E9:814E,3040,packed,packed_lz/LocGfxPack_096.bin,lz12 -> 4096 B
-LocGfxPack_097,$E9:814F,$E9:8A2A,2268,packed,packed_lz/LocGfxPack_097.bin,lz12 -> 4096 B
-LocGfxPack_098,$E9:8A2B,$E9:94C9,2719,packed,packed_lz/LocGfxPack_098.bin,lz12 -> 4096 B
-LocGfxPack_099,$E9:94CA,$E9:9EE1,2584,packed,packed_lz/LocGfxPack_099.bin,lz12 -> 4096 B
-LocGfxPack_100,$E9:9EE2,$E9:A9CC,2795,packed,packed_lz/LocGfxPack_100.bin,lz12 -> 4096 B
-LocGfxPack_101,$E9:A9CD,$E9:B892,3782,packed,packed_lz/LocGfxPack_101.bin,lz12 -> 4096 B
-LocGfxPack_102,$E9:B893,$E9:C55F,3277,packed,packed_lz/LocGfxPack_102.bin,lz12 -> 4096 B
-LocGfxPack_103,$E9:C560,$E9:CFD3,2676,packed,packed_lz/LocGfxPack_103.bin,lz12 -> 4096 B
-LocGfxPack_104,$E9:CFD4,$E9:D9F3,2592,packed,packed_lz/LocGfxPack_104.bin,lz12 -> 4096 B
-LocGfxPack_105,$E9:D9F4,$E9:E5AE,3003,packed,packed_lz/LocGfxPack_105.bin,lz12 -> 4096 B
-LocGfxPack_106,$E9:E5AF,$E9:F1B3,3077,packed,packed_lz/LocGfxPack_106.bin,lz12 -> 4096 B
-LocGfxPack_107,$E9:F1B4,$E9:FFD2,3615,packed,packed_lz/LocGfxPack_107.bin,lz12 -> 4096 B
+LocGfxPack_087,$E9:0000,$E9:0B57,2904,gfxpack,gfx/LocGfxPack_087.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_088,$E9:0B58,$E9:1847,3312,gfxpack,gfx/LocGfxPack_088.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_089,$E9:1848,$E9:2765,3870,gfxpack,gfx/LocGfxPack_089.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_090,$E9:2766,$E9:3216,2737,gfxpack,gfx/LocGfxPack_090.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_091,$E9:3217,$E9:405F,3657,gfxpack,gfx/LocGfxPack_091.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_092,$E9:4060,$E9:4CC7,3176,gfxpack,gfx/LocGfxPack_092.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_093,$E9:4CC8,$E9:5A86,3519,gfxpack,gfx/LocGfxPack_093.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_094,$E9:5A87,$E9:68E9,3683,gfxpack,gfx/LocGfxPack_094.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_095,$E9:68EA,$E9:756E,3205,gfxpack,gfx/LocGfxPack_095.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_096,$E9:756F,$E9:814E,3040,gfxpack,gfx/LocGfxPack_096.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_097,$E9:814F,$E9:8A2A,2268,gfxpack,gfx/LocGfxPack_097.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_098,$E9:8A2B,$E9:94C9,2719,gfxpack,gfx/LocGfxPack_098.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_099,$E9:94CA,$E9:9EE1,2584,gfxpack,gfx/LocGfxPack_099.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_100,$E9:9EE2,$E9:A9CC,2795,gfxpack,gfx/LocGfxPack_100.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_101,$E9:A9CD,$E9:B892,3782,gfxpack,gfx/LocGfxPack_101.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_102,$E9:B893,$E9:C55F,3277,gfxpack,gfx/LocGfxPack_102.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_103,$E9:C560,$E9:CFD3,2676,gfxpack,gfx/LocGfxPack_103.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_104,$E9:CFD4,$E9:D9F3,2592,gfxpack,gfx/LocGfxPack_104.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_105,$E9:D9F4,$E9:E5AE,3003,gfxpack,gfx/LocGfxPack_105.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_106,$E9:E5AF,$E9:F1B3,3077,gfxpack,gfx/LocGfxPack_106.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_107,$E9:F1B4,$E9:FFD2,3615,gfxpack,gfx/LocGfxPack_107.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_E9FFD3,$E9:FFD3,$E9:FFFF,45,fill,,$00
-LocGfxPack_108,$EA:0000,$EA:0CD3,3284,packed,packed_lz/LocGfxPack_108.bin,lz12 -> 4096 B
-LocGfxPack_109,$EA:0CD4,$EA:1A3E,3435,packed,packed_lz/LocGfxPack_109.bin,lz12 -> 4096 B
-LocGfxPack_110,$EA:1A3F,$EA:270B,3277,packed,packed_lz/LocGfxPack_110.bin,lz12 -> 4096 B
-LocGfxPack_111,$EA:270C,$EA:33F9,3310,packed,packed_lz/LocGfxPack_111.bin,lz12 -> 4096 B
-LocGfxPack_112,$EA:33FA,$EA:411D,3364,packed,packed_lz/LocGfxPack_112.bin,lz12 -> 4096 B
-LocGfxPack_113,$EA:411E,$EA:4D82,3173,packed,packed_lz/LocGfxPack_113.bin,lz12 -> 4096 B
-LocGfxPack_114,$EA:4D83,$EA:5A78,3318,packed,packed_lz/LocGfxPack_114.bin,lz12 -> 4096 B
-LocGfxPack_115,$EA:5A79,$EA:6B8B,4371,packed,packed_lz/LocGfxPack_115.bin,lz12 -> 4096 B
-LocGfxPack_116,$EA:6B8C,$EA:7884,3321,packed,packed_lz/LocGfxPack_116.bin,lz12 -> 4096 B
-LocGfxPack_117,$EA:7885,$EA:82C6,2626,packed,packed_lz/LocGfxPack_117.bin,lz12 -> 4096 B
-LocGfxPack_118,$EA:82C7,$EA:911B,3669,packed,packed_lz/LocGfxPack_118.bin,lz12 -> 4096 B
-LocGfxPack_119,$EA:911C,$EA:9FC1,3750,packed,packed_lz/LocGfxPack_119.bin,lz12 -> 4096 B
-LocGfxPack_120,$EA:9FC2,$EA:AD48,3463,packed,packed_lz/LocGfxPack_120.bin,lz12 -> 4096 B
-LocGfxPack_121,$EA:AD49,$EA:B679,2353,packed,packed_lz/LocGfxPack_121.bin,lz12 -> 4096 B
-LocGfxPack_122,$EA:B67A,$EA:C010,2455,packed,packed_lz/LocGfxPack_122.bin,lz12 -> 4096 B
-LocGfxPack_123,$EA:C011,$EA:CA0C,2556,packed,packed_lz/LocGfxPack_123.bin,lz12 -> 4096 B
-LocGfxPack_124,$EA:CA0D,$EA:D93E,3890,packed,packed_lz/LocGfxPack_124.bin,lz12 -> 4096 B
-LocGfxPack_125,$EA:D93F,$EA:E171,2099,packed,packed_lz/LocGfxPack_125.bin,lz12 -> 4096 B
-LocGfxPack_126,$EA:E172,$EA:ED9F,3118,packed,packed_lz/LocGfxPack_126.bin,lz12 -> 4096 B
-LocGfxPack_127,$EA:EDA0,$EA:EF8B,492,packed,packed_lz/LocGfxPack_127.bin,lz12 -> 4096 B
-LocGfxPack_128,$EA:EF8C,$EA:F419,1166,packed,packed_lz/LocGfxPack_128.bin,lz12 -> 1536 B
-LocGfxPack_129,$EA:F41A,$EA:FF49,2864,packed,packed_lz/LocGfxPack_129.bin,lz12 -> 4096 B
+LocGfxPack_108,$EA:0000,$EA:0CD3,3284,gfxpack,gfx/LocGfxPack_108.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_109,$EA:0CD4,$EA:1A3E,3435,gfxpack,gfx/LocGfxPack_109.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_110,$EA:1A3F,$EA:270B,3277,gfxpack,gfx/LocGfxPack_110.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_111,$EA:270C,$EA:33F9,3310,gfxpack,gfx/LocGfxPack_111.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_112,$EA:33FA,$EA:411D,3364,gfxpack,gfx/LocGfxPack_112.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_113,$EA:411E,$EA:4D82,3173,gfxpack,gfx/LocGfxPack_113.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_114,$EA:4D83,$EA:5A78,3318,gfxpack,gfx/LocGfxPack_114.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_115,$EA:5A79,$EA:6B8B,4371,gfxpack,gfx/LocGfxPack_115.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_116,$EA:6B8C,$EA:7884,3321,gfxpack,gfx/LocGfxPack_116.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_117,$EA:7885,$EA:82C6,2626,gfxpack,gfx/LocGfxPack_117.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_118,$EA:82C7,$EA:911B,3669,gfxpack,gfx/LocGfxPack_118.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_119,$EA:911C,$EA:9FC1,3750,gfxpack,gfx/LocGfxPack_119.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_120,$EA:9FC2,$EA:AD48,3463,gfxpack,gfx/LocGfxPack_120.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_121,$EA:AD49,$EA:B679,2353,gfxpack,gfx/LocGfxPack_121.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_122,$EA:B67A,$EA:C010,2455,gfxpack,gfx/LocGfxPack_122.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_123,$EA:C011,$EA:CA0C,2556,gfxpack,gfx/LocGfxPack_123.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_124,$EA:CA0D,$EA:D93E,3890,gfxpack,gfx/LocGfxPack_124.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_125,$EA:D93F,$EA:E171,2099,gfxpack,gfx/LocGfxPack_125.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_126,$EA:E172,$EA:ED9F,3118,gfxpack,gfx/LocGfxPack_126.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_127,$EA:EDA0,$EA:EF8B,492,gfxpack,gfx/LocGfxPack_127.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_128,$EA:EF8C,$EA:F419,1166,gfxpack,gfx/LocGfxPack_128.png,lz12 -> 1536 B; 4bpp 48 tiles
+LocGfxPack_129,$EA:F41A,$EA:FF49,2864,gfxpack,gfx/LocGfxPack_129.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_EAFF4A,$EA:FF4A,$EA:FFFF,182,fill,,$00
-LocGfxPack_130,$EB:0000,$EB:0C54,3157,packed,packed_lz/LocGfxPack_130.bin,lz12 -> 4096 B
-LocGfxPack_131,$EB:0C55,$EB:19F4,3488,packed,packed_lz/LocGfxPack_131.bin,lz12 -> 4096 B
-LocGfxPack_132,$EB:19F5,$EB:27C1,3533,packed,packed_lz/LocGfxPack_132.bin,lz12 -> 4096 B
-LocGfxPack_133,$EB:27C2,$EB:34BB,3322,packed,packed_lz/LocGfxPack_133.bin,lz12 -> 4096 B
-LocGfxPack_134,$EB:34BC,$EB:43A6,3819,packed,packed_lz/LocGfxPack_134.bin,lz12 -> 4096 B
-LocGfxPack_135,$EB:43A7,$EB:4FF9,3155,packed,packed_lz/LocGfxPack_135.bin,lz12 -> 4096 B
-LocGfxPack_136,$EB:4FFA,$EB:5C52,3161,packed,packed_lz/LocGfxPack_136.bin,lz12 -> 4096 B
-LocGfxPack_137,$EB:5C53,$EB:67C6,2932,packed,packed_lz/LocGfxPack_137.bin,lz12 -> 4096 B
-LocGfxPack_138,$EB:67C7,$EB:733D,2935,packed,packed_lz/LocGfxPack_138.bin,lz12 -> 4096 B
-LocGfxPack_139,$EB:733E,$EB:7F1E,3041,packed,packed_lz/LocGfxPack_139.bin,lz12 -> 4096 B
-LocGfxPack_140,$EB:7F1F,$EB:8E6D,3919,packed,packed_lz/LocGfxPack_140.bin,lz12 -> 4096 B
-LocGfxPack_141,$EB:8E6E,$EB:9D77,3850,packed,packed_lz/LocGfxPack_141.bin,lz12 -> 4096 B
-LocGfxPack_142,$EB:9D78,$EB:ABAE,3639,packed,packed_lz/LocGfxPack_142.bin,lz12 -> 4096 B
-LocGfxPack_143,$EB:ABAF,$EB:B8F6,3400,packed,packed_lz/LocGfxPack_143.bin,lz12 -> 4096 B
-LocGfxPack_144,$EB:B8F7,$EB:C65C,3430,packed,packed_lz/LocGfxPack_144.bin,lz12 -> 4096 B
-LocGfxPack_145,$EB:C65D,$EB:D3C9,3437,packed,packed_lz/LocGfxPack_145.bin,lz12 -> 4096 B
-LocGfxPack_146,$EB:D3CA,$EB:E152,3465,packed,packed_lz/LocGfxPack_146.bin,lz12 -> 4096 B
-LocGfxPack_147,$EB:E153,$EB:ED00,2990,packed,packed_lz/LocGfxPack_147.bin,lz12 -> 4096 B
-LocGfxPack_148,$EB:ED01,$EB:FA11,3345,packed,packed_lz/LocGfxPack_148.bin,lz12 -> 4096 B
-LocGfxPack_149,$EB:FA12,$EB:FEF3,1250,packed,packed_lz/LocGfxPack_149.bin,lz12 -> 4096 B
+LocGfxPack_130,$EB:0000,$EB:0C54,3157,gfxpack,gfx/LocGfxPack_130.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_131,$EB:0C55,$EB:19F4,3488,gfxpack,gfx/LocGfxPack_131.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_132,$EB:19F5,$EB:27C1,3533,gfxpack,gfx/LocGfxPack_132.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_133,$EB:27C2,$EB:34BB,3322,gfxpack,gfx/LocGfxPack_133.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_134,$EB:34BC,$EB:43A6,3819,gfxpack,gfx/LocGfxPack_134.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_135,$EB:43A7,$EB:4FF9,3155,gfxpack,gfx/LocGfxPack_135.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_136,$EB:4FFA,$EB:5C52,3161,gfxpack,gfx/LocGfxPack_136.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_137,$EB:5C53,$EB:67C6,2932,gfxpack,gfx/LocGfxPack_137.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_138,$EB:67C7,$EB:733D,2935,gfxpack,gfx/LocGfxPack_138.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_139,$EB:733E,$EB:7F1E,3041,gfxpack,gfx/LocGfxPack_139.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_140,$EB:7F1F,$EB:8E6D,3919,gfxpack,gfx/LocGfxPack_140.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_141,$EB:8E6E,$EB:9D77,3850,gfxpack,gfx/LocGfxPack_141.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_142,$EB:9D78,$EB:ABAE,3639,gfxpack,gfx/LocGfxPack_142.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_143,$EB:ABAF,$EB:B8F6,3400,gfxpack,gfx/LocGfxPack_143.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_144,$EB:B8F7,$EB:C65C,3430,gfxpack,gfx/LocGfxPack_144.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_145,$EB:C65D,$EB:D3C9,3437,gfxpack,gfx/LocGfxPack_145.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_146,$EB:D3CA,$EB:E152,3465,gfxpack,gfx/LocGfxPack_146.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_147,$EB:E153,$EB:ED00,2990,gfxpack,gfx/LocGfxPack_147.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_148,$EB:ED01,$EB:FA11,3345,gfxpack,gfx/LocGfxPack_148.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_149,$EB:FA12,$EB:FEF3,1250,gfxpack,gfx/LocGfxPack_149.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_EBFEF4,$EB:FEF4,$EB:FFFF,268,fill,,$00
-LocGfxPack_150,$EC:0000,$EC:0E5C,3677,packed,packed_lz/LocGfxPack_150.bin,lz12 -> 4096 B
-LocGfxPack_151,$EC:0E5D,$EC:1B71,3349,packed,packed_lz/LocGfxPack_151.bin,lz12 -> 4096 B
-LocGfxPack_152,$EC:1B72,$EC:2785,3092,packed,packed_lz/LocGfxPack_152.bin,lz12 -> 4096 B
-LocGfxPack_153,$EC:2786,$EC:36D5,3920,packed,packed_lz/LocGfxPack_153.bin,lz12 -> 4096 B
-LocGfxPack_154,$EC:36D6,$EC:462D,3928,packed,packed_lz/LocGfxPack_154.bin,lz12 -> 4096 B
-LocGfxPack_155,$EC:462E,$EC:51AD,2944,packed,packed_lz/LocGfxPack_155.bin,lz12 -> 4096 B
-LocGfxPack_156,$EC:51AE,$EC:5F9D,3568,packed,packed_lz/LocGfxPack_156.bin,lz12 -> 4096 B
-LocGfxPack_157,$EC:5F9E,$EC:6E56,3769,packed,packed_lz/LocGfxPack_157.bin,lz12 -> 4096 B
-LocGfxPack_158,$EC:6E57,$EC:79C1,2923,packed,packed_lz/LocGfxPack_158.bin,lz12 -> 4096 B
-LocGfxPack_159,$EC:79C2,$EC:85F7,3126,packed,packed_lz/LocGfxPack_159.bin,lz12 -> 4096 B
-LocGfxPack_160,$EC:85F8,$EC:9116,2847,packed,packed_lz/LocGfxPack_160.bin,lz12 -> 4096 B
-LocGfxPack_161,$EC:9117,$EC:9C7E,2920,packed,packed_lz/LocGfxPack_161.bin,lz12 -> 4096 B
-LocGfxPack_162,$EC:9C7F,$EC:A8B3,3125,packed,packed_lz/LocGfxPack_162.bin,lz12 -> 4096 B
-LocGfxPack_163,$EC:A8B4,$EC:B4F8,3141,packed,packed_lz/LocGfxPack_163.bin,lz12 -> 4096 B
-LocGfxPack_164,$EC:B4F9,$EC:C045,2893,packed,packed_lz/LocGfxPack_164.bin,lz12 -> 4096 B
-LocGfxPack_165,$EC:C046,$EC:CDA7,3426,packed,packed_lz/LocGfxPack_165.bin,lz12 -> 4096 B
-LocGfxPack_166,$EC:CDA8,$EC:DA4F,3240,packed,packed_lz/LocGfxPack_166.bin,lz12 -> 4096 B
-LocGfxPack_167,$EC:DA50,$EC:E3F7,2472,packed,packed_lz/LocGfxPack_167.bin,lz12 -> 4096 B
-LocGfxPack_168,$EC:E3F8,$EC:EC66,2159,packed,packed_lz/LocGfxPack_168.bin,lz12 -> 4096 B
-LocGfxPack_169,$EC:EC67,$EC:F61C,2486,packed,packed_lz/LocGfxPack_169.bin,lz12 -> 4096 B
-LocGfxPack_170,$EC:F61D,$EC:FEB0,2196,packed,packed_lz/LocGfxPack_170.bin,lz12 -> 4096 B
+LocGfxPack_150,$EC:0000,$EC:0E5C,3677,gfxpack,gfx/LocGfxPack_150.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_151,$EC:0E5D,$EC:1B71,3349,gfxpack,gfx/LocGfxPack_151.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_152,$EC:1B72,$EC:2785,3092,gfxpack,gfx/LocGfxPack_152.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_153,$EC:2786,$EC:36D5,3920,gfxpack,gfx/LocGfxPack_153.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_154,$EC:36D6,$EC:462D,3928,gfxpack,gfx/LocGfxPack_154.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_155,$EC:462E,$EC:51AD,2944,gfxpack,gfx/LocGfxPack_155.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_156,$EC:51AE,$EC:5F9D,3568,gfxpack,gfx/LocGfxPack_156.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_157,$EC:5F9E,$EC:6E56,3769,gfxpack,gfx/LocGfxPack_157.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_158,$EC:6E57,$EC:79C1,2923,gfxpack,gfx/LocGfxPack_158.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_159,$EC:79C2,$EC:85F7,3126,gfxpack,gfx/LocGfxPack_159.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_160,$EC:85F8,$EC:9116,2847,gfxpack,gfx/LocGfxPack_160.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_161,$EC:9117,$EC:9C7E,2920,gfxpack,gfx/LocGfxPack_161.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_162,$EC:9C7F,$EC:A8B3,3125,gfxpack,gfx/LocGfxPack_162.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_163,$EC:A8B4,$EC:B4F8,3141,gfxpack,gfx/LocGfxPack_163.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_164,$EC:B4F9,$EC:C045,2893,gfxpack,gfx/LocGfxPack_164.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_165,$EC:C046,$EC:CDA7,3426,gfxpack,gfx/LocGfxPack_165.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_166,$EC:CDA8,$EC:DA4F,3240,gfxpack,gfx/LocGfxPack_166.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_167,$EC:DA50,$EC:E3F7,2472,gfxpack,gfx/LocGfxPack_167.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_168,$EC:E3F8,$EC:EC66,2159,gfxpack,gfx/LocGfxPack_168.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_169,$EC:EC67,$EC:F61C,2486,gfxpack,gfx/LocGfxPack_169.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_170,$EC:F61D,$EC:FEB0,2196,gfxpack,gfx/LocGfxPack_170.png,lz12 -> 4096 B; 4bpp 128 tiles
 Padding_ECFEB1,$EC:FEB1,$EC:FFFF,335,fill,,$00
 LocMeta12Pack_000,$ED:0000,$ED:0DB5,3510,metatiles,maps/LocMeta12Pack_000.meta,lz11 -> 4096 B
 LocMeta12Pack_001,$ED:0DB6,$ED:13C5,1552,metatiles,maps/LocMeta12Pack_001.meta,lz11 -> 4096 B
@@ -1366,16 +1366,16 @@ LocMeta3Pack_016,$EF:A96C,$EF:AA6C,257,metatiles,maps/LocMeta3Pack_016.meta,lz11
 LocMeta3Pack_017,$EF:AA6D,$EF:AC90,548,metatiles,maps/LocMeta3Pack_017.meta,lz11 -> 2048 B
 LocMeta3Pack_018,$EF:AC91,$EF:B167,1239,metatiles,maps/LocMeta3Pack_018.meta,lz11 -> 2048 B
 Unknown_EFB168,$EF:B168,$EF:BFFF,3736,extracted,unknown/Unknown_EFB168.bin,
-LocGfxPack_171,$EF:C000,$EF:C1D2,467,packed,packed_lz/LocGfxPack_171.bin,lz12 -> 512 B
-LocGfxPack_172,$EF:C1D3,$EF:C805,1587,packed,packed_lz/LocGfxPack_172.bin,lz12 -> 4096 B
-LocGfxPack_173,$EF:C806,$EF:CDC2,1469,packed,packed_lz/LocGfxPack_173.bin,lz12 -> 4096 B
-LocGfxPack_174,$EF:CDC3,$EF:D02C,618,packed,packed_lz/LocGfxPack_174.bin,lz12 -> 4096 B
-LocGfxPack_175,$EF:D02D,$EF:D2AC,640,packed,packed_lz/LocGfxPack_175.bin,lz12 -> 4096 B
-LocGfxPack_176,$EF:D2AD,$EF:D91C,1648,packed,packed_lz/LocGfxPack_176.bin,lz12 -> 4096 B
-LocGfxPack_177,$EF:D91D,$EF:E5AA,3214,packed,packed_lz/LocGfxPack_177.bin,lz12 -> 4096 B
-LocGfxPack_178,$EF:E5AB,$EF:E80B,609,packed,packed_lz/LocGfxPack_178.bin,lz12 -> 4096 B
-LocGfxPack_179,$EF:E80C,$EF:F2E0,2773,packed,packed_lz/LocGfxPack_179.bin,lz12 -> 4096 B
-LocGfxPack_180,$EF:F2E1,$EF:FF17,3127,packed,packed_lz/LocGfxPack_180.bin,lz12 -> 4096 B
+LocGfxPack_171,$EF:C000,$EF:C1D2,467,gfxpack,gfx/LocGfxPack_171.png,lz12 -> 512 B; 4bpp 16 tiles
+LocGfxPack_172,$EF:C1D3,$EF:C805,1587,gfxpack,gfx/LocGfxPack_172.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_173,$EF:C806,$EF:CDC2,1469,gfxpack,gfx/LocGfxPack_173.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_174,$EF:CDC3,$EF:D02C,618,gfxpack,gfx/LocGfxPack_174.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_175,$EF:D02D,$EF:D2AC,640,gfxpack,gfx/LocGfxPack_175.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_176,$EF:D2AD,$EF:D91C,1648,gfxpack,gfx/LocGfxPack_176.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_177,$EF:D91D,$EF:E5AA,3214,gfxpack,gfx/LocGfxPack_177.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_178,$EF:E5AB,$EF:E80B,609,gfxpack,gfx/LocGfxPack_178.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_179,$EF:E80C,$EF:F2E0,2773,gfxpack,gfx/LocGfxPack_179.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_180,$EF:F2E1,$EF:FF17,3127,gfxpack,gfx/LocGfxPack_180.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
 Padding_EFFF18,$EF:FF18,$EF:FFFF,232,fill,,$00
 MapPropsPack_000,$F0:0000,$F0:004F,80,mapprops,maps/MapPropsPack_000.map,lz11 -> 522 B
 MapPropsPack_001,$F0:0050,$F0:0183,308,mapprops,maps/MapPropsPack_001.map,lz11 -> 778 B
@@ -2050,10 +2050,10 @@ C3Pack_070,$FD:545E,$FD:57EF,914,packed,packed_lz/C3Pack_070.bin,lz11 -> 4096 B
 C3Pack_071,$FD:57F0,$FD:58E0,241,packed,packed_lz/C3Pack_071.bin,lz11 -> 2048 B
 C3Pack_072,$FD:58E1,$FD:6692,3506,packed,packed_lz/C3Pack_072.bin,lz11 -> 19456 B
 Padding_FD6693,$FD:6693,$FD:67FF,365,fill,,$00
-LocGfxPack_200,$FD:6800,$FD:7466,3175,packed,packed_lz/LocGfxPack_200.bin,lz12 -> 4096 B
-LocGfxPack_201,$FD:7467,$FD:7E5B,2549,packed,packed_lz/LocGfxPack_201.bin,lz12 -> 4096 B
-LocGfxPack_202,$FD:7E5C,$FD:804E,499,packed,packed_lz/LocGfxPack_202.bin,lz12 -> 4096 B
-LocGfxPack_203,$FD:804F,$FD:8E63,3605,packed,packed_lz/LocGfxPack_203.bin,lz12 -> 4096 B
+LocGfxPack_200,$FD:6800,$FD:7466,3175,gfxpack,gfx/LocGfxPack_200.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_201,$FD:7467,$FD:7E5B,2549,gfxpack,gfx/LocGfxPack_201.png,lz12 -> 4096 B; 4bpp 128 tiles
+LocGfxPack_202,$FD:7E5C,$FD:804E,499,gfxpack,gfx/LocGfxPack_202.png,lz12 -> 4096 B; 4bpp 124 tiles + 128 B
+LocGfxPack_203,$FD:804F,$FD:8E63,3605,gfxpack,gfx/LocGfxPack_203.png,lz12 -> 4096 B; 4bpp 128 tiles
 Unknown_FD8E64,$FD:8E64,$FD:8FFF,412,extracted,unknown/Unknown_FD8E64.bin,
 EvtPack_008,$FD:9000,$FD:9162,355,events,events/EvtPack_008.evt,lz11 -> 413 B
 EvtPack_010,$FD:9163,$FD:928A,296,events,events/EvtPack_010.evt,lz11 -> 677 B
