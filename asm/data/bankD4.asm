@@ -9,8 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/
+; build/text/ and build/records/, battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/, or
+; graphics it encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
@@ -19,14 +20,14 @@
 ; Read by Spr_CopyTileD2 and the GfxRom_D2-D5 readers; Battle_InitScene (Battler_TileGfxPtr).
 org $D40000
 Gfx_D40000:
-    incbin "../../build/assets/graphics/Gfx_D40000.bin"
+    incbin "../../build/gfx/Gfx_D40000.bin"          ; graphics: 4bpp 994 tiles
 
 ; $D4:7C40-$D4:FAFF (32,448 B), graphics, confirmed: 4bpp 8x8 tiles, uncompressed (32 B per
 ; tile)
 ; Read by Spr_CopyTileD2 and the GfxRom_D2-D5 readers; Battle_InitScene (Battler_TileGfxPtr).
 org $D47C40
 Gfx_D47C40:
-    incbin "../../build/assets/graphics/Gfx_D47C40.bin"
+    incbin "../../build/gfx/Gfx_D47C40.bin"          ; graphics: 4bpp 1014 tiles
 
 ; $D4:FB00-$D4:FCFA (507 B), packed_lz, confirmed: lz12 -> 672 B: object sprite tile graphics
 ; (4bpp)

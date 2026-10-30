@@ -9,8 +9,9 @@
 ; from your own ROM to build/assets/, a pack tools/build_rom.py
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
-; build/text/ and build/records/, or battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/
+; build/text/ and build/records/, battle and layer-effect
+; scripts it assembles into build/battle/ and build/fx/, or
+; graphics it encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
