@@ -263,7 +263,7 @@ class Derived(unittest.TestCase):
 
     def test_every_counted_row_is_derived(self):
         self.assertEqual(set(records.READERS) - set(records.DERIVED), set())
-        self.assertEqual(len(records.DERIVED), 16)
+        self.assertEqual(len(records.DERIVED), 17)
 
     def test_loc_palettes(self):
         rom = bytearray(0x400000)
@@ -314,7 +314,8 @@ class Derived(unittest.TestCase):
                                    ('LocRom_RecSize', 15, '$F6:1C00'), ('Menu_SramUnk05F3Mask', 0x3FF, '$FF:D296'),
                                    ('Battle_ActObjects', 15, '$CE:8870'), ('Battle_FacingRight', 30, '$CE:8870'),
                                    ('LocPal_RowBytes', 28, '$F6:24C0'),
-                                   ('Pal_Row0SetMask', 8, '$FF:B210'), ('Menu_WinStyleMask', 3, '$FF:B210')):
+                                   ('Pal_Row0SetMask', 8, '$FF:B210'), ('Menu_WinStyleMask', 3, '$FF:B210'),
+                                   ('Menu_SlotLocCount', 25, '$FF:D024')):
             got = records.derived_problems(rom, dict(D, **{name: value}), ed.read_manifest())
             self.assertTrue(any(x.startswith(start) for x in got), (name, got))
         no_piece = [p for p in ed.read_manifest() if p['label'] != 'BattleRom_ActObjRec_Lists']

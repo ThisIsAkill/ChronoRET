@@ -231,7 +231,8 @@ class SceneLayers(unittest.TestCase):
         rom[0x06FD02 + 0x10], rom[0x06FD02 + 0x11], rom[0x06FD02 + 0x14] = 3, 0x85, 2   # maps: bit 7
         rom[0x06FD02 + 0x0A] = 4                                                          # palettes
         self.assertEqual(maps.scene_named(bytes(rom)), {'C2SceneRom_MetatilePacks': {3}, 'C2SceneRom_MapPacks': set(),
-                                                        'C2SceneRom_Bg3MapPacks': {2}, 'C2SceneRom_PalettePacks': {4, D['C2Scene_ExtraPalPack']}})
+                                                        'C2SceneRom_Bg3MapPacks': {2}, 'C2SceneRom_PalettePacks': {4, D['C2Scene_ExtraPalPack']},
+                                                        'C2SceneRom_ListPacks': {0}})
 
     def test_build_checks_the_unpacked_size(self):
         import tempfile
@@ -255,6 +256,44 @@ class SceneLayers(unittest.TestCase):
                             self.assertEqual(build_rom.build_maps(tmp), 1)
             finally:
                 build_rom.extract_data.read_manifest = saved
+
+    def test_scene_lists(self):
+        data = bytes([2] + list(range(14)) + [1, 9, 9, 9] + [1, 8, 8, 8] + [2, 0x34, 0x12, 0x00, 0x14])
+        text = maps.render_scene_lists('S', data)
+        self.assertEqual(maps.assemble_scene_lists(text, 'S'), data)
+        self.assertIn('@list A 2\n00: 00 01 02 03 04 05 06\n01: 07', text)
+        for bad, why in ((data[:-1], 'list D\'s 2 entries run past the data'), (data + b'\x00', '1 B after list D'),
+                         (bytes([0]) + data[15:], 'list A has a count of 0'), (data[:15], 'list B\'s count is past')):
+            with self.subTest(why=why):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    maps.split_lists(bad, 'S')
+        for old, new, why in (('@scenelists S', '@scenelists T', 'the first line is @scenelists S'),
+                              ('@list B 1', '@list C 1', 'expected @list B N'),
+                              ('@list B 1', '@list B 0', 'expected @list B N'),
+                              ('@list B 1', '@list B 2', 'list B needs 2 entry lines'),
+                              ('00: 09 09 09', '00: 09 09', 'expected 00: and 3 bytes'),
+                              ('00: 09 09 09', '01: 09 09 09', 'expected 00: and 3 bytes'),
+                              ('00: 09 09 09', '00: 09 09 ZZ', 'is not 2 hex digits')):
+            with self.subTest(new=new):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    maps.assemble_scene_lists(text.replace(old, new, 1), 'S')
+        with self.assertRaisesRegex(maps.MapsError, 'a line after list D'):
+            maps.assemble_scene_lists(text + '02: 00 00\n', 'S')
+        self.assertTrue(maps.size_ok('scenelists', None, 19))
+
+    def test_list_sizes_from_the_source(self):
+        self.assertEqual(maps.list_problems(), [])
+        import tempfile
+        src = (maps.ROOT / 'asm' / 'bankC2' / 'bankC2.asm').read_text()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'asm' / 'bankC2').mkdir(parents=True)
+            path = Path(tmp) / 'asm' / 'bankC2' / 'bankC2.asm'
+            i = src.index('.list_b:')
+            path.write_text(src[:i] + src[i:].replace('    STA.w WMDATA\n', '', 1))
+            self.assertEqual(maps.list_problems(Path(tmp)), ['C2Scene_LoadLists copies [7, 2, 3, 2] B per entry, '
+                                                             'not (7, 3, 3, 2)'])
+            path.write_text(src.replace('.list_c:', '.list_x:'))
+            self.assertIn('not found', maps.list_problems(Path(tmp))[0])
 
     def test_only_named_scene_packs(self):
         self.assertEqual(maps.kind_of('via C2SceneRom_PalettePacks[3]; x'), ('scenepal', None))
@@ -387,6 +426,14 @@ class WithRom(unittest.TestCase):
             self.assertIn('ScenePalPack_003: refused', maps.check(rom))
         finally:
             extract_data.unpack_piece, maps.assemble_piece, maps.render_piece = saved
+
+    def test_check_sees_the_list_sizes(self):
+        saved = maps.LIST_SIZES
+        maps.LIST_SIZES = (7, 3, 3, 3)
+        try:
+            self.assertTrue(any('C2Scene_LoadLists copies' in x for x in maps.check(ed.read_rom())))
+        finally:
+            maps.LIST_SIZES = saved
 
     def test_scene_packs_are_the_headers(self):
         self.assertEqual(maps.scene_named(ed.read_rom()), maps.SCENE_NAMED)
