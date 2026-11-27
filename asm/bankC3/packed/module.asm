@@ -17998,7 +17998,7 @@ C3Mod_Prog10TurnNmi:
 ; offset Y = (page $0A00's var 6 - 1) x 4 (the horizon line's entry,
 ; 4 bytes a line), the first divisor X = var 8.
 ; Callers note: the patched JSR at $35FC (C3Mod_BuildM7Tables' .setup,
-;   operand written at $86EA by C3Mod_Prog10).
+;   operand written by the STA at $86EC in C3Mod_Prog10).
 ; Entry: M=0, X=0, DP = $0A00 (C3Mod_BuildM7Tables' DP, the script
 ;        page: here C3Mod_Prog10ViewTask's), DB any.
 ; Exit:  M=0, X=0; A = Y; X, Y as above.
@@ -18100,8 +18100,9 @@ C3Mod_Prog10TextTask:
 ; each (C3Mod_Prog10FigPick) and their places: figure 0 at X $80, Y
 ; $70, figure 1 at X $A0, Y $60 (a word to C3_Prog10FigPos + X).
 ; Callers note: C3Mod_Prog10 ($870E).
-; Entry: M=1 (16-bit set here), X any (set to 0 and 2), DP=0 (the
-;        figure words), DB any.
+; Entry: M=1 (16-bit set here), X=0 (16-bit: the LDX #0 and #2 are
+;        3-byte loads; X=0 at the call at $870E; X is set to 0 and 2
+;        here), DP=0 (the figure words), DB any.
 ; Exit:  M=1, DB = $00; A = $60A0; X = 2; Y as C3Mod_Prog10FigPick left
 ;        it.
 ; Calls: C3Mod_Prog10FigPick.
@@ -18561,16 +18562,17 @@ C3Mod_Prog10FlatNmi:                    ; header: see C3Mod_Prog10FlatBg2Nmi
 
 ; $7E:9E7A — C3Mod_PriorityByte (1 byte, $9E7A–$9E7A)
 ; The byte $20, the fixed DMA source of the high-byte fills of
-; C3Mod_Prog10GridNmi ($8D9F) and C3Mod_Prog13 ($8F6D): map words with
-; the priority bit set.
+; C3Mod_Prog10GridNmi (LDX #C3Mod_PriorityByte at $8D9E) and
+; C3Mod_Prog13 ($8F6C): map words with the priority bit set.
 C3Mod_PriorityByte:
     db $20
 
 ; $7E:9E7B — C3Mod_CreditLineTask (129 bytes, $9E7B–$9EFB)
 ; A task: the credit roll on a BG (C3Mod_CreditLineNmi sends the row and
 ; the scroll). Every 16 frames (C3_FrameCount AND $F), or every frame
-; when C3_Prog13Count is not 0 (a word read: program 13 run before, the
-; fast roll), a line: 32 zero bytes from $D2:0000 (GfxRom_D2; MVN, DB =
+; when C3_Prog13Count is not 0 (a word read; C3Mod_Prog13 adds 1 to it
+; before its roll, so program 13's own roll is the fast one; program 12
+; and program 10's text scene roll slowly), a line: 32 zero bytes from $D2:0000 (GfxRom_D2; MVN, DB =
 ; $00 after) to C3_CreditRow; WMADD = $7E:141C (8-bit: WMADDH 0, then a
 ; 16-bit STX) and the text from C3_Prog10TextPtr (bank $7E, long
 ; reads): $2F ends the line (.line), $5C ends the roll (.stop), $00
@@ -18587,8 +18589,10 @@ C3Mod_PriorityByte:
 ; C3Mod_CreditLineNmi removed (C3Mod_NmiTaskRemove) and the task ends.
 ; Callers note: a task added by script opcode $FA at $92CF
 ;   (C3Mod_Prog10TextScript) and $940B (C3Mod_Prog13Script).
-; Entry: a task: M=0, X=0, DP=0 (C3_Prog10TextPtr..), DB any (MVN sets
-;        $00; the text reads are long).
+; Entry: a task: M=0, X=0, DP=0 (C3_Prog10TextPtr..), DB = $00 as a
+;        task: on the path that builds no line, the word read of STAT77
+;        / STAT78 ($9EDF) is absolute, so DB must map the registers (the
+;        MVN sets $00 on the other path; the text reads are long).
 ; Exit:  M=0, X=0, DB = $00 after a line; A as the scroll leaves it;
 ;        or JMP C3Mod_TaskEnd (M=1).
 ; Calls: C3Mod_NmiTaskRemove.
@@ -18713,8 +18717,8 @@ C3Mod_CreditLineNmi:
 ;   (C3Mod_Prog10TextScript). C3Mod_Prog10GridMapNmi: $92D7.
 ;   C3Mod_Prog10GridCharsNmi: $92DB.
 ; Entry: an NMI task: M=1, X=0, DP any, DB=$00.
-; Exit:  JMP C3Mod_NmiTaskEnd with M=1; A = MDMAEN_Ch7, X = the source,
-;        Y = the count.
+; Exit:  JMP C3Mod_NmiTaskEnd with M=1; A = MDMAEN_Ch7, X = $1801
+;        (C3Mod_DmaFrom7F's DMAP7 / BBAD7 word), Y = the count.
 ; Calls: C3Mod_DmaFrom7F, C3Mod_NmiTaskEnd (JMP).
 C3Mod_Prog10GridTilesNmi:
     LDX.w #!C3_SprTilesHigh
@@ -18743,7 +18747,8 @@ C3Mod_Prog10GridCharsNmi:               ; header: see C3Mod_Prog10GridTilesNmi
 ; Callers note: C3Mod_Prog10GridCharsNmi's .send ($9F53).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute registers); X = the source,
 ;        Y = the count, VMADD set.
-; Exit:  M=1, X=0; A = MDMAEN_Ch7; X, Y unchanged.
+; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = $1801 (the LDX of the DMAP7 /
+;        BBAD7 word at $9F5F); Y unchanged.
 C3Mod_DmaFrom7F:
     STY.w DAS7L
     STX.w A1T7L
@@ -19468,8 +19473,11 @@ C3Mod_FigSeqs:
 ;     are probably control bytes); C3_Prog10TextPtr gets $AB1A
 ;     (C3Mod_Prog13: its "PRODUCER//KAZUHIKO AOKI" part) or $B099
 ;     (C3Mod_Prog10GridNmi: "//////TRANSLATOR"), for
-;     C3Mod_CreditLineTask ($9E9F), which ends at the "\" before
-;     "CODE END"; C3Mod_Prog10TextTask reads the texts from
+;     C3Mod_CreditLineTask ($9E9F), which stops at the first $5C ("\")
+;     after its start: from C3Mod_Prog13's $AB1A that is the one at
+;     $B098, just before $B099's part; from C3Mod_Prog10GridNmi's $B099
+;     the one at $B573, before "CODE END", which only that start
+;     reaches; C3Mod_Prog10TextTask reads the texts from
 ;     C3_ResultWord ($9B59) and stops at $AB1A ($9B76);
 ;   - it ends with the module's end marker "\CODE END 7E" (as the kernel
 ;     ends with "CODE END C3").

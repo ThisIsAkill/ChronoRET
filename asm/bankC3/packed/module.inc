@@ -1260,7 +1260,7 @@ endmacro
 !C3_CreditRowMask = $03E0                ; the map rows of a 32 x 32 map
 !C3_CreditTileBase = $40                 ; a credit character's tile = the character - this
 !C3_TextStop = $5C                       ; a credit text's end code ('\')
-!C3_CreditFastStep = $0008               ; C3_CreditScroll's step when program 13 runs again
+!C3_CreditFastStep = $0008               ; C3_CreditScroll's step in program 13's roll (C3_Prog13Count set)
 !C3_Prog13DriftMask = $0007              ; C3Mod_Prog13DriftRandom: a drift of -4 to 3 ...
 !C3_Prog13DriftBias = $0004
 !C3_Prog13TimeMask = $03FF               ; ... after 1 to $400 frames

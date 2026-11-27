@@ -660,9 +660,12 @@ WinFx_StepWipe:
 ; by a flip-flop that every read toggles and only a STAT78 read clears,
 ; and nothing on this path reads STAT78 (the module's reads, at
 ; $7E:9AB3 in C3Mod_Prog10QuadTask and $7E:9EDF in C3Mod_CreditLineTask,
-; a word read of STAT77 whose high byte is STAT78, are elsewhere). At
-; M=1 OPHCT is read once a call, so it alternates from call to call
-; (bit 8 and open bus every other call),
+; a word read of STAT77 whose high byte is STAT78, are elsewhere, but
+; each clears the flip-flop: in program 12, C3Mod_CreditLineTask's slow
+; roll reads it every frame while C3Mod_StarsTask calls here, so the
+; phase is reset each frame there). At M=1 OPHCT is read once a call,
+; so, between such resets, it alternates from call to call (bit 8 and
+; open bus every other call),
 ; and OPVCT twice, keeping the phase it had (low then high from a clear
 ; flip-flop); at M=0 the word reads also take the next register
 ; (OPHCT's read takes OPVCT, OPVCT's STAT77), so H is read once and V
