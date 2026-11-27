@@ -2170,7 +2170,8 @@ BattleRom_ColoursC,$FF:9E0A,$FF:9E0F,6,records,records/BattleRom_ColoursC.tsv,pa
 MenuRom_WindowGfx,$FF:9E10,$FF:B20F,5120,graphics,gfx/MenuRom_WindowGfx.png,4bpp 160 tiles
 FieldRom_PalRow0Sets,$FF:B210,$FF:B29F,144,records,records/FieldRom_PalRow0Sets.tsv,palette 9 x 16 B
 Palette_FFB2A0,$FF:B2A0,$FF:B30F,112,extracted,palette/Palette_FFB2A0.bin,
-MenuRom_ItemTextPtrs,$FF:B310,$FF:BD17,2568,extracted,text/MenuRom_ItemTextPtrs.bin,
+MenuRom_ItemTextPtrs,$FF:B310,$FF:B517,520,menutext,menu/MenuRom_ItemTextPtrs.mtx,
+Unknown_FFB518,$FF:B518,$FF:BD17,2048,extracted,unknown/Unknown_FFB518.bin,
 MenuRom_DrawArgLens,$FF:BD18,$FF:BD2D,22,extracted,table/MenuRom_DrawArgLens.bin,
 MenuRom_MainIconList,$FF:BD2E,$FF:BD50,35,drawlist,menu/MenuRom_MainIconList.mdl,
 MenuRom_MainConfirmList,$FF:BD51,$FF:BD5B,11,drawlist,menu/MenuRom_MainConfirmList.mdl,
@@ -2231,10 +2232,7 @@ MenuRom_LoadAskList,$FF:C391,$FF:C3BB,43,drawlist,menu/MenuRom_LoadAskList.mdl,
 MenuRom_NameList,$FF:C3BC,$FF:C41E,99,drawlist,menu/MenuRom_NameList.mdl,
 MenuRom_NameShowList,$FF:C41F,$FF:C428,10,drawlist,menu/MenuRom_NameShowList.mdl,
 MenuRom_NameChoiceList,$FF:C429,$FF:C456,46,drawlist,menu/MenuRom_NameChoiceList.mdl,
-MenuRom_StringPtrs,$FF:C457,$FF:C969,1299,extracted,text/MenuRom_StringPtrs.bin,
-MenuRom_EquipLabel3,$FF:C96A,$FF:C970,7,extracted,text/MenuRom_EquipLabel3.bin,
-MenuRom_EquipLabel0,$FF:C971,$FF:C979,9,extracted,text/MenuRom_EquipLabel0.bin,
-MenuRom_EquipLabel12,$FF:C97A,$FF:C9AB,50,extracted,text/MenuRom_EquipLabel12.bin,
+MenuRom_StringPtrs,$FF:C457,$FF:C9AB,1365,menutext,menu/MenuRom_StringPtrs.mtx,
 MenuRom_NameChars,$FF:C9AC,$FF:C9FB,80,records,records/MenuRom_NameChars.tsv,table 8 x 10 B
 MenuRom_Font2bppB,$FF:C9FC,$FF:CAFB,256,graphics,gfx/MenuRom_Font2bppB.png,2bpp 16 tiles
 MenuRom_GlyphRows,$FF:CAFC,$FF:CB9B,160,graphics,gfx/MenuRom_GlyphRows.png,2bpp 10 tiles

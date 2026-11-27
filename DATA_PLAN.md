@@ -1094,6 +1094,42 @@ On the `data-tables-5` branch, second commit.
   - The remaining packs: object, dial, `Unk7000`/`7200` and battle background-map packs, the
     unnamed scene and location packs, and the 12 packs no pointer reaches.
 
+## Menu strings
+
+On the `data-tables-7` branch. `tools/menutext.py` (piece `menutext`, a text tool) gives the
+menu's string tables a readable form in `build/assets/menu/<label>.mtx`. They are extracted from
+the user's ROM only; no string is committed.
+
+- **The reader.** `Menu_DrawStringLoop` reads a string up to its 0 byte, or up to the tile that
+  takes its count (`Menu_TextLeft`, from the caller's flags byte; 0 = 256) to 0.
+  - Bytes `$01`-`$0F` are control codes, not counted, run through `Menu_TextCtrlTable`.
+  - Code `$04` runs a sub-string with the same count; `$05` runs a RAM name with its own count;
+    `$07` takes one off the count without testing it.
+  - Each code's argument bytes (`ARGS`: 0 0 2 4 3 2 2 2 1 1 1 4 3 0 0 0) are derived by running its
+    handler (`tools/absint.py`) with Y on the arguments and reading Y at its RTS. `check` compares
+    the derivation with `ARGS`.
+- **The proofs.** A string is proved only where a caller is known to draw it, with that caller's
+  count:
+  - `MenuRom_ItemTextPtrs` (`$FF:B310`): `Menu_DrawInvEntry` draws entry id with a count of
+    `Menu_ItemTextLen` (9). The ids are 1 to `Menu_ItemIdEnd` - 1 (241; id 0 is blanks), so the
+    table is 242 words.
+    - Its 5 strings (34 B) are proved; `ACCESSORY` is ended by the count, not a 0.
+    - The byte after the table and the 0 after `ACCESSORY` stay bytes.
+    - The 2,048 B after the strings, which the old row took to be strings too, are an unknown row
+      now: no entry names them.
+  - `MenuRom_StringPtrs` (`$FF:C457`, now one row with the three equipment labels after it):
+    `Menu_DrawCmdString` draws entry arg 0-1 with the count of arg 4.
+    - The entries the 56 draw lists name are proved, all with a count of 256, and so are the
+      sub-strings they name.
+    - The equipment labels are proved too. `Menu_EquipValueLabel` copies `Menu_InfoLabelBytes` (11)
+      of each to `Menu_InfoLabel`, which a proved string draws as its sub-string; each label's 0
+      falls inside its 11 bytes.
+    - 39 strings (1,201 B) are proved. 36 B stay bytes, among them the strings of entries no draw
+      list names (`Who'll you replace?`, for one). Those entries are written as their words.
+- **Results.** Both pieces (1,885 B) assemble back byte-exact. A string the text would place inside
+  another is refused, and so are a string that ends differently for two counts, a sub-string past
+  the piece, and a label with no 0 in its copied bytes.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed

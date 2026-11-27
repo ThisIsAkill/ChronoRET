@@ -162,6 +162,7 @@ import scripts  # noqa: E402
 import sprites  # noqa: E402
 import anims  # noqa: E402
 import drawlists  # noqa: E402
+import menutext  # noqa: E402
 import data_survey  # noqa: E402
 import records  # noqa: E402
 import text  # noqa: E402
@@ -199,7 +200,7 @@ MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx', 'anim',
           'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'scenelists',
           'actframes',
-          'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist')
+          'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist', 'menutext')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -298,7 +299,7 @@ KIND_LABELS = {
 # (build/<OUT>/<label>.bin, what is incbin'd), INCBIN_NOTE, ERROR,
 # is_piece_row(survey row) -> kind or None (no ROM), extract_texts(rom,
 # pieces) -> ({label: text}, problems) and assemble_piece(piece, text).
-TEXT_TOOLS = (anims, drawlists)
+TEXT_TOOLS = (anims, drawlists, menutext)
 
 
 def text_tool(piece: str):
@@ -981,7 +982,7 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
     for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'actframes.py', 'sprites.py', 'anims.py',
-                 'drawlists.py', 'absint.py', 'disasm.py'):
+                 'drawlists.py', 'menutext.py', 'absint.py', 'disasm.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
     return h.hexdigest()
 
