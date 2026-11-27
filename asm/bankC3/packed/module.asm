@@ -3087,24 +3087,24 @@ C3Mod_Prog0RunA:
     db !C3Op_Set|8 : dw $0008
     db !C3Op_Set|11 : dw $0001
     db !C3Op_Set|12 : dw $0001
-.l3F79:
+.angle_up_dist_down:
     db !C3Op_Add|5 : dw $0010
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|1 : dw $0007, .l3F79             ; 8 passes
+    db !C3Op_LoopYield|1 : dw $0007, .angle_up_dist_down             ; 8 passes
     db !C3Op_Add|8 : dw $0001
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_Loop|0 : dw $000E, .l3F79                  ; 15 passes
+    db !C3Op_Loop|0 : dw $000E, .angle_up_dist_down                  ; 15 passes
     db !C3Op_Set|12 : dw $0000
-.l3F92:
+.angle_up_dist_down_b:
     db !C3Op_Add|5 : dw $0010
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $0007, .l3F92             ; 8 passes
+    db !C3Op_LoopYield|0 : dw $0007, .angle_up_dist_down_b             ; 8 passes
     db !C3Op_Add|8 : dw $0001
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Set|11 : dw $0000
     db !C3Op_TaskAdd : dw C3Mod_SteerTask
-.l3FA9:
-    db !C3Op_JumpYield : dw .l3FA9
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:3FAC — C3Mod_Prog0RunB (94 bytes, $3FAC–$4009)
 ; The other opening view (page $0A00): angle $300, distance $10,
@@ -3118,36 +3118,36 @@ C3Mod_Prog0RunB:
     db !C3Op_Set|2 : dw $0010
     db !C3Op_Set|8 : dw $0018
     db !C3Op_Set|0 : dw $0060
-.l3FB8:
+.dist_up:
     db !C3Op_Add|2 : dw $0002
-    db !C3Op_LoopYield|0 : dw $003F, .l3FB8             ; 64 passes
+    db !C3Op_LoopYield|0 : dw $003F, .dist_up             ; 64 passes
     db !C3Op_Set|11 : dw $0001
     db !C3Op_Set|12 : dw -$1
-.l3FC6:
+.scale_up_angle_down_dist_down:
     db !C3Op_Add|0 : dw $0002
     db !C3Op_Add|5 : dw -$14
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l3FC6             ; 16 passes
+    db !C3Op_LoopYield|0 : dw $000F, .scale_up_angle_down_dist_down             ; 16 passes
     db !C3Op_Set|12 : dw $0000
-.l3FD7:
+.scale_up_angle_down_dist_down_b:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|5 : dw -$C
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l3FD7             ; 16 passes
-.l3FE5:
+    db !C3Op_LoopYield|0 : dw $000F, .scale_up_angle_down_dist_down_b             ; 16 passes
+.scale_down_angle_down_dist_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|5 : dw -$A
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l3FE5             ; 16 passes
-.l3FF3:
+    db !C3Op_LoopYield|0 : dw $000F, .scale_down_angle_down_dist_down             ; 16 passes
+.scale_down_angle_down_dist_down_b:
     db !C3Op_Add|0 : dw -$2
     db !C3Op_Add|5 : dw -$6
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l3FF3             ; 16 passes
+    db !C3Op_LoopYield|0 : dw $000F, .scale_down_angle_down_dist_down_b             ; 16 passes
     db !C3Op_Set|11 : dw $0000
     db !C3Op_TaskAdd : dw C3Mod_SteerTask
-.l4007:
-    db !C3Op_JumpYield : dw .l4007
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:400A — C3Mod_Prog0ScriptB (67 bytes, $400A–$404C)
 ; Page $0B00's first script: C3_ViewY = $18, vars 0 and 6 = $FF; the
@@ -3160,23 +3160,23 @@ C3Mod_Prog0ScriptB:
     db !C3Op_Set|0 : dw $00FF
     db !C3Op_Set|6 : dw $00FF
     db !C3Op_Driver : dw !C3_SndSfxA|($96<<8), $0080
-.l4018:
-    db !C3Op_LoopYield|1 : dw $003B, .l4018             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_Driver : dw !C3_SndSfxA|($96<<8), $0080
-.l4022:
-    db !C3Op_LoopYield|1 : dw $003B, .l4022             ; 60 passes
+.wait_60_b:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_b             ; 60 passes
     db !C3Op_Driver : dw !C3_SndSfxA|($96<<8), $0080
-.l402C:
-    db !C3Op_LoopYield|1 : dw $003B, .l402C             ; 60 passes
+.wait_60_c:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_c             ; 60 passes
     db !C3Op_Driver : dw !Audio_CmdPlaySfx|($97<<8), $0080
-.l4036:
-    db !C3Op_LoopYield|1 : dw $0013, .l4036             ; 20 passes
+.wait_20:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20             ; 20 passes
     db !C3Op_Poke8 : dw !C3_PauseAllowed : db 1
     db !C3Op_Set|13 : dw $0001
     db !C3Op_Driver : dw !C3_SndSfxA|($44<<8), $0080
     db !C3Op_TaskAdd : dw C3Mod_RaceStepTask
-.l404A:
-    db !C3Op_JumpYield : dw .l404A
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:404D — C3Mod_Prog0WipeA (118 bytes, $404D–$40C2)
 ; Page $0A00's first script with C3_EntryArg bit 6 (a run that ends by
@@ -3198,38 +3198,38 @@ C3Mod_Prog0WipeA:
     db !C3Op_TaskAdd : dw C3Mod_ExitTask
     db !C3Op_Poke8 : dw !C3_Brightness : db 15
     db !C3Op_Driver : dw !C3_SndSfxA|($BA<<8), $0080
-.l406A:
+.y_down:
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $006F, .l406A             ; 112 passes
-.l4072:
+    db !C3Op_LoopYield|0 : dw $006F, .y_down             ; 112 passes
+.y_down_var5_down:
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|5 : dw -$4
-    db !C3Op_LoopYield|0 : dw $002F, .l4072             ; 48 passes
-.l407D:
+    db !C3Op_LoopYield|0 : dw $002F, .y_down_var5_down             ; 48 passes
+.var5_down:
     db !C3Op_Add|5 : dw -$4
-    db !C3Op_LoopYield|0 : dw $002F, .l407D             ; 48 passes
-.l4085:
+    db !C3Op_LoopYield|0 : dw $002F, .var5_down             ; 48 passes
+.var5_down_y_up:
     db !C3Op_Add|5 : dw -$4
     db !C3Op_Add|2 : dw $0001
-    db !C3Op_LoopYield|0 : dw $001F, .l4085             ; 32 passes
+    db !C3Op_LoopYield|0 : dw $001F, .var5_down_y_up             ; 32 passes
     db !C3Op_Add|8 : dw $0001
-.l4093:
+.y_up_var0_up:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_LoopYield|0 : dw $0033, .l4093             ; 52 passes
+    db !C3Op_LoopYield|0 : dw $0033, .y_up_var0_up             ; 52 passes
     db !C3Op_Add|8 : dw $0001
     db !C3Op_Poke8 : dw !WinFx_C3EMode : db 2
     db !C3Op_Driver : dw !C3_SndSfxA|($BA<<8), $0080
-.l40AE:
+.y_up_var0_up_b:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_LoopYield|0 : dw $0003, .l40AE             ; 4 passes
-.l40BD:
-    db !C3Op_LoopYield|1 : dw $0017, .l40BD             ; 24 passes
+    db !C3Op_LoopYield|0 : dw $0003, .y_up_var0_up_b             ; 4 passes
+.wait_24:
+    db !C3Op_LoopYield|1 : dw $0017, .wait_24             ; 24 passes
     db !C3Op_End
 
 ; $7E:40C3 — C3Mod_Prog0WipeB (106 bytes, $40C3–$412C)
@@ -3241,37 +3241,37 @@ C3Mod_Prog0WipeB:
     db !C3Op_Set|2 : dw $0040
     db !C3Op_Set|0 : dw $00FF
     db !C3Op_Set|8 : dw $0030
-.l40CF:
-    db !C3Op_LoopYield|1 : dw $0007, .l40CF             ; 8 passes
+.wait_8:
+    db !C3Op_LoopYield|1 : dw $0007, .wait_8             ; 8 passes
     db !C3Op_Poke8 : dw !WinFx_C3EMode : db 1
     db !C3Op_Yield
     db !C3Op_TaskAdd : dw C3Mod_ExitTask
     db !C3Op_Poke8 : dw !C3_Brightness : db 15
     db !C3Op_Driver : dw !C3_SndSfxA|($BA<<8), $0080
-.l40E5:
-    db !C3Op_LoopYield|1 : dw $0007, .l40E5             ; 8 passes
-.l40EA:
+.wait_8_b:
+    db !C3Op_LoopYield|1 : dw $0007, .wait_8_b             ; 8 passes
+.var0_down_var5_up_y_up:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|5 : dw $0004
     db !C3Op_Add|2 : dw $0001
-    db !C3Op_LoopYield|1 : dw $0003, .l40EA             ; 4 passes
+    db !C3Op_LoopYield|1 : dw $0003, .var0_down_var5_up_y_up             ; 4 passes
     db !C3Op_Add|8 : dw -$1
-    db !C3Op_Loop|0 : dw $001F, .l40EA                  ; 32 passes
-.l4100:
+    db !C3Op_Loop|0 : dw $001F, .var0_down_var5_up_y_up                  ; 32 passes
+.y_down_var5_up_var0_down:
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|5 : dw $0004
     db !C3Op_Add|0 : dw -$1
-    db !C3Op_LoopYield|0 : dw $003F, .l4100             ; 64 passes
-.l410E:
-    db !C3Op_LoopYield|1 : dw $0027, .l410E             ; 40 passes
-.l4113:
+    db !C3Op_LoopYield|0 : dw $003F, .y_down_var5_up_var0_down             ; 64 passes
+.wait_40:
+    db !C3Op_LoopYield|1 : dw $0027, .wait_40             ; 40 passes
+.y_down:
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $005F, .l4113             ; 96 passes
+    db !C3Op_LoopYield|0 : dw $005F, .y_down             ; 96 passes
     db !C3Op_Poke8 : dw !WinFx_C3EMode : db 2
     db !C3Op_Driver : dw !C3_SndSfxA|($BA<<8), $0080
-.l4124:
+.y_down_b:
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $001F, .l4124             ; 32 passes
+    db !C3Op_LoopYield|0 : dw $001F, .y_down_b             ; 32 passes
     db !C3Op_End
 
 ; $7E:412D — C3Mod_Prog0Start (49 bytes, $412D–$415D)
@@ -3310,8 +3310,8 @@ C3Mod_Prog0WipeScriptB:
     db !C3Op_Set|0 : dw $00FF
     db !C3Op_Set|6 : dw $00FF
     db !C3Op_Set|13 : dw $0001
-.l416A:
-    db !C3Op_JumpYield : dw .l416A
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:416D — C3Mod_DriftTask (57 bytes, $416D–$41A5)
 ; A task: on the two frames in four that have C3_FrameCount bit 1
@@ -3374,23 +3374,23 @@ C3Mod_DriftTask:
 C3Mod_Prog0Finish:
     db !C3Op_LoopYield|1 : dw $013F, C3Mod_Prog0Finish  ; 320 passes
     db !C3Op_TaskRemove : dw C3Mod_DriftTask
-.l41AE:
+.angle_up:
     db !C3Op_Add|5 : dw $0002
-    db !C3Op_LoopYield|1 : dw $0006, .l41AE             ; 7 passes
+    db !C3Op_LoopYield|1 : dw $0006, .angle_up             ; 7 passes
     db !C3Op_Add|5 : dw $0002
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw -$1
-    db !C3Op_LoopYield|0 : dw $001F, .l41AE             ; 32 passes
-.l41C4:
+    db !C3Op_LoopYield|0 : dw $001F, .angle_up             ; 32 passes
+.angle_up_b:
     db !C3Op_Add|5 : dw $0002
-    db !C3Op_LoopYield|1 : dw $0006, .l41C4             ; 7 passes
+    db !C3Op_LoopYield|1 : dw $0006, .angle_up_b             ; 7 passes
     db !C3Op_Add|5 : dw $0002
     db !C3Op_Add|2 : dw -$2
     db !C3Op_Add|0 : dw -$2
-    db !C3Op_LoopYield|0 : dw $001F, .l41C4             ; 32 passes
-.l41DA:
-    db !C3Op_LoopYield|1 : dw $006F, .l41DA             ; 112 passes
-.l41DF:
+    db !C3Op_LoopYield|0 : dw $001F, .angle_up_b             ; 32 passes
+.wait_112:
+    db !C3Op_LoopYield|1 : dw $006F, .wait_112             ; 112 passes
+.horizon_up_dist_up_scale_up:
     db !C3Op_Add|6 : dw $0001
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
@@ -3399,9 +3399,9 @@ C3Mod_Prog0Finish:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $0017, .l41DF             ; 24 passes
+    db !C3Op_LoopYield|0 : dw $0017, .horizon_up_dist_up_scale_up             ; 24 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l41F9:
+.horizon_up_dist_up_scale_up_b:
     db !C3Op_Add|6 : dw $0001
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
@@ -3410,7 +3410,7 @@ C3Mod_Prog0Finish:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $0017, .l41F9             ; 24 passes
+    db !C3Op_LoopYield|0 : dw $0017, .horizon_up_dist_up_scale_up_b             ; 24 passes
     db !C3Op_End
 
 ; $7E:4211 — C3Mod_Prog0Quit (60 bytes, $4211–$424C)
@@ -3425,20 +3425,20 @@ C3Mod_Prog0Quit:
     db !C3Op_Driver : dw !C3_SndStopSfx|($00<<8), $0000
     db !C3Op_Driver : dw !C3_SndStopSfx|($01<<8), $0000
     db !C3Op_Driver : dw !C3_SndTempoPitch|($40<<8), $0080
-.l4220:
-    db !C3Op_LoopYield|1 : dw $001F, .l4220             ; 32 passes
+.wait_32:
+    db !C3Op_LoopYield|1 : dw $001F, .wait_32             ; 32 passes
     db !C3Op_NmiAdd : dw C3Mod_RestoreColumnTask
     db !C3Op_Jump : dw .fade
 .copy:
     db !C3Op_Driver : dw !C3_SndStopSfx|($00<<8), $0000
     db !C3Op_Driver : dw !C3_SndStopSfx|($01<<8), $0000
     db !C3Op_Driver : dw !C3_SndTempoPitch|($40<<8), $0080
-.l423A:
-    db !C3Op_LoopYield|1 : dw $001F, .l423A             ; 32 passes
+.wait_32_b:
+    db !C3Op_LoopYield|1 : dw $001F, .wait_32_b             ; 32 passes
 .fade:
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l4242:
-    db !C3Op_LoopYield|1 : dw $007F, .l4242             ; 128 passes
+.wait_128:
+    db !C3Op_LoopYield|1 : dw $007F, .wait_128             ; 128 passes
     db !C3Op_Driver : dw !C3_SndStopAll|($00<<8), $0000
     db !C3Op_End
 
@@ -6773,14 +6773,14 @@ C3Mod_Prog4ScriptA:
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
     db !C3Op_NmiAdd : dw C3Mod_OamUploadTask
     db !C3Op_NmiAdd : dw C3Mod_PlaneNmiTask
-.l5555:
-    db !C3Op_LoopYield|1 : dw $0077, .l5555             ; 120 passes
+.wait_120:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120             ; 120 passes
     db !C3Op_Ppu, !Layer_Bg1Obj, TM-!DP_PPU
-.l555D:
+.scale_down:
     db !C3Op_Add|0 : dw -$40
-    db !C3Op_LoopYield|0 : dw $0035, .l555D             ; 54 passes
-.l5565:
-    db !C3Op_JumpYield : dw .l5565
+    db !C3Op_LoopYield|0 : dw $0035, .scale_down             ; 54 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:5568 — C3Mod_Prog4ScriptB (145 bytes, $5568–$55F8)
 ; Page $0B00's script in program 4 (its vars: 0 the stars' speed, 1
@@ -6800,58 +6800,58 @@ C3Mod_Prog4ScriptA:
 C3Mod_Prog4ScriptB:
     db !C3Op_Set|0 : dw -$1
     db !C3Op_Set|2 : dw -$1
-.l556E:
-    db !C3Op_LoopYield|1 : dw $0081, .l556E             ; 130 passes
+.wait_130:
+    db !C3Op_LoopYield|1 : dw $0081, .wait_130             ; 130 passes
     db !C3Op_Set|2 : dw $0000
-.l5576:
+.speed_up:
     db !C3Op_Add|0 : dw $0001
-.l5579:
-    db !C3Op_LoopYield|2 : dw $0001, .l5579             ; 2 passes
-    db !C3Op_LoopYield|0 : dw $0007, .l5576             ; 8 passes
-.l5583:
-    db !C3Op_LoopYield|1 : dw $0059, .l5583             ; 90 passes
+.wait_2:
+    db !C3Op_LoopYield|2 : dw $0001, .wait_2             ; 2 passes
+    db !C3Op_LoopYield|0 : dw $0007, .speed_up             ; 8 passes
+.wait_90:
+    db !C3Op_LoopYield|1 : dw $0059, .wait_90             ; 90 passes
     db !C3Op_TaskAdd : dw C3Mod_StarDriftTask
     db !C3Op_Set|5 : dw $0200
-.l558E:
+.drift_angle_up:
     db !C3Op_Add|5 : dw $0002
-    db !C3Op_LoopYield|1 : dw $0043, .l558E             ; 68 passes
-    db !C3Op_Loop|0 : dw $0002, .l558E                  ; 3 passes
+    db !C3Op_LoopYield|1 : dw $0043, .drift_angle_up             ; 68 passes
+    db !C3Op_Loop|0 : dw $0002, .drift_angle_up                  ; 3 passes
     db !C3Op_TaskAdd : dw C3Mod_DriftTurnTask
-.l559E:
+.drift_y_up:
     db !C3Op_Add|2 : dw $0001
-.l55A1:
-    db !C3Op_LoopYield|2 : dw $000F, .l55A1             ; 16 passes
-    db !C3Op_Loop|0 : dw $0007, .l559E                  ; 8 passes
-.l55AB:
+.wait_16:
+    db !C3Op_LoopYield|2 : dw $000F, .wait_16             ; 16 passes
+    db !C3Op_Loop|0 : dw $0007, .drift_y_up                  ; 8 passes
+.drift_y_down:
     db !C3Op_Add|2 : dw -$1
-.l55AE:
-    db !C3Op_LoopYield|2 : dw $000F, .l55AE             ; 16 passes
-    db !C3Op_Loop|0 : dw $000F, .l55AB                  ; 16 passes
-.l55B8:
+.wait_16_b:
+    db !C3Op_LoopYield|2 : dw $000F, .wait_16_b             ; 16 passes
+    db !C3Op_Loop|0 : dw $000F, .drift_y_down                  ; 16 passes
+.drift_y_up_b:
     db !C3Op_Add|2 : dw $0001
-.l55BB:
-    db !C3Op_LoopYield|2 : dw $000F, .l55BB             ; 16 passes
-    db !C3Op_Loop|0 : dw $0007, .l55B8                  ; 8 passes
-.l55C5:
-    db !C3Op_LoopYield|1 : dw $0033, .l55C5             ; 52 passes
+.wait_16_c:
+    db !C3Op_LoopYield|2 : dw $000F, .wait_16_c             ; 16 passes
+    db !C3Op_Loop|0 : dw $0007, .drift_y_up_b                  ; 8 passes
+.wait_52:
+    db !C3Op_LoopYield|1 : dw $0033, .wait_52             ; 52 passes
     db !C3Op_TaskRemove : dw C3Mod_DriftTurnTask
-.l55CD:
-    db !C3Op_LoopYield|1 : dw $003B, .l55CD             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_TaskRemove : dw C3Mod_StarDriftTask
     db !C3Op_CallW : dw C3Mod_Prog4ToZoomOut
-.l55D8:
+.speed_up_b:
     db !C3Op_Add|0 : dw $0001
-.l55DB:
-    db !C3Op_LoopYield|2 : dw $0003, .l55DB             ; 4 passes
-    db !C3Op_LoopYield|0 : dw $0007, .l55D8             ; 8 passes
-.l55E5:
-    db !C3Op_LoopYield|1 : dw $003B, .l55E5             ; 60 passes
+.wait_4:
+    db !C3Op_LoopYield|2 : dw $0003, .wait_4             ; 4 passes
+    db !C3Op_LoopYield|0 : dw $0007, .speed_up_b             ; 8 passes
+.wait_60_b:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_b             ; 60 passes
     db !C3Op_CallW : dw C3Mod_Prog4ToEnd
     db !C3Op_Set|0 : dw $0000
     db !C3Op_Set|1 : dw $0000
     db !C3Op_Set|2 : dw $0000
-.l55F6:
-    db !C3Op_JumpYield : dw .l55F6
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:55F9 — C3Mod_DriftTurnTask (11 bytes, $55F9–$5603)
 ; A task: page $0B00's C3_DriftAngle + 2 (CLC) each frame (the stars'
@@ -6879,21 +6879,21 @@ C3Mod_Prog4End:
     db !C3Op_Set|0 : dw $0000
     db !C3Op_Set|1 : dw -$E0
     db !C3Op_Set|2 : dw $0000
-.l5610:
+.scroll_y_down_scale_up_scroll_x_up:
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw $0007
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0001
     db !C3Op_Add|0 : dw $0007
-    db !C3Op_LoopYield|0 : dw $00B7, .l5610             ; 184 passes
-.l5622:
-    db !C3Op_LoopYield|1 : dw $0013, .l5622             ; 20 passes
+    db !C3Op_LoopYield|0 : dw $00B7, .scroll_y_down_scale_up_scroll_x_up             ; 184 passes
+.wait_20:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20             ; 20 passes
     db !C3Op_Ppu, !TM_Obj, TM-!DP_PPU
-.l562A:
-    db !C3Op_LoopYield|1 : dw $003B, .l562A             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
-.l5632:
-    db !C3Op_JumpYield : dw .l5632
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:5635 — C3Mod_Prog4ZoomOut (11 bytes, $5635–$563F)
 ; Page $0A00's script from C3Mod_Prog4ToZoomOut: 54 frames of the scale
@@ -6901,8 +6901,8 @@ C3Mod_Prog4End:
 C3Mod_Prog4ZoomOut:
     db !C3Op_Add|0 : dw $0040
     db !C3Op_LoopYield|0 : dw $0035, C3Mod_Prog4ZoomOut ; 54 passes
-.l563D:
-    db !C3Op_JumpYield : dw .l563D
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:5640 — C3Mod_Prog4ToEnd (13 bytes, $5640–$564C)
 ; A script routine (opcode $x0), also called by code: writes $0080 over
@@ -7751,18 +7751,18 @@ C3Mod_Prog2Script:
     db !C3Op_Set|6 : dw $0007
     db !C3Op_Set|1 : dw -$C0
     db !C3Op_Set|0 : dw $0080
-.l5B38:
+.scale_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $007F, .l5B38             ; 128 passes
-.l5B43:
-    db !C3Op_LoopYield|1 : dw $004D, .l5B43             ; 78 passes
+    db !C3Op_LoopYield|0 : dw $007F, .scale_up             ; 128 passes
+.wait_78:
+    db !C3Op_LoopYield|1 : dw $004D, .wait_78             ; 78 passes
     db !C3Op_TaskAdd : dw C3Mod_SwingDrawTask
     db !C3Op_TaskAdd : dw C3Mod_SwingTask
-.l5B4E:
-    db !C3Op_JumpYield : dw .l5B4E
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:5B51 — C3Mod_Prog2Wave (72 bytes, $5B51–$5B98)
 ; Page $0A00's script from the end of the swing (C3Mod_SwingTask): 85
@@ -7784,26 +7784,26 @@ C3Mod_Prog2Wave:
     db !C3Op_TaskRemove : dw C3Mod_RockTask
     db !C3Op_Yield
     db !C3Op_CallW : dw C3Mod_Prog2ToMode2
-.l5B63:
-    db !C3Op_LoopYield|1 : dw $00B7, .l5B63             ; 184 passes
-.l5B68:
+.wait_184:
+    db !C3Op_LoopYield|1 : dw $00B7, .wait_184             ; 184 passes
+.scroll_x_up:
     db !C3Op_Add|1 : dw $0002
-    db !C3Op_LoopYield|0 : dw $0067, .l5B68             ; 104 passes
+    db !C3Op_LoopYield|0 : dw $0067, .scroll_x_up             ; 104 passes
     db !C3Op_CallW : dw C3Mod_PalWhitenAnim
     db !C3Op_TaskAdd : dw C3Mod_SidePicTask
-.l5B76:
-    db !C3Op_LoopYield|1 : dw $0077, .l5B76             ; 120 passes
+.wait_120:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120             ; 120 passes
     db !C3Op_TaskAdd : dw C3Mod_WaveCountTask
-.l5B7E:
-    db !C3Op_LoopYield|1 : dw $0077, .l5B7E             ; 120 passes
+.wait_120_b:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120_b             ; 120 passes
     db !C3Op_CallW : dw C3Mod_PalFadeAnim
     db !C3Op_TaskAdd : dw C3Mod_BottomPicTask
-.l5B89:
-    db !C3Op_LoopYield|1 : dw $02CF, .l5B89             ; 720 passes
+.wait_720:
+    db !C3Op_LoopYield|1 : dw $02CF, .wait_720             ; 720 passes
     db !C3Op_Poke8 : dw !C3_Prog2Done : db 1
     db !C3Op_TaskAdd : dw C3Mod_MusicFadeTask
-.l5B95:
-    db !C3Op_JumpYield : dw .l5B95
+.hold:
+    db !C3Op_JumpYield : dw .hold
     db !C3Op_End
 
 ; $7E:5B99 — C3Mod_SkipTask (38 bytes, $5B99–$5BBE)
@@ -8876,33 +8876,33 @@ C3Mod_Prog7:
 C3Mod_Prog7Script:
     db !C3Op_Call : dw C3Mod_Prog7Start
     db !C3Op_TaskAdd : dw C3Mod_SparksTask
-.l6343:
-    db !C3Op_LoopYield|1 : dw $0077, .l6343             ; 120 passes
+.wait_120:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120             ; 120 passes
     db !C3Op_TaskAdd : dw C3Mod_PalFadeTask
     db !C3Op_CallW : dw C3Mod_Prog7Fade
-.l634E:
-    db !C3Op_LoopYield|1 : dw $00B3, .l634E             ; 180 passes
+.wait_180:
+    db !C3Op_LoopYield|1 : dw $00B3, .wait_180             ; 180 passes
     db !C3Op_Poke8 : dw !C3_Prog9 : db 1
-.l6357:
-    db !C3Op_LoopYield|1 : dw $0077, .l6357             ; 120 passes
+.wait_120_b:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120_b             ; 120 passes
     db !C3Op_Ppu, !CGADSUB_AddBg1Backdrop, CGADSUB-!DP_PPU
     db !C3Op_CallW : dw C3Mod_Prog7FadeSlow
     db !C3Op_Poke8 : dw !C3_EntryArg : db 7
-.l6366:
-    db !C3Op_LoopYield|1 : dw $00E5, .l6366             ; 230 passes
+.wait_230:
+    db !C3Op_LoopYield|1 : dw $00E5, .wait_230             ; 230 passes
     db !C3Op_Poke8 : dw !C3_SongReq : db !C3_SongProg7
-.l636F:
-    db !C3Op_LoopYield|1 : dw $0009, .l636F             ; 10 passes
+.wait_10:
+    db !C3Op_LoopYield|1 : dw $0009, .wait_10             ; 10 passes
     db !C3Op_TaskRemove : dw C3Mod_SparksTask
     db !C3Op_TaskAdd : dw C3Mod_TextTask
     db !C3Op_CallW : dw C3Mod_PalFadeAnim
     db !C3Op_Poke8 : dw FieldAnimB.Unk3 : db 2
     db !C3Op_Poke8 : dw FieldAnimB.Unk1 : db !C3_TextColours
-.l6385:
-    db !C3Op_LoopYield|1 : dw $007F, .l6385             ; 128 passes
+.wait_128:
+    db !C3Op_LoopYield|1 : dw $007F, .wait_128             ; 128 passes
     db !C3Op_TaskAdd : dw C3Mod_ResetWaitTask
-.l638D:
-    db !C3Op_JumpYield : dw .l638D
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:6390 — C3Mod_Prog7Start (22 bytes, $6390–$63A5)
 ; A script subroutine (opcode $F3) of both programs' scripts: var 0 =
@@ -8929,22 +8929,22 @@ C3Mod_Prog7Start:
 ; never added) and the song is not changed.
 C3Mod_Prog8Script:
     db !C3Op_Call : dw C3Mod_Prog7Start
-.l63A9:
-    db !C3Op_LoopYield|1 : dw $0077, .l63A9             ; 120 passes
+.wait_120:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120             ; 120 passes
     db !C3Op_TaskAdd : dw C3Mod_PalFadeTask
     db !C3Op_CallW : dw C3Mod_Prog8Fade
-.l63B4:
-    db !C3Op_LoopYield|1 : dw $0077, .l63B4             ; 120 passes
+.wait_120_b:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120_b             ; 120 passes
     db !C3Op_Ppu, !CGADSUB_AddBg1Backdrop, CGADSUB-!DP_PPU
     db !C3Op_TaskAdd : dw C3Mod_TextTask
     db !C3Op_CallW : dw C3Mod_PalFadeAnim
     db !C3Op_Poke8 : dw FieldAnimB.Unk3 : db 2
     db !C3Op_Poke8 : dw FieldAnimB.Unk1 : db !C3_TextColours
-.l63CA:
-    db !C3Op_LoopYield|1 : dw $007F, .l63CA             ; 128 passes
+.wait_128:
+    db !C3Op_LoopYield|1 : dw $007F, .wait_128             ; 128 passes
     db !C3Op_TaskAdd : dw C3Mod_ResetWaitTask
-.l63D2:
-    db !C3Op_JumpYield : dw .l63D2
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:63D5 — C3Mod_ResetWaitTask (32 bytes, $63D5–$63F4)
 ; A task: waits for any button (C3_Pad, 16-bit: BEQ while 0); then the
@@ -9837,8 +9837,8 @@ C3Mod_WipeTableB:
 C3Mod_Prog3WipeA:
     db !C3Op_Call : dw C3Mod_Prog3Start
     db !C3Op_TaskAdd : dw C3Mod_Prog3WipeTask
-.l689E:
-    db !C3Op_JumpYield : dw .l689E
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:68A1 — C3Mod_Prog3WipeB (97 bytes, $68A1–$6901)
 ; Page $0B00's script in that run (its vars: 0 the wave's size
@@ -9862,34 +9862,34 @@ C3Mod_Prog3WipeB:
     db !C3Op_Yield
     db !C3Op_Poke8 : dw !C3_Brightness : db !C3_BrightnessFull
     db !C3Op_Poke8 : dw !WinFx_C3EMode : db !WinFx_C3EMode2
-.l68B8:
-    db !C3Op_LoopYield|1 : dw $001F, .l68B8             ; 32 passes
+.wait_32:
+    db !C3Op_LoopYield|1 : dw $001F, .wait_32             ; 32 passes
     db !C3Op_TaskAdd : dw C3Mod_ExitTask
     db !C3Op_Add|0 : dw -$1
-.l68C3:
-    db !C3Op_LoopYield|1 : dw $003B, .l68C3             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_Add|0 : dw -$1
-.l68CB:
-    db !C3Op_LoopYield|1 : dw $003B, .l68CB             ; 60 passes
+.wait_60_b:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_b             ; 60 passes
     db !C3Op_Add|0 : dw -$1
-.l68D3:
-    db !C3Op_LoopYield|1 : dw $0018, .l68D3             ; 25 passes
+.wait_25:
+    db !C3Op_LoopYield|1 : dw $0018, .wait_25             ; 25 passes
     db !C3Op_Add|0 : dw -$1
-.l68DB:
-    db !C3Op_LoopYield|1 : dw $0018, .l68DB             ; 25 passes
+.wait_25_b:
+    db !C3Op_LoopYield|1 : dw $0018, .wait_25_b             ; 25 passes
     db !C3Op_Add|0 : dw -$1
-.l68E3:
-    db !C3Op_LoopYield|1 : dw $000E, .l68E3             ; 15 passes
+.wait_15:
+    db !C3Op_LoopYield|1 : dw $000E, .wait_15             ; 15 passes
     db !C3Op_Add|0 : dw -$1
-.l68EB:
-    db !C3Op_LoopYield|1 : dw $001D, .l68EB             ; 30 passes
+.wait_30:
+    db !C3Op_LoopYield|1 : dw $001D, .wait_30             ; 30 passes
     db !C3Op_Poke8 : dw !WinFx_C3EMode : db !WinFx_C3EMode1
     db !C3Op_Driver : dw !C3_SndSfxA|(!C3_SfxWipe<<8), !C3_SfxArg1
-.l68F9:
-    db !C3Op_LoopYield|1 : dw $001F, .l68F9             ; 32 passes
+.wait_32_b:
+    db !C3Op_LoopYield|1 : dw $001F, .wait_32_b             ; 32 passes
     db !C3Op_End
-.l68FF:
-    db !C3Op_JumpYield : dw .l68FF
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:6902 — C3Mod_Prog3ScriptA (9 bytes, $6902–$690A)
 ; Page $0A00's script in program 3 otherwise: C3Mod_Prog3Start,
@@ -9897,8 +9897,8 @@ C3Mod_Prog3WipeB:
 C3Mod_Prog3ScriptA:
     db !C3Op_Call : dw C3Mod_Prog3Start
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
-.l6908:
-    db !C3Op_JumpYield : dw .l6908
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:690B — C3Mod_Prog3Unused (47 bytes, $690B–$6939)
 ; A page script that nothing starts (no reference to $690B was found;
@@ -9911,7 +9911,7 @@ C3Mod_Prog3Unused:
     db !C3Op_Yield
     db !C3Op_Add|5 : dw $000A
     db !C3Op_LoopYield|0 : dw $0017, C3Mod_Prog3Unused  ; 24 passes
-.l691A:
+.wave_up_var5_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|5 : dw $0006
     db !C3Op_Yield
@@ -9920,11 +9920,11 @@ C3Mod_Prog3Unused:
     db !C3Op_Add|5 : dw $0005
     db !C3Op_Yield
     db !C3Op_Add|5 : dw $0005
-    db !C3Op_LoopYield|0 : dw $0017, .l691A             ; 24 passes
+    db !C3Op_LoopYield|0 : dw $0017, .wave_up_var5_up             ; 24 passes
     db !C3Op_Set|0 : dw $0020
     db !C3Op_Set|5 : dw $0200
-.l6937:
-    db !C3Op_JumpYield : dw .l6937
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:693A — C3Mod_Prog3ScriptB (74 bytes, $693A–$6983)
 ; Page $0B00's script in program 3 otherwise: var 2 = $1B0, var 1 = -1,
@@ -9936,32 +9936,32 @@ C3Mod_Prog3ScriptB:
     db !C3Op_Set|2 : dw $01B0
     db !C3Op_Set|1 : dw -$1
     db !C3Op_Set|0 : dw $0006
-.l6943:
-    db !C3Op_LoopYield|1 : dw $001F, .l6943             ; 32 passes
+.wait_32:
+    db !C3Op_LoopYield|1 : dw $001F, .wait_32             ; 32 passes
     db !C3Op_Add|0 : dw -$1
-.l694B:
-    db !C3Op_LoopYield|1 : dw $0077, .l694B             ; 120 passes
+.wait_120:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120             ; 120 passes
     db !C3Op_Add|0 : dw -$1
-.l6953:
-    db !C3Op_LoopYield|1 : dw $0077, .l6953             ; 120 passes
+.wait_120_b:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120_b             ; 120 passes
     db !C3Op_Add|0 : dw -$1
-.l695B:
-    db !C3Op_LoopYield|1 : dw $0031, .l695B             ; 50 passes
+.wait_50:
+    db !C3Op_LoopYield|1 : dw $0031, .wait_50             ; 50 passes
     db !C3Op_Add|0 : dw -$1
-.l6963:
-    db !C3Op_LoopYield|1 : dw $0031, .l6963             ; 50 passes
+.wait_50_b:
+    db !C3Op_LoopYield|1 : dw $0031, .wait_50_b             ; 50 passes
     db !C3Op_Add|0 : dw -$1
-.l696B:
-    db !C3Op_LoopYield|1 : dw $001D, .l696B             ; 30 passes
+.wait_30:
+    db !C3Op_LoopYield|1 : dw $001D, .wait_30             ; 30 passes
     db !C3Op_Add|0 : dw -$1
-.l6973:
-    db !C3Op_LoopYield|1 : dw $0077, .l6973             ; 120 passes
+.wait_120_c:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120_c             ; 120 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
-.l697B:
-    db !C3Op_LoopYield|1 : dw $003F, .l697B             ; 64 passes
+.wait_64:
+    db !C3Op_LoopYield|1 : dw $003F, .wait_64             ; 64 passes
     db !C3Op_End
-.l6981:
-    db !C3Op_JumpYield : dw .l6981
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:6984 — C3Mod_Prog3Start (43 bytes, $6984–$69AE)
 ; A script subroutine (opcode $F3) of both page $0A00 scripts: the
@@ -11060,74 +11060,74 @@ C3Mod_Prog5ScriptB:
     db !C3Op_TaskAdd : dw C3Mod_Prog5MosaicTask
     db !C3Op_Poke8 : dw !C3_MosaicDelay : db 20
     db !C3Op_Poke8 : dw !C3_MosaicEvery : db 20
-.l71BC:
-    db !C3Op_LoopYield|1 : dw $003B, .l71BC             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_Poke8 : dw !C3_MosaicEvery : db 10
-.l71C5:
-    db !C3Op_LoopYield|1 : dw $003B, .l71C5             ; 60 passes
+.wait_60_b:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_b             ; 60 passes
     db !C3Op_Poke8 : dw !C3_MosaicEvery : db 8
-.l71CE:
-    db !C3Op_LoopYield|1 : dw $003B, .l71CE             ; 60 passes
+.wait_60_c:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_c             ; 60 passes
     db !C3Op_Poke8 : dw !C3_MosaicEvery : db 4
-.l71D7:
-    db !C3Op_LoopYield|1 : dw $003B, .l71D7             ; 60 passes
+.wait_60_d:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_d             ; 60 passes
     db !C3Op_TaskRemove : dw C3Mod_MosaicTimerTask
     db !C3Op_Yield
     db !C3Op_Poke8 : dw !C3_MosaicStep : db !C3_MosaicRandom
     db !C3Op_Poke8 : dw !C3_DriftOn : db 1
-.l71E8:
-    db !C3Op_LoopYield|1 : dw $0077, .l71E8             ; 120 passes
-.l71ED:
-    db !C3Op_LoopYield|2 : dw $0009, .l71ED             ; 10 passes
+.wait_120:
+    db !C3Op_LoopYield|1 : dw $0077, .wait_120             ; 120 passes
+.wait_10:
+    db !C3Op_LoopYield|2 : dw $0009, .wait_10             ; 10 passes
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_Loop|0 : dw $001F, .l71ED                  ; 32 passes
-.l71FD:
-    db !C3Op_LoopYield|2 : dw $0003, .l71FD             ; 4 passes
+    db !C3Op_Loop|0 : dw $001F, .wait_10                  ; 32 passes
+.wait_4:
+    db !C3Op_LoopYield|2 : dw $0003, .wait_4             ; 4 passes
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_Loop|0 : dw $000F, .l71FD                  ; 16 passes
+    db !C3Op_Loop|0 : dw $000F, .wait_4                  ; 16 passes
     db !C3Op_Poke8 : dw !C3_SongReq : db !C3_SongProg7
-.l720E:
-    db !C3Op_LoopYield|2 : dw $0003, .l720E             ; 4 passes
+.wait_4_b:
+    db !C3Op_LoopYield|2 : dw $0003, .wait_4_b             ; 4 passes
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_Loop|0 : dw $002F, .l720E                  ; 48 passes
-.l721B:
-    db !C3Op_LoopYield|1 : dw $0027, .l721B             ; 40 passes
+    db !C3Op_Loop|0 : dw $002F, .wait_4_b                  ; 48 passes
+.wait_40:
+    db !C3Op_LoopYield|1 : dw $0027, .wait_40             ; 40 passes
     db !C3Op_TaskAdd : dw C3Mod_RadiusTask
-.l7223:
-    db !C3Op_LoopYield|1 : dw $0013, .l7223             ; 20 passes
+.wait_20:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20             ; 20 passes
     db !C3Op_Ppu, !C3_Prog5ObjWindows, WOBJSEL-!DP_PPU
     db !C3Op_Poke8 : dw !C3_DriftOn : db 0
-.l722F:
+.circle2_down:
     db !C3Op_Add|0 : dw -$3
-    db !C3Op_LoopYield|0 : dw $001F, .l722F             ; 32 passes
+    db !C3Op_LoopYield|0 : dw $001F, .circle2_down             ; 32 passes
     db !C3Op_Set|0 : dw $0000
     db !C3Op_Set|2 : dw $0000
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 6
-.l7241:
-    db !C3Op_LoopYield|1 : dw $0005, .l7241             ; 6 passes
+.wait_6:
+    db !C3Op_LoopYield|1 : dw $0005, .wait_6             ; 6 passes
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 5
-.l724A:
-    db !C3Op_LoopYield|1 : dw $0007, .l724A             ; 8 passes
+.wait_8:
+    db !C3Op_LoopYield|1 : dw $0007, .wait_8             ; 8 passes
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 4
-.l7253:
-    db !C3Op_LoopYield|1 : dw $0009, .l7253             ; 10 passes
+.wait_10_b:
+    db !C3Op_LoopYield|1 : dw $0009, .wait_10_b             ; 10 passes
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 3
-.l725C:
-    db !C3Op_LoopYield|1 : dw $000F, .l725C             ; 16 passes
+.wait_16:
+    db !C3Op_LoopYield|1 : dw $000F, .wait_16             ; 16 passes
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 2
-.l7265:
-    db !C3Op_LoopYield|1 : dw $0013, .l7265             ; 20 passes
+.wait_20_b:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20_b             ; 20 passes
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 1
-.l726E:
-    db !C3Op_LoopYield|1 : dw $0013, .l726E             ; 20 passes
+.wait_20_c:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20_c             ; 20 passes
     db !C3Op_Poke8 : dw !C3_MosaicStep : db 0
-.l7277:
-    db !C3Op_LoopYield|1 : dw $0013, .l7277             ; 20 passes
+.wait_20_d:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20_d             ; 20 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog5MosaicTask
     db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
-.l7282:
-    db !C3Op_JumpYield : dw .l7282
+.hold:
+    db !C3Op_JumpYield : dw .hold
     db !C3Op_End
 
 ; $7E:7286 — C3Mod_PickDrift (22 bytes, $7286–$729B)
@@ -11170,14 +11170,14 @@ C3Mod_Drift0:
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_LoopYield|0 : dw $0007, C3Mod_Drift0       ; 8 passes
-.l72AE:
+.scale_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $0013, .l72AE             ; 20 passes
-.l72B7:
+    db !C3Op_LoopYield|0 : dw $0013, .scale_down             ; 20 passes
+.scale_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $000B, .l72B7             ; 12 passes
+    db !C3Op_LoopYield|0 : dw $000B, .scale_up             ; 12 passes
     db !C3Op_Jump : dw C3Mod_Prog5Drift
 
 ; $7E:72C3 — C3Mod_Drift1 (33 bytes, $72C3–$72E3)
@@ -11187,13 +11187,13 @@ C3Mod_Drift1:
     db !C3Op_Add|5 : dw $0010
     db !C3Op_Add|0 : dw $0002
     db !C3Op_LoopYield|0 : dw $001F, C3Mod_Drift1       ; 32 passes
-.l72CE:
+.angle_up:
     db !C3Op_Add|5 : dw $0008
-    db !C3Op_LoopYield|0 : dw $002F, .l72CE             ; 48 passes
-.l72D6:
+    db !C3Op_LoopYield|0 : dw $002F, .angle_up             ; 48 passes
+.angle_up_scale_down:
     db !C3Op_Add|5 : dw $0004
     db !C3Op_Add|0 : dw -$2
-    db !C3Op_LoopYield|0 : dw $001F, .l72D6             ; 32 passes
+    db !C3Op_LoopYield|0 : dw $001F, .angle_up_scale_down             ; 32 passes
     db !C3Op_Jump : dw C3Mod_Prog5Drift
 
 ; $7E:72E4 — C3Mod_Drift2 (24 bytes, $72E4–$72FB)
@@ -11202,12 +11202,12 @@ C3Mod_Drift1:
 C3Mod_Drift2:
     db !C3Op_Add|5 : dw -$20
     db !C3Op_LoopYield|0 : dw $000F, C3Mod_Drift2       ; 16 passes
-.l72EC:
+.angle_down:
     db !C3Op_Add|5 : dw -$10
-    db !C3Op_LoopYield|0 : dw $0017, .l72EC             ; 24 passes
-.l72F4:
+    db !C3Op_LoopYield|0 : dw $0017, .angle_down             ; 24 passes
+.angle_down_b:
     db !C3Op_Add|5 : dw -$8
-    db !C3Op_LoopYield|0 : dw $000F, .l72F4             ; 16 passes
+    db !C3Op_LoopYield|0 : dw $000F, .angle_down_b             ; 16 passes
 
 ; $7E:72FC — C3Mod_Drift3 (3 bytes, $72FC–$72FE)
 ; No drift: straight back to C3Mod_Prog5Drift.
@@ -13122,8 +13122,8 @@ C3Mod_Prog6Script:
     db !C3Op_Set|9 : dw $0000
     db !C3Op_Set|5 : dw $0200
     db !C3Op_Poke8 : dw !C3_Prog6HorizonMask : db 0
-.l7CB5:
-    db !C3Op_JumpYield : dw .l7CB5
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:7CB8 — C3Mod_Prog6Brake (28 bytes, $7CB8–$7CD3)
 ; Page $0A00's script from $7D12 on (C3Mod_Prog6ScriptB's word poke of
@@ -13134,14 +13134,14 @@ C3Mod_Prog6Brake:
     db !C3Op_Driver : dw !C3_SndSfxA|($DA<<8), $0080
     db !C3Op_Set|8 : dw -$6
     db !C3Op_Set|10 : dw $0000
-.l7CC3:
-    db !C3Op_LoopYield|1 : dw $0013, .l7CC3             ; 20 passes
-.l7CC8:
+.wait_20:
+    db !C3Op_LoopYield|1 : dw $0013, .wait_20             ; 20 passes
+.step_down:
     db !C3Op_Add|8 : dw -$2
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $0005, .l7CC8             ; 6 passes
-.l7CD1:
-    db !C3Op_JumpYield : dw .l7CD1
+    db !C3Op_LoopYield|0 : dw $0005, .step_down             ; 6 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:7CD4 — C3Mod_Prog6Dive (31 bytes, $7CD4–$7CF2)
 ; Page $0A00's script from $7DC8 on: C3_Prog6HorizonMask = 1; sound
@@ -13152,14 +13152,14 @@ C3Mod_Prog6Dive:
     db !C3Op_Poke8 : dw !C3_Prog6HorizonMask : db 1
     db !C3Op_Driver : dw !C3_SndSfxA|($DB<<8), $0080
     db !C3Op_Set|8 : dw $000D
-.l7CE0:
+.scale_down:
     db !C3Op_Add|0 : dw -$4
-    db !C3Op_LoopYield|0 : dw $001F, .l7CE0             ; 32 passes
-.l7CE8:
+    db !C3Op_LoopYield|0 : dw $001F, .scale_down             ; 32 passes
+.scale_up:
     db !C3Op_Add|0 : dw $0002
-    db !C3Op_LoopYield|0 : dw $003F, .l7CE8             ; 64 passes
-.l7CF0:
-    db !C3Op_JumpYield : dw .l7CF0
+    db !C3Op_LoopYield|0 : dw $003F, .scale_up             ; 64 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:7CF3 — C3Mod_Prog6ScriptB (468 bytes, $7CF3–$7EC6)
 ; Page $0B00's script in program 6 (its vars: 0 the scaled picture's
@@ -13214,11 +13214,11 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Set|1 : dw $0000
     db !C3Op_NmiAdd : dw C3Mod_UploadPalette
     db !C3Op_CallW : dw C3Mod_Prog6PalIn
-.l7CFF:
-    db !C3Op_LoopYield|1 : dw $003B, .l7CFF             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_TaskAdd : dw C3Mod_PalAnimTask
-.l7D07:
-    db !C3Op_LoopYield|1 : dw $012B, .l7D07             ; 300 passes
+.wait_300:
+    db !C3Op_LoopYield|1 : dw $012B, .wait_300             ; 300 passes
     db !C3Op_TaskRemove : dw C3Mod_PalAnimTask
     db !C3Op_NmiRemove : dw C3Mod_UploadPalette
     db !C3Op_Poke16 : dw !C3_ScriptPageA+!C3Script_Ptr, C3Mod_Prog6Brake
@@ -13234,13 +13234,13 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Yield
     db !C3Op_Ppu, !Layer_Bg1Obj, TS-!DP_PPU
     db !C3Op_Ppu, !Layer_Bg12Obj, TMW-!DP_PPU
-.l7D39:
+.var10_down_pic_x_up:
     db !C3Op_Add|10 : dw -$1
     db !C3Op_AddVar|1, 20                               ; var 1 += var 10
-    db !C3Op_LoopYield|0 : dw $0016, .l7D39             ; 23 passes
-.l7D43:
-    db !C3Op_LoopYield|1 : dw $0028, .l7D43             ; 41 passes
-.l7D48:
+    db !C3Op_LoopYield|0 : dw $0016, .var10_down_pic_x_up             ; 23 passes
+.wait_41:
+    db !C3Op_LoopYield|1 : dw $0028, .wait_41             ; 41 passes
+.pic_x_up_pic_y_up_size_up:
     db !C3Op_Add|1 : dw $0003
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0002
@@ -13250,8 +13250,8 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0003
     db !C3Op_Add|0 : dw $0002
-    db !C3Op_LoopYield|0 : dw $0007, .l7D48             ; 8 passes
-.l7D64:
+    db !C3Op_LoopYield|0 : dw $0007, .pic_x_up_pic_y_up_size_up             ; 8 passes
+.pic_x_up_pic_y_down_size_down:
     db !C3Op_Add|1 : dw $0002
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw -$2
@@ -13261,32 +13261,32 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0002
     db !C3Op_Add|0 : dw -$2
-    db !C3Op_LoopYield|0 : dw $000F, .l7D64             ; 16 passes
-.l7D80:
+    db !C3Op_LoopYield|0 : dw $000F, .pic_x_up_pic_y_down_size_down             ; 16 passes
+.pic_x_up_pic_y_up_size_up_b:
     db !C3Op_Add|1 : dw $0001
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0002
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l7D80             ; 16 passes
+    db !C3Op_LoopYield|0 : dw $000F, .pic_x_up_pic_y_up_size_up_b             ; 16 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog6RadiusTask
-.l7D95:
+.radius_down:
     db !C3Op_Add|6 : dw -$1
-    db !C3Op_LoopYield|0 : dw $0005, .l7D95             ; 6 passes
-.l7D9D:
+    db !C3Op_LoopYield|0 : dw $0005, .radius_down             ; 6 passes
+.radius_down_pic_x_down:
     db !C3Op_Add|6 : dw -$1
     db !C3Op_Add|1 : dw -$2
-    db !C3Op_LoopYield|0 : dw $0009, .l7D9D             ; 10 passes
+    db !C3Op_LoopYield|0 : dw $0009, .radius_down_pic_x_down             ; 10 passes
     db !C3Op_Ppu, 0, TMW-!DP_PPU
     db !C3Op_TaskRemove : dw C3Mod_Prog6CircleTask
     db !C3Op_Set|10 : dw $0000
-.l7DB1:
+.var10_down_pic_x_up_b:
     db !C3Op_Add|10 : dw -$1
     db !C3Op_AddVar|1, 20                               ; var 1 += var 10
-    db !C3Op_LoopYield|0 : dw $0011, .l7DB1             ; 18 passes
+    db !C3Op_LoopYield|0 : dw $0011, .var10_down_pic_x_up_b             ; 18 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog6Sprites
-.l7DBE:
-    db !C3Op_LoopYield|1 : dw $0031, .l7DBE             ; 50 passes
+.wait_50:
+    db !C3Op_LoopYield|1 : dw $0031, .wait_50             ; 50 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageA+!C3_M7Angle, $0200
     db !C3Op_Poke16 : dw !C3_ScriptPageA+!C3Script_Ptr, C3Mod_Prog6Dive
     db !C3Op_Set|1 : dw $0000
@@ -13294,8 +13294,8 @@ C3Mod_Prog6ScriptB:
     db !C3Op_TaskAdd : dw C3Mod_Prog6ShuffleTask
     db !C3Op_NmiAdd : dw C3Mod_Prog6HalfNmi
     db !C3Op_NmiAdd : dw C3Mod_Prog6StripNmi
-.l7DDC:
-    db !C3Op_LoopYield|1 : dw $00B3, .l7DDC             ; 180 passes
+.wait_180:
+    db !C3Op_LoopYield|1 : dw $00B3, .wait_180             ; 180 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageA+!C3_Prog6ScrollStep, -$11
     db !C3Op_CallW : dw C3Mod_Prog6TasksA
     db !C3Op_NmiAdd : dw C3Mod_Prog6StreamNmi
@@ -13306,15 +13306,15 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Driver : dw !C3_SndSfxA|($DA<<8), $0080
     db !C3Op_Set|1 : dw $00D0
     db !C3Op_Set|0 : dw $0060
-.l7E03:
+.pic_x_down_pic_y_up_size_up:
     db !C3Op_Add|1 : dw -$2
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|1 : dw -$2
-    db !C3Op_LoopYield|0 : dw $0017, .l7E03             ; 24 passes
-.l7E18:
+    db !C3Op_LoopYield|0 : dw $0017, .pic_x_down_pic_y_up_size_up             ; 24 passes
+.pic_x_down_pic_y_down_size_down:
     db !C3Op_Add|1 : dw -$3
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw -$2
@@ -13322,38 +13322,38 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|1 : dw -$3
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $0017, .l7E18             ; 24 passes
-.l7E30:
+    db !C3Op_LoopYield|0 : dw $0017, .pic_x_down_pic_y_down_size_down             ; 24 passes
+.pic_x_up_pic_y_down_size_up:
     db !C3Op_Add|1 : dw $0003
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0003
     db !C3Op_Add|2 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l7E30             ; 16 passes
-.l7E45:
+    db !C3Op_LoopYield|0 : dw $000F, .pic_x_up_pic_y_down_size_up             ; 16 passes
+.pic_x_up_pic_y_up_size_down:
     db !C3Op_Add|1 : dw $0004
     db !C3Op_Add|2 : dw $0002
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0004
     db !C3Op_Add|2 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l7E45             ; 16 passes
-.l7E5A:
+    db !C3Op_LoopYield|0 : dw $000F, .pic_x_up_pic_y_up_size_down             ; 16 passes
+.pic_x_down_pic_y_up_size_up_b:
     db !C3Op_Add|1 : dw -$8
     db !C3Op_Add|2 : dw $0002
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Add|1 : dw -$8
     db !C3Op_Add|2 : dw $0001
-    db !C3Op_LoopYield|0 : dw $0007, .l7E5A             ; 8 passes
-.l7E6F:
+    db !C3Op_LoopYield|0 : dw $0007, .pic_x_down_pic_y_up_size_up_b             ; 8 passes
+.pic_x_down_pic_y_down_size_up:
     db !C3Op_Add|1 : dw -$6
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_LoopYield|0 : dw $001F, .l7E6F             ; 32 passes
-.l7E7D:
-    db !C3Op_LoopYield|1 : dw $003B, .l7E7D             ; 60 passes
+    db !C3Op_LoopYield|0 : dw $001F, .pic_x_down_pic_y_down_size_up             ; 32 passes
+.wait_60_b:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_b             ; 60 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageA+!C3_M7Angle, $0000
     db !C3Op_Set|1 : dw $0000
     db !C3Op_CallW : dw C3Mod_Prog6TasksB
@@ -13366,16 +13366,16 @@ C3Mod_Prog6ScriptB:
     db !C3Op_Driver : dw !C3_SndStopSong, $0000
     db !C3Op_Driver : dw !C3_SndSfxA|($DC<<8), $0080
     db !C3Op_TaskAdd : dw C3Mod_Prog6ColourTask
-.l7EAE:
-    db !C3Op_LoopYield|1 : dw $003B, .l7EAE             ; 60 passes
+.wait_60_c:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_c             ; 60 passes
     db !C3Op_TaskAdd : dw C3Mod_PalAnimTask
     db !C3Op_NmiAdd : dw C3Mod_UploadPalette
     db !C3Op_CallW : dw C3Mod_Prog6PalOut
-.l7EBC:
-    db !C3Op_LoopYield|1 : dw $0031, .l7EBC             ; 50 passes
+.wait_50_b:
+    db !C3Op_LoopYield|1 : dw $0031, .wait_50_b             ; 50 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
-.l7EC4:
-    db !C3Op_JumpYield : dw .l7EC4
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:7EC7 — C3Mod_Prog6TableA (10 bytes, $7EC7–$7ED0)
 ; The task list C3Mod_Prog6TasksA installs: C3Mod_Prog6PlaneTask,
@@ -16491,7 +16491,7 @@ C3Mod_Prog10ScrollTask:
 ;     C3Mod_Prog10FlatNmi removed, C3Mod_Prog10Mode4Nmi and
 ;     C3Mod_Prog10Bg2VofsNmi added; 60 frames; C3Mod_Prog10FadeE1; 780
 ;     frames; C3_NoSoftReset = 0 and C3_EntryArg = 0; 1800 frames;
-;     C3_SongReq = 7; then it waits for good (.l9314: a jump to itself
+;     C3_SongReq = 7; then it waits for good (.hold: a jump to itself
 ;     that yields; nothing moves it on, and C3_NoSoftReset = 0 lets the
 ;     player reset).
 C3Mod_Prog10TextScript:
@@ -16519,27 +16519,27 @@ C3Mod_Prog10TextScript:
     db !C3Op_CallW : dw C3Mod_Prog10Fade01
     db !C3Op_Yield
     db !C3Op_CallW : dw C3Mod_Prog10Fade41
-.l9117:
-    db !C3Op_LoopYield|1 : dw $027F, .l9117             ; 640 passes
+.wait_640:
+    db !C3Op_LoopYield|1 : dw $027F, .wait_640             ; 640 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicSink
     db !C3Op_Poke8 : dw !C3_Prog10FigsLeave : db 1
     db !C3Op_TaskAdd : dw C3Mod_Prog10PicTask
     db !C3Op_Yield
     db !C3Op_Poke8 : dw !C3_HdmaEnable : db 63
-.l912D:
+.scale_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $009F, .l912D             ; 160 passes
+    db !C3Op_LoopYield|0 : dw $009F, .scale_up             ; 160 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10FigsTask
-.l913A:
-    db !C3Op_LoopYield|1 : dw $043F, .l913A             ; 1088 passes
+.wait_1088:
+    db !C3Op_LoopYield|1 : dw $043F, .wait_1088             ; 1088 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicRise
-.l9144:
-    db !C3Op_LoopYield|1 : dw $036F, .l9144             ; 880 passes
+.wait_880:
+    db !C3Op_LoopYield|1 : dw $036F, .wait_880             ; 880 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l914C:
-    db !C3Op_LoopYield|1 : dw $000F, .l914C             ; 16 passes
+.wait_16:
+    db !C3Op_LoopYield|1 : dw $000F, .wait_16             ; 16 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10FigsTask
     db !C3Op_Poke8 : dw !C3_Prog10Wobble : db 8
     db !C3Op_Poke8 : dw !C3_HdmaEnable : db 56
@@ -16558,15 +16558,15 @@ C3Mod_Prog10TextScript:
     db !C3Op_WaitApu, 4
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
     db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 20
-.l9195:
+.scale_up_b:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $00FF, .l9195             ; 256 passes
+    db !C3Op_LoopYield|0 : dw $00FF, .scale_up_b             ; 256 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l91A3:
-    db !C3Op_LoopYield|1 : dw $000E, .l91A3             ; 15 passes
+.wait_15:
+    db !C3Op_LoopYield|1 : dw $000E, .wait_15             ; 15 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10SpinFlashTask
     db !C3Op_Yield
     db !C3Op_CallW : dw C3Mod_Prog10Fill
@@ -16586,16 +16586,16 @@ C3Mod_Prog10TextScript:
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_Prog10SprX, $FFE0
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_Prog10SprY, $0080
     db !C3Op_Poke8 : dw !C3_Prog10Wobble : db 7
-.l91E9:
+.scale_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $017F, .l91E9             ; 384 passes
+    db !C3Op_LoopYield|0 : dw $017F, .scale_down             ; 384 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l91F8:
-    db !C3Op_LoopYield|1 : dw $000F, .l91F8             ; 16 passes
+.wait_16_b:
+    db !C3Op_LoopYield|1 : dw $000F, .wait_16_b             ; 16 passes
     db !C3Op_CallW : dw C3Mod_Prog10Strip
     db !C3Op_Call : dw C3Mod_Prog10Tasks
     db !C3Op_TaskAdd : dw C3Mod_Prog10PicTask
@@ -16610,16 +16610,16 @@ C3Mod_Prog10TextScript:
     db !C3Op_Set|1 : dw -$58
     db !C3Op_Set|2 : dw -$48
     db !C3Op_Set|5 : dw $0090
-.l922B:
+.bg2_down_x_down:
     db !C3Op_Add|7 : dw -$1
     db !C3Op_Add|1 : dw -$1
     db !C3Op_Yield
     db !C3Op_Add|1 : dw -$1
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $01A9, .l922B             ; 426 passes
+    db !C3Op_LoopYield|0 : dw $01A9, .bg2_down_x_down             ; 426 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicRiseB
-.l9241:
+.angle_up_bg2_down_x_down:
     db !C3Op_Add|5 : dw $0001
     db !C3Op_Add|7 : dw -$1
     db !C3Op_Add|1 : dw -$1
@@ -16630,7 +16630,7 @@ C3Mod_Prog10TextScript:
     db !C3Op_Add|5 : dw $0001
     db !C3Op_Yield
     db !C3Op_Add|5 : dw $0001
-    db !C3Op_LoopYield|0 : dw $0035, .l9241             ; 54 passes
+    db !C3Op_LoopYield|0 : dw $0035, .angle_up_bg2_down_x_down             ; 54 passes
 .stars:
     db !C3Op_WaitApu, 7
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10StarsB
@@ -16641,11 +16641,11 @@ C3Mod_Prog10TextScript:
     db !C3Op_Call : dw C3Mod_Prog10Tasks
     db !C3Op_TaskAdd : dw C3Mod_Prog10StarsTask
     db !C3Op_NmiAdd : dw C3Mod_ClearOamHigh
-.l927B:
-    db !C3Op_LoopYield|1 : dw $02FF, .l927B             ; 768 passes
+.wait_768:
+    db !C3Op_LoopYield|1 : dw $02FF, .wait_768             ; 768 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l9283:
-    db !C3Op_LoopYield|1 : dw $000F, .l9283             ; 16 passes
+.wait_16_c:
+    db !C3Op_LoopYield|1 : dw $000F, .wait_16_c             ; 16 passes
     db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1410
     db !C3Op_CallW : dw C3Mod_Prog10TextPlace
     db !C3Op_CallW : dw C3Mod_Prog10M7Scene
@@ -16657,14 +16657,14 @@ C3Mod_Prog10TextScript:
     db !C3Op_Set|2 : dw -$38
     db !C3Op_Set|0 : dw $0010
     db !C3Op_Ppu, $21, CGADSUB-!DP_PPU
-.l92AB:
+.scale_up_c:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $00EF, .l92AB             ; 240 passes
-.l92B6:
-    db !C3Op_LoopYield|1 : dw $00B3, .l92B6             ; 180 passes
+    db !C3Op_LoopYield|0 : dw $00EF, .scale_up_c             ; 240 passes
+.wait_180:
+    db !C3Op_LoopYield|1 : dw $00B3, .wait_180             ; 180 passes
     db !C3Op_CallW : dw C3Mod_Prog10Grid
     db !C3Op_Call : dw C3Mod_Prog10Tasks_frame
     db !C3Op_TaskRemove : dw C3Mod_FadeInTask
@@ -16688,18 +16688,18 @@ C3Mod_Prog10TextScript:
     db !C3Op_NmiRemove : dw C3Mod_Prog10FlatNmi
     db !C3Op_NmiAdd : dw C3Mod_Prog10Mode4Nmi
     db !C3Op_NmiAdd : dw C3Mod_Prog10Bg2VofsNmi
-.l92F6:
-    db !C3Op_LoopYield|1 : dw $003B, .l92F6             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_CallW : dw C3Mod_Prog10FadeE1
-.l92FE:
-    db !C3Op_LoopYield|1 : dw $030B, .l92FE             ; 780 passes
+.wait_780:
+    db !C3Op_LoopYield|1 : dw $030B, .wait_780             ; 780 passes
     db !C3Op_Poke8 : dw !C3_NoSoftReset : db 0
     db !C3Op_Poke8 : dw !C3_EntryArg : db 0
-.l930B:
-    db !C3Op_LoopYield|1 : dw $0707, .l930B             ; 1800 passes
+.wait_1800:
+    db !C3Op_LoopYield|1 : dw $0707, .wait_1800             ; 1800 passes
     db !C3Op_Poke8 : dw !C3_SongReq : db 7
-.l9314:
-    db !C3Op_JumpYield : dw .l9314
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9317 — C3Mod_Prog10TextExit (14 bytes, $9317–$9324)
 ; Where C3Mod_Prog10Grid sends page $0A00 when C3_EntryArg's low
@@ -16712,8 +16712,8 @@ C3Mod_Prog10TextExit:
     db !C3Op_Poke16 : dw !C3_FadeStep, $0404
     db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
     db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
-.l9322:
-    db !C3Op_JumpYield : dw .l9322
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9325 — C3Mod_Prog10Tasks (28 bytes, $9325–$9340)
 ; A script subroutine (opcode $F3) of program 10's scripts: the NMI
@@ -16742,8 +16742,8 @@ C3Mod_Prog10Tasks:
 C3Mod_Prog10TextB:
     db !C3Op_Set|1 : dw -$20
     db !C3Op_Set|2 : dw $0020
-.l9347:
-    db !C3Op_JumpYield : dw .l9347
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:934A — C3Mod_Prog10PicDrift (60 bytes, $934A–$9385)
 ; Page $0B00 in the strip scene: vars 1 and 2 = $20 and $18; 512
@@ -16753,16 +16753,16 @@ C3Mod_Prog10TextB:
 C3Mod_Prog10PicDrift:
     db !C3Op_Set|1 : dw $0020
     db !C3Op_Set|2 : dw $0018
-.l9350:
-    db !C3Op_LoopYield|1 : dw $01FF, .l9350             ; 512 passes
-.l9355:
+.wait_512:
+    db !C3Op_LoopYield|1 : dw $01FF, .wait_512             ; 512 passes
+.pic_x_up_pic_y_up:
     db !C3Op_Add|1 : dw $0001
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $005F, .l9355             ; 96 passes
-.l9363:
+    db !C3Op_LoopYield|0 : dw $005F, .pic_x_up_pic_y_up             ; 96 passes
+.pic_x_up_pic_y_up_b:
     db !C3Op_Add|1 : dw $0001
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
@@ -16773,15 +16773,15 @@ C3Mod_Prog10PicDrift:
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $001F, .l9363             ; 32 passes
-.l9378:
+    db !C3Op_LoopYield|0 : dw $001F, .pic_x_up_pic_y_up_b             ; 32 passes
+.pic_x_up:
     db !C3Op_Add|1 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $001F, .l9378             ; 32 passes
-.l9383:
-    db !C3Op_JumpYield : dw .l9383
+    db !C3Op_LoopYield|0 : dw $001F, .pic_x_up             ; 32 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9386 — C3Mod_Prog10PicSink (16 bytes, $9386–$9395)
 ; Page $0B00: 160 x (vars 2 and 6 + 1, three frames: 480); wait.
@@ -16791,27 +16791,27 @@ C3Mod_Prog10PicSink:
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_LoopYield|0 : dw $009F, C3Mod_Prog10PicSink ; 160 passes
-.l9393:
-    db !C3Op_JumpYield : dw .l9393
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9396 — C3Mod_Prog10PicRise (16 bytes, $9396–$93A5)
 ; Page $0B00: 8 x (var 2 - 1, then 32 frames, then the outer loop's
 ; yield: 33 frames a pass, 264 in all); wait.
 C3Mod_Prog10PicRise:
     db !C3Op_Add|2 : dw -$1
-.l9399:
-    db !C3Op_LoopYield|2 : dw $001F, .l9399             ; 32 passes
+.wait_32:
+    db !C3Op_LoopYield|2 : dw $001F, .wait_32             ; 32 passes
     db !C3Op_LoopYield|0 : dw $0007, C3Mod_Prog10PicRise ; 8 passes
-.l93A3:
-    db !C3Op_JumpYield : dw .l93A3
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:93A6 — C3Mod_Prog10PicRiseB (11 bytes, $93A6–$93B0)
 ; Page $0B00: 144 x (var 2 - 1, a frame); wait.
 C3Mod_Prog10PicRiseB:
     db !C3Op_Add|2 : dw -$1
     db !C3Op_LoopYield|0 : dw $008F, C3Mod_Prog10PicRiseB ; 144 passes
-.l93AE:
-    db !C3Op_JumpYield : dw .l93AE
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:93B1 — C3Mod_Prog10StarsB (50 bytes, $93B1–$93E2)
 ; Page $0B00 in the stars part (vars 0-2 as C3Mod_StarsTask reads
@@ -16827,19 +16827,19 @@ C3Mod_Prog10StarsB:
     db !C3Op_Set|1 : dw $0000
     db !C3Op_Ppu, $10, TM-!DP_PPU
     db !C3Op_Ppu, $00, TMW-!DP_PPU
-.l93C3:
-    db !C3Op_LoopYield|1 : dw $007F, .l93C3             ; 128 passes
+.wait_128:
+    db !C3Op_LoopYield|1 : dw $007F, .wait_128             ; 128 passes
     db !C3Op_Set|1 : dw -$1
-.l93CB:
+.drift_angle_down:
     db !C3Op_Add|5 : dw -$4
-    db !C3Op_LoopYield|0 : dw $003E, .l93CB             ; 63 passes
+    db !C3Op_LoopYield|0 : dw $003E, .drift_angle_down             ; 63 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10DriftAngleTask
     db !C3Op_Yield
     db !C3Op_Set|1 : dw -$1
     db !C3Op_Set|2 : dw -$2
     db !C3Op_Set|0 : dw $0002
-.l93E0:
-    db !C3Op_JumpYield : dw .l93E0
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:93E3 — C3Mod_Prog13Script (52 bytes, $93E3–$9416)
 ; Page $0A00's script of programs 12 and 13 (C3Mod_Prog13): the tasks
@@ -16862,13 +16862,13 @@ C3Mod_Prog13Script:
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_DriftY, $0000
     db !C3Op_Yield
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
-.l9406:
-    db !C3Op_LoopYield|1 : dw $003B, .l9406             ; 60 passes
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
     db !C3Op_TaskAdd : dw C3Mod_CreditLineTask
     db !C3Op_NmiAdd : dw C3Mod_CreditLineNmi
-.l9411:
+.call_prog13checkend:
     db !C3Op_CallW : dw C3Mod_Prog13CheckEnd
-    db !C3Op_JumpYield : dw .l9411
+    db !C3Op_JumpYield : dw .call_prog13checkend
 
 ; $7E:9417 — C3Mod_Prog13End (57 bytes, $9417–$944F)
 ; Programs 12 and 13 after the credit text (C3Script_Ptr = this - 2
@@ -16885,8 +16885,8 @@ C3Mod_Prog13End:
     db !C3Op_Ppu, $00, SETINI-!DP_PPU
     db !C3Op_Ppu, $15, TM-!DP_PPU
     db !C3Op_CallW : dw C3Mod_Prog13Whiten
-.l942A:
-    db !C3Op_LoopYield|1 : dw $00FF, .l942A             ; 256 passes
+.wait_256:
+    db !C3Op_LoopYield|1 : dw $00FF, .wait_256             ; 256 passes
     db !C3Op_TaskAdd : dw C3Mod_Prog13DriftInit
     db !C3Op_Driver : dw !C3_SndStopAll|($00<<8), $0000
     db !C3Op_Driver : dw !C3_SndFadeSong|($00<<8), $0080
@@ -16894,8 +16894,8 @@ C3Mod_Prog13End:
     db !C3Op_Poke8 : dw !C3_NoSoftReset : db 0
     db !C3Op_Poke8 : dw !C3_EntryArg : db 0
     db !C3Op_Poke8 : dw !C3_SongReq : db 3
-.l944D:
-    db !C3Op_JumpYield : dw .l944D
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9450 — C3Mod_Prog10TurnScript (451 bytes, $9450–$9612)
 ; Page $0A00's script of the turning-picture scene (C3_EntryArg low
@@ -16961,28 +16961,28 @@ C3Mod_Prog10TurnScript:
     db !C3Op_CallW : dw C3Mod_Prog10Fade01
     db !C3Op_CallW : dw C3Mod_Prog10Fade41
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10TurnOrbitB
-.l94B4:
-    db !C3Op_LoopYield|1 : dw $001F, .l94B4             ; 32 passes
+.wait_32:
+    db !C3Op_LoopYield|1 : dw $001F, .wait_32             ; 32 passes
     db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1010
     db !C3Op_CallW : dw C3Mod_Prog10TextPlace
-.l94C1:
-    db !C3Op_LoopYield|1 : dw $029F, .l94C1             ; 672 passes
+.wait_672:
+    db !C3Op_LoopYield|1 : dw $029F, .wait_672             ; 672 passes
     db !C3Op_NmiRemove : dw C3Mod_Return
     db !C3Op_NmiAdd : dw C3Mod_Prog10SprNmi
     db !C3Op_Poke8 : dw !C3_Prog10FigsLeave : db 1
-.l94D0:
+.scale_up_y_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $003F, .l94D0             ; 64 passes
+    db !C3Op_LoopYield|0 : dw $003F, .scale_up_y_up             ; 64 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10FigsTask
-.l94E1:
-    db !C3Op_LoopYield|1 : dw $00AF, .l94E1             ; 176 passes
+.wait_176:
+    db !C3Op_LoopYield|1 : dw $00AF, .wait_176             ; 176 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l94E9:
-    db !C3Op_LoopYield|1 : dw $0010, .l94E9             ; 17 passes
+.wait_17:
+    db !C3Op_LoopYield|1 : dw $0010, .wait_17             ; 17 passes
     db !C3Op_CallW : dw C3Mod_Prog10Turn
     db !C3Op_TaskAdd : dw C3Mod_Prog10ScrollTask
     db !C3Op_TaskAdd : dw C3Mod_Prog10FrameTask
@@ -17001,48 +17001,48 @@ C3Mod_Prog10TurnScript:
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10TurnZoomB
     db !C3Op_WaitApu, 3
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
-.l952B:
-    db !C3Op_LoopYield|1 : dw $003B, .l952B             ; 60 passes
-.l9530:
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
+.scale_down_angle_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|5 : dw -$1
     db !C3Op_Yield
     db !C3Op_Add|5 : dw -$1
-    db !C3Op_LoopYield|0 : dw $004F, .l9530             ; 80 passes
-.l953F:
+    db !C3Op_LoopYield|0 : dw $004F, .scale_down_angle_down             ; 80 passes
+.angle_down:
     db !C3Op_Add|5 : dw -$1
-    db !C3Op_LoopYield|0 : dw $011F, .l953F             ; 288 passes
-.l9547:
-    db !C3Op_LoopYield|1 : dw $003B, .l9547             ; 60 passes
-.l954C:
+    db !C3Op_LoopYield|0 : dw $011F, .angle_down             ; 288 passes
+.wait_60_b:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60_b             ; 60 passes
+.scale_up:
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_LoopYield|0 : dw $003F, .l954C             ; 64 passes
-.l9554:
-    db !C3Op_LoopYield|1 : dw $023F, .l9554             ; 576 passes
-.l9559:
+    db !C3Op_LoopYield|0 : dw $003F, .scale_up             ; 64 passes
+.wait_576:
+    db !C3Op_LoopYield|1 : dw $023F, .wait_576             ; 576 passes
+.scale_down_angle_up:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|5 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l9559             ; 16 passes
-.l9564:
+    db !C3Op_LoopYield|0 : dw $000F, .scale_down_angle_up             ; 16 passes
+.scale_down_angle_up_b:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|5 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l9564             ; 16 passes
-.l956F:
+    db !C3Op_LoopYield|0 : dw $000F, .scale_down_angle_up_b             ; 16 passes
+.scale_down_angle_up_c:
     db !C3Op_Add|0 : dw -$2
     db !C3Op_Add|5 : dw $0004
-    db !C3Op_LoopYield|0 : dw $001F, .l956F             ; 32 passes
-.l957A:
+    db !C3Op_LoopYield|0 : dw $001F, .scale_down_angle_up_c             ; 32 passes
+.scale_up_angle_up:
     db !C3Op_Add|0 : dw $0002
     db !C3Op_Add|5 : dw $0004
-    db !C3Op_LoopYield|0 : dw $001F, .l957A             ; 32 passes
-.l9585:
+    db !C3Op_LoopYield|0 : dw $001F, .scale_up_angle_up             ; 32 passes
+.scale_up_angle_up_b:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|5 : dw $0002
-    db !C3Op_LoopYield|0 : dw $000F, .l9585             ; 16 passes
-.l9590:
+    db !C3Op_LoopYield|0 : dw $000F, .scale_up_angle_up_b             ; 16 passes
+.scale_up_angle_up_c:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|5 : dw $0001
-    db !C3Op_LoopYield|0 : dw $007F, .l9590             ; 128 passes
+    db !C3Op_LoopYield|0 : dw $007F, .scale_up_angle_up_c             ; 128 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10FrameTask
     db !C3Op_Yield
     db !C3Op_Yield
@@ -17069,25 +17069,25 @@ C3Mod_Prog10TurnScript:
     db !C3Op_Poke8 : dw !C3_Brightness : db 15
     db !C3Op_Poke16 : dw !C3_Prog10Frame, $0A00
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10TurnEndB
-.l95EF:
+.scale_up_b:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $00BF, .l95EF             ; 192 passes
+    db !C3Op_LoopYield|0 : dw $00BF, .scale_up_b             ; 192 passes
     db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
-.l9601:
+.scale_up_c:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $000F, .l9601             ; 16 passes
-.l9610:
-    db !C3Op_JumpYield : dw .l9610
+    db !C3Op_LoopYield|0 : dw $000F, .scale_up_c             ; 16 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9613 — C3Mod_Prog10MainScript (232 bytes, $9613–$96FA)
 ; Page $0A00's script of program 10's main scene (C3_EntryArg low
@@ -17138,42 +17138,42 @@ C3Mod_Prog10MainScript:
     db !C3Op_WaitApu, 6
     db !C3Op_TaskAdd : dw C3Mod_FadeInTask
     db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 6
-.l9672:
+.scale_down:
     db !C3Op_Add|0 : dw -$1
-    db !C3Op_LoopYield|0 : dw $009F, .l9672             ; 160 passes
+    db !C3Op_LoopYield|0 : dw $009F, .scale_down             ; 160 passes
     db !C3Op_CallW : dw C3Mod_Prog10FadeTo52
     db !C3Op_TaskAdd : dw C3Mod_PalFadeTask
-.l9680:
-    db !C3Op_LoopYield|1 : dw $021F, .l9680             ; 544 passes
-.l9685:
+.wait_544:
+    db !C3Op_LoopYield|1 : dw $021F, .wait_544             ; 544 passes
+.angle_up:
     db !C3Op_Add|5 : dw $0001
-    db !C3Op_LoopYield|0 : dw $00FF, .l9685             ; 256 passes
+    db !C3Op_LoopYield|0 : dw $00FF, .angle_up             ; 256 passes
     db !C3Op_CallW : dw C3Mod_Prog10FadeTo53
-.l9690:
-    db !C3Op_LoopYield|1 : dw $029F, .l9690             ; 672 passes
-.l9695:
+.wait_672:
+    db !C3Op_LoopYield|1 : dw $029F, .wait_672             ; 672 passes
+.scale_up:
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_LoopYield|0 : dw $005F, .l9695             ; 96 passes
+    db !C3Op_LoopYield|0 : dw $005F, .scale_up             ; 96 passes
     db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10MainBEnd
-.l96A2:
+.scale_up_angle_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|5 : dw $0006
-    db !C3Op_LoopYield|0 : dw $001F, .l96A2             ; 32 passes
-.l96AD:
+    db !C3Op_LoopYield|0 : dw $001F, .scale_up_angle_up             ; 32 passes
+.scale_up_angle_up_horizon_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|5 : dw $0006
     db !C3Op_Add|6 : dw $0001
-    db !C3Op_LoopYield|0 : dw $001F, .l96AD             ; 32 passes
-.l96BB:
+    db !C3Op_LoopYield|0 : dw $001F, .scale_up_angle_up_horizon_up             ; 32 passes
+.horizon_up:
     db !C3Op_Add|6 : dw $0001
-    db !C3Op_LoopYield|0 : dw $006F, .l96BB             ; 112 passes
+    db !C3Op_LoopYield|0 : dw $006F, .horizon_up             ; 112 passes
     db !C3Op_NmiRemove : dw C3Mod_Prog10TilesNmi
     db !C3Op_Yield
     db !C3Op_Poke8 : dw !C3_Prog10TilesReady : db 1
     db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
-.l96CE:
+.horizon_up_b:
     db !C3Op_Add|6 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000B, .l96CE             ; 12 passes
+    db !C3Op_LoopYield|0 : dw $000B, .horizon_up_b             ; 12 passes
     db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 20
     db !C3Op_Poke16 : dw !C3_Prog10TextShow, $0140
     db !C3Op_Poke16 : dw !C3_Prog10TextGap, $0040
@@ -17181,8 +17181,8 @@ C3Mod_Prog10MainScript:
     db !C3Op_CallW : dw C3Mod_Prog10TextPlace
     db !C3Op_Poke8 : dw !C3_HdmaEnable : db 0
     db !C3Op_CallW : dw C3Mod_Prog10IdleOff
-.l96F3:
-    db !C3Op_LoopYield|1 : dw $0003, .l96F3             ; 4 passes
+.wait_4:
+    db !C3Op_LoopYield|1 : dw $0003, .wait_4             ; 4 passes
     db !C3Op_JumpYield : dw C3Mod_Prog10TextScript_stars
 
 ; $7E:96FB — C3Mod_Prog10IdleOff (7 bytes, $96FB–$9701)
@@ -17231,12 +17231,12 @@ C3Mod_Prog10MainB:
     db !C3Op_Set|6 : dw $0040
     db !C3Op_Set|0 : dw $00C0
     db !C3Op_WaitApu, 6
-.l9720:
+.size_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $004F, .l9720             ; 80 passes
-.l9729:
-    db !C3Op_JumpYield : dw .l9729
+    db !C3Op_LoopYield|0 : dw $004F, .size_down             ; 80 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:972C — C3Mod_Prog10UnusedB1 (43 bytes, $972C–$9756)
 ; A page $0B00 script nothing points to (no word $972C in the module):
@@ -17248,19 +17248,19 @@ C3Mod_Prog10UnusedB1:
     db !C3Op_Set|2 : dw $0050
     db !C3Op_Set|1 : dw $0080
     db !C3Op_Set|6 : dw $000C
-.l973B:
+.size_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|1 : dw $003F, .l973B             ; 64 passes
-.l9745:
+    db !C3Op_LoopYield|1 : dw $003F, .size_down             ; 64 passes
+.size_up:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|1 : dw $003F, .l9745             ; 64 passes
-    db !C3Op_LoopYield|0 : dw $0001, .l973B             ; 2 passes
-.l9754:
-    db !C3Op_JumpYield : dw .l9754
+    db !C3Op_LoopYield|1 : dw $003F, .size_up             ; 64 passes
+    db !C3Op_LoopYield|0 : dw $0001, .size_down             ; 2 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9757 — C3Mod_Prog10UnusedB2 (60 bytes, $9757–$9792)
 ; Another (no word $9757 in the module): vars 0 $FFF, 8 -4, 2 $40, 1 =
@@ -17272,26 +17272,26 @@ C3Mod_Prog10UnusedB2:
     db !C3Op_Set|2 : dw $0040
     db !C3Op_CopyVar|1, 4                               ; var 1 = var 2
     db !C3Op_Set|6 : dw $000C
-.l9765:
+.pic_y_up_pic_x_follows_size_down:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
     db !C3Op_CopyVar|1, 4                               ; var 1 = var 2
     db !C3Op_Add|0 : dw -$3
-    db !C3Op_LoopYield|0 : dw $007F, .l9765             ; 128 passes
-.l9773:
+    db !C3Op_LoopYield|0 : dw $007F, .pic_y_up_pic_x_follows_size_down             ; 128 passes
+.pic_y_up_pic_x_follows_size_down_b:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Yield
     db !C3Op_CopyVar|1, 4                               ; var 1 = var 2
     db !C3Op_Add|0 : dw -$1
-    db !C3Op_LoopYield|0 : dw $0007, .l9773             ; 8 passes
-.l9781:
+    db !C3Op_LoopYield|0 : dw $0007, .pic_y_up_pic_x_follows_size_down_b             ; 8 passes
+.pic_y_up_pic_x_up:
     db !C3Op_Add|2 : dw $0002
     db !C3Op_Yield
     db !C3Op_Add|1 : dw $0002
-    db !C3Op_LoopYield|0 : dw $0017, .l9781             ; 24 passes
+    db !C3Op_LoopYield|0 : dw $0017, .pic_y_up_pic_x_up             ; 24 passes
     db !C3Op_Set|0 : dw $0FFF
-.l9790:
-    db !C3Op_JumpYield : dw .l9790
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9793 — C3Mod_Prog10MainBEnd (19 bytes, $9793–$97A5)
 ; Page $0B00 at the main scene's end: 48 x (8 x (var 0 + 1, a frame),
@@ -17322,35 +17322,35 @@ C3Mod_Prog10TurnOrbitB:
     db !C3Op_Set|0 : dw $01FF
     db !C3Op_Set|5 : dw $0280
     db !C3Op_TaskAdd : dw C3Mod_Prog10OrbitTask
-.l97B5:
-    db !C3Op_LoopYield|1 : dw $02BF, .l97B5             ; 704 passes
-.l97BA:
+.wait_704:
+    db !C3Op_LoopYield|1 : dw $02BF, .wait_704             ; 704 passes
+.speed_down_size_down_orbit_down:
     db !C3Op_Add|8 : dw -$8
     db !C3Op_Add|0 : dw -$2
     db !C3Op_Add|5 : dw -$2
-    db !C3Op_LoopYield|0 : dw $006F, .l97BA             ; 112 passes
-.l97C8:
+    db !C3Op_LoopYield|0 : dw $006F, .speed_down_size_down_orbit_down             ; 112 passes
+.speed_down_size_down_orbit_down_b:
     db !C3Op_Add|8 : dw -$8
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|5 : dw -$2
-    db !C3Op_LoopYield|0 : dw $008F, .l97C8             ; 144 passes
+    db !C3Op_LoopYield|0 : dw $008F, .speed_down_size_down_orbit_down_b             ; 144 passes
     db !C3Op_TaskRemove : dw C3Mod_Prog10OrbitTask
-.l97D9:
+.pic_x_down_pic_y_up_size_down:
     db !C3Op_Add|1 : dw -$1
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l97D9             ; 16 passes
-.l97E7:
+    db !C3Op_LoopYield|0 : dw $000F, .pic_x_down_pic_y_up_size_down             ; 16 passes
+.pic_x_down_pic_y_up_size_down_b:
     db !C3Op_Add|1 : dw -$2
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|0 : dw -$1
-    db !C3Op_LoopYield|0 : dw $002F, .l97E7             ; 48 passes
-.l97F5:
+    db !C3Op_LoopYield|0 : dw $002F, .pic_x_down_pic_y_up_size_down_b             ; 48 passes
+.pic_x_down_pic_y_up:
     db !C3Op_Add|1 : dw -$2
     db !C3Op_Add|2 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l97F5             ; 16 passes
-.l9800:
-    db !C3Op_JumpYield : dw .l9800
+    db !C3Op_LoopYield|0 : dw $000F, .pic_x_down_pic_y_up             ; 16 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9803 — C3Mod_Prog10TurnZoomB (120 bytes, $9803–$987A)
 ; Page $0B00: var 8 = -6 (C3Mod_Prog10ScrollTask), var 0 = $80, var 6
@@ -17365,47 +17365,47 @@ C3Mod_Prog10TurnZoomB:
     db !C3Op_Set|2 : dw $0070
     db !C3Op_Set|1 : dw $0080
     db !C3Op_WaitApu, 3
-.l9814:
-    db !C3Op_LoopYield|1 : dw $003B, .l9814             ; 60 passes
-.l9819:
+.wait_60:
+    db !C3Op_LoopYield|1 : dw $003B, .wait_60             ; 60 passes
+.size_down:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Yield
     db !C3Op_Yield
     db !C3Op_Yield
-    db !C3Op_LoopYield|0 : dw $0027, .l9819             ; 40 passes
-.l9824:
-    db !C3Op_LoopYield|1 : dw $015B, .l9824             ; 348 passes
-.l9829:
+    db !C3Op_LoopYield|0 : dw $0027, .size_down             ; 40 passes
+.wait_348:
+    db !C3Op_LoopYield|1 : dw $015B, .wait_348             ; 348 passes
+.size_up:
     db !C3Op_Add|0 : dw $0001
-    db !C3Op_LoopYield|0 : dw $003F, .l9829             ; 64 passes
-.l9831:
-    db !C3Op_LoopYield|1 : dw $023F, .l9831             ; 576 passes
-.l9836:
+    db !C3Op_LoopYield|0 : dw $003F, .size_up             ; 64 passes
+.wait_576:
+    db !C3Op_LoopYield|1 : dw $023F, .wait_576             ; 576 passes
+.size_down_radius_up:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|6 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l9836             ; 16 passes
-.l9841:
+    db !C3Op_LoopYield|0 : dw $000F, .size_down_radius_up             ; 16 passes
+.size_down_radius_up_b:
     db !C3Op_Add|0 : dw -$1
     db !C3Op_Add|6 : dw $0001
-    db !C3Op_LoopYield|0 : dw $000F, .l9841             ; 16 passes
-.l984C:
+    db !C3Op_LoopYield|0 : dw $000F, .size_down_radius_up_b             ; 16 passes
+.size_down_radius_up_c:
     db !C3Op_Add|0 : dw -$2
     db !C3Op_Add|6 : dw $0001
-    db !C3Op_LoopYield|0 : dw $001F, .l984C             ; 32 passes
-.l9857:
+    db !C3Op_LoopYield|0 : dw $001F, .size_down_radius_up_c             ; 32 passes
+.size_up_radius_down:
     db !C3Op_Add|0 : dw $0002
     db !C3Op_Add|6 : dw -$1
-    db !C3Op_LoopYield|0 : dw $001F, .l9857             ; 32 passes
-.l9862:
+    db !C3Op_LoopYield|0 : dw $001F, .size_up_radius_down             ; 32 passes
+.size_up_radius_down_b:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|6 : dw -$1
-    db !C3Op_LoopYield|0 : dw $000F, .l9862             ; 16 passes
-.l986D:
+    db !C3Op_LoopYield|0 : dw $000F, .size_up_radius_down_b             ; 16 passes
+.size_up_radius_down_c:
     db !C3Op_Add|0 : dw $0001
     db !C3Op_Add|6 : dw -$1
-    db !C3Op_LoopYield|0 : dw $007F, .l986D             ; 128 passes
-.l9878:
-    db !C3Op_JumpYield : dw .l9878
+    db !C3Op_LoopYield|0 : dw $007F, .size_up_radius_down_c             ; 128 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:987B — C3Mod_Prog10TurnEndB (28 bytes, $987B–$9896)
 ; Page $0B00 at the turning scene's end: var 0 = $40, var 2 = $D3, var
@@ -17415,14 +17415,14 @@ C3Mod_Prog10TurnEndB:
     db !C3Op_Set|0 : dw $0040
     db !C3Op_Set|2 : dw $00D3
     db !C3Op_Set|1 : dw $0080
-.l9884:
+.pic_y_down_size_up:
     db !C3Op_Add|2 : dw -$1
     db !C3Op_Add|0 : dw $0001
-.l988A:
-    db !C3Op_LoopYield|2 : dw $0003, .l988A             ; 4 passes
-    db !C3Op_LoopYield|0 : dw $00CF, .l9884             ; 208 passes
-.l9894:
-    db !C3Op_JumpYield : dw .l9894
+.wait_4:
+    db !C3Op_LoopYield|2 : dw $0003, .wait_4             ; 4 passes
+    db !C3Op_LoopYield|0 : dw $00CF, .pic_y_down_size_up             ; 208 passes
+.hold:
+    db !C3Op_JumpYield : dw .hold
 
 ; $7E:9897 — C3Mod_Prog13DriftInit (21 bytes, $9897–$98AB)
 ; A task: three times C3Mod_Prog13DriftRandom, keeping only its A (1 to
