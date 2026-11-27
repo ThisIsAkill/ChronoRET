@@ -175,8 +175,8 @@ AudioRom_Block4700,$C7:40B4,$C7:42B6,515,extracted,brr_sample/AudioRom_Block4700
 AudioRom_Block1E00,$C7:42B7,$C7:42DC,38,extracted,spc_data/AudioRom_Block1E00.bin,
 AudioRom_Block1F80,$C7:42DD,$C7:42F2,22,extracted,spc_data/AudioRom_Block1F80.bin,
 AudioRom_Block1F00,$C7:42F3,$C7:4308,22,extracted,spc_data/AudioRom_Block1F00.bin,
-AudioRom_Block2F00,$C7:4309,$C7:5B0A,6146,extracted,music_sequence/AudioRom_Block2F00.bin,
-AudioRom_Block2F00Alt,$C7:5B0B,$C7:730C,6146,extracted,music_sequence/AudioRom_Block2F00Alt.bin,
+AudioRom_Block2F00,$C7:4309,$C7:5B0A,6146,music,music/AudioRom_Block2F00.mus,"effects, part 1 of 1"
+AudioRom_Block2F00Alt,$C7:5B0B,$C7:730C,6146,music,music/AudioRom_Block2F00Alt.mus,"effects, part 1 of 1"
 AudioSample_01,$C7:730D,$C7:81AE,3746,extracted,brr_sample/AudioSample_01.bin,
 AudioSample_02,$C7:81AF,$C7:8951,1955,extracted,brr_sample/AudioSample_02.bin,
 AudioSample_03,$C7:8952,$C7:8B81,560,extracted,brr_sample/AudioSample_03.bin,
@@ -242,90 +242,90 @@ AudioSample_59,$CA:7C99,$CA:7FD6,830,extracted,brr_sample/AudioSample_59.bin,
 AudioSample_60,$CA:7FD7,$CA:831D,839,extracted,brr_sample/AudioSample_60.bin,
 AudioSample_61,$CA:831E,$CA:8664,839,extracted,brr_sample/AudioSample_61.bin,
 AudioSample_62,$CA:8665,$CA:8ACB,1127,extracted,brr_sample/AudioSample_62.bin,
-AudioSong_00,$CA:8ACC,$CA:8AF1,38,extracted,music_sequence/AudioSong_00.bin,
-AudioSong_01,$CA:8AF2,$CA:8FB2,1217,extracted,music_sequence/AudioSong_01.bin,
-AudioSong_02,$CA:8FB3,$CA:944D,1179,extracted,music_sequence/AudioSong_02.bin,
-AudioSong_03,$CA:944E,$CA:9AB8,1643,extracted,music_sequence/AudioSong_03.bin,
-AudioSong_04,$CA:9AB9,$CA:9D84,716,extracted,music_sequence/AudioSong_04.bin,
-AudioSong_05,$CA:9D85,$CA:9EC2,318,extracted,music_sequence/AudioSong_05.bin,
-AudioSong_06,$CA:9EC3,$CA:AAA9,3047,extracted,music_sequence/AudioSong_06.bin,
-AudioSong_07,$CA:AAAA,$CA:ABF3,330,extracted,music_sequence/AudioSong_07.bin,
-AudioSong_08,$CA:ABF4,$CA:B1B1,1470,extracted,music_sequence/AudioSong_08.bin,
-AudioSong_09,$CA:B1B2,$CA:B521,880,extracted,music_sequence/AudioSong_09.bin,
-AudioSong_0A,$CA:B522,$CA:B94C,1067,extracted,music_sequence/AudioSong_0A.bin,
-AudioSong_0B,$CA:B94D,$CA:BC33,743,extracted,music_sequence/AudioSong_0B.bin,
-AudioSong_0C,$CA:BC34,$CA:C14D,1306,extracted,music_sequence/AudioSong_0C.bin,
-AudioSong_0D,$CA:C14E,$CA:C679,1324,extracted,music_sequence/AudioSong_0D.bin,
-AudioSong_0F,$CA:C67A,$CA:C8BF,582,extracted,music_sequence/AudioSong_0F.bin,
-AudioSong_0E,$CA:C8C0,$CA:D0EB,2092,extracted,music_sequence/AudioSong_0E.bin,
-AudioSong_10,$CA:D0EC,$CA:D212,295,extracted,music_sequence/AudioSong_10.bin,
-AudioSong_11,$CA:D213,$CA:D354,322,extracted,music_sequence/AudioSong_11.bin,
-AudioSong_12,$CA:D355,$CA:D3AD,89,extracted,music_sequence/AudioSong_12.bin,
-AudioSong_13,$CA:D3AE,$CA:DD80,2515,extracted,music_sequence/AudioSong_13.bin,
-AudioSong_14,$CA:DD81,$CA:E0F3,883,extracted,music_sequence/AudioSong_14.bin,
-AudioSong_15,$CA:E0F4,$CA:E6DC,1513,extracted,music_sequence/AudioSong_15.bin,
-AudioSong_16,$CA:E6DD,$CA:ED53,1655,extracted,music_sequence/AudioSong_16.bin,
-AudioSong_17,$CA:ED54,$CA:F5FC,2217,extracted,music_sequence/AudioSong_17.bin,
-AudioSong_18,$CA:F5FD,$CA:FFFF,2563,extracted,music_sequence/AudioSong_18.bin,
-AudioSong_18_Cont,$CB:0000,$CB:010B,268,extracted,music_sequence/AudioSong_18_Cont.bin,
-AudioSong_19,$CB:010C,$CB:0193,136,extracted,music_sequence/AudioSong_19.bin,
-AudioSong_1A,$CB:0194,$CB:0220,141,extracted,music_sequence/AudioSong_1A.bin,
-AudioSong_1B,$CB:0221,$CB:05E2,962,extracted,music_sequence/AudioSong_1B.bin,
-AudioSong_1C,$CB:05E3,$CB:0787,421,extracted,music_sequence/AudioSong_1C.bin,
-AudioSong_1D,$CB:0788,$CB:0B31,938,extracted,music_sequence/AudioSong_1D.bin,
-AudioSong_1E,$CB:0B32,$CB:10F3,1474,extracted,music_sequence/AudioSong_1E.bin,
-AudioSong_1F,$CB:10F4,$CB:13F1,766,extracted,music_sequence/AudioSong_1F.bin,
-AudioSong_20,$CB:13F2,$CB:1455,100,extracted,music_sequence/AudioSong_20.bin,
-AudioSong_21,$CB:1456,$CB:14D5,128,extracted,music_sequence/AudioSong_21.bin,
-AudioSong_22,$CB:14D6,$CB:156B,150,extracted,music_sequence/AudioSong_22.bin,
-AudioSong_23,$CB:156C,$CB:1A30,1221,extracted,music_sequence/AudioSong_23.bin,
-AudioSong_24,$CB:1A31,$CB:1AF1,193,extracted,music_sequence/AudioSong_24.bin,
-AudioSong_25,$CB:1AF2,$CB:1C15,292,extracted,music_sequence/AudioSong_25.bin,
-AudioSong_26,$CB:1C16,$CB:1D58,323,extracted,music_sequence/AudioSong_26.bin,
-AudioSong_27,$CB:1D59,$CB:22E0,1416,extracted,music_sequence/AudioSong_27.bin,
-AudioSong_28,$CB:22E1,$CB:2C05,2341,extracted,music_sequence/AudioSong_28.bin,
-AudioSong_29,$CB:2C06,$CB:340E,2057,extracted,music_sequence/AudioSong_29.bin,
-AudioSong_2A,$CB:340F,$CB:3A37,1577,extracted,music_sequence/AudioSong_2A.bin,
-AudioSong_2B,$CB:3A38,$CB:3B0A,211,extracted,music_sequence/AudioSong_2B.bin,
-AudioSong_2C,$CB:3B0B,$CB:3E25,795,extracted,music_sequence/AudioSong_2C.bin,
-AudioSong_2D,$CB:3E26,$CB:4274,1103,extracted,music_sequence/AudioSong_2D.bin,
-AudioSong_2E,$CB:4275,$CB:430D,153,extracted,music_sequence/AudioSong_2E.bin,
-AudioSong_2F,$CB:430E,$CB:4795,1160,extracted,music_sequence/AudioSong_2F.bin,
-AudioSong_30,$CB:4796,$CB:4A22,653,extracted,music_sequence/AudioSong_30.bin,
-AudioSong_31,$CB:4A23,$CB:4F0D,1259,extracted,music_sequence/AudioSong_31.bin,
-AudioSong_32,$CB:4F0E,$CB:5A69,2908,extracted,music_sequence/AudioSong_32.bin,
-AudioSong_33,$CB:5A6A,$CB:60B0,1607,extracted,music_sequence/AudioSong_33.bin,
-AudioSong_34,$CB:60B1,$CB:613E,142,extracted,music_sequence/AudioSong_34.bin,
-AudioSong_35,$CB:613F,$CB:61FA,188,extracted,music_sequence/AudioSong_35.bin,
-AudioSong_36,$CB:61FB,$CB:6589,911,extracted,music_sequence/AudioSong_36.bin,
-AudioSong_37,$CB:658A,$CB:6626,157,extracted,music_sequence/AudioSong_37.bin,
-AudioSong_38,$CB:6627,$CB:6F25,2303,extracted,music_sequence/AudioSong_38.bin,
-AudioSong_39,$CB:6F26,$CB:7C4F,3370,extracted,music_sequence/AudioSong_39.bin,
-AudioSong_3A,$CB:7C50,$CB:7D56,263,extracted,music_sequence/AudioSong_3A.bin,
-AudioSong_3B,$CB:7D57,$CB:8400,1706,extracted,music_sequence/AudioSong_3B.bin,
-AudioSong_3C,$CB:8401,$CB:8B4F,1871,extracted,music_sequence/AudioSong_3C.bin,
-AudioSong_3D,$CB:8B50,$CB:8C60,273,extracted,music_sequence/AudioSong_3D.bin,
-AudioSong_3E,$CB:8C61,$CB:9063,1027,extracted,music_sequence/AudioSong_3E.bin,
-AudioSong_3F,$CB:9064,$CB:A337,4820,extracted,music_sequence/AudioSong_3F.bin,
-AudioSong_40,$CB:A338,$CB:A453,284,extracted,music_sequence/AudioSong_40.bin,
-AudioSong_41,$CB:A454,$CB:A56A,279,extracted,music_sequence/AudioSong_41.bin,
-AudioSong_42,$CB:A56B,$CB:A6CC,354,extracted,music_sequence/AudioSong_42.bin,
-AudioSong_43,$CB:A6CD,$CB:A728,92,extracted,music_sequence/AudioSong_43.bin,
-AudioSong_44,$CB:A729,$CB:AFA2,2170,extracted,music_sequence/AudioSong_44.bin,
-AudioSong_45,$CB:AFA3,$CB:B604,1634,extracted,music_sequence/AudioSong_45.bin,
-AudioSong_46,$CB:B605,$CB:BFD5,2513,extracted,music_sequence/AudioSong_46.bin,
-AudioSong_47,$CB:BFD6,$CB:C185,432,extracted,music_sequence/AudioSong_47.bin,
-AudioSong_48,$CB:C186,$CB:C2F8,371,extracted,music_sequence/AudioSong_48.bin,
-AudioSong_49,$CB:C2F9,$CB:CC52,2394,extracted,music_sequence/AudioSong_49.bin,
-AudioSong_4A,$CB:CC53,$CB:CD4B,249,extracted,music_sequence/AudioSong_4A.bin,
-AudioSong_4B,$CB:CD4C,$CB:CDBC,113,extracted,music_sequence/AudioSong_4B.bin,
-AudioSong_4C,$CB:CDBD,$CB:CE32,118,extracted,music_sequence/AudioSong_4C.bin,
-AudioSong_4D,$CB:CE33,$CB:D314,1250,extracted,music_sequence/AudioSong_4D.bin,
-AudioSong_4E,$CB:D315,$CB:E03F,3371,extracted,music_sequence/AudioSong_4E.bin,
-AudioSong_4F,$CB:E040,$CB:E13D,254,extracted,music_sequence/AudioSong_4F.bin,
-AudioSong_50,$CB:E13E,$CB:E88E,1873,extracted,music_sequence/AudioSong_50.bin,
-AudioSong_51,$CB:E88F,$CB:EE20,1426,extracted,music_sequence/AudioSong_51.bin,
-AudioSong_52,$CB:EE21,$CB:F163,835,extracted,music_sequence/AudioSong_52.bin,
+AudioSong_00,$CA:8ACC,$CA:8AF1,38,music,music/AudioSong_00.mus,"song, part 1 of 1"
+AudioSong_01,$CA:8AF2,$CA:8FB2,1217,music,music/AudioSong_01.mus,"song, part 1 of 1"
+AudioSong_02,$CA:8FB3,$CA:944D,1179,music,music/AudioSong_02.mus,"song, part 1 of 1"
+AudioSong_03,$CA:944E,$CA:9AB8,1643,music,music/AudioSong_03.mus,"song, part 1 of 1"
+AudioSong_04,$CA:9AB9,$CA:9D84,716,music,music/AudioSong_04.mus,"song, part 1 of 1"
+AudioSong_05,$CA:9D85,$CA:9EC2,318,music,music/AudioSong_05.mus,"song, part 1 of 1"
+AudioSong_06,$CA:9EC3,$CA:AAA9,3047,music,music/AudioSong_06.mus,"song, part 1 of 1"
+AudioSong_07,$CA:AAAA,$CA:ABF3,330,music,music/AudioSong_07.mus,"song, part 1 of 1"
+AudioSong_08,$CA:ABF4,$CA:B1B1,1470,music,music/AudioSong_08.mus,"song, part 1 of 1"
+AudioSong_09,$CA:B1B2,$CA:B521,880,music,music/AudioSong_09.mus,"song, part 1 of 1"
+AudioSong_0A,$CA:B522,$CA:B94C,1067,music,music/AudioSong_0A.mus,"song, part 1 of 1"
+AudioSong_0B,$CA:B94D,$CA:BC33,743,music,music/AudioSong_0B.mus,"song, part 1 of 1"
+AudioSong_0C,$CA:BC34,$CA:C14D,1306,music,music/AudioSong_0C.mus,"song, part 1 of 1"
+AudioSong_0D,$CA:C14E,$CA:C679,1324,music,music/AudioSong_0D.mus,"song, part 1 of 1"
+AudioSong_0F,$CA:C67A,$CA:C8BF,582,music,music/AudioSong_0F.mus,"song, part 1 of 1"
+AudioSong_0E,$CA:C8C0,$CA:D0EB,2092,music,music/AudioSong_0E.mus,"song, part 1 of 1"
+AudioSong_10,$CA:D0EC,$CA:D212,295,music,music/AudioSong_10.mus,"song, part 1 of 1"
+AudioSong_11,$CA:D213,$CA:D354,322,music,music/AudioSong_11.mus,"song, part 1 of 1"
+AudioSong_12,$CA:D355,$CA:D3AD,89,music,music/AudioSong_12.mus,"song, part 1 of 1"
+AudioSong_13,$CA:D3AE,$CA:DD80,2515,music,music/AudioSong_13.mus,"song, part 1 of 1"
+AudioSong_14,$CA:DD81,$CA:E0F3,883,music,music/AudioSong_14.mus,"song, part 1 of 1"
+AudioSong_15,$CA:E0F4,$CA:E6DC,1513,music,music/AudioSong_15.mus,"song, part 1 of 1"
+AudioSong_16,$CA:E6DD,$CA:ED53,1655,music,music/AudioSong_16.mus,"song, part 1 of 1"
+AudioSong_17,$CA:ED54,$CA:F5FC,2217,music,music/AudioSong_17.mus,"song, part 1 of 1"
+AudioSong_18,$CA:F5FD,$CA:FFFF,2563,music,music/AudioSong_18.mus,"song, part 1 of 2"
+AudioSong_18_Cont,$CB:0000,$CB:010B,268,music,music/AudioSong_18.mus,"song, part 2 of 2"
+AudioSong_19,$CB:010C,$CB:0193,136,music,music/AudioSong_19.mus,"song, part 1 of 1"
+AudioSong_1A,$CB:0194,$CB:0220,141,music,music/AudioSong_1A.mus,"song, part 1 of 1"
+AudioSong_1B,$CB:0221,$CB:05E2,962,music,music/AudioSong_1B.mus,"song, part 1 of 1"
+AudioSong_1C,$CB:05E3,$CB:0787,421,music,music/AudioSong_1C.mus,"song, part 1 of 1"
+AudioSong_1D,$CB:0788,$CB:0B31,938,music,music/AudioSong_1D.mus,"song, part 1 of 1"
+AudioSong_1E,$CB:0B32,$CB:10F3,1474,music,music/AudioSong_1E.mus,"song, part 1 of 1"
+AudioSong_1F,$CB:10F4,$CB:13F1,766,music,music/AudioSong_1F.mus,"song, part 1 of 1"
+AudioSong_20,$CB:13F2,$CB:1455,100,music,music/AudioSong_20.mus,"song, part 1 of 1"
+AudioSong_21,$CB:1456,$CB:14D5,128,music,music/AudioSong_21.mus,"song, part 1 of 1"
+AudioSong_22,$CB:14D6,$CB:156B,150,music,music/AudioSong_22.mus,"song, part 1 of 1"
+AudioSong_23,$CB:156C,$CB:1A30,1221,music,music/AudioSong_23.mus,"song, part 1 of 1"
+AudioSong_24,$CB:1A31,$CB:1AF1,193,music,music/AudioSong_24.mus,"song, part 1 of 1"
+AudioSong_25,$CB:1AF2,$CB:1C15,292,music,music/AudioSong_25.mus,"song, part 1 of 1"
+AudioSong_26,$CB:1C16,$CB:1D58,323,music,music/AudioSong_26.mus,"song, part 1 of 1"
+AudioSong_27,$CB:1D59,$CB:22E0,1416,music,music/AudioSong_27.mus,"song, part 1 of 1"
+AudioSong_28,$CB:22E1,$CB:2C05,2341,music,music/AudioSong_28.mus,"song, part 1 of 1"
+AudioSong_29,$CB:2C06,$CB:340E,2057,music,music/AudioSong_29.mus,"song, part 1 of 1"
+AudioSong_2A,$CB:340F,$CB:3A37,1577,music,music/AudioSong_2A.mus,"song, part 1 of 1"
+AudioSong_2B,$CB:3A38,$CB:3B0A,211,music,music/AudioSong_2B.mus,"song, part 1 of 1"
+AudioSong_2C,$CB:3B0B,$CB:3E25,795,music,music/AudioSong_2C.mus,"song, part 1 of 1"
+AudioSong_2D,$CB:3E26,$CB:4274,1103,music,music/AudioSong_2D.mus,"song, part 1 of 1"
+AudioSong_2E,$CB:4275,$CB:430D,153,music,music/AudioSong_2E.mus,"song, part 1 of 1"
+AudioSong_2F,$CB:430E,$CB:4795,1160,music,music/AudioSong_2F.mus,"song, part 1 of 1"
+AudioSong_30,$CB:4796,$CB:4A22,653,music,music/AudioSong_30.mus,"song, part 1 of 1"
+AudioSong_31,$CB:4A23,$CB:4F0D,1259,music,music/AudioSong_31.mus,"song, part 1 of 1"
+AudioSong_32,$CB:4F0E,$CB:5A69,2908,music,music/AudioSong_32.mus,"song, part 1 of 1"
+AudioSong_33,$CB:5A6A,$CB:60B0,1607,music,music/AudioSong_33.mus,"song, part 1 of 1"
+AudioSong_34,$CB:60B1,$CB:613E,142,music,music/AudioSong_34.mus,"song, part 1 of 1"
+AudioSong_35,$CB:613F,$CB:61FA,188,music,music/AudioSong_35.mus,"song, part 1 of 1"
+AudioSong_36,$CB:61FB,$CB:6589,911,music,music/AudioSong_36.mus,"song, part 1 of 1"
+AudioSong_37,$CB:658A,$CB:6626,157,music,music/AudioSong_37.mus,"song, part 1 of 1"
+AudioSong_38,$CB:6627,$CB:6F25,2303,music,music/AudioSong_38.mus,"song, part 1 of 1"
+AudioSong_39,$CB:6F26,$CB:7C4F,3370,music,music/AudioSong_39.mus,"song, part 1 of 1"
+AudioSong_3A,$CB:7C50,$CB:7D56,263,music,music/AudioSong_3A.mus,"song, part 1 of 1"
+AudioSong_3B,$CB:7D57,$CB:8400,1706,music,music/AudioSong_3B.mus,"song, part 1 of 1"
+AudioSong_3C,$CB:8401,$CB:8B4F,1871,music,music/AudioSong_3C.mus,"song, part 1 of 1"
+AudioSong_3D,$CB:8B50,$CB:8C60,273,music,music/AudioSong_3D.mus,"song, part 1 of 1"
+AudioSong_3E,$CB:8C61,$CB:9063,1027,music,music/AudioSong_3E.mus,"song, part 1 of 1"
+AudioSong_3F,$CB:9064,$CB:A337,4820,music,music/AudioSong_3F.mus,"song, part 1 of 1"
+AudioSong_40,$CB:A338,$CB:A453,284,music,music/AudioSong_40.mus,"song, part 1 of 1"
+AudioSong_41,$CB:A454,$CB:A56A,279,music,music/AudioSong_41.mus,"song, part 1 of 1"
+AudioSong_42,$CB:A56B,$CB:A6CC,354,music,music/AudioSong_42.mus,"song, part 1 of 1"
+AudioSong_43,$CB:A6CD,$CB:A728,92,music,music/AudioSong_43.mus,"song, part 1 of 1"
+AudioSong_44,$CB:A729,$CB:AFA2,2170,music,music/AudioSong_44.mus,"song, part 1 of 1"
+AudioSong_45,$CB:AFA3,$CB:B604,1634,music,music/AudioSong_45.mus,"song, part 1 of 1"
+AudioSong_46,$CB:B605,$CB:BFD5,2513,music,music/AudioSong_46.mus,"song, part 1 of 1"
+AudioSong_47,$CB:BFD6,$CB:C185,432,music,music/AudioSong_47.mus,"song, part 1 of 1"
+AudioSong_48,$CB:C186,$CB:C2F8,371,music,music/AudioSong_48.mus,"song, part 1 of 1"
+AudioSong_49,$CB:C2F9,$CB:CC52,2394,music,music/AudioSong_49.mus,"song, part 1 of 1"
+AudioSong_4A,$CB:CC53,$CB:CD4B,249,music,music/AudioSong_4A.mus,"song, part 1 of 1"
+AudioSong_4B,$CB:CD4C,$CB:CDBC,113,music,music/AudioSong_4B.mus,"song, part 1 of 1"
+AudioSong_4C,$CB:CDBD,$CB:CE32,118,music,music/AudioSong_4C.mus,"song, part 1 of 1"
+AudioSong_4D,$CB:CE33,$CB:D314,1250,music,music/AudioSong_4D.mus,"song, part 1 of 1"
+AudioSong_4E,$CB:D315,$CB:E03F,3371,music,music/AudioSong_4E.mus,"song, part 1 of 1"
+AudioSong_4F,$CB:E040,$CB:E13D,254,music,music/AudioSong_4F.mus,"song, part 1 of 1"
+AudioSong_50,$CB:E13E,$CB:E88E,1873,music,music/AudioSong_50.mus,"song, part 1 of 1"
+AudioSong_51,$CB:E88F,$CB:EE20,1426,music,music/AudioSong_51.mus,"song, part 1 of 1"
+AudioSong_52,$CB:EE21,$CB:F163,835,music,music/AudioSong_52.mus,"song, part 1 of 1"
 Music_CBF164,$CB:F164,$CB:FF90,3629,extracted,music_sequence/Music_CBF164.bin,
 Padding_CBFF91,$CB:FF91,$CB:FFFF,111,fill,,$FF
 BattleRom_AreaRec,$CC:0000,$CC:05CB,1484,extracted,table/BattleRom_AreaRec.bin,

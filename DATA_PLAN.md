@@ -146,8 +146,8 @@ pointer by `!AudioAram_Song + !SpcSong_Data - !SpcSong_Origin` (the header word 
 `!SpcSong_Origin`; the header of the song start in `asm/spc700/driver.asm`, lines 1951-1954), so
 a label must be written relative to the header's origin, not to `$2000`. The effect tracks sit
 at `$2F00`. Note
-`Audio_SongTable` is not in address order (songs `$0E`/`$0F` are swapped in ROM). Difficulty
-medium; 2-3 sessions.
+`Audio_SongTable` is not in address order (songs `$0E`/`$0F` are swapped in ROM). Done (below,
+"Music sequences as text"): the songs and both effect blocks; the orphan stays extracted.
 
 **Text** (208 KB). 15 message tables (word pointers, then strings), the dictionary at
 `$DE:FA00` (127 entries for codes `$21`-`$9F`, and a 128th word reached only by code `$12`
@@ -392,8 +392,8 @@ extraction: an edit is lost when it runs again.
   nothing to the disassembly. The same holds for some `$FF` sub-opcodes and the menu, sound and
   sprite callees of `$29`, `$82`, `$83`, `$AF`/`$B0`, `$CF`-`$D7`, `$E8`-`$EC` and `$F8`-`$FA`,
   whose handlers keep the script position in direct page or on the stack around the call.
-- **Left:** the music sequences (step 7; the battle, scene and layer-effect scripts are below); a
-  message's string number is still a number (the text units' strings have no names yet).
+- **Left:** a message's string number is still a number (the text units' strings have no names
+  yet). The music sequences and the battle, scene and layer-effect scripts are below.
 
 ## Battle scripts (step 7, second part)
 
@@ -831,6 +831,71 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
     are probably never played.
   - The battle-action frames (`$D1`), and `$E4:0000`-`$1FFF`, are separate tables, not done here.
 
+## Music sequences as text
+
+On the `data-music` branch. `tools/music.py` makes one readable file per song of
+`Audio_SongTable` and per sound-effect block in `build/assets/music/`. The build assembles them to
+`build/music/` (one file per piece), which is incbin'd; `tools/verify.py` counts them as "music".
+
+- **The format, from the driver.** `tools/absint.py` runs 65816 code only, so
+  `tools/spcwalk.py` walks the matched SPC700 source itself (`asm/spc700/driver.asm`; no ROM or
+  asar needed). It starts at `Spc_TrackStep` with one track byte known and all else unknown. The
+  values it tracks are the track pointer (`!Spc_TrackPtr+X`, as "byte under test + k"), the
+  song's move (`!Spc_Scratch00`), the track (X: song and effect tracks are both followed) and an
+  exact stack. A branch on an unknown flag is followed both ways. A RET goes to the address
+  pushed, so `Spc_RunSeqCommand`'s dispatch is run, not assumed; with an unknown index it goes to
+  every entry of the table (the look-ahead's second handlers). The two branches onto an
+  operand byte run the instruction that byte encodes. States that meet are joined.
+  - Every byte below `!Spc_SeqFirstCmd` takes one byte and the track waits. These are notes,
+    ties and rests (`!Spc_SeqFirstTie`, `!Spc_SeqFirstRest`, a length from
+    `Spc_DurationTable[byte % 14]`).
+  - Each command `$C4`-`$FF` gets its length and its flows. `next`: it steps on. `jump`: it
+    sets the pointer to a word of two adjacent operands plus the move; this is `$F6`, `$F5`
+    and `$FA`. `end`: `$EB`-`$EF`, `$FE`, `$FF`, and `$E9`/`$EA` with no track. `elsewhere`:
+    it sets the pointer from something its bytes do not give; this is `$E3` (the loop's saved
+    start) and `$E9`/`$EA` (an effect's track).
+  - The walk refuses a command whose length differs between paths, a jump word that is not two
+    adjacent operands, a half-set pointer, an unmodelled instruction, and a store that may reach
+    the pointer. An indexed store with an unknown index is taken to reach its base to base+$FF,
+    not wrapping in the direct page.
+  - Every derived length equals `Spc_SeqOperandCounts` + 1 (`test_music.py` checks it against
+    the source table and against a written-out table of every command).
+  - The result is cached in `build/music/format.json` with a sha256 key; a changed file is
+    refused.
+- **The layout** comes from the same source.
+  - Songs: the header of `Spc_StartSong` (`!SpcSong_Origin`, `!SpcSong_NoTrack`, two sets of
+    `!Spc_NumSongTracks` bytes of track pointers, data from `!SpcSong_Data`). Pointers and jump
+    words are in the header's origin space, written as labels at their ARAM address once
+    loaded.
+  - Effect blocks: a table of 256 entries of `!Spc_SfxEntry` bytes (an effect number is one
+    byte, `Spc_SfxTrackPtr`). A pointer with high byte 0 is no track (`Spc_StartSfx`).
+  - Song `$18` spans two survey rows at the end of bank `$CA`; it is one unit.
+- **The text.** One command per line, named after its handler (`Volume $64`, `LoopJump $02
+  ->L_2029`, `EndTrack_EB`). A note is `note N LEN` (index 0-11, length in steps). Ties and
+  rests are `tie LEN` and `rest LEN`. Bytes nothing reaches are `@bytes`, only after a command
+  that does not step on.
+- **Checks on assembly.** The assembler checks each line's operand count and the place of
+  `->LABEL`, refuses labels nothing references, stray words, a header after the tracks and
+  `@raw`, and walks the result again from the track entries. Every reached byte must start a
+  line, every line must be reached, and every jump must land on a line. So a regrouping of the
+  same bytes is refused. A mutation sweep in `test_music.py` checks that no single-token or
+  single-line change of a sample song gives the same bytes.
+- **Results.** All 83 songs and both effect blocks (85 units, 104,092 B in 86 pieces) assemble
+  back byte-exact; 51 B are data nothing reaches.
+  - In songs `$16` and `$4D`, a `$EB` follows a `Jump` (one byte each).
+  - In the effect blocks, `$FF` fill follows a last endless loop (11 and 38 B). The first `$FF`
+    after each such `LoopEnd` is counted as an end command, since `$E3` can step on.
+- **Not read, still extracted** (3,629 B): the orphan at `$CB:F164`. No table or pointer reaches
+  it, so nothing says where its tracks start.
+- **Not settled:**
+  - Note names. The note index is the byte / 14. Its pitch is `Spc_PitchTable[(base + index +
+    transpose - 10) mod 12]`, with the sample's tuning on top, so the absolute note depends on
+    the sample. The text keeps the index.
+  - Drum mode (`$FB`) turns the index into a drum-kit entry (`Spc_DrumNote`), and `$E8` replaces
+    the next note's length. The text still shows the byte's own index and length.
+  - The look-ahead (`Spc_PeekNote`) reads `$DC`'s operand as a note (a quirk of the driver,
+    already in its header). The format follows the step, not the look-ahead.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
@@ -858,8 +923,8 @@ On the `data-tables-2` branch. `tools/sprites.py` gives the sprite frame records
 5. **Text** (done, above): the encoder and the dictionary question; the pointer tables.
 6. **Tables and palettes** (first part done, below; 2-4 sessions left): the tables still
    extracted, and the inferred table ends.
-7. **Script languages**: battle, layer-effect, scene and location event scripts (done,
-   below), music sequences (2-3).
+7. **Script languages**: battle, layer-effect, scene and location event scripts and the music
+   sequences (done, above).
 8. **Readable assets**: tile converters (raw tiles: first part done, below; the packed ones
    next), palette converters, sprite frames (2), maps if wanted.
 9. **Unknown and probable rows** (1).

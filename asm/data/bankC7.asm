@@ -10,8 +10,9 @@
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
 ; build/text/ and build/records/, battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/, or
-; graphics it encodes from images into build/gfx/
+; scripts it assembles into build/battle/ and build/fx/, music
+; sequences it assembles into build/music/, or graphics it
+; encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
@@ -65,14 +66,14 @@ AudioRom_Block1F00:
 ; Read by Audio_BootBlockPtrs, Audio_UploadBlock2F00.
 org $C74309
 AudioRom_Block2F00:
-    incbin "../../build/assets/music_sequence/AudioRom_Block2F00.bin"
+    incbin "../../build/music/AudioRom_Block2F00.bin"          ; music: effects, part 1 of 1
 
 ; $C7:5B0B-$C7:730C (6,146 B), music_sequence, confirmed: u16 length + bytes for ARAM $2F00: the
 ; alternate sound-effect block (sent while Audio_Unk1E10 is nonzero)
 ; Read by Audio_TableDirectory, Audio_UploadBlock2F00.
 org $C75B0B
 AudioRom_Block2F00Alt:
-    incbin "../../build/assets/music_sequence/AudioRom_Block2F00Alt.bin"
+    incbin "../../build/music/AudioRom_Block2F00Alt.bin"          ; music: effects, part 1 of 1
 
 ; $C7:730D-$C7:81AE (3,746 B), brr_sample, confirmed: u16 length + BRR blocks (9 B)
 ; Read by Audio_UploadSample, Audio_CmdSwapSample.

@@ -26,7 +26,8 @@ counted apart as well, never as source, and so are records pieces
 from the ROM; events pieces (tools/events.py): event script packs
 assembled from their disassembly, then packed; battle pieces
 (tools/battle.py): battle scripts and their tables assembled from their
-readable form; and scene and fx pieces (tools/scripts.py): the scene
+readable form; music pieces (tools/music.py): songs and sound-effect
+blocks assembled from their readable form; and scene and fx pieces (tools/scripts.py): the scene
 script packs and the layer-effect scripts, assembled the same way (the
 scene packs then packed); and graphics pieces (tools/graphics.py): tile
 graphics encoded from indexed images; and mapprops and metatiles pieces
@@ -213,7 +214,8 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
                'graphics_bytes': 0, 'gfxpack_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
-               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'sprframes_bytes': 0}
+               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'sprframes_bytes': 0,
+               'music_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -245,13 +247,14 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         build_rom.build_records()
         build_rom.build_battle()
         build_rom.build_sprites()
+        build_rom.build_music()
     except (extract_data.DataError, build_rom.BuildError) as e:
         problems.append(str(e))
         return figures, problems
     for p in pieces:
         if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
                               'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
-                              'graphics', 'gfxpack', 'sprframes'):
+                              'graphics', 'gfxpack', 'sprframes', 'music'):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz'
@@ -262,6 +265,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
                 else extract_data.SPRITES_OUT / f'{p["label"]}.bin' if p['piece'] == 'sprframes'
                 else extract_data.TEXT_OUT / f'{p["label"]}.bin' if p['piece'] == 'text'
                 else extract_data.BATTLE_OUT / f'{p["label"]}.bin' if p['piece'] == 'battle'
+                else extract_data.MUSIC_OUT / f'{p["label"]}.bin' if p['piece'] == 'music'
                 else extract_data.RECORDS_OUT / f'{p["label"]}.bin')
         if path.read_bytes() != rom[p['offset']:p['stop']]:
             problems.append(f'{path} is not the ROM\'s bytes at {p["start"]}-{p["end"]}')
@@ -287,6 +291,13 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         bsplit['data'] += st['data'] - st['kept']
         bsplit['kept'] += st['kept']
     figures['battle_split'] = bsplit
+    # How much of the music nothing reaches (data).
+    import music
+    units = music.unit_pieces(pieces)
+    msplit = {'units': len(units), 'data': 0}
+    for unit in units:
+        msplit['data'] += music.stats((extract_data.ASSETS / f'music/{unit}.mus').read_text())['data']
+    figures['music_split'] = msplit
     # How much of the scene and layer-effect scripts nothing reaches (data).
     import scripts
     ssplit = {'scene': 0, 'fx': 0, 'scene_unpacked': 0}
@@ -425,6 +436,11 @@ def main() -> int:
               f'(build/assets/battle/ -> build/battle/, incbin): '
               f'{data["battle_bytes"] - bs["data"] - bs["kept"]:,} B read as scripts and tables, '
               f'{bs["data"]:,} B no opcode or record reaches (data), {bs["kept"]:,} B of scripts kept as bytes')
+        mu = data['music_split']
+        print(f'  {"music":<16} {data["music_bytes"]:>9,} bytes of music sequences ({mu["units"]} songs and '
+              f'sound-effect blocks) assembled by the build from their disassembly (build/assets/music/ -> '
+              f'build/music/, incbin): {data["music_bytes"] - mu["data"]:,} B read as headers, tables, '
+              f'commands and notes, {mu["data"]:,} B no command reaches (data)')
         ss = data['scripts_split']
         print(f'  {"scene":<16} {data["scene_bytes"]:>9,} bytes of scene scripts packed by the build from '
               f'scripts assembled from their disassembly (build/assets/scene/ -> build/scene/ -> '
