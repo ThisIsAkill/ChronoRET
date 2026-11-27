@@ -179,7 +179,7 @@ class WithRom(unittest.TestCase):
         items = strings['$FF:B310']
         self.assertEqual(items['entries'], d['Menu_ItemIdEnd'])
         self.assertEqual(sorted(e - s for s, (e, _) in items['strings'].items()), [5, 6, 7, 7, 9])
-        self.assertFalse(items['strings'][0x3FB509][1])                   # ACCESSORY: the count of 9 ends it
+        self.assertFalse(items['strings'][0x3FB509][1])                   # the last string: the count of 9 ends it
         labels = [d[n] - 0xC00000 for n in mt._equip_labels()]
         self.assertTrue(all(a in strings['$FF:C457']['strings'] for a in labels))
         # without the draw lists, no string of MenuRom_StringPtrs is proved
@@ -199,7 +199,7 @@ class WithRom(unittest.TestCase):
                 mt.proofs(rom, p, ps, d)
         finally:
             mt.draw_uses = saved
-        mt.draw_uses = lambda rom, pieces: {7: {2, 256}}               # entry 7 ("Weapon") drawn two ways
+        mt.draw_uses = lambda rom, pieces: {7: {2, 256}}               # entry 7 drawn two ways
         try:
             with self.assertRaisesRegex(mt.MenuTextError, 'ends differently for different counts'):
                 mt.proofs(rom, p, ps, d)

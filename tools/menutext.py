@@ -46,7 +46,7 @@ The readable form (build/assets/menu/<label>.mtx):
   @entry I NAME | $XXXX          entry I: a proved string's label (or an
                                  inline one), else the word as it is
   NAME:                          a proved string, on the next line:
-      WEAPON{end}                glyphs (text.py's names for the codes,
+      ABC{end}                   glyphs (text.py's names for the codes,
                                  a display convention; _ is tile $FF),
                                  {gXX} any other tile, {cXX a b ..} code XX
                                  and its argument bytes, {end} the 0,

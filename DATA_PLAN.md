@@ -1116,8 +1116,8 @@ the user's ROM only; no string is committed.
   - `MenuRom_ItemTextPtrs` (`$FF:B310`): `Menu_DrawInvEntry` draws entry id with a count of
     `Menu_ItemTextLen` (9). The ids are 1 to `Menu_ItemIdEnd` - 1 (241; id 0 is blanks), so the
     table is 242 words.
-    - Its 5 strings (34 B) are proved; `ACCESSORY` is ended by the count, not a 0.
-    - The byte after the table and the 0 after `ACCESSORY` stay bytes.
+    - Its 5 strings (34 B) are proved; the last is ended by the count, not a 0.
+    - The byte after the table and the 0 after the last string stay bytes.
     - The 2,048 B after the strings, which the old row took to be strings too, are an unknown row
       now: no entry names them.
   - `MenuRom_StringPtrs` (`$FF:C457`, now one row with the three equipment labels after it):
@@ -1128,7 +1128,7 @@ the user's ROM only; no string is committed.
       of each to `Menu_InfoLabel`, which a proved string draws as its sub-string; each label's 0
       falls inside its 11 bytes.
     - 39 strings (1,201 B) are proved. 36 B stay bytes, among them the strings of entries no draw
-      list names (`Who'll you replace?`, for one). Those entries are written as their words.
+      list names (entry 11, for one). Those entries are written as their words.
 - **Results.** Both pieces (1,885 B) assemble back byte-exact. A string the text would place inside
   another is refused, and so are a string that ends differently for two counts, a sub-string past
   the piece, and a label with no 0 in its copied bytes.
