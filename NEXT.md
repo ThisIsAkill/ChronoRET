@@ -917,7 +917,8 @@ describing it in source, with totals, order of work and estimates, is [DATA_PLAN
    window builders `WinFx_BuildCircle`/`WinFx_StepWipe`/`WinFx_BuildQuad`, `C3_RandomByte`, and the
    services of the packed module: `C3_ScaleBitmap`, `C3_ModuleNmi`/`C3_ModuleFrame`, the script
    interpreter `C3_RunScript` and its task lists, the sprite builders, `C3_BuildCopyCode`,
-   `C3_ReadPad`, `C3_MulSigned`, `C3_FindDivisor`, the staff text, the "CODE END C3" marker).
+   `C3_ReadPad`, `C3_MulSigned`, `C3_FindDivisor`, the staff text and the ASCII end-of-code
+   marker after the last RTL; those two are now text pieces of the data layer, from your ROM).
    The pack at `$C3:1200` and the scene data after the module stay ROM bytes. The module,
    `BankC3_PackedModule` (`$C3:1313`-`$7A2B`, the jet-bike race program, unpacked to
    `$7E:3000`-`$B57E`), is built from source: `asm/bankC3/packed/module.asm` is the unpacked
