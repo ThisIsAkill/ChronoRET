@@ -14668,7 +14668,7 @@ C3Mod_Prog10:
     STA.w A1B7
     LDA.b #!MDMAEN_Ch7
     STA.w MDMAEN
-    LDX.w #C3Mod_Unk9CE2
+    LDX.w #C3Mod_Prog10PicNmi
     JSR C3Mod_NmiTaskAdd
 .common:
     STZ.w !Decomp_DestBank
@@ -14702,31 +14702,31 @@ C3Mod_Prog10:
     LDY.w #!C3_Prog10Black+1
     LDA.b #!C3_Prog10BlackBytes-1       ; with B = 0: $00EE
     MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes (bank $7E)
-    LDX.w #C3Mod_Unk9613
-    LDY.w #C3Mod_Unk970F
+    LDX.w #C3Mod_Prog10MainScript
+    LDY.w #C3Mod_Prog10MainB
     LDA.l !C3_EntryArg
     AND.b #!C3_EntryLowNibble
     CMP.b #!C3_Prog10TextMode
     BNE .mode_b
     LDX.w #C3Mod_StaffTexts
     STX.w !C3_ResultWord
-    LDX.w #C3Mod_Unk90CF
-    LDY.w #C3Mod_Unk9341
+    LDX.w #C3Mod_Prog10TextScript
+    LDY.w #C3Mod_Prog10TextB
     BRA .scripts
 .mode_b:
     CMP.b #!C3_Prog10ModeB
     BNE .scripts
     LDX.w #C3Mod_StaffTexts
     STX.w !C3_ResultWord
-    LDX.w #C3Mod_Unk9450
-    LDY.w #C3Mod_Unk97A6
+    LDX.w #C3Mod_Prog10TurnScript
+    LDY.w #C3Mod_Prog10TurnIdleB
 .scripts:
     STX.w !C3_ScriptPageA+!C3Script_Ptr
     STY.w !C3_ScriptPageB+!C3Script_Ptr
     REP #$20
     PHB
     JSR C3Mod_ScriptTaskA
-    LDA.w #C3Mod_Unk9B46
+    LDA.w #C3Mod_Prog10M7Setup
     STA.w C3Mod_BuildM7Tables_setup+1
     PLB
     SEP #$20
@@ -14741,7 +14741,7 @@ C3Mod_Prog10:
     STX.b !C3_Prog10Word7F
     LDA.b #1
     STA.w !C3_NoSoftReset
-    JSR C3Mod_Unk9BB8
+    JSR C3Mod_Prog10FigsInit
     LDY.w #C3Mod_Prog10Hdma
     JSR C3Mod_SetupHdma
     LDA.b #!C3_Prog10HdmaOn
@@ -15725,7 +15725,7 @@ C3Mod_Prog10Grid:
     AND.b #!C3_EntryLowNibble
     CMP.b #!C3_EntryLowNibble
     BNE .grid
-    LDX.w #C3Mod_Unk9315
+    LDX.w #C3Mod_Prog10TextExit-2
     STX.w !C3_ScriptPageA+!C3Script_Ptr
     JMP C3Mod_Prog10Fill_exit
 .grid:
@@ -15828,7 +15828,7 @@ C3Mod_Prog10GridNmi:
     STX.w DAS7L
     LDX.w #!BBAD_VMDATAH<<8|!DMAP_FixedSource
     STX.w DMAP7                         ; and BBAD7
-    LDX.w #C3Mod_Unk9E7A
+    LDX.w #C3Mod_PriorityByte
     STX.w A1T7L
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
@@ -15990,7 +15990,7 @@ C3Mod_Prog12:
     LDA.b #!C3_Prog12Setini
     STA.w SETINI
     LDA.b #!Op_BCS
-    STA.l C3Mod_Unk9EE3
+    STA.l C3Mod_CreditLineTask_field
     BRA C3Mod_Prog13_setup
 
 ; $7E:8EA8 — C3Mod_Prog13 (322 bytes with its .setup, $8EA8–$8FE9)
@@ -16106,7 +16106,7 @@ C3Mod_Prog13:
     STX.w DAS7L
     LDX.w #!BBAD_VMDATAH<<8|!DMAP_FixedSource
     STX.w DMAP7                         ; and BBAD7
-    LDX.w #C3Mod_Unk9E7A
+    LDX.w #C3Mod_PriorityByte
     STX.w A1T7L
     LDA.b #!VMAIN_IncAfterHigh
     STA.w VMAIN
@@ -16119,13 +16119,13 @@ C3Mod_Prog13:
     PEA.w !Bank7E                       ; PLB takes the $7E; the $00 stays for the PLB after
     PLB
     JSR C3Mod_Prog4ToEnd
-    LDX.w #C3Mod_Unk93E3
+    LDX.w #C3Mod_Prog13Script
     STX.w !C3_ScriptPageA+!C3Script_Ptr
     JSR C3Mod_ScriptTaskA
     SEP #$20
     LDA.b #BG3VOFS-!DP_PPU
-    STA.w C3Mod_Unk9F22+1
-    STA.w C3Mod_Unk9F27+1
+    STA.w C3Mod_CreditLineNmi_vofs+1
+    STA.w C3Mod_CreditLineNmi_vofs_high+1
     PLB
     PEA.w !DP_PPU
     PLD
@@ -16198,7 +16198,7 @@ C3Mod_Prog10HdmaStrip:
 ; C3Mod_Prog10GridNmi's and C3Mod_Prog13's: 0 COLDATA (indirect, one
 ; register) from the table at $A00C (not matched yet); the end.
 C3Mod_Prog10HdmaGrid:
-    db !DMAP_HdmaIndirect, !BBAD_COLDATA : dw C3Mod_UnkA00C : db !Bank7E
+    db !DMAP_HdmaIndirect, !BBAD_COLDATA : dw C3Mod_Prog10Coldata : db !Bank7E
     db !C3_HdmaListEnd
 
 ; $7E:9029 — C3Mod_Prog10HdmaWindow (6 bytes, $9029–$902E)
@@ -16364,8 +16364,3063 @@ C3Mod_VramFill:                         ; header: see C3Mod_VramFillLow
     RTS
 
 %C3ModOrg($7E90C1)
-C3Mod_Rest90C1:
-    %C3ModRomBytes($7E90C1, $7EA651)
+; ============================================================
+; Program 10, 12 and 13's scripts and tasks ($90C1–$A650)
+; ============================================================
+; The scripts (C3_RunScript's opcodes, !C3Op_*) that C3Mod_Prog10 and
+; C3Mod_Prog13 put on pages $0A00 and $0B00, and their script
+; routines, tasks, NMI tasks and data. Program 10 has three scenes by
+; C3_EntryArg's low nibble: $A, the staff-text scene
+; (C3Mod_Prog10TextScript / C3Mod_Prog10TextB); $B, the turning
+; picture (C3Mod_Prog10TurnScript / C3Mod_Prog10TurnIdleB); else the
+; main one (C3Mod_Prog10MainScript / C3Mod_Prog10MainB), which ends
+; in the text scene's last part. Programs 12 and 13 run
+; C3Mod_Prog13Script. A page's script can hand page $0B00 another
+; script by poking its C3Script_Ptr (opcode $F2). A loop opcode runs
+; its body limit + 1 times (counter 0 first).
+
+; $7E:90C1 — C3Mod_Prog10ScrollTask (14 bytes, $90C1–$90CE)
+; A task: page $0A00's var 2 (the plane's Y scroll) + page $0B00's var
+; 8 (CLC), AND $3FF (the 1,024-dot mode-7 map), stored back.
+; Callers note: a task added by script opcode $FA at $94F1
+;   (C3Mod_Prog10TurnScript) and $9628 (C3Mod_Prog10MainScript).
+; Entry: a task (C3Mod_RunTasks): M=0, X any, DP any, DB=$00 (both
+;        pages are absolute).
+; Exit:  M=0; A = the new var 2; X, Y unchanged.
+C3Mod_Prog10ScrollTask:
+    LDA.w !C3_ScriptPageA+!C3_Prog10ViewY
+    CLC
+    ADC.w !C3_ScriptPageB+!C3_Prog10ScrollStep
+    AND.w #!C3_Prog10ScrollMask
+    STA.w !C3_ScriptPageA+!C3_Prog10ViewY
+    RTS
+
+; $7E:90CF — C3Mod_Prog10TextScript (584 bytes, $90CF–$9316)
+; Page $0A00's script of the staff-text scene (C3Mod_Prog10, C3_EntryArg
+; low nibble $A). In order:
+;   - C3Mod_Prog10Tasks; the tasks C3Mod_Prog10ViewTask,
+;     C3Mod_Prog10SpinFlashTask and C3Mod_Prog10FigsTask and the NMI
+;     tasks C3Mod_Prog10M7Nmi, C3Mod_Prog10SplitNmi and
+;     C3Mod_Prog10TurnNmi; the view (var 0 $40, 1 $A4, 2 $24, 5 $200,
+;     6 2, 8 0), WH0 = 1, WH1 = 0; C3_Prog10Wobble 8; the text place
+;     ($10, $10: C3Mod_Prog10TextPlace); after song marker 1 (opcode
+;     $F5) C3_Prog10TextsLeft = 9, after marker 2 the fades of colours
+;     $01-$40 and $41-$7F (C3Mod_Prog10Fade01 / Fade41) a frame apart;
+;   - 640 frames; page $0B00 to C3Mod_Prog10PicSink;
+;     C3_Prog10FigsLeave = 1; C3Mod_Prog10PicTask; C3_HdmaEnable $3F;
+;     160 x (var 0 + 1, three frames); C3Mod_Prog10FigsTask removed;
+;     1088 frames; page $0B00 to C3Mod_Prog10PicRise; 880 frames;
+;     C3Mod_FadeOutTask, 16 frames;
+;   - C3Mod_Prog10FigsTask removed again at $9151, though no longer
+;     in the list: C3_TaskListRemove searches on past the list's end
+;     (DB = $7E under C3_RunScript) and clears the first even-addressed
+;     word $9BF9 after $7E:0920, which in the module is the operand of
+;     the $F9 at $9137 ($9138, already run: no effect), unless WRAM
+;     below the module holds such a word first;
+;     wobble 8, C3_HdmaEnable $38, picture 2, C3_Prog10Large 1, page
+;     $0B00's vars 1 and 2 = -$A8 and $E0, C3_Prog10TextTimer $10,
+;     C3_Prog10TextGap $18, place ($10, $90); view var 1 $A2, 2 $83, 5
+;     $300, 0 $80; after marker 4 C3Mod_FadeInTask and 20 texts; 256 x
+;     (var 0 + 1, four frames); C3Mod_FadeOutTask, 15 frames;
+;     C3Mod_Prog10SpinFlashTask removed;
+;   - the flat scene: C3Mod_Prog10Fill; C3_Prog10TextGap $40, place
+;     ($10, $14); C3Mod_Prog10Tasks, C3Mod_Prog10PicTask,
+;     C3Mod_Prog10WobbleTask, NMI C3Mod_Prog10FlatNmi; picture 1; vars
+;     3 and 4 $28, 1 -$58, 2 -$48, 0 $280; page $0B00's vars 1 and 2
+;     -$20 and $80; wobble 7; 384 x (var 0 - 1, five frames);
+;     C3Mod_FadeOutTask, 16 frames;
+;   - the strip scene: C3Mod_Prog10Strip; C3Mod_Prog10Tasks,
+;     C3Mod_Prog10PicTask, NMI C3Mod_Prog10StripNmi and
+;     C3Mod_Prog10FlatBg2Nmi; picture 3; page $0B00 to
+;     C3Mod_Prog10PicDrift; wobble 4; vars 0 $140, 3 and 4 $28, 1 -$58,
+;     2 -$48, 5 $90; 426 x (var 7 - 1, var 1 - 2 over three frames);
+;     page $0B00 to C3Mod_Prog10PicRiseB; 54 x (var 5 + 4, var 7 - 1,
+;     var 1 - 2 over four frames);
+;   - .stars ($925E; also where C3Mod_Prog10MainScript ends up): after
+;     marker 7 page $0B00 to C3Mod_Prog10StarsB, C3_Brightness 0, TM
+;     = the sprites, TMW = 0; C3Mod_Prog10Stars; C3Mod_Prog10Tasks,
+;     C3Mod_Prog10StarsTask, NMI C3Mod_ClearOamHigh; 768 frames;
+;     C3Mod_FadeOutTask, 16 frames;
+;   - the mode-7 scene: place ($10, $14); C3Mod_Prog10M7Scene;
+;     C3Mod_Prog10Tasks, NMI C3Mod_Prog10FlatNmi; vars 3 and 4 8, 1
+;     -$4C, 2 -$38, 0 $10; CGADSUB $21; 240 x (var 0 + 1, four frames);
+;     180 frames;
+;   - the credit roll: C3Mod_Prog10Grid (with C3_EntryArg's low nibble
+;     $A it builds the grid); the tasks of C3Mod_Prog10Tasks' .frame
+;     part; C3Mod_FadeInTask and C3Mod_Prog10TextTask removed; after
+;     marker 8 NMI C3Mod_Prog10GridNmi and C3Mod_CreditLineNmi, task
+;     C3Mod_CreditLineTask; a frame apart the one-shot NMI tasks
+;     C3Mod_Prog10GridTilesNmi, GridMapNmi, GridCharsNmi and ClearNmi;
+;     after marker 9 C3Mod_Prog10Palette, the tasks
+;     C3Mod_Prog10QuadTask and C3Mod_Prog10LogoTask,
+;     C3Mod_Prog10FlatNmi removed, C3Mod_Prog10Mode4Nmi and
+;     C3Mod_Prog10Bg2VofsNmi added; 60 frames; C3Mod_Prog10FadeE1; 780
+;     frames; C3_NoSoftReset = 0 and C3_EntryArg = 0; 1800 frames;
+;     C3_SongReq = 7; then it waits (.l9314: a jump to itself that
+;     yields) until C3Mod_Prog10Grid's $F path moves it to
+;     C3Mod_Prog10TextExit.
+C3Mod_Prog10TextScript:
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_TaskAdd : dw C3Mod_Prog10ViewTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10SpinFlashTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10FigsTask
+    db !C3Op_NmiAdd : dw C3Mod_Prog10M7Nmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10SplitNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10TurnNmi
+    db !C3Op_Set|0 : dw $0040
+    db !C3Op_Set|1 : dw $00A4
+    db !C3Op_Set|2 : dw $0024
+    db !C3Op_Set|5 : dw $0200
+    db !C3Op_Set|6 : dw $0002
+    db !C3Op_Set|8 : dw $0000
+    db !C3Op_Ppu, $01, WH0-!DP_PPU
+    db !C3Op_Ppu, $00, WH1-!DP_PPU
+    db !C3Op_Poke8 : dw !C3_Prog10Wobble : db 8
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_WaitApu, 1
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 9
+    db !C3Op_WaitApu, 2
+    db !C3Op_CallW : dw C3Mod_Prog10Fade01
+    db !C3Op_Yield
+    db !C3Op_CallW : dw C3Mod_Prog10Fade41
+.l9117:
+    db !C3Op_LoopYield|1 : dw $027F, .l9117             ; 640 passes
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicSink
+    db !C3Op_Poke8 : dw !C3_Prog10FigsLeave : db 1
+    db !C3Op_TaskAdd : dw C3Mod_Prog10PicTask
+    db !C3Op_Yield
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 63
+.l912D:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $009F, .l912D             ; 160 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10FigsTask
+.l913A:
+    db !C3Op_LoopYield|1 : dw $043F, .l913A             ; 1088 passes
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicRise
+.l9144:
+    db !C3Op_LoopYield|1 : dw $036F, .l9144             ; 880 passes
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
+.l914C:
+    db !C3Op_LoopYield|1 : dw $000F, .l914C             ; 16 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10FigsTask
+    db !C3Op_Poke8 : dw !C3_Prog10Wobble : db 8
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 56
+    db !C3Op_Poke8 : dw !C3_Prog10Picture : db 2
+    db !C3Op_Poke8 : dw !C3_Prog10Large : db 1
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_Prog10SprX, $FF58
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_Prog10SprY, $00E0
+    db !C3Op_Poke16 : dw !C3_Prog10TextTimer, $0010
+    db !C3Op_Poke16 : dw !C3_Prog10TextGap, $0018
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $9010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Set|1 : dw $00A2
+    db !C3Op_Set|2 : dw $0083
+    db !C3Op_Set|5 : dw $0300
+    db !C3Op_Set|0 : dw $0080
+    db !C3Op_WaitApu, 4
+    db !C3Op_TaskAdd : dw C3Mod_FadeInTask
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 20
+.l9195:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $00FF, .l9195             ; 256 passes
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
+.l91A3:
+    db !C3Op_LoopYield|1 : dw $000E, .l91A3             ; 15 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10SpinFlashTask
+    db !C3Op_Yield
+    db !C3Op_CallW : dw C3Mod_Prog10Fill
+    db !C3Op_Poke16 : dw !C3_Prog10TextGap, $0040
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1410
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_TaskAdd : dw C3Mod_Prog10PicTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10WobbleTask
+    db !C3Op_NmiAdd : dw C3Mod_Prog10FlatNmi
+    db !C3Op_Poke8 : dw !C3_Prog10Picture : db 1
+    db !C3Op_Set|3 : dw $0028
+    db !C3Op_Set|4 : dw $0028
+    db !C3Op_Set|1 : dw -$58
+    db !C3Op_Set|2 : dw -$48
+    db !C3Op_Set|0 : dw $0280
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_Prog10SprX, $FFE0
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_Prog10SprY, $0080
+    db !C3Op_Poke8 : dw !C3_Prog10Wobble : db 7
+.l91E9:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $017F, .l91E9             ; 384 passes
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
+.l91F8:
+    db !C3Op_LoopYield|1 : dw $000F, .l91F8             ; 16 passes
+    db !C3Op_CallW : dw C3Mod_Prog10Strip
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_TaskAdd : dw C3Mod_Prog10PicTask
+    db !C3Op_NmiAdd : dw C3Mod_Prog10StripNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10FlatBg2Nmi
+    db !C3Op_Poke8 : dw !C3_Prog10Picture : db 3
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicDrift
+    db !C3Op_Poke8 : dw !C3_Prog10Wobble : db 4
+    db !C3Op_Set|0 : dw $0140
+    db !C3Op_Set|3 : dw $0028
+    db !C3Op_Set|4 : dw $0028
+    db !C3Op_Set|1 : dw -$58
+    db !C3Op_Set|2 : dw -$48
+    db !C3Op_Set|5 : dw $0090
+.l922B:
+    db !C3Op_Add|7 : dw -$1
+    db !C3Op_Add|1 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Add|1 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $01A9, .l922B             ; 426 passes
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10PicRiseB
+.l9241:
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_Add|7 : dw -$1
+    db !C3Op_Add|1 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_Add|1 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_LoopYield|0 : dw $0035, .l9241             ; 54 passes
+.stars:
+    db !C3Op_WaitApu, 7
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10StarsB
+    db !C3Op_Poke8 : dw !C3_Brightness : db 0
+    db !C3Op_Ppu, $10, TM-!DP_PPU
+    db !C3Op_Ppu, $00, TMW-!DP_PPU
+    db !C3Op_CallW : dw C3Mod_Prog10Stars
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_TaskAdd : dw C3Mod_Prog10StarsTask
+    db !C3Op_NmiAdd : dw C3Mod_ClearOamHigh
+.l927B:
+    db !C3Op_LoopYield|1 : dw $02FF, .l927B             ; 768 passes
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
+.l9283:
+    db !C3Op_LoopYield|1 : dw $000F, .l9283             ; 16 passes
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1410
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_CallW : dw C3Mod_Prog10M7Scene
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_NmiAdd : dw C3Mod_Prog10FlatNmi
+    db !C3Op_Set|3 : dw $0008
+    db !C3Op_Set|4 : dw $0008
+    db !C3Op_Set|1 : dw -$4C
+    db !C3Op_Set|2 : dw -$38
+    db !C3Op_Set|0 : dw $0010
+    db !C3Op_Ppu, $21, CGADSUB-!DP_PPU
+.l92AB:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $00EF, .l92AB             ; 240 passes
+.l92B6:
+    db !C3Op_LoopYield|1 : dw $00B3, .l92B6             ; 180 passes
+    db !C3Op_CallW : dw C3Mod_Prog10Grid
+    db !C3Op_Call : dw C3Mod_Prog10Tasks_frame
+    db !C3Op_TaskRemove : dw C3Mod_FadeInTask
+    db !C3Op_TaskRemove : dw C3Mod_Prog10TextTask
+    db !C3Op_WaitApu, 8
+    db !C3Op_NmiAdd : dw C3Mod_Prog10GridNmi
+    db !C3Op_NmiAdd : dw C3Mod_CreditLineNmi
+    db !C3Op_TaskAdd : dw C3Mod_CreditLineTask
+    db !C3Op_Yield
+    db !C3Op_NmiAdd : dw C3Mod_Prog10GridTilesNmi
+    db !C3Op_Yield
+    db !C3Op_NmiAdd : dw C3Mod_Prog10GridMapNmi
+    db !C3Op_Yield
+    db !C3Op_NmiAdd : dw C3Mod_Prog10GridCharsNmi
+    db !C3Op_Yield
+    db !C3Op_NmiAdd : dw C3Mod_Prog10ClearNmi
+    db !C3Op_WaitApu, 9
+    db !C3Op_CallW : dw C3Mod_Prog10Palette
+    db !C3Op_TaskAdd : dw C3Mod_Prog10QuadTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10LogoTask
+    db !C3Op_NmiRemove : dw C3Mod_Prog10FlatNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10Mode4Nmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10Bg2VofsNmi
+.l92F6:
+    db !C3Op_LoopYield|1 : dw $003B, .l92F6             ; 60 passes
+    db !C3Op_CallW : dw C3Mod_Prog10FadeE1
+.l92FE:
+    db !C3Op_LoopYield|1 : dw $030B, .l92FE             ; 780 passes
+    db !C3Op_Poke8 : dw !C3_NoSoftReset : db 0
+    db !C3Op_Poke8 : dw !C3_EntryArg : db 0
+.l930B:
+    db !C3Op_LoopYield|1 : dw $0707, .l930B             ; 1800 passes
+    db !C3Op_Poke8 : dw !C3_SongReq : db 7
+.l9314:
+    db !C3Op_JumpYield : dw .l9314
+
+; $7E:9317 — C3Mod_Prog10TextExit (14 bytes, $9317–$9324)
+; Where C3Mod_Prog10Grid sends page $0A00 when C3_EntryArg's low
+; nibble is $F (C3Script_Ptr = this - 2: C3_RunScript adds 2 after the
+; routine): C3_FadeStep and C3_FadeTimer 4, the tasks
+; C3Mod_ScriptTaskA and C3Mod_FadeOutExitTask (the module ends when
+; the fade is out); then it waits.
+C3Mod_Prog10TextExit:
+    db !C3Op_Poke16 : dw !C3_FadeStep, $0404
+    db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
+.l9322:
+    db !C3Op_JumpYield : dw .l9322
+
+; $7E:9325 — C3Mod_Prog10Tasks (28 bytes, $9325–$9340)
+; A script subroutine (opcode $F3) of program 10's scripts: the NMI
+; tasks C3Mod_OamUploadTask, C3Mod_HideSprites and
+; C3Mod_UploadPalette, then .frame ($932E, called on its own at
+; $92BE): the tasks C3Mod_ScriptTaskA, C3Mod_ScriptTaskB,
+; C3Mod_PalAnimTask, C3Mod_Prog10TextTask, C3Mod_Prog10WobbleTask and
+; C3Mod_FadeInTask; return.
+C3Mod_Prog10Tasks:
+    db !C3Op_NmiAdd : dw C3Mod_OamUploadTask
+    db !C3Op_NmiAdd : dw C3Mod_HideSprites
+    db !C3Op_NmiAdd : dw C3Mod_UploadPalette
+.frame:
+    db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
+    db !C3Op_TaskAdd : dw C3Mod_ScriptTaskB
+    db !C3Op_TaskAdd : dw C3Mod_PalAnimTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10TextTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10WobbleTask
+    db !C3Op_TaskAdd : dw C3Mod_FadeInTask
+    db !C3Op_Return
+
+; $7E:9341 — C3Mod_Prog10TextB (9 bytes, $9341–$9349)
+; Page $0B00's first script in the staff-text scene: var 1 = -$20,
+; var 2 = $20 (C3Mod_Prog10PicTask's picture place, negated); then it
+; waits for page $0A00 to hand it the next one.
+C3Mod_Prog10TextB:
+    db !C3Op_Set|1 : dw -$20
+    db !C3Op_Set|2 : dw $0020
+.l9347:
+    db !C3Op_JumpYield : dw .l9347
+
+; $7E:934A — C3Mod_Prog10PicDrift (60 bytes, $934A–$9385)
+; Page $0B00 in the strip scene: vars 1 and 2 = $20 and $18; 512
+; frames; 96 x (vars 1 and 2 + 1, three frames); 32 x (var 1 + 2, var
+; 2 + 1, over seven frames); 32 x (var 1 + 1, three frames); wait.
+C3Mod_Prog10PicDrift:
+    db !C3Op_Set|1 : dw $0020
+    db !C3Op_Set|2 : dw $0018
+.l9350:
+    db !C3Op_LoopYield|1 : dw $01FF, .l9350             ; 512 passes
+.l9355:
+    db !C3Op_Add|1 : dw $0001
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $005F, .l9355             ; 96 passes
+.l9363:
+    db !C3Op_Add|1 : dw $0001
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Add|1 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $001F, .l9363             ; 32 passes
+.l9378:
+    db !C3Op_Add|1 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $001F, .l9378             ; 32 passes
+.l9383:
+    db !C3Op_JumpYield : dw .l9383
+
+; $7E:9386 — C3Mod_Prog10PicSink (16 bytes, $9386–$9395)
+; Page $0B00: 160 x (vars 2 and 6 + 1, two frames); wait.
+C3Mod_Prog10PicSink:
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $009F, C3Mod_Prog10PicSink ; 160 passes
+.l9393:
+    db !C3Op_JumpYield : dw .l9393
+
+; $7E:9396 — C3Mod_Prog10PicRise (16 bytes, $9396–$93A5)
+; Page $0B00: 8 x (var 2 - 1, then 32 frames); wait.
+C3Mod_Prog10PicRise:
+    db !C3Op_Add|2 : dw -$1
+.l9399:
+    db !C3Op_LoopYield|2 : dw $001F, .l9399             ; 32 passes
+    db !C3Op_LoopYield|0 : dw $0007, C3Mod_Prog10PicRise ; 8 passes
+.l93A3:
+    db !C3Op_JumpYield : dw .l93A3
+
+; $7E:93A6 — C3Mod_Prog10PicRiseB (11 bytes, $93A6–$93B0)
+; Page $0B00: 144 x (var 2 - 1, a frame); wait.
+C3Mod_Prog10PicRiseB:
+    db !C3Op_Add|2 : dw -$1
+    db !C3Op_LoopYield|0 : dw $008F, C3Mod_Prog10PicRiseB ; 144 passes
+.l93AE:
+    db !C3Op_JumpYield : dw .l93AE
+
+; $7E:93B1 — C3Mod_Prog10StarsB (50 bytes, $93B1–$93E2)
+; Page $0B00 in the stars part (vars 0-2 as C3Mod_StarsTask reads
+; them: C3_StarSpeed, C3_DriftX, C3_DriftY): the task
+; C3Mod_Prog10DriftAngleTask; var 5 = $300, vars 0 and 1 = 0; TM = the
+; sprites, TMW = 0; 128 frames; var 1 = -1; 63 x (var 5 - 4, a frame);
+; C3Mod_Prog10DriftAngleTask removed; var 1 = -1, var 2 = -2, var 0 =
+; 2; wait.
+C3Mod_Prog10StarsB:
+    db !C3Op_TaskAdd : dw C3Mod_Prog10DriftAngleTask
+    db !C3Op_Set|5 : dw $0300
+    db !C3Op_Set|0 : dw $0000
+    db !C3Op_Set|1 : dw $0000
+    db !C3Op_Ppu, $10, TM-!DP_PPU
+    db !C3Op_Ppu, $00, TMW-!DP_PPU
+.l93C3:
+    db !C3Op_LoopYield|1 : dw $007F, .l93C3             ; 128 passes
+    db !C3Op_Set|1 : dw -$1
+.l93CB:
+    db !C3Op_Add|5 : dw -$4
+    db !C3Op_LoopYield|0 : dw $003E, .l93CB             ; 63 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10DriftAngleTask
+    db !C3Op_Yield
+    db !C3Op_Set|1 : dw -$1
+    db !C3Op_Set|2 : dw -$2
+    db !C3Op_Set|0 : dw $0002
+.l93E0:
+    db !C3Op_JumpYield : dw .l93E0
+
+; $7E:93E3 — C3Mod_Prog13Script (52 bytes, $93E3–$9416)
+; Page $0A00's script of programs 12 and 13 (C3Mod_Prog13): the tasks
+; C3Mod_ScriptTaskA, C3Mod_StarsTask and C3Mod_PalAnimTask, the NMI
+; tasks C3Mod_OamUploadTask, C3Mod_HideSprites, C3Mod_ClearOamHigh
+; and C3Mod_UploadPalette; page $0B00's C3_DriftX and C3_DriftY = 0
+; (C3_StarSpeed is C3Mod_Prog13's); C3Mod_FadeInTask; 60 frames;
+; C3Mod_CreditLineTask and NMI C3Mod_CreditLineNmi; then each frame
+; C3Mod_Prog13CheckEnd, which moves it to C3Mod_Prog13End once the
+; credit text has reached its end code.
+C3Mod_Prog13Script:
+    db !C3Op_TaskAdd : dw C3Mod_ScriptTaskA
+    db !C3Op_TaskAdd : dw C3Mod_StarsTask
+    db !C3Op_TaskAdd : dw C3Mod_PalAnimTask
+    db !C3Op_NmiAdd : dw C3Mod_OamUploadTask
+    db !C3Op_NmiAdd : dw C3Mod_HideSprites
+    db !C3Op_NmiAdd : dw C3Mod_ClearOamHigh
+    db !C3Op_NmiAdd : dw C3Mod_UploadPalette
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_DriftX, $0000
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_DriftY, $0000
+    db !C3Op_Yield
+    db !C3Op_TaskAdd : dw C3Mod_FadeInTask
+.l9406:
+    db !C3Op_LoopYield|1 : dw $003B, .l9406             ; 60 passes
+    db !C3Op_TaskAdd : dw C3Mod_CreditLineTask
+    db !C3Op_NmiAdd : dw C3Mod_CreditLineNmi
+.l9411:
+    db !C3Op_CallW : dw C3Mod_Prog13CheckEnd
+    db !C3Op_JumpYield : dw .l9411
+
+; $7E:9417 — C3Mod_Prog13End (57 bytes, $9417–$944F)
+; Programs 12 and 13 after the credit text (C3Script_Ptr = this - 2
+; from C3Mod_Prog13CheckEnd): C3_StarSpeed = -2; the song faded to
+; volume 0 over $80 steps (driver command C3_SndFadeSong); SETINI = 0;
+; TM = $15 (BG1, BG3 and the sprites); C3Mod_Prog13Whiten; 256 frames;
+; C3Mod_Prog13DriftInit; driver commands C3_SndStopAll, C3_SndFadeSong
+; (volume $80 at once) and C3_SndTimer with Arg0 0 (the fast-forward
+; of C3Mod_Prog13 off); C3_NoSoftReset = 0, C3_EntryArg = 0,
+; C3_SongReq = 3; wait.
+C3Mod_Prog13End:
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3_StarSpeed, $FFFE
+    db !C3Op_Driver : dw !C3_SndFadeSong|($80<<8), $0000
+    db !C3Op_Ppu, $00, SETINI-!DP_PPU
+    db !C3Op_Ppu, $15, TM-!DP_PPU
+    db !C3Op_CallW : dw C3Mod_Prog13Whiten
+.l942A:
+    db !C3Op_LoopYield|1 : dw $00FF, .l942A             ; 256 passes
+    db !C3Op_TaskAdd : dw C3Mod_Prog13DriftInit
+    db !C3Op_Driver : dw !C3_SndStopAll|($00<<8), $0000
+    db !C3Op_Driver : dw !C3_SndFadeSong|($00<<8), $0080
+    db !C3Op_Driver : dw !C3_SndTimer|($00<<8), $0000
+    db !C3Op_Poke8 : dw !C3_NoSoftReset : db 0
+    db !C3Op_Poke8 : dw !C3_EntryArg : db 0
+    db !C3Op_Poke8 : dw !C3_SongReq : db 3
+.l944D:
+    db !C3Op_JumpYield : dw .l944D
+
+; $7E:9450 — C3Mod_Prog10TurnScript (451 bytes, $9450–$9612)
+; Page $0A00's script of the turning-picture scene (C3_EntryArg low
+; nibble $B):
+;   - C3Mod_Prog10TurnB; an NMI task C3Mod_Return (a placeholder that
+;     does nothing: an RTS); C3Mod_Prog10Tasks; the tasks
+;     C3Mod_Prog10ViewTask, C3Mod_Prog10FlashTask and
+;     C3Mod_Prog10FigsTask, NMI C3Mod_Prog10M7Nmi, SplitNmi, TurnNmi
+;     and TilesNmi; place ($10, $90); the view (var 0 $60, 1 $B0, 2
+;     $40, 5 $200, 6 2, 8 0); WH0 = 1, WH1 = 0; C3_HdmaEnable $3F;
+;     C3_Prog10TextTimer's low byte 1; after marker 1 C3_Prog10TextShow
+;     $E8, C3_Prog10TextGap $20, 6 texts; after marker 2
+;     C3Mod_Prog10Fade01 and Fade41; page $0B00 to
+;     C3Mod_Prog10TurnOrbitB; 32 frames; place ($10, $10); 672 frames;
+;   - the NMI task C3Mod_Return swapped for C3Mod_Prog10SprNmi;
+;     C3_Prog10FigsLeave = 1; 64 x (vars 0 and 2 + 1, three frames);
+;     C3Mod_Prog10FigsTask removed; 176 frames; C3Mod_FadeOutTask, 17
+;     frames;
+;   - C3Mod_Prog10Turn; the tasks C3Mod_Prog10ScrollTask and
+;     C3Mod_Prog10FrameTask; timer 64, 7 texts, C3_Prog10Large 0,
+;     C3_HdmaEnable $7F; place ($10, $90); view var 0 $80, 1 $80, 2
+;     $E0, 5 $200, 6 2, 8 0; page $0B00 to C3Mod_Prog10TurnZoomB; after
+;     marker 3 C3Mod_FadeInTask; then 60 frames and var 0 and var 5
+;     steps over 1,488 frames (the loops below);
+;   - C3Mod_Prog10FrameTask removed; after marker 4 place ($10, $50),
+;     timer 64, 3 texts; C3Mod_Prog10FadeTo51 and C3Mod_PalFadeTask;
+;     the NMI task C3Mod_Prog10SprNmi removed and added back as a task
+;     (it runs with M=0 then; see its header); C3Mod_Prog10TextTask
+;     removed and added again (the same entry); place ($10, $38); vars
+;     1 -$80, 2 -$70, 5 $200, 0 $80; C3_HdmaEnable $38, C3_Prog10Large
+;     1, C3_Brightness 15, C3_Prog10Frame $0A00; page $0B00 to
+;     C3Mod_Prog10TurnEndB; 192 x (var 0 + 2, three frames);
+;     C3Mod_FadeOutExitTask; 16 more; wait.
+C3Mod_Prog10TurnScript:
+    db !C3Op_CallW : dw C3Mod_Prog10TurnB
+    db !C3Op_NmiAdd : dw C3Mod_Return
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_TaskAdd : dw C3Mod_Prog10ViewTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10FlashTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10FigsTask
+    db !C3Op_NmiAdd : dw C3Mod_Prog10M7Nmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10SplitNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10TurnNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10TilesNmi
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $9010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Set|0 : dw $0060
+    db !C3Op_Set|1 : dw $00B0
+    db !C3Op_Set|2 : dw $0040
+    db !C3Op_Set|5 : dw $0200
+    db !C3Op_Set|6 : dw $0002
+    db !C3Op_Set|8 : dw $0000
+    db !C3Op_Ppu, $01, WH0-!DP_PPU
+    db !C3Op_Ppu, $00, WH1-!DP_PPU
+    db !C3Op_Yield
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 63
+    db !C3Op_Poke8 : dw !C3_Prog10TextTimer : db 1
+    db !C3Op_WaitApu, 1
+    db !C3Op_Poke16 : dw !C3_Prog10TextShow, $00E8
+    db !C3Op_Poke16 : dw !C3_Prog10TextGap, $0020
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 6
+    db !C3Op_WaitApu, 2
+    db !C3Op_CallW : dw C3Mod_Prog10Fade01
+    db !C3Op_CallW : dw C3Mod_Prog10Fade41
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10TurnOrbitB
+.l94B4:
+    db !C3Op_LoopYield|1 : dw $001F, .l94B4             ; 32 passes
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+.l94C1:
+    db !C3Op_LoopYield|1 : dw $029F, .l94C1             ; 672 passes
+    db !C3Op_NmiRemove : dw C3Mod_Return
+    db !C3Op_NmiAdd : dw C3Mod_Prog10SprNmi
+    db !C3Op_Poke8 : dw !C3_Prog10FigsLeave : db 1
+.l94D0:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $003F, .l94D0             ; 64 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10FigsTask
+.l94E1:
+    db !C3Op_LoopYield|1 : dw $00AF, .l94E1             ; 176 passes
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
+.l94E9:
+    db !C3Op_LoopYield|1 : dw $0010, .l94E9             ; 17 passes
+    db !C3Op_CallW : dw C3Mod_Prog10Turn
+    db !C3Op_TaskAdd : dw C3Mod_Prog10ScrollTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10FrameTask
+    db !C3Op_Poke8 : dw !C3_Prog10TextTimer : db 64
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 7
+    db !C3Op_Poke8 : dw !C3_Prog10Large : db 0
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 127
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $9010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Set|0 : dw $0080
+    db !C3Op_Set|1 : dw $0080
+    db !C3Op_Set|2 : dw $00E0
+    db !C3Op_Set|5 : dw $0200
+    db !C3Op_Set|6 : dw $0002
+    db !C3Op_Set|8 : dw $0000
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10TurnZoomB
+    db !C3Op_WaitApu, 3
+    db !C3Op_TaskAdd : dw C3Mod_FadeInTask
+.l952B:
+    db !C3Op_LoopYield|1 : dw $003B, .l952B             ; 60 passes
+.l9530:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Add|5 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Add|5 : dw -$1
+    db !C3Op_LoopYield|0 : dw $004F, .l9530             ; 80 passes
+.l953F:
+    db !C3Op_Add|5 : dw -$1
+    db !C3Op_LoopYield|0 : dw $011F, .l953F             ; 288 passes
+.l9547:
+    db !C3Op_LoopYield|1 : dw $003B, .l9547             ; 60 passes
+.l954C:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_LoopYield|0 : dw $003F, .l954C             ; 64 passes
+.l9554:
+    db !C3Op_LoopYield|1 : dw $023F, .l9554             ; 576 passes
+.l9559:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_LoopYield|0 : dw $000F, .l9559             ; 16 passes
+.l9564:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_LoopYield|0 : dw $000F, .l9564             ; 16 passes
+.l956F:
+    db !C3Op_Add|0 : dw -$2
+    db !C3Op_Add|5 : dw $0004
+    db !C3Op_LoopYield|0 : dw $001F, .l956F             ; 32 passes
+.l957A:
+    db !C3Op_Add|0 : dw $0002
+    db !C3Op_Add|5 : dw $0004
+    db !C3Op_LoopYield|0 : dw $001F, .l957A             ; 32 passes
+.l9585:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|5 : dw $0002
+    db !C3Op_LoopYield|0 : dw $000F, .l9585             ; 16 passes
+.l9590:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_LoopYield|0 : dw $007F, .l9590             ; 128 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10FrameTask
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_WaitApu, 4
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $5010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Poke8 : dw !C3_Prog10TextTimer : db 64
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 3
+    db !C3Op_CallW : dw C3Mod_Prog10FadeTo51
+    db !C3Op_TaskAdd : dw C3Mod_PalFadeTask
+    db !C3Op_NmiRemove : dw C3Mod_Prog10SprNmi
+    db !C3Op_TaskRemove : dw C3Mod_Prog10TextTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10TextTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10SprNmi
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $3810
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Set|1 : dw -$80
+    db !C3Op_Set|2 : dw -$70
+    db !C3Op_Set|5 : dw $0200
+    db !C3Op_Set|0 : dw $0080
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 56
+    db !C3Op_Poke8 : dw !C3_Prog10Large : db 1
+    db !C3Op_Poke8 : dw !C3_Brightness : db 15
+    db !C3Op_Poke16 : dw !C3_Prog10Frame, $0A00
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10TurnEndB
+.l95EF:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $00BF, .l95EF             ; 192 passes
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutExitTask
+.l9601:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $000F, .l9601             ; 16 passes
+.l9610:
+    db !C3Op_JumpYield : dw .l9610
+
+; $7E:9613 — C3Mod_Prog10MainScript (232 bytes, $9613–$96FA)
+; Page $0A00's script of program 10's main scene (C3_EntryArg low
+; nibble neither $A nor $B): C3Mod_Prog10Turn and
+; C3Mod_Prog10Colours51; NMI C3Mod_Prog10SprNmi; C3Mod_Prog10Tasks
+; with C3Mod_FadeInTask removed again; the tasks C3Mod_Prog10ViewTask,
+; FlashTask, ScrollTask and FrameTask, NMI C3Mod_Prog10M7Nmi,
+; SplitNmi, TurnNmi and TilesNmi; place ($10, $80), C3_Prog10TextShow
+; $E8, C3_Prog10TextGap $20; M7SEL = 0; C3_Prog10Large 0,
+; C3_HdmaEnable $7F, timer 64; view var 5 $380, 6 2, 0 $FF, 8 $20;
+; after marker 6 C3Mod_FadeInTask and 6 texts; 160 x (var 0 - 1);
+; C3Mod_Prog10FadeTo52 and C3Mod_PalFadeTask; 544 frames; 256 x (var 5
+; + 1); C3Mod_Prog10FadeTo53 (the fade task still running); 672
+; frames; 96 x (var 0 + 1); page $0B00 to C3Mod_Prog10MainBEnd; var 0
+; and var 5 / var 6 steps over 176 frames; C3Mod_Prog10TilesNmi removed,
+; C3_Prog10TilesReady's low byte 1; C3Mod_FadeOutTask; 12 x (var 6 +
+; 1); 20 texts, C3_Prog10TextShow $140, C3_Prog10TextGap $40, place
+; ($10, $14); C3_HdmaEnable 0; C3Mod_Prog10IdleOff; 4 frames; then on
+; in C3Mod_Prog10TextScript's .stars part.
+C3Mod_Prog10MainScript:
+    db !C3Op_CallW : dw C3Mod_Prog10Turn
+    db !C3Op_CallW : dw C3Mod_Prog10Colours51
+    db !C3Op_NmiAdd : dw C3Mod_Prog10SprNmi
+    db !C3Op_Call : dw C3Mod_Prog10Tasks
+    db !C3Op_TaskRemove : dw C3Mod_FadeInTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10ViewTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10FlashTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10ScrollTask
+    db !C3Op_TaskAdd : dw C3Mod_Prog10FrameTask
+    db !C3Op_NmiAdd : dw C3Mod_Prog10M7Nmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10SplitNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10TurnNmi
+    db !C3Op_NmiAdd : dw C3Mod_Prog10TilesNmi
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $8010
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Yield
+    db !C3Op_Poke16 : dw !C3_Prog10TextShow, $00E8
+    db !C3Op_Poke16 : dw !C3_Prog10TextGap, $0020
+    db !C3Op_Ppu, $00, M7SEL-!DP_PPU
+    db !C3Op_Yield
+    db !C3Op_Poke8 : dw !C3_Prog10Large : db 0
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 127
+    db !C3Op_Poke8 : dw !C3_Prog10TextTimer : db 64
+    db !C3Op_Set|5 : dw $0380
+    db !C3Op_Set|6 : dw $0002
+    db !C3Op_Set|0 : dw $00FF
+    db !C3Op_Set|8 : dw $0020
+    db !C3Op_WaitApu, 6
+    db !C3Op_TaskAdd : dw C3Mod_FadeInTask
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 6
+.l9672:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_LoopYield|0 : dw $009F, .l9672             ; 160 passes
+    db !C3Op_CallW : dw C3Mod_Prog10FadeTo52
+    db !C3Op_TaskAdd : dw C3Mod_PalFadeTask
+.l9680:
+    db !C3Op_LoopYield|1 : dw $021F, .l9680             ; 544 passes
+.l9685:
+    db !C3Op_Add|5 : dw $0001
+    db !C3Op_LoopYield|0 : dw $00FF, .l9685             ; 256 passes
+    db !C3Op_CallW : dw C3Mod_Prog10FadeTo53
+.l9690:
+    db !C3Op_LoopYield|1 : dw $029F, .l9690             ; 672 passes
+.l9695:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_LoopYield|0 : dw $005F, .l9695             ; 96 passes
+    db !C3Op_Poke16 : dw !C3_ScriptPageB+!C3Script_Ptr, C3Mod_Prog10MainBEnd
+.l96A2:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|5 : dw $0006
+    db !C3Op_LoopYield|0 : dw $001F, .l96A2             ; 32 passes
+.l96AD:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|5 : dw $0006
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_LoopYield|0 : dw $001F, .l96AD             ; 32 passes
+.l96BB:
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_LoopYield|0 : dw $006F, .l96BB             ; 112 passes
+    db !C3Op_NmiRemove : dw C3Mod_Prog10TilesNmi
+    db !C3Op_Yield
+    db !C3Op_Poke8 : dw !C3_Prog10TilesReady : db 1
+    db !C3Op_TaskAdd : dw C3Mod_FadeOutTask
+.l96CE:
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_LoopYield|0 : dw $000B, .l96CE             ; 12 passes
+    db !C3Op_Poke8 : dw !C3_Prog10TextsLeft : db 20
+    db !C3Op_Poke16 : dw !C3_Prog10TextShow, $0140
+    db !C3Op_Poke16 : dw !C3_Prog10TextGap, $0040
+    db !C3Op_Poke16 : dw !C3_Prog10TextPlace, $1410
+    db !C3Op_CallW : dw C3Mod_Prog10TextPlace
+    db !C3Op_Poke8 : dw !C3_HdmaEnable : db 0
+    db !C3Op_CallW : dw C3Mod_Prog10IdleOff
+.l96F3:
+    db !C3Op_LoopYield|1 : dw $0003, .l96F3             ; 4 passes
+    db !C3Op_JumpYield : dw C3Mod_Prog10TextScript_stars
+
+; $7E:96FB — C3Mod_Prog10IdleOff (7 bytes, $96FB–$9701)
+; A script routine (opcode $F0): C3Mod_Return written back over
+; C3Mod_Start's idle call (C3Mod_Prog10Turn put C3Mod_Prog10ScaleIdle
+; there), so the loop between frames does nothing again.
+; Callers note: script opcode $F0 at $96F0 (C3Mod_Prog10MainScript).
+; Entry: M=0, X=0, DP = the script's page ($0A00), DB = $7E (the store
+;        is absolute, into the module), as C3_RunScript calls opcode
+;        $F0's routines.
+; Exit:  M=0; A = C3Mod_Return; X, Y unchanged.
+C3Mod_Prog10IdleOff:
+    LDA.w #C3Mod_Return
+    STA.w C3Mod_Start_wait_exit+1
+    RTS
+
+; $7E:9702 — C3Mod_Prog10Colours51 (13 bytes, $9702–$970E)
+; A script routine (opcode $F0): MVN in bank $7E of A + 1 = 257 bytes
+; from $7E:C995 (raw pack 51, put there by C3Mod_Prog10) to $7E:2200
+; (C3_PaletteBuf's colours 0-$7F, sent by C3Mod_UploadPalette): an
+; overrun of one byte, pack 51 being 256 bytes: the byte at $7E:CA95
+; (raw pack 52's first) lands on $7E:2300, the low byte of
+; C3_PaletteBuf's colour $80 (sprite palette 0's colour 0, which is
+; transparent: no visible change).
+; Callers note: script opcode $F0 at $9616 (C3Mod_Prog10MainScript).
+; Entry: M=0 (the 16-bit count), X=0, DP any, DB any (MVN sets DB =
+;        $7E), as opcode $F0 calls it (DP = $0A00, DB = $7E).
+; Exit:  M=0, X=0, DB = $7E; A = $FFFF, X = $CA96, Y = $2301.
+C3Mod_Prog10Colours51:
+    LDX.w #!C3_Prog10Rows51
+    LDY.w #!C3_Prog10Black
+    LDA.w #!C3_Prog10Colours51Bytes
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes (bank $7E)
+    RTS
+
+; $7E:970F — C3Mod_Prog10MainB (29 bytes, $970F–$972B)
+; Page $0B00's script of the main scene: var 8 = -9
+; (C3Mod_Prog10ScrollTask: page $0A00's var 2 - 9 a frame), var 2 =
+; $50, var 1 = $80, var 6 = $40 (C3Mod_Prog10TurnNmi's radius), var 0 =
+; $C0 (the picture's step); after marker 6, 80 x (var 0 - 1, a frame);
+; wait.
+C3Mod_Prog10MainB:
+    db !C3Op_Set|8 : dw -$9
+    db !C3Op_Set|2 : dw $0050
+    db !C3Op_Set|1 : dw $0080
+    db !C3Op_Set|6 : dw $0040
+    db !C3Op_Set|0 : dw $00C0
+    db !C3Op_WaitApu, 6
+.l9720:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $004F, .l9720             ; 80 passes
+.l9729:
+    db !C3Op_JumpYield : dw .l9729
+
+; $7E:972C — C3Mod_Prog10UnusedB1 (43 bytes, $972C–$9756)
+; A page $0B00 script nothing points to (no word $972C in the module):
+; vars 0 $60, 8 -9, 2 $50, 1 $80, 6 $0C; twice (64 x (var 0 - 1, two
+; frames), 64 x (var 0 + 1, two frames)); wait.
+C3Mod_Prog10UnusedB1:
+    db !C3Op_Set|0 : dw $0060
+    db !C3Op_Set|8 : dw -$9
+    db !C3Op_Set|2 : dw $0050
+    db !C3Op_Set|1 : dw $0080
+    db !C3Op_Set|6 : dw $000C
+.l973B:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|1 : dw $003F, .l973B             ; 64 passes
+.l9745:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|1 : dw $003F, .l9745             ; 64 passes
+    db !C3Op_LoopYield|0 : dw $0001, .l973B             ; 2 passes
+.l9754:
+    db !C3Op_JumpYield : dw .l9754
+
+; $7E:9757 — C3Mod_Prog10UnusedB2 (60 bytes, $9757–$9792)
+; Another (no word $9757 in the module): vars 0 $FFF, 8 -4, 2 $40, 1 =
+; var 2, 6 $0C; 128 x (var 2 + 1, var 1 = var 2, var 0 - 3); 8 x (the
+; same with var 0 - 1); 24 x (vars 1 and 2 + 2); var 0 = $FFF; wait.
+C3Mod_Prog10UnusedB2:
+    db !C3Op_Set|0 : dw $0FFF
+    db !C3Op_Set|8 : dw -$4
+    db !C3Op_Set|2 : dw $0040
+    db !C3Op_CopyVar|1, 4                               ; var 1 = var 2
+    db !C3Op_Set|6 : dw $000C
+.l9765:
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_CopyVar|1, 4                               ; var 1 = var 2
+    db !C3Op_Add|0 : dw -$3
+    db !C3Op_LoopYield|0 : dw $007F, .l9765             ; 128 passes
+.l9773:
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Yield
+    db !C3Op_CopyVar|1, 4                               ; var 1 = var 2
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_LoopYield|0 : dw $0007, .l9773             ; 8 passes
+.l9781:
+    db !C3Op_Add|2 : dw $0002
+    db !C3Op_Yield
+    db !C3Op_Add|1 : dw $0002
+    db !C3Op_LoopYield|0 : dw $0017, .l9781             ; 24 passes
+    db !C3Op_Set|0 : dw $0FFF
+.l9790:
+    db !C3Op_JumpYield : dw .l9790
+
+; $7E:9793 — C3Mod_Prog10MainBEnd (19 bytes, $9793–$97A5)
+; Page $0B00 at the main scene's end: 48 x (8 x (var 0 + 1, a frame),
+; var 2 - 1: opcode $80, no yield of its own); var 2 = $F0; then
+; C3Mod_Prog10TurnIdleB's wait (the next opcode).
+C3Mod_Prog10MainBEnd:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_LoopYield|1 : dw $0007, C3Mod_Prog10MainBEnd ; 8 passes
+    db !C3Op_Add|2 : dw -$1
+    db !C3Op_Loop|0 : dw $002F, C3Mod_Prog10MainBEnd    ; 48 passes
+    db !C3Op_Set|2 : dw $00F0
+
+; $7E:97A6 — C3Mod_Prog10TurnIdleB (3 bytes, $97A6–$97A8)
+; Page $0B00's first script in the turning-picture scene: a jump to
+; itself that yields (also C3Mod_Prog10MainBEnd's end).
+C3Mod_Prog10TurnIdleB:
+    db !C3Op_JumpYield : dw C3Mod_Prog10TurnIdleB
+
+; $7E:97A9 — C3Mod_Prog10TurnOrbitB (90 bytes, $97A9–$9802)
+; Page $0B00: var 8 = 0, var 0 = $1FF, var 5 = $280;
+; C3Mod_Prog10OrbitTask (the picture circles: var 5 the angle, var 8
+; the radius); 704 frames; 112 x (var 8 - 8, var 0 - 2, var 5 - 2); 144
+; x (var 8 - 8, var 0 - 1, var 5 - 2); C3Mod_Prog10OrbitTask removed;
+; 16 x (var 1 - 1, var 2 + 1, var 0 - 1); 48 x (var 1 - 2, var 2 + 1,
+; var 0 - 1); 16 x (var 1 - 2, var 2 + 1); wait.
+C3Mod_Prog10TurnOrbitB:
+    db !C3Op_Set|8 : dw $0000
+    db !C3Op_Set|0 : dw $01FF
+    db !C3Op_Set|5 : dw $0280
+    db !C3Op_TaskAdd : dw C3Mod_Prog10OrbitTask
+.l97B5:
+    db !C3Op_LoopYield|1 : dw $02BF, .l97B5             ; 704 passes
+.l97BA:
+    db !C3Op_Add|8 : dw -$8
+    db !C3Op_Add|0 : dw -$2
+    db !C3Op_Add|5 : dw -$2
+    db !C3Op_LoopYield|0 : dw $006F, .l97BA             ; 112 passes
+.l97C8:
+    db !C3Op_Add|8 : dw -$8
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Add|5 : dw -$2
+    db !C3Op_LoopYield|0 : dw $008F, .l97C8             ; 144 passes
+    db !C3Op_TaskRemove : dw C3Mod_Prog10OrbitTask
+.l97D9:
+    db !C3Op_Add|1 : dw -$1
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_LoopYield|0 : dw $000F, .l97D9             ; 16 passes
+.l97E7:
+    db !C3Op_Add|1 : dw -$2
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_LoopYield|0 : dw $002F, .l97E7             ; 48 passes
+.l97F5:
+    db !C3Op_Add|1 : dw -$2
+    db !C3Op_Add|2 : dw $0001
+    db !C3Op_LoopYield|0 : dw $000F, .l97F5             ; 16 passes
+.l9800:
+    db !C3Op_JumpYield : dw .l9800
+
+; $7E:9803 — C3Mod_Prog10TurnZoomB (120 bytes, $9803–$987A)
+; Page $0B00: var 8 = -6 (C3Mod_Prog10ScrollTask), var 0 = $80, var 6
+; = 0, var 2 = $70, var 1 = $80; after marker 3: 60 frames; 40 x (var
+; 0 - 1); 348 frames; 64 x (var 0 + 1); 576 frames; var 0 and var 6
+; steps (16 x (-1, +1) twice, 32 x (-2, +1), 32 x (+2, -1), 16 x (+1,
+; -1), 128 x (+1, -1)); wait.
+C3Mod_Prog10TurnZoomB:
+    db !C3Op_Set|8 : dw -$6
+    db !C3Op_Set|0 : dw $0080
+    db !C3Op_Set|6 : dw $0000
+    db !C3Op_Set|2 : dw $0070
+    db !C3Op_Set|1 : dw $0080
+    db !C3Op_WaitApu, 3
+.l9814:
+    db !C3Op_LoopYield|1 : dw $003B, .l9814             ; 60 passes
+.l9819:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_Yield
+    db !C3Op_LoopYield|0 : dw $0027, .l9819             ; 40 passes
+.l9824:
+    db !C3Op_LoopYield|1 : dw $015B, .l9824             ; 348 passes
+.l9829:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_LoopYield|0 : dw $003F, .l9829             ; 64 passes
+.l9831:
+    db !C3Op_LoopYield|1 : dw $023F, .l9831             ; 576 passes
+.l9836:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_LoopYield|0 : dw $000F, .l9836             ; 16 passes
+.l9841:
+    db !C3Op_Add|0 : dw -$1
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_LoopYield|0 : dw $000F, .l9841             ; 16 passes
+.l984C:
+    db !C3Op_Add|0 : dw -$2
+    db !C3Op_Add|6 : dw $0001
+    db !C3Op_LoopYield|0 : dw $001F, .l984C             ; 32 passes
+.l9857:
+    db !C3Op_Add|0 : dw $0002
+    db !C3Op_Add|6 : dw -$1
+    db !C3Op_LoopYield|0 : dw $001F, .l9857             ; 32 passes
+.l9862:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|6 : dw -$1
+    db !C3Op_LoopYield|0 : dw $000F, .l9862             ; 16 passes
+.l986D:
+    db !C3Op_Add|0 : dw $0001
+    db !C3Op_Add|6 : dw -$1
+    db !C3Op_LoopYield|0 : dw $007F, .l986D             ; 128 passes
+.l9878:
+    db !C3Op_JumpYield : dw .l9878
+
+; $7E:987B — C3Mod_Prog10TurnEndB (28 bytes, $987B–$9896)
+; Page $0B00 at the turning scene's end: var 0 = $40, var 2 = $D3, var
+; 1 = $80; 208 x (var 2 - 1, var 0 + 1, four frames); wait.
+C3Mod_Prog10TurnEndB:
+    db !C3Op_Set|0 : dw $0040
+    db !C3Op_Set|2 : dw $00D3
+    db !C3Op_Set|1 : dw $0080
+.l9884:
+    db !C3Op_Add|2 : dw -$1
+    db !C3Op_Add|0 : dw $0001
+.l988A:
+    db !C3Op_LoopYield|2 : dw $0003, .l988A             ; 4 passes
+    db !C3Op_LoopYield|0 : dw $00CF, .l9884             ; 208 passes
+.l9894:
+    db !C3Op_JumpYield : dw .l9894
+
+; $7E:9897 — C3Mod_Prog13DriftInit (21 bytes, $9897–$98AB)
+; A task: three times C3Mod_Prog13DriftRandom, keeping only its A (1 to
+; $400) as C3_Prog13TimerX, TimerY and TimerSpeed; then it hands its
+; entry to C3Mod_Prog13DriftTask (C3Mod_TaskReplace, from next frame).
+; Callers note: a task added by script opcode $FA at $942F
+;   (C3Mod_Prog13End).
+; Entry: a task (C3Mod_RunTasks): M=0, X=0, DP=0 (the timers), DB=$00
+;        (C3Mod_KernelRandom's).
+; Exit:  JMP C3Mod_TaskReplace with X = C3Mod_Prog13DriftTask.
+; Calls: C3Mod_Prog13DriftRandom.
+C3Mod_Prog13DriftInit:
+    JSR C3Mod_Prog13DriftRandom
+    STA.b !C3_Prog13TimerX
+    JSR C3Mod_Prog13DriftRandom
+    STA.b !C3_Prog13TimerY
+    JSR C3Mod_Prog13DriftRandom
+    STA.b !C3_Prog13TimerSpeed
+    LDX.w #C3Mod_Prog13DriftTask
+    JMP C3Mod_TaskReplace
+
+; $7E:98AC — C3Mod_Prog13DriftTask (55 bytes, $98AC–$98E2)
+; A task: the stars' drift and speed change at random times. Each of
+; C3_Prog13TimerX, TimerY and TimerSpeed counts down (16-bit DEC /
+; BNE); when one reaches 0, C3Mod_Prog13DriftRandom gives page $0B00's
+; C3_DriftX, C3_DriftY or C3_StarSpeed a new value X (-4 to 3) and the
+; timer a new count A (1 to $400). If then all three are 0,
+; C3_StarSpeed = 1 (INC), so the stars never stand still.
+; Callers note: a task: LDX #C3Mod_Prog13DriftTask / JMP
+;   C3Mod_TaskReplace at $98A6 (C3Mod_Prog13DriftInit).
+; Entry: a task: M=0, X=0, DP=0, DB=$00 (page $0B00 is absolute).
+; Exit:  M=0, X=0; A = the last word tested (or C3_StarSpeed's 0 before
+;        the INC); X = the last random X; Y unchanged.
+; Calls: C3Mod_Prog13DriftRandom.
+C3Mod_Prog13DriftTask:
+    DEC.b !C3_Prog13TimerX
+    BNE .y
+    JSR C3Mod_Prog13DriftRandom
+    STX.w !C3_ScriptPageB+!C3_DriftX
+    STA.b !C3_Prog13TimerX
+.y:
+    DEC.b !C3_Prog13TimerY
+    BNE .speed
+    JSR C3Mod_Prog13DriftRandom
+    STX.w !C3_ScriptPageB+!C3_DriftY
+    STA.b !C3_Prog13TimerY
+.speed:
+    DEC.b !C3_Prog13TimerSpeed
+    BNE .check
+    JSR C3Mod_Prog13DriftRandom
+    STX.w !C3_ScriptPageB+!C3_StarSpeed
+    STA.b !C3_Prog13TimerSpeed
+.check:
+    LDA.w !C3_ScriptPageB+!C3_DriftX
+    BNE .done
+    LDA.w !C3_ScriptPageB+!C3_DriftY
+    BNE .done
+    LDA.w !C3_ScriptPageB+!C3_StarSpeed
+    BNE .done
+    INC.w !C3_ScriptPageB+!C3_StarSpeed
+.done:
+    RTS
+
+; $7E:98E3 — C3Mod_Prog13DriftRandom (19 bytes, $98E3–$98F5)
+; Two random words (C3Mod_KernelRandom at M=0): X = the first AND 7,
+; minus 4 (SEC): -4 to 3; A = the second AND $3FF, + 1: 1 to $400.
+; Callers note: C3Mod_Prog13DriftInit ($9897, $989C, $98A1) and
+;   C3Mod_Prog13DriftTask ($98B0, $98BC, $98C8).
+; Entry: M=0, X=0, DP=0 and DB=$00 (C3Mod_KernelRandom's; both callers
+;        are tasks).
+; Exit:  M=0, X=0; A and X as above; Y unchanged; C3_RandSeed changed.
+; Calls: C3Mod_KernelRandom.
+C3Mod_Prog13DriftRandom:
+    JSR C3Mod_KernelRandom
+    AND.w #!C3_Prog13DriftMask
+    SEC
+    SBC.w #!C3_Prog13DriftBias
+    TAX
+    JSR C3Mod_KernelRandom
+    AND.w #!C3_Prog13TimeMask
+    INC A
+    RTS
+
+; $7E:98F6 — C3Mod_Prog10FadeTo51 (35 bytes with C3Mod_Prog10FadeTo52 and C3Mod_Prog10FadeTo53, $98F6–$9918)
+; Script routines (opcode $F0): C3Mod_PalFadeTask's arguments for a
+; fade of C3_PaletteBuf's colours 0-$6F towards raw pack 51's colours
+; at $7E:C995 (C3Mod_Prog10FadeTo51), pack 52's at $CA95
+; (C3Mod_Prog10FadeTo52, $98FB) or pack 53's at $CB95
+; (C3Mod_Prog10FadeTo53, $9900; .set, $9903, the shared tail):
+; C3_PalFadeSrc = the pack, C3_PalFadeDest = $2200, C3_PalFadeLeft =
+; $20 steps (a 16-bit store: its high byte $0367 = 0 too),
+; C3_PalFadeCount = $70.
+; Sub-entry: C3Mod_Prog10FadeTo52 ($98FB), C3Mod_Prog10FadeTo53 ($9900).
+; Callers note: script opcode $F0 at $95B3 (C3Mod_Prog10TurnScript).
+;   C3Mod_Prog10FadeTo52: $967A, C3Mod_Prog10FadeTo53: $968D
+;   (C3Mod_Prog10MainScript).
+; Entry: M=0, X any, DP any, DB=$7E or $00 (absolute stores to low
+;        WRAM; $7E under opcode $F0).
+; Exit:  M=0; A = $0070; X, Y unchanged.
+C3Mod_Prog10FadeTo51:
+    LDA.w #!C3_Prog10Rows51
+    BRA C3Mod_Prog10FadeTo53_set
+C3Mod_Prog10FadeTo52:                   ; header: see C3Mod_Prog10FadeTo51
+    LDA.w #!C3_Prog10Rows52
+    BRA C3Mod_Prog10FadeTo53_set
+C3Mod_Prog10FadeTo53:                   ; header: see C3Mod_Prog10FadeTo51
+    LDA.w #!C3_Prog10Rows53
+.set:
+    STA.w !C3_PalFadeSrc
+    LDA.w #!C3_Prog10Black
+    STA.w !C3_PalFadeDest
+    LDA.w #!C3_Prog10FadeSteps
+    STA.w !C3_PalFadeLeft
+    LDA.w #!C3_Prog10FadeColours
+    STA.w !C3_PalFadeCount
+    RTS
+
+; $7E:9919 — C3Mod_Prog10TextPlace (17 bytes, $9919–$9929)
+; A script routine (opcode $F0): the two bytes of C3_Prog10TextPlace
+; (the scripts poke them as a word: X low, Y high) go into
+; C3Mod_DrawText's .line_x and .line_y operands, the place of the next
+; text drawn (C3Mod_Prog10TextTask).
+; Callers note: script opcode $F0 at $9105, $917D, $91B9, $928D
+;   (C3Mod_Prog10TextScript), $9473, $94BE, $950C, $95A8, $95CA
+;   (C3Mod_Prog10TurnScript), $963F and $96E9 (C3Mod_Prog10MainScript).
+; Entry: M=0 (8-bit set here), X any, DP any, DB = $7E (the operand
+;        stores are absolute into the module, as opcode $F0 runs).
+; Exit:  M=0; A's low byte = the Y byte, B as entered; X, Y unchanged.
+C3Mod_Prog10TextPlace:
+    SEP #$20
+    LDA.w !C3_Prog10TextPlace
+    STA.w C3Mod_DrawText_line_x+1
+    LDA.w !C3_Prog10TextPlace+1
+    STA.w C3Mod_DrawText_line_y+1
+    REP #$20
+    RTS
+
+; $7E:992A — C3Mod_Prog10OrbitTask (69 bytes, $992A–$996E)
+; A task (DP = $0B00): the picture circles. With a = page $0B00's var 5
+; and r = its var 8 (C3Mod_MulSigned16, the product's middle bytes
+; C3Math_Lo + 1, i.e. / 256): var 1 = (C3Mod_Sine(a) x r / 256) / 16 +
+; $80, var 2 = (C3Mod_Cosine(a) x r / 256) / 32 + $70 (CLC before each
+; add); the shifts are LSRs (unsigned) of a signed value, so a negative
+; product gives $0Fxx / $07xx (+ the centre), far off screen: a quirk;
+; then A = -a - $301 (EOR / INC, SBC #$300 with the C = 0 the ADC #$70
+; left, as long as var 2 does not carry) into C3Mod_Prog10FrameTask's
+; .frame (JMP): the picture's frame by that angle.
+; Callers note: a task added by script opcode $FA at $97B2 and removed
+;   by $F9 at $97D6 (C3Mod_Prog10TurnOrbitB).
+; Entry: a task: M=0, X=0, DP any (set to $0B00 here; C3Mod_RunTasks
+;        restores it), DB=$00 (.frame's absolute stores).
+; Exit:  through C3Mod_Prog10FrameTask's .frame: M=0, DP = $0B00; A =
+;        C3_Prog10Frame; C3Math_A.. of page $0B00 changed.
+; Calls: C3Mod_Sine, C3Mod_Cosine, C3Mod_MulSigned16,
+;   C3Mod_Prog10FrameTask's .frame (JMP).
+C3Mod_Prog10OrbitTask:
+    LDA.w #!C3_ScriptPageB
+    TCD
+    LDA.b !C3_Prog10OrbitAngle
+    JSR C3Mod_Sine
+    STA.b !C3Math_A
+    LDA.b !C3_Prog10ScrollStep
+    STA.b !C3Math_B
+    JSR C3Mod_MulSigned16
+    LDA.b !C3Math_Lo+1
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C3_Prog10OrbitX
+    STA.b !C3_Prog10SprX
+    LDA.b !C3_Prog10OrbitAngle
+    JSR C3Mod_Cosine
+    STA.b !C3Math_A
+    LDA.b !C3_Prog10ScrollStep
+    STA.b !C3Math_B
+    JSR C3Mod_MulSigned16
+    LDA.b !C3Math_Lo+1
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C3_Prog10OrbitY
+    STA.b !C3_Prog10SprY
+    LDA.b !C3_Prog10OrbitAngle
+    EOR.w #!Eng_Invert16
+    INC A
+    SBC.w #!C3_Prog10OrbitTurn
+    JMP C3Mod_Prog10FrameTask_frame
+
+; $7E:996F — C3Mod_Prog13CheckEnd (14 bytes, $996F–$997C)
+; A script routine (opcode $F0): when C3_Prog10TextDone is set (8-bit,
+; read as a word and ANDed), page $0A00's C3Script_Ptr = C3Mod_Prog13End
+; - 2 (C3_RunScript adds 2 after the call): the script goes on there.
+; Callers note: script opcode $F0 at $9411 (C3Mod_Prog13Script).
+; Entry: M=0, X any, DP = $0A00 (C3Script_Ptr is direct page), DB any
+;        (the flag is read absolute: $7E under opcode $F0, where
+;        $7E:006A is low WRAM's $006A).
+; Exit:  M=0; A = the flag, or C3Mod_Prog13End - 2; X, Y unchanged.
+C3Mod_Prog13CheckEnd:
+    LDA.w !C3_Prog10TextDone
+    AND.w #!Eng_LowByteMask
+    BEQ .done
+    LDA.w #C3Mod_Prog13End-2
+    STA.b !C3Script_Ptr
+.done:
+    RTS
+
+; $7E:997D — C3Mod_Prog10DriftAngleTask (31 bytes, $997D–$999B)
+; A task (DP = $0B00): the stars drift along page $0B00's var 5
+; (C3_DriftAngle): C3_DriftY = C3Mod_Sine(var 5) / 64 and C3_StarSpeed
+; = C3Mod_Cosine(var 5) / 64, by six LSRs (unsigned; the low byte,
+; which is all C3Mod_StarsTask reads, is the same as a signed shift's).
+; Callers note: a task added by script opcode $FA at $93B1 and removed
+;   by $F9 at $93D3 (C3Mod_Prog10StarsB).
+; Entry: a task: M=0, X=0 (C3Mod_Sine's index), DP any (set to $0B00;
+;        restored by C3Mod_RunTasks), DB any.
+; Exit:  M=0, DP = $0B00; A = C3_StarSpeed; X = the angle's table
+;        index; Y unchanged.
+; Calls: C3Mod_Sine, C3Mod_Cosine.
+C3Mod_Prog10DriftAngleTask:
+    PEA.w !C3_ScriptPageB
+    PLD
+    LDA.b !C3_DriftAngle
+    JSR C3Mod_Sine
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C3_DriftY
+    LDA.b !C3_DriftAngle
+    JSR C3Mod_Cosine
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C3_StarSpeed
+    RTS
+
+; $7E:999C — C3Mod_Prog10StarsTask (25 bytes, $999C–$99B4)
+; A task: the stars after the text scene's other sprites: when
+; C3_OamPos - $100 has bit 15 set (CMP / BPL: below sprite 64),
+; C3Mod_FinishOamHigh closes the high-table byte and C3_OamPos = $100,
+; C3_OamHiPtr = $0910 (sprite 64's); then C3Mod_StarsTask (JMP; see its
+; header for the carry this leaves).
+; Callers note: a task added by script opcode $FA at $9275
+;   (C3Mod_Prog10TextScript's .stars part).
+; Entry: a task: M=0, X=0, DP=0 (C3_OamPos..), DB=$00.
+; Exit:  as C3Mod_StarsTask's.
+; Calls: C3Mod_FinishOamHigh, C3Mod_StarsTask (JMP).
+C3Mod_Prog10StarsTask:
+    LDA.b !C3_OamPos
+    CMP.w #!C3_Prog10StarsFrom
+    BPL .stars
+    JSR C3Mod_FinishOamHigh
+    REP #$20
+    LDA.w #!C3_Prog10StarsFrom
+    STA.b !C3_OamPos
+    LDA.w #!C3_Prog10StarsHigh
+    STA.b !C3_OamHiPtr
+.stars:
+    JMP C3Mod_StarsTask
+
+; $7E:99B5 — C3Mod_Prog10WobbleTask (69 bytes, $99B5–$99F9)
+; A task: a wobble of radius r = C3_Prog10Wobble (16-bit) by the frame
+; count f (C3_FrameCount; C3_TmpFE = 2f): C3_Prog10WobbleX =
+; C3Mod_Sine(4f) x r / 256 and C3_Prog10WobbleY = C3Mod_Cosine(2f) x r
+; / 256, each as |value| x r by C3Mod_Mul16 (its middle bytes) with
+; the sign put back (EOR / INC under the PHP / PLP of the value's N):
+; an X twice as fast as the Y, a figure eight. C3Mod_Prog10PicTask adds
+; them to the picture's place.
+; Callers note: a task added by script opcode $FA at $91C2
+;   (C3Mod_Prog10TextScript) and $933A (C3Mod_Prog10Tasks).
+; Entry: a task: M=0, X=0, DP=0, DB any (direct page only).
+; Exit:  M=0, X=0; A = C3_Prog10WobbleY; X = the angle's table index;
+;        Y unchanged.
+; Calls: C3Mod_Sine, C3Mod_Cosine, C3Mod_Mul16.
+C3Mod_Prog10WobbleTask:
+    LDA.b !C3_FrameCount
+    ASL A
+    STA.b !C3_TmpFE
+    ASL A
+    JSR C3Mod_Sine
+    PHP
+    BPL .x_plus
+    EOR.w #!Eng_Invert16
+    INC A
+.x_plus:
+    STA.b !C3Math_A
+    LDA.b !C3_Prog10Wobble
+    STA.b !C3Math_B
+    JSR C3Mod_Mul16
+    LDA.b !C3Math_Lo+1
+    PLP
+    BPL .x_done
+    EOR.w #!Eng_Invert16
+    INC A
+.x_done:
+    STA.b !C3_Prog10WobbleX
+    LDA.b !C3_TmpFE
+    JSR C3Mod_Cosine
+    PHP
+    BPL .y_plus
+    EOR.w #!Eng_Invert16
+    INC A
+.y_plus:
+    STA.b !C3Math_A
+    LDA.b !C3_Prog10Wobble
+    STA.b !C3Math_B
+    JSR C3Mod_Mul16
+    LDA.b !C3Math_Lo+1
+    PLP
+    BPL .y_done
+    EOR.w #!Eng_Invert16
+    INC A
+.y_done:
+    STA.b !C3_Prog10WobbleY
+    RTS
+
+; $7E:99FA — C3Mod_Prog10LogoTask (18 bytes, $99FA–$9A0B)
+; A task: C3Mod_Prog10LogoSprites at X $3C, Y $90 (C3_SprListLarge).
+; Callers note: a task added by script opcode $FA at $92EA
+;   (C3Mod_Prog10TextScript).
+; Entry: a task: M=0, X=0, DP=0 (C3_SprBase*), DB=$00 (C3_SprListLarge's
+;        ports and OAM shadow are absolute).
+; Exit:  M=0, X=0; as C3_SprListLarge leaves them.
+; Calls: C3_SprListLarge (JSL).
+C3Mod_Prog10LogoTask:
+    LDA.w #!C3_Prog10LogoX
+    STA.b !C3_SprBaseX
+    LDA.w #!C3_Prog10LogoY
+    STA.b !C3_SprBaseY
+    LDA.w #C3Mod_Prog10LogoSprites
+    JSL !C3_SprListLarge
+    RTS
+
+; $7E:9A0C — C3Mod_Prog10QuadTask (177 bytes, $9A0C–$9ABC)
+; A task: a window opened by a four-point shape. WinFx_QuadTablePtr /
+; Bank = $7E:E000 (C3_Prog10WindowLines: a 16-bit store of $7E00 to
+; $0351, then $E000 to $0350); the points: Y of point 3 =
+; C3_Prog10QuadYB / 4, point 2 = QuadYC / 4, point 1 = QuadYD / 4 + 9
+; (+ 8, INC), point 0 = QuadYA / 4 + 8 (16-bit stores: each high byte
+; is overwritten by the next point's X below, but point 3's lands on
+; $0368, WinFx_QuadTopY, which WinFx_BuildQuad sets itself); points 2
+; and 3's X = $FF, points 0 and 1's X = C3_Prog10QuadX (8-bit);
+; WinFx_BuildQuad (JSL $C30EFA, the routine of BankC3_Entry0011).
+; Then:
+;   - while C3_Prog10QuadX is not 0: C3Mod_Prog10QuadSprites at X =
+;     QuadX - 12, Y = QuadYA / 4 (C3Mod_SprListMixed); QuadX - 2,
+;     QuadYA + 4, QuadYD = QuadYA;
+;   - else QuadYA + 1 and QuadYD + 3 while each is below $390 (signed
+;     CMP / BPL);
+;   - both: when QuadYB is $390 or more (CMP / BMI) COLDATA and SETINI
+;     = 0 (TDC with DP = 0: a 16-bit store, both registers) and the task
+;     ends (C3Mod_TaskEnd); else QuadYB + 1, QuadYC + 3 while below
+;     $390; then on an odd field (STAT78 bit 7, ASL / BCC) page $0A00's
+;     var 2 - 1 (an 8-bit DEC: its low byte only).
+; C3Mod_Prog10Palette starts QuadX at $E0 and the four Ys at $80.
+; Callers note: a task added by script opcode $FA at $92E7
+;   (C3Mod_Prog10TextScript).
+; Entry: a task: M=0 (16-bit stores; 8-bit set inside), X=0, DP=0 (the
+;        quad words; TDC = 0), DB=$00 (WinFx_QuadPoints.., COLDATA and
+;        STAT78 are absolute; C3Mod_SprListMixed's).
+; Exit:  M=1, X=0 (RTS); A = STAT78 x 2; or JMP C3Mod_TaskEnd.
+; Calls: WinFx_BuildQuad (JSL), C3Mod_SprListMixed (JSL).
+C3Mod_Prog10QuadTask:
+    LDA.w #!Bank7E<<8
+    STA.w !WinFx_QuadTablePtr+1         ; and WinFx_QuadTableBank
+    LDA.w #!C3_Prog10WindowLines
+    STA.w !WinFx_QuadTablePtr
+    LDA.b !C3_Prog10QuadYB
+    LSR A
+    LSR A
+    STA.w !WinFx_QuadPoints+7
+    LDA.b !C3_Prog10QuadYC
+    LSR A
+    LSR A
+    STA.w !WinFx_QuadPoints+5
+    LDA.b !C3_Prog10QuadYD
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C3_Prog10QuadTop
+    INC A
+    STA.w !WinFx_QuadPoints+3
+    LDA.b !C3_Prog10QuadYA
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C3_Prog10QuadTop
+    STA.w !WinFx_QuadPoints+1
+    SEP #$20
+    LDA.b #!C3_Prog10QuadRight
+    STA.w !WinFx_QuadPoints+4
+    STA.w !WinFx_QuadPoints+6
+    LDA.b !C3_Prog10QuadX
+    STA.w !WinFx_QuadPoints
+    STA.w !WinFx_QuadPoints+2
+    JSL !WinFx_BuildQuad
+    REP #$20
+    LDA.b !C3_Prog10QuadX
+    BEQ .open
+    LDA.b !C3_Prog10QuadX
+    SEC
+    SBC.w #!C3_Prog10QuadSprX
+    STA.b !C3_SprBaseX
+    LDA.b !C3_Prog10QuadYA
+    LSR A
+    LSR A
+    STA.b !C3_SprBaseY
+    LDA.w #C3Mod_Prog10QuadSprites
+    JSL C3Mod_SprListMixed
+    DEC.b !C3_Prog10QuadX
+    DEC.b !C3_Prog10QuadX
+    LDA.b !C3_Prog10QuadYA
+    INC A
+    INC A
+    INC A
+    INC A
+    STA.b !C3_Prog10QuadYA
+    STA.b !C3_Prog10QuadYD
+    BRA .bottom
+.open:
+    LDA.b !C3_Prog10QuadYA
+    CMP.w #!C3_Prog10QuadEnd
+    BPL .d
+    INC A
+    STA.b !C3_Prog10QuadYA
+.d:
+    LDA.b !C3_Prog10QuadYD
+    CMP.w #!C3_Prog10QuadEnd
+    BPL .bottom
+    INC A
+    INC A
+    INC A
+    STA.b !C3_Prog10QuadYD
+.bottom:
+    LDA.b !C3_Prog10QuadYB
+    CMP.w #!C3_Prog10QuadEnd
+    BMI .more
+    TDC
+    STA.w COLDATA                       ; and SETINI
+    JMP C3Mod_TaskEnd
+.more:
+    INC A
+    STA.b !C3_Prog10QuadYB
+    LDA.b !C3_Prog10QuadYC
+    CMP.w #!C3_Prog10QuadEnd
+    BPL .field
+    INC A
+    INC A
+    INC A
+    STA.b !C3_Prog10QuadYC
+.field:
+    SEP #$20
+    LDA.w STAT78
+    ASL A
+    BCC .done
+    DEC.w !C3_ScriptPageA+!C3_Prog10ViewY
+.done:
+    RTS
+
+; $7E:9ABD — C3Mod_Prog10ViewTask (54 bytes, $9ABD–$9AF2)
+; A task (DP = $0A00): with C3_Prog10Large set (a 16-bit absolute read
+; of $007B-$007C), C3Mod_PlaneMatrixSet (JMP, with the carry as
+; entered: see C3Mod_SpinTask): the flat turned plane; else the
+; perspective plane: when page $0A00's vars 0, 5, 6 or 8 differ from
+; C3_Prog10Built's four words, the copies from the first that differs
+; on are stored and C3Mod_BuildM7Tables rebuilds the line tables (JMP;
+; its .setup is C3Mod_Prog10M7Setup, written by C3Mod_Prog10); all
+; equal: nothing.
+; Callers note: a task added by script opcode $FA at $90D2
+;   (C3Mod_Prog10TextScript), $9459 (C3Mod_Prog10TurnScript) and $9622
+;   (C3Mod_Prog10MainScript).
+; Entry: a task: M=0, X=0, DP any (set to $0A00; restored by
+;        C3Mod_RunTasks), DB any (C3Mod_BuildM7Tables sets its own;
+;        the flag read is absolute: $00 as a task).
+; Exit:  M=0; RTS with A = var 8 when nothing changed; else as
+;        C3Mod_PlaneMatrixSet or C3Mod_BuildM7Tables leave them.
+; Calls: C3Mod_PlaneMatrixSet (JMP), C3Mod_BuildM7Tables (JMP).
+C3Mod_Prog10ViewTask:
+    LDA.w #!C3_ScriptPageA
+    TCD
+    LDA.w !C3_Prog10Large
+    BEQ .plane
+    JMP C3Mod_PlaneMatrixSet
+.plane:
+    LDA.b !C3_Prog10ViewScale
+    CMP.b !C3_Prog10Built
+    BNE .scale
+    LDA.b !C3_Prog10Angle
+    CMP.b !C3_Prog10Built+2
+    BNE .angle
+    LDA.b !C3_Prog10Horizon
+    CMP.b !C3_Prog10Built+4
+    BNE .horizon
+    LDA.b !C3_Prog10FirstDiv
+    CMP.b !C3_Prog10Built+6
+    BNE .divisor
+    RTS
+.scale:
+    STA.b !C3_Prog10Built
+    LDA.b !C3_Prog10Angle
+.angle:
+    STA.b !C3_Prog10Built+2
+    LDA.b !C3_Prog10Horizon
+.horizon:
+    STA.b !C3_Prog10Built+4
+    LDA.b !C3_Prog10FirstDiv
+.divisor:
+    STA.b !C3_Prog10Built+6
+    JMP C3Mod_BuildM7Tables
+
+; $7E:9AF3 — C3Mod_Prog10TurnNmi (83 bytes, $9AF3–$9B45)
+; An NMI task: page $0A00's var 15 = page $0B00's var 6 (the radius);
+; with DP = $0A00, the radius turned by var 5 (C3Mod_MulSigned16's
+; middle bytes, / 256): C3_Prog10TurnY = C3Mod_Cosine(var 5) x radius,
+; C3_Prog10TurnX = C3Mod_Sine(var 5) x radius; C3_Prog10ScrollX = var 1
+; + TurnX, C3_Prog10M7X = that + $80; C3_Prog10ScrollY = var 2 + TurnY,
+; C3_Prog10M7Y = that + $E0 (CLC before each add): the plane turns
+; about the point (128, 224) on screen, moved by the radius.
+; C3Mod_Prog10M7Nmi sends the words.
+; Callers note: an NMI task added by script opcode $F8 at $90E1
+;   (C3Mod_Prog10TextScript), $9468 (C3Mod_Prog10TurnScript) and $9634
+;   (C3Mod_Prog10MainScript).
+; Entry: an NMI task (C3Mod_RunNmiTasks): M=1 (16-bit set here), X=0,
+;        DP any (set to $0A00; restored by C3Mod_RunNmiTasks), DB=$00
+;        (the $1400 words and page $0B00 are absolute).
+; Exit:  M=0, DP = $0A00; A = C3_Prog10M7Y; X = the angle's table index;
+;        Y unchanged; page $0A00's C3Math_* changed.
+; Calls: C3Mod_Cosine, C3Mod_Sine, C3Mod_MulSigned16.
+C3Mod_Prog10TurnNmi:
+    REP #$20
+    LDA.w !C3_ScriptPageB+!C3_Prog10Radius
+    STA.w !C3_ScriptPageA+!C3_Prog10TurnRadius
+    LDA.w #!C3_ScriptPageA
+    TCD
+    LDA.b !C3_Prog10Angle
+    JSR C3Mod_Cosine
+    STA.b !C3Math_A
+    LDA.b !C3_Prog10TurnRadius
+    STA.b !C3Math_B
+    JSR C3Mod_MulSigned16
+    LDA.b !C3Math_Lo+1
+    STA.w !C3_Prog10TurnY
+    LDA.b !C3_Prog10Angle
+    JSR C3Mod_Sine
+    STA.b !C3Math_A
+    LDA.b !C3_Prog10TurnRadius
+    STA.b !C3Math_B
+    JSR C3Mod_MulSigned16
+    LDA.b !C3Math_Lo+1
+    STA.w !C3_Prog10TurnX
+    LDA.b !C3_Prog10ViewX
+    CLC
+    ADC.w !C3_Prog10TurnX
+    STA.w !C3_Prog10ScrollX
+    CLC
+    ADC.w #!C3_Prog10M7CentreX
+    STA.w !C3_Prog10M7X
+    LDA.b !C3_Prog10ViewY
+    CLC
+    ADC.w !C3_Prog10TurnY
+    STA.w !C3_Prog10ScrollY
+    CLC
+    ADC.w #!C3_Prog10M7CentreY
+    STA.w !C3_Prog10M7Y
+    RTS
+
+; $7E:9B46 — C3Mod_Prog10M7Setup (9 bytes, $9B46–$9B4E)
+; C3Mod_BuildM7Tables' setup routine for program 10 (C3Mod_Prog10
+; writes its address over the JSR operand at .setup): the first line's
+; offset Y = (page $0A00's var 6 - 1) x 4 (the horizon line's entry,
+; 4 bytes a line), the first divisor X = var 8.
+; Callers note: the patched JSR at $35FC (C3Mod_BuildM7Tables' .setup,
+;   operand written at $86EA by C3Mod_Prog10).
+; Entry: M=0, X=0, DP = $0A00 (C3Mod_BuildM7Tables' DP, the script
+;        page: here C3Mod_Prog10ViewTask's), DB any.
+; Exit:  M=0, X=0; A = Y; X, Y as above.
+C3Mod_Prog10M7Setup:
+    LDA.b !C3_Prog10Horizon
+    DEC A
+    ASL A
+    ASL A
+    TAY
+    LDX.b !C3_Prog10FirstDiv
+    RTS
+
+
+; $7E:9B4F — C3Mod_Prog10TextTask (105 bytes, $9B4F–$9BB7)
+; A task: the staff texts one at a time, as sprites. Nothing while
+; C3_Prog10TextsLeft is 0. C3_Prog10TextPhase's bit 0 (LSR) picks:
+;   - even (between texts): C3_Prog10TextTimer - 1; at 0 the timer =
+;     C3_Prog10TextShow, the phase + 1 and .fade with X = $FF00 (in);
+;   - odd (a text shows): C3Mod_DrawText of the text at C3_ResultWord
+;     (C3Mod_Prog10 sets it to C3Mod_StaffTexts); only when
+;     C3_Brightness's low nibble is $F (the screen fully faded in) does
+;     the timer go down: at 0, C3_Prog10TextsLeft - 1, the phase + 1, the
+;     timer = C3_Prog10TextGap, and C3_ResultWord = X, the end of the
+;     text drawn (the next one), unless X - $AB1A has bit 15 clear (CPX /
+;     BMI): the texts up to C3_Prog10TextB done, the task ends
+;     (C3Mod_TaskEnd); at $20 frames left .fade with X = $00FF (out);
+;   - .fade ($9B9C): FieldAnimB record 0 = a kind-5 fade (PalAnim_Fade,
+;     C3_FadeAnimKind) of colours $F0-$F3 (sprite palette 7, the text's
+;     with C3Mod_DrawText's attribute $3F), .Unk3 = 8, .Unk5 = 1 (every
+;     frame), .Unk7 / .Unk8 = X: level 0 to $FF or $FF to 0. The word
+;     stores overlap: .Unk0 is stored as $0050 (.Unk1 0), then
+;     .Unk1 / .Unk2 as $04F0.
+; Callers note: a task added by script opcode $FA at $9337
+;   (C3Mod_Prog10Tasks' .frame) and $95BF (C3Mod_Prog10TurnScript),
+;   removed by $F9 at $92C4 (C3Mod_Prog10TextScript) and $95BC
+;   (C3Mod_Prog10TurnScript).
+; Entry: a task: M=0, X=0, DP=0 (C3Mod_DrawText needs DP = 0), DB=$00
+;        (C3_ResultWord, C3_Brightness and FieldAnimB are absolute).
+; Exit:  M=0, X=0 (C3Mod_DrawText leaves DB = $00 and P as entered);
+;        A, X and Y as the path leaves them; or JMP C3Mod_TaskEnd.
+; Calls: C3Mod_DrawText.
+C3Mod_Prog10TextTask:
+    LDA.b !C3_Prog10TextsLeft
+    BNE .run
+    RTS
+.run:
+    LDA.b !C3_Prog10TextPhase
+    LSR A
+    BCC .gap
+    LDX.w !C3_ResultWord
+    JSR C3Mod_DrawText
+    LDA.w !C3_Brightness
+    AND.w #!C3_BrightnessFull
+    CMP.w #!C3_BrightnessFull
+    BNE .done
+    DEC.b !C3_Prog10TextTimer
+    BNE .fading
+    DEC.b !C3_Prog10TextsLeft
+    INC.b !C3_Prog10TextPhase
+    LDA.b !C3_Prog10TextGap
+    STA.b !C3_Prog10TextTimer
+    CPX.w #!C3_Prog10TextB
+    BMI .next
+    JMP C3Mod_TaskEnd
+.next:
+    STX.w !C3_ResultWord
+    RTS
+.fading:
+    LDA.b !C3_Prog10TextTimer
+    CMP.w #!C3_Prog10TextFadeAt
+    BEQ .out
+.done:
+    RTS
+.gap:
+    DEC.b !C3_Prog10TextTimer
+    BNE .done
+    LDA.b !C3_Prog10TextShow
+    STA.b !C3_Prog10TextTimer
+    INC.b !C3_Prog10TextPhase
+    LDX.w #!C3_TextFadeIn
+    BRA .fade
+.out:
+    LDX.w #!C3_TextFadeOut
+.fade:
+    STX.w FieldAnimB.Unk7               ; and .Unk8
+    LDA.w #!C3_FadeAnimKind
+    STA.w FieldAnimB.Unk0               ; and .Unk1
+    LDX.w #!C3_TextFadeColours
+    STX.w FieldAnimB.Unk1               ; and .Unk2
+    LDX.w #!C3_TextFadeStep
+    STX.w FieldAnimB.Unk3               ; and .Unk4
+    LDX.w #1
+    STX.w FieldAnimB.Unk5               ; and .Unk6
+    RTS
+
+; $7E:9BB8 — C3Mod_Prog10FigsInit (32 bytes, $9BB8–$9BD7)
+; The two figures of C3Mod_Prog10FigsTask: with DB = $7E (PEA $007E /
+; PLB; the $00 stays for the PLB at the end, DB = $00 then) a sequence
+; each (C3Mod_Prog10FigPick) and their places: figure 0 at X $80, Y
+; $70, figure 1 at X $A0, Y $60 (a word to C3_Prog10FigPos + X).
+; Callers note: C3Mod_Prog10 ($870E).
+; Entry: M=1 (16-bit set here), X any (set to 0 and 2), DP=0 (the
+;        figure words), DB any.
+; Exit:  M=1, DB = $00; A = $60A0; X = 2; Y as C3Mod_Prog10FigPick left
+;        it.
+; Calls: C3Mod_Prog10FigPick.
+C3Mod_Prog10FigsInit:
+    PEA.w !Bank7E                       ; PLB takes the $7E; the $00 stays for the PLB at the end
+    PLB
+    REP #$20
+    LDX.w #0
+    JSR C3Mod_Prog10FigPick
+    LDA.w #!C3_Prog10Fig0Pos
+    STA.b !C3_Prog10FigPos,X
+    LDX.w #2
+    JSR C3Mod_Prog10FigPick
+    LDA.w #!C3_Prog10Fig1Pos
+    STA.b !C3_Prog10FigPos,X
+    SEP #$20
+    PLB
+    RTS
+
+; $7E:9BD8 — C3Mod_Prog10FigPick (33 bytes, $9BD8–$9BF8)
+; A new sequence for figure X / 2: when C3_Prog10FigsLeave (a word,
+; $9F-$A0) is not 0, C3Mod_FigSeqs' .hidden part (48 frames of the empty
+; list, then this again); else C3Mod_Prog10FigSeqs entry (random AND 3)
+; (C3Mod_TableRandom; the CMP #5 / BPL that would pick again can never
+; be taken, so the table's fifth entry is never used); C3_Prog10FigSeq
+; + X = it (2 before the sequence's first entry), C3_Prog10FigTimer + X
+; = 1 (the next frame steps to that entry).
+; Callers note: C3Mod_Prog10FigsInit ($9BC1, $9BCC) and
+;   C3Mod_Prog10FigsTask ($9C13).
+; Entry: M=0, X=0, DP=0 (the words; C3Mod_TableRandom's TDC / XBA needs
+;        a page boundary), DB = $7E (the table read is absolute; both
+;        callers set it); X = the figure's word offset.
+; Exit:  M=0; A = 1; X unchanged; Y = the table offset (unchanged on the
+;        leave path).
+; Calls: C3Mod_TableRandom.
+C3Mod_Prog10FigPick:
+    LDA.b !C3_Prog10FigsLeave
+    BEQ .random
+    LDA.w #C3Mod_FigSeqs_hidden-2
+    BRA .set
+.random:
+    JSR C3Mod_TableRandom
+    AND.w #!C3_FigSeqMask
+    CMP.w #!C3_FigSeqCount
+    BPL .random
+    ASL A
+    TAY
+    LDA.w C3Mod_Prog10FigSeqs,Y
+.set:
+    STA.b !C3_Prog10FigSeq,X
+    LDA.w #1
+    STA.b !C3_Prog10FigTimer,X
+    RTS
+
+; $7E:9BF9 — C3Mod_Prog10FigsTask (85 bytes, $9BF9–$9C4D)
+; A task: two animated figures. With DB = $7E (PHK / PLB): the dead
+; LDA #$E0 at C3Mod_DrawFigure's .dead made CMP #$E0 (no effect: no
+; path reaches it; put back at the end); for figure X = 0, 2
+; (CPX #4): C3_Prog10FigTimer + X - 1; at 0 the sequence pointer + 2
+; and its byte (LDA (dp,X), AND $FF): 0 ends the sequence
+; (C3Mod_Prog10FigPick, and this step again), else it is the new
+; timer, pointer + 1. Then C3_SprBaseX = the word at C3_Prog10FigPos +
+; X (its low byte the X), C3_SprBaseY = the word one byte on (its low
+; byte the Y); .check's BCS (the Y range test) made NOP / NOP, its word
+; kept in C3_TmpF0; C3Mod_DrawFigure of the list the pointer names,
+; with DB = $00 (PEA $7E00 / PLB; the $7E stays for the PLB after) and
+; X kept; .check put back.
+; Callers note: a task added by script opcode $FA at $90D8
+;   (C3Mod_Prog10TextScript) and $945F (C3Mod_Prog10TurnScript),
+;   removed by $F9 at $9137, $9151 (C3Mod_Prog10TextScript) and $94DE
+;   (C3Mod_Prog10TurnScript).
+; Entry: a task: M=0, X=0, DP=0, DB any (set to $7E; restored by
+;        C3Mod_RunTasks).
+; Exit:  M=0, X=0, DB = $7E; A = the restored operand word; X = 4; Y as
+;        C3Mod_DrawFigure leaves it.
+; Calls: C3Mod_Prog10FigPick, C3Mod_DrawFigure.
+C3Mod_Prog10FigsTask:
+    PHK
+    PLB
+    LDA.w #!Op_CMPImm|(!C3_OamHideY<<8)
+    STA.w C3Mod_DrawFigure_dead
+    LDX.w #0
+.figure:
+    DEC.b !C3_Prog10FigTimer,X
+    BNE .draw
+.step:
+    INC.b !C3_Prog10FigSeq,X
+    INC.b !C3_Prog10FigSeq,X
+    LDA.b (!C3_Prog10FigSeq,X)
+    AND.w #!Eng_LowByteMask
+    BNE .timer
+    JSR C3Mod_Prog10FigPick
+    BRA .step
+.timer:
+    STA.b !C3_Prog10FigTimer,X
+    INC.b !C3_Prog10FigSeq,X
+.draw:
+    LDA.b !C3_Prog10FigPos,X
+    STA.b !C3_SprBaseX
+    LDA.b !C3_Prog10FigPos+1,X
+    STA.b !C3_SprBaseY
+    LDA.w C3Mod_DrawFigure_check
+    STA.b !C3_TmpF0
+    LDA.w #!Op_NOP|(!Op_NOP<<8)
+    STA.w C3Mod_DrawFigure_check
+    LDA.b (!C3_Prog10FigSeq,X)
+    PEA.w !Bank7E<<8                    ; PLB takes the $00; the $7E stays for the PLB after
+    PLB
+    PHX
+    JSR C3Mod_DrawFigure
+    PLX
+    PLB
+    LDA.b !C3_TmpF0
+    STA.w C3Mod_DrawFigure_check
+    INX
+    INX
+    CPX.w #!C3_Prog10Figs
+    BNE .figure
+    LDA.w #!Op_LdaImm|(!C3_OamHideY<<8)
+    STA.w C3Mod_DrawFigure_dead
+    RTS
+
+; $7E:9C4E — C3Mod_Prog10FigSeqs (10 bytes, $9C4E–$9C57)
+; C3Mod_Prog10FigPick's sequences, each 2 before its first entry (the
+; task adds 2 before reading). The fifth is never picked (AND 3).
+C3Mod_Prog10FigSeqs:
+    dw C3Mod_FigSeqs-2, C3Mod_FigSeqs_s1-2, C3Mod_FigSeqs_s2-2
+    dw C3Mod_FigSeqs_s3-2, C3Mod_FigSeqs_s4-2
+
+; $7E:9C58 — C3Mod_Prog10PicTask (138 bytes, $9C58–$9CE1)
+; A task: the staff-text scene's picture and its window. C3_SprBaseX
+; and Y = 0 (16-bit STZ: the high bytes stay 0); 8-bit: when
+; C3_Prog10Picture differs from C3_Prog10PicShown, PicShown = it and
+; the one-shot NMI task C3Mod_Prog10PicNmi sends its tiles
+; (C3Mod_NmiTaskAdd); then (with C3Mod_Prog10Window's offsets):
+;   - x = -(page $0B00's var 1 + C3_Prog10WobbleX) (EOR / INC, low
+;     bytes; the CLC's sum): C3_SprBaseX and both left edges (.third +
+;     1, .fourth + 1); x + C3_Prog10PicWidth (CLC) both right edges;
+;   - y = -(var 2 + C3_Prog10WobbleY): C3_SprBaseY; y / 2 (LSR) the
+;     first count, + C (ADC #0) the second; C3_Prog10PicHeight / 2 and
+;     that + C the third and fourth counts;
+;   - C3_Prog10PicTimer + 1; at 4 it is 0 and C3_Prog10PicFrame + 1 (0
+;     after 2): the tiles of C3Mod_Pic0Sprites' records 23 and 24 =
+;     $E0 + 4 x frame and that + 2 (a three-frame animation);
+;   - C3Mod_DrawFigure (JMP) of the picture's list (C3Mod_Prog10Pictures
+;     entry C3_Prog10Picture AND 3).
+; Callers note: a task added by script opcode $FA at $9125, $91BF and
+;   $9203 (C3Mod_Prog10TextScript).
+; Entry: a task: M=0 (8-bit set inside), X=0, DP=0, DB=$00 (page
+;        $0B00 absolute; the module stores are long;
+;        C3Mod_DrawFigure's).
+; Exit:  through C3Mod_DrawFigure: M=0, X=0; X = C3_OamHiPtr, Y =
+;        C3_OamPos.
+; Calls: C3Mod_NmiTaskAdd, C3Mod_DrawFigure (JMP).
+C3Mod_Prog10PicTask:
+    STZ.b !C3_SprBaseX
+    STZ.b !C3_SprBaseY
+    SEP #$20
+    LDA.b !C3_Prog10Picture
+    CMP.b !C3_Prog10PicShown
+    BEQ .window
+    STA.b !C3_Prog10PicShown
+    LDX.w #C3Mod_Prog10PicNmi
+    JSR C3Mod_NmiTaskAdd
+.window:
+    LDA.w !C3_ScriptPageB+!C3_Prog10SprX
+    CLC
+    ADC.b !C3_Prog10WobbleX
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !C3_SprBaseX
+    STA.l C3Mod_Prog10Window_third+1
+    STA.l C3Mod_Prog10Window_fourth+1
+    CLC
+    ADC.b !C3_Prog10PicWidth
+    STA.l C3Mod_Prog10Window_third+2
+    STA.l C3Mod_Prog10Window_fourth+2
+    LDA.w !C3_ScriptPageB+!C3_Prog10SprY
+    CLC
+    ADC.b !C3_Prog10WobbleY
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !C3_SprBaseY
+    LSR A
+    STA.l C3Mod_Prog10Window
+    ADC.b #0
+    STA.l C3Mod_Prog10Window_second
+    LDA.b !C3_Prog10PicHeight
+    LSR A
+    STA.l C3Mod_Prog10Window_third
+    ADC.b #0
+    STA.l C3Mod_Prog10Window_fourth
+    INC.b !C3_Prog10PicTimer
+    LDA.b !C3_Prog10PicTimer
+    CMP.b #!C3_PicFrameTime
+    BNE .draw
+    STZ.b !C3_Prog10PicTimer
+    LDA.b !C3_Prog10PicFrame
+    INC A
+    CMP.b #!C3_PicFrames
+    BMI .frame
+    LDA.b #0
+.frame:
+    STA.b !C3_Prog10PicFrame
+    ASL A
+    ASL A
+    ORA.b #!C3_PicTileBase
+    STA.l C3Mod_Pic0Sprites+!C3_PicAnimTileA
+    INC A
+    INC A
+    STA.l C3Mod_Pic0Sprites+!C3_PicAnimTileB
+.draw:
+    LDA.b !C3_Prog10Picture
+    REP #$20
+    AND.w #!C3_PicMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l C3Mod_Prog10Pictures+2,X
+    JMP C3Mod_DrawFigure
+
+; $7E:9CE2 — C3Mod_Prog10PicNmi (67 bytes, $9CE2–$9D24)
+; A one-shot NMI task: picture n = C3_Prog10Picture AND 3: its $800
+; bytes of tiles (C3Mod_Prog10Pictures entry n: $7F:D800, $E800, $F000
+; or $F800, where C3Mod_Prog10 put pack 60's tiles in order) to VRAM
+; word $5800 (sprite tiles $180 on: DMA channel 7, two registers from
+; VMDATAL, VMAIN = $80); C3_Prog10PicWidth and PicHeight from the
+; entry; then it ends itself (C3Mod_NmiTaskEnd).
+; Callers note: an NMI task: LDX #C3Mod_Prog10PicNmi / JSR
+;   C3Mod_NmiTaskAdd at $864F (C3Mod_Prog10) and $9C66
+;   (C3Mod_Prog10PicTask).
+; Entry: an NMI task: M=1 (16-bit set inside), X=0, DP=0, DB=$00.
+; Exit:  JMP C3Mod_NmiTaskEnd with M=1; A = MDMAEN_Ch7.
+; Calls: C3Mod_NmiTaskEnd (JMP).
+C3Mod_Prog10PicNmi:
+    LDA.w !C3_Prog10Picture
+    REP #$20
+    AND.w #!C3_PicMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l C3Mod_Prog10Pictures,X
+    STA.w A1T7L
+    LDA.w #!C3_PicTileBytes
+    STA.w DAS7L
+    LDY.w #!C3_Prog10TilesVram
+    STY.w VMADDL
+    LDY.w #!BBAD_VMDATAL<<8|!DMAP_TwoRegs
+    STY.w DMAP7                         ; and BBAD7
+    SEP #$20
+    LDA.l C3Mod_Prog10Pictures+4,X
+    STA.b !C3_Prog10PicWidth
+    LDA.l C3Mod_Prog10Pictures+6,X
+    STA.b !C3_Prog10PicHeight
+    LDA.b #!Bank7F
+    STA.w A1B7
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STA.w MDMAEN                        ; MDMAEN_Ch7, the same value
+    JMP C3Mod_NmiTaskEnd
+
+; $7E:9D25 — C3Mod_Prog10Pictures (32 bytes, $9D25–$9D44)
+; The four pictures of the staff-text scene, 8 bytes each: the $7F
+; address of the tiles, the sprite list (C3Mod_DrawFigure's), the width
+; and the height (a byte and a zero each).
+C3Mod_Prog10Pictures:
+    dw $D800, C3Mod_Pic0Sprites : db $37, 0, $97, 0
+    dw $E800, C3Mod_Pic1Sprites : db $3D, 0, $48, 0
+    dw $F000, C3Mod_Pic2Sprites : db $38, 0, $38, 0
+    dw $F800, C3Mod_Pic3Sprites : db $28, 0, $48, 0
+
+; $7E:9D45 — C3Mod_Prog10SpinFlashTask (109 bytes with C3Mod_Prog10FlashTask, $9D45–$9DB1)
+; A task: page $0A00's var 5 (the angle) - 1, then
+; C3Mod_Prog10FlashTask ($9D48), a task of its own: every 8 frames
+; (C3_FrameCount AND 7 = 0) with DB = $7E (PHK / PLB) four pairs of
+; colour words swapped in both C3_PaletteBuf and C3_PaletteWork:
+; colours $14 and $15, $11 and $12, $0D and $2D, $0E and $2E (a flash).
+; Sub-entry: C3Mod_Prog10FlashTask ($9D48).
+; Callers note: a task added by script opcode $FA at $90D5 and removed
+;   by $F9 at $91A8 (C3Mod_Prog10TextScript). C3Mod_Prog10FlashTask: a
+;   task added by $FA at $945C (C3Mod_Prog10TurnScript) and $9625
+;   (C3Mod_Prog10MainScript).
+; Entry: a task: M=0, X=0, DP=0 (C3_FrameCount), DB=$00 (page $0A00;
+;        set to $7E for the colours; restored by C3Mod_RunTasks).
+; Exit:  M=0, X=0; A = the AND's result, or the last colour word, X the
+;        other; DB = $7E after a swap.
+C3Mod_Prog10SpinFlashTask:
+    DEC.w !C3_ScriptPageA+!C3_Prog10Angle
+C3Mod_Prog10FlashTask:                  ; header: see C3Mod_Prog10SpinFlashTask
+    LDA.b !C3_FrameCount
+    AND.w #!C3_Prog10FlashEvery
+    BNE .done
+    PHK
+    PLB
+    LDA.w !C3_PaletteBufLow+!C3_Flash14
+    LDX.w !C3_PaletteBufLow+!C3_Flash15
+    STX.w !C3_PaletteBufLow+!C3_Flash14
+    STA.w !C3_PaletteBufLow+!C3_Flash15
+    LDA.w !C3_PaletteBufLow+!C3_Flash11
+    LDX.w !C3_PaletteBufLow+!C3_Flash12
+    STX.w !C3_PaletteBufLow+!C3_Flash11
+    STA.w !C3_PaletteBufLow+!C3_Flash12
+    LDA.w !C3_PaletteBufLow+!C3_Flash0D
+    LDX.w !C3_PaletteBufLow+!C3_Flash2D
+    STX.w !C3_PaletteBufLow+!C3_Flash0D
+    STA.w !C3_PaletteBufLow+!C3_Flash2D
+    LDA.w !C3_PaletteBufLow+!C3_Flash0E
+    LDX.w !C3_PaletteBufLow+!C3_Flash2E
+    STX.w !C3_PaletteBufLow+!C3_Flash0E
+    STA.w !C3_PaletteBufLow+!C3_Flash2E
+    LDA.w !C3_PaletteWorkLow+!C3_Flash14
+    LDX.w !C3_PaletteWorkLow+!C3_Flash15
+    STX.w !C3_PaletteWorkLow+!C3_Flash14
+    STA.w !C3_PaletteWorkLow+!C3_Flash15
+    LDA.w !C3_PaletteWorkLow+!C3_Flash11
+    LDX.w !C3_PaletteWorkLow+!C3_Flash12
+    STX.w !C3_PaletteWorkLow+!C3_Flash11
+    STA.w !C3_PaletteWorkLow+!C3_Flash12
+    LDA.w !C3_PaletteWorkLow+!C3_Flash0D
+    LDX.w !C3_PaletteWorkLow+!C3_Flash2D
+    STX.w !C3_PaletteWorkLow+!C3_Flash0D
+    STA.w !C3_PaletteWorkLow+!C3_Flash2D
+    LDA.w !C3_PaletteWorkLow+!C3_Flash0E
+    LDX.w !C3_PaletteWorkLow+!C3_Flash2E
+    STX.w !C3_PaletteWorkLow+!C3_Flash0E
+    STA.w !C3_PaletteWorkLow+!C3_Flash2E
+.done:
+    RTS
+
+; $7E:9DB2 — C3Mod_Prog10DeadInc (10 bytes, $9DB2–$9DBB)
+; Code no path reaches (no branch, call, table or script names $9DB2):
+; INC $000E twice, INC page $0A00's var 1, RTS. Left between two
+; routines; never run.
+; Callers note: none (dead code).
+; Entry: never entered (as code: M=0, DP and DB any).
+; Exit:  never entered.
+C3Mod_Prog10DeadInc:
+    INC.w !C3_Unk000E
+    INC.w !C3_Unk000E
+    INC.w !C3_ScriptPageA+!C3_Prog10ViewX
+    RTS
+
+; $7E:9DBC — C3Mod_Prog10M7Nmi (93 bytes, $9DBC–$9E18)
+; An NMI task: with C3_Prog10Large set (8-bit), page $0A00's var 3 =
+; var 1 + $80 and var 4 = var 2 + $80 (16-bit ADCs with no CLC: the
+; first takes the carry C3Mod_RunNmiTasks left, 0 unless this is the
+; first NMI task; the second the first's carry out), then
+; C3Mod_PlaneNmiTask (JMP: the flat turned plane, centred); else the
+; perspective plane: M7X = C3_Prog10M7X, M7Y = C3_Prog10M7Y (low, then
+; high byte); C3_Prog10LowHofs / LowVofs (BG1's scroll below the split,
+; C3Mod_Prog10Scroll's HDMA) = C3_Prog10ScrollX / ScrollY;
+; C3_Prog10TopHofs = -var 5 (the sky moves with the angle);
+; C3_Prog10TopVofs = $27 - var 6 (EOR, SEC / ADC).
+; Callers note: an NMI task added by script opcode $F8 at $90DB
+;   (C3Mod_Prog10TextScript), $9462 (C3Mod_Prog10TurnScript) and $962E
+;   (C3Mod_Prog10MainScript).
+; Entry: an NMI task: M=1, X=0, DP=0 (C3_Prog10Large), DB=$00 (the
+;        registers and words are absolute).
+; Exit:  M=0 (RTS); A = C3_Prog10TopVofs; X, Y unchanged; or as
+;        C3Mod_PlaneNmiTask leaves them.
+; Calls: C3Mod_PlaneNmiTask (JMP).
+C3Mod_Prog10M7Nmi:
+    LDA.b !C3_Prog10Large
+    BEQ .lines
+    REP #$20
+    LDA.w !C3_ScriptPageA+!C3_Prog10ViewX
+    ADC.w #!C3_Prog10PlaneCentre
+    STA.w !C3_ScriptPageA+!C3_Prog10CentreX
+    LDA.w !C3_ScriptPageA+!C3_Prog10ViewY
+    ADC.w #!C3_Prog10PlaneCentre
+    STA.w !C3_ScriptPageA+!C3_Prog10CentreY
+    SEP #$20
+    JMP C3Mod_PlaneNmiTask
+.lines:
+    SEP #$20
+    LDA.w !C3_Prog10M7X
+    STA.w M7X
+    LDA.w !C3_Prog10M7X+1
+    STA.w M7X
+    LDA.w !C3_Prog10M7Y
+    STA.w M7Y
+    LDA.w !C3_Prog10M7Y+1
+    STA.w M7Y
+    REP #$20
+    LDA.w !C3_Prog10ScrollX
+    STA.w !C3_Prog10LowHofs
+    LDA.w !C3_Prog10ScrollY
+    STA.w !C3_Prog10LowVofs
+    LDA.w !C3_ScriptPageA+!C3_Prog10Angle
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.w !C3_Prog10TopHofs
+    LDA.w !C3_ScriptPageA+!C3_Prog10Horizon
+    EOR.w #!Eng_Invert16
+    SEC
+    ADC.w #!C3_Prog10SkyBase
+    STA.w !C3_Prog10TopVofs
+    RTS
+
+; $7E:9E19 — C3Mod_Prog10FlatBg2Nmi (97 bytes with C3Mod_Prog10FlatNmi, $9E19–$9E79)
+; NMI tasks of the flat (unturned) mode-7 plane. C3Mod_Prog10FlatBg2Nmi:
+; BG2HOFS = page $0A00's var 7 (low, then high byte), C3_Prog10LowHofs
+; = var 1 (a 16-bit STX: C3Mod_Prog10StripNmi's HDMA scroll), then
+; C3Mod_Prog10FlatNmi ($9E2B): DP = $0A00; M7B = M7C = 0; M7A = M7D =
+; var 0 (the scale); M7X = var 3, M7Y = var 4; BG1HOFS = var 1, BG1VOFS
+; = var 2 (each low, then high byte).
+; Sub-entry: C3Mod_Prog10FlatNmi ($9E2B).
+; Callers note: an NMI task added by script opcode $F8 at $9209
+;   (C3Mod_Prog10TextScript). C3Mod_Prog10FlatNmi: added by $F8 at
+;   $91C5 and $9296, removed by $F7 at $92ED (C3Mod_Prog10TextScript).
+; Entry: an NMI task: M=1, X=0, DP any (set to $0A00 at $9E2B; restored
+;        by C3Mod_RunNmiTasks), DB=$00 (absolute registers and page).
+; Exit:  M=1, DP = $0A00; A = var 2's high byte; X = var 1 at
+;        C3Mod_Prog10FlatBg2Nmi's entry, else unchanged; Y unchanged.
+C3Mod_Prog10FlatBg2Nmi:
+    LDA.w !C3_ScriptPageA+!C3_Prog10Bg2Scroll
+    STA.w BG2HOFS
+    LDA.w !C3_ScriptPageA+!C3_Prog10Bg2Scroll+1
+    STA.w BG2HOFS
+    LDX.w !C3_ScriptPageA+!C3_Prog10ViewX
+    STX.w !C3_Prog10LowHofs
+C3Mod_Prog10FlatNmi:                    ; header: see C3Mod_Prog10FlatBg2Nmi
+    PEA.w !C3_ScriptPageA
+    PLD
+    LDA.b #0
+    STA.w M7B
+    STA.w M7B
+    STA.w M7C
+    STA.w M7C
+    LDA.b !C3_Prog10ViewScale
+    STA.w M7A
+    LDA.b !C3_Prog10ViewScale+1
+    STA.w M7A
+    LDA.b !C3_Prog10ViewScale
+    STA.w M7D
+    LDA.b !C3_Prog10ViewScale+1
+    STA.w M7D
+    LDA.b !C3_Prog10CentreX
+    STA.w M7X
+    LDA.b !C3_Prog10CentreX+1
+    STA.w M7X
+    LDA.b !C3_Prog10CentreY
+    STA.w M7Y
+    LDA.b !C3_Prog10CentreY+1
+    STA.w M7Y
+    LDA.b !C3_Prog10ViewX
+    STA.w BG1HOFS
+    LDA.b !C3_Prog10ViewX+1
+    STA.w BG1HOFS
+    LDA.b !C3_Prog10ViewY
+    STA.w BG1VOFS
+    LDA.b !C3_Prog10ViewY+1
+    STA.w BG1VOFS
+    RTS
+
+; $7E:9E7A — C3Mod_PriorityByte (1 byte, $9E7A–$9E7A)
+; The byte $20, the fixed DMA source of the high-byte fills of
+; C3Mod_Prog10GridNmi ($8D9F) and C3Mod_Prog13 ($8F6D): map words with
+; the priority bit set.
+C3Mod_PriorityByte:
+    db $20
+
+; $7E:9E7B — C3Mod_CreditLineTask (129 bytes, $9E7B–$9EFB)
+; A task: the credit roll on a BG (C3Mod_CreditLineNmi sends the row and
+; the scroll). Every 16 frames (C3_FrameCount AND $F), or every frame
+; when C3_Prog13Count is not 0 (a word read: program 13 run before, the
+; fast roll), a line: 32 zero bytes from $D2:0000 (GfxRom_D2; MVN, DB =
+; $00 after) to C3_CreditRow; WMADD = $7E:141C (8-bit: WMADDH 0, then a
+; 16-bit STX) and the text from C3_Prog10TextPtr (bank $7E, long
+; reads): $2F ends the line (.line), $5C ends the roll (.stop), $00
+; skips two bytes (C3Mod_DrawText's place codes), $20 is made $40, and
+; any other character c gives tile c - $40 (WMDATA: the row's low
+; bytes from column 8 on). .line: C3_Prog10TextPtr = past the $2F;
+; C3_Prog10TextY = ((it + $20) AND $3E0) + $4800 (REP #$21: C = 0; the
+; next map row of the BG at VRAM word $4800). Then the scroll
+; (.scroll, $9ED6): with C3_Prog13Count's low byte set,
+; C3_CreditScroll + 8 (CLC); else on an odd field (STAT77 read as a
+; word, so its high byte is STAT78; ASL puts STAT78 bit 7 in C) + 1:
+; .field ($9EE3) is BCC, which C3Mod_Prog12 makes BCS (the other
+; field, in its interlaced screen). .stop: C3_Prog10TextDone + 1,
+; C3Mod_CreditLineNmi removed (C3Mod_NmiTaskRemove) and the task ends.
+; Callers note: a task added by script opcode $FA at $92CF
+;   (C3Mod_Prog10TextScript) and $940B (C3Mod_Prog13Script).
+; Entry: a task: M=0, X=0, DP=0 (C3_Prog10TextPtr..), DB any (MVN sets
+;        $00; the text reads are long).
+; Exit:  M=0, X=0, DB = $00 after a line; A as the scroll leaves it;
+;        or JMP C3Mod_TaskEnd (M=1).
+; Calls: C3Mod_NmiTaskRemove.
+C3Mod_CreditLineTask:
+    LDA.b !C3_Prog13Count
+    BNE .build
+    LDA.b !C3_FrameCount
+    AND.w #!C3_CreditLineEvery
+    BNE .scroll
+.build:
+    LDX.w #!GfxRom_D2&$FFFF
+    LDY.w #!C3_CreditRow
+    LDA.w #!C3_CreditRowBytes-1
+    MVN $00,!BankD2                     ; lint-ok: MVN operands are bank bytes ($D2:0000 to $00)
+    SEP #$20
+    LDA.b #0
+    STA.w WMADDH
+    LDX.w #!C3_CreditRowText
+    STX.w WMADDL                        ; and WMADDM
+    LDX.b !C3_Prog10TextPtr
+.char:
+    LDA.l !C3_Bank7EBase,X
+    INX
+    CMP.b #!C3_TextNewLine
+    BEQ .line
+    CMP.b #!C3_TextStop
+    BEQ .stop
+    CMP.b #!C3_TextPlace
+    BNE .glyph
+    INX
+    INX
+    BRA .char
+.glyph:
+    CMP.b #!C3_TextSpace
+    BNE .tile
+    LDA.b #!C3_CreditTileBase
+.tile:
+    SEC
+    SBC.b #!C3_CreditTileBase
+    STA.w WMDATA
+    BRA .char
+.line:
+    STX.b !C3_Prog10TextPtr
+    REP #$21                            ; and C = 0
+    LDA.b !C3_Prog10TextY
+    ADC.w #!C3_MapRowWords
+    AND.w #!C3_CreditRowMask
+    CLC
+    ADC.w #!C3_Prog10GridBgMap
+    STA.b !C3_Prog10TextY
+.scroll:
+    REP #$20
+    LDA.b !C3_Prog13Count
+    AND.w #!Eng_LowByteMask
+    BNE .fast
+    LDA.w STAT77                        ; and STAT78
+    ASL A
+.field:
+    BCC .done
+    INC.b !C3_CreditScroll
+.done:
+    RTS
+.fast:
+    LDA.b !C3_CreditScroll
+    CLC
+    ADC.w #!C3_CreditFastStep
+    STA.b !C3_CreditScroll
+    RTS
+.stop:
+    INC.b !C3_Prog10TextDone
+    LDX.w #C3Mod_CreditLineNmi
+    JSR C3Mod_NmiTaskRemove
+    JMP C3Mod_TaskEnd
+
+; $7E:9EFC — C3Mod_CreditLineNmi (47 bytes, $9EFC–$9F2A)
+; An NMI task: C3_CreditRow's 32 bytes to the low bytes of VRAM from
+; C3_Prog10TextY (VMAIN = 0; DMA channel 7, one register, VMDATAL, from
+; $00:1414); then BG2VOFS = C3_CreditScroll (low, then high byte; .vofs
+; and .vofs_high: C3Mod_Prog13 writes BG3VOFS's low address byte over
+; both operands, so programs 12 and 13 scroll BG3).
+; Callers note: an NMI task added by script opcode $F8 at $92CC
+;   (C3Mod_Prog10TextScript) and $940E (C3Mod_Prog13Script); removed by
+;   LDX #C3Mod_CreditLineNmi / JSR C3Mod_NmiTaskRemove at $9EF3
+;   (C3Mod_CreditLineTask).
+; Entry: an NMI task: M=1, X=0, DP=0, DB=$00.
+; Exit:  M=1, X=0; A = C3_CreditScroll's high byte, X = $1414; Y
+;        unchanged.
+C3Mod_CreditLineNmi:
+    LDX.b !C3_Prog10TextY
+    STX.w VMADDL
+    LDX.w #!C3_CreditRowBytes
+    STX.w DAS7L
+    LDX.w #!BBAD_VMDATAL<<8
+    STX.w DMAP7                         ; and BBAD7
+    LDX.w #!C3_CreditRow
+    STX.w A1T7L
+    LDA.b #0
+    STA.w A1B7
+    STA.w VMAIN
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDA.b !C3_CreditScroll
+.vofs:
+    STA.w BG2VOFS
+    LDA.b !C3_CreditScroll+1
+.vofs_high:
+    STA.w BG2VOFS
+    RTS
+
+; $7E:9F2B — C3Mod_Prog10GridTilesNmi (46 bytes with C3Mod_Prog10GridMapNmi and C3Mod_Prog10GridCharsNmi, $9F2B–$9F58)
+; One-shot NMI tasks that send what C3Mod_Prog10Grid built in $7F
+; (through C3Mod_DmaFrom7F, then C3Mod_NmiTaskEnd at .send, $9F53):
+;   - C3Mod_Prog10GridTilesNmi: $A00 bytes from $7F:0400 (pack 47) to
+;     VRAM word $5000;
+;   - C3Mod_Prog10GridMapNmi ($9F39): $800 bytes from $7F:1000 (the
+;     grid map) to $4C00;
+;   - C3Mod_Prog10GridCharsNmi ($9F47): $100 bytes from $7F:0F00 (pack
+;     64) to 0.
+; Sub-entry: C3Mod_Prog10GridMapNmi ($9F39), C3Mod_Prog10GridCharsNmi
+;   ($9F47).
+; Callers note: NMI tasks added by script opcode $F8 at $92D3
+;   (C3Mod_Prog10TextScript). C3Mod_Prog10GridMapNmi: $92D7.
+;   C3Mod_Prog10GridCharsNmi: $92DB.
+; Entry: an NMI task: M=1, X=0, DP any, DB=$00.
+; Exit:  JMP C3Mod_NmiTaskEnd with M=1; A = MDMAEN_Ch7, X = the source,
+;        Y = the count.
+; Calls: C3Mod_DmaFrom7F, C3Mod_NmiTaskEnd (JMP).
+C3Mod_Prog10GridTilesNmi:
+    LDX.w #!C3_SprTilesHigh
+    STX.w VMADDL
+    LDY.w #!C3_Prog10Pack47Bytes
+    LDX.w #!C3_Prog10GridFrom47
+    BRA C3Mod_Prog10GridCharsNmi_send
+C3Mod_Prog10GridMapNmi:                 ; header: see C3Mod_Prog10GridTilesNmi
+    LDX.w #!C3_Prog10GridMapVram
+    STX.w VMADDL
+    LDY.w #!C3_Prog10GridMapSend
+    LDX.w #!C3_Prog10GridMap
+    BRA C3Mod_Prog10GridCharsNmi_send
+C3Mod_Prog10GridCharsNmi:               ; header: see C3Mod_Prog10GridTilesNmi
+    LDX.w #0
+    STX.w VMADDL
+    LDY.w #!C3_Prog10Pack64Bytes
+    LDX.w #!C3_Prog10GridFrom64
+.send:
+    JSR C3Mod_DmaFrom7F
+    JMP C3Mod_NmiTaskEnd
+
+; $7E:9F59 — C3Mod_DmaFrom7F (26 bytes, $9F59–$9F72)
+; DMA channel 7: Y bytes from $7F:X to VRAM at the address the caller
+; set (two registers from VMDATAL, VMAIN = $80).
+; Callers note: C3Mod_Prog10GridCharsNmi's .send ($9F53).
+; Entry: M=1, X=0, DP any, DB=$00 (absolute registers); X = the source,
+;        Y = the count, VMADD set.
+; Exit:  M=1, X=0; A = MDMAEN_Ch7; X, Y unchanged.
+C3Mod_DmaFrom7F:
+    STY.w DAS7L
+    STX.w A1T7L
+    LDX.w #!BBAD_VMDATAL<<8|!DMAP_TwoRegs
+    STX.w DMAP7                         ; and BBAD7
+    LDA.b #!Bank7F
+    STA.w A1B7
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STA.w MDMAEN                        ; MDMAEN_Ch7, the same value
+    RTS
+
+; $7E:9F73 — C3Mod_Prog10ClearNmi (23 bytes, $9F73–$9F89)
+; A one-shot NMI task: VRAM words $20A0-$23FF zeroed ($6C0 bytes:
+; C3Mod_VramFill with Y = $1809, fixed source, two registers; VMAIN =
+; $80); then it ends itself.
+; Callers note: an NMI task added by script opcode $F8 at $92DF
+;   (C3Mod_Prog10TextScript).
+; Entry: an NMI task: M=1, X=0, DP any, DB=$00.
+; Exit:  JMP C3Mod_NmiTaskEnd; as C3Mod_VramFill leaves them.
+; Calls: C3Mod_VramFill, C3Mod_NmiTaskEnd (JMP).
+C3Mod_Prog10ClearNmi:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #!C3_Prog10ClearVram
+    STX.w VMADDL
+    LDX.w #!C3_Prog10ClearBytes
+    LDY.w #!BBAD_VMDATAL<<8|!DMAP_FixedSource|!DMAP_TwoRegs
+    JSR C3Mod_VramFill
+    JMP C3Mod_NmiTaskEnd
+
+; $7E:9F8A — C3Mod_Prog10FadeE1 (31 bytes, $9F8A–$9FA8)
+; A script routine (opcode $F0): FieldAnimB record 0 = a kind-5 fade
+; (PalAnim_Fade) of colours $E1-$EF, .Unk3 = 1, every frame (.Unk5 =
+; 1), level 0 to $FF (.Unk7 / .Unk8 = $FF00); 16-bit STX stores that
+; overlap (.Unk0 as $0050, then .Unk1 / .Unk2 as $0FE1).
+; Callers note: script opcode $F0 at $92FB (C3Mod_Prog10TextScript).
+; Entry: M=0 or 1, X=0 (the 16-bit STX stores), DP any, DB = $00 or $7E
+;        (FieldAnimB is low WRAM; $7E under opcode $F0).
+; Exit:  X = 1; A, Y unchanged.
+C3Mod_Prog10FadeE1:
+    LDX.w #!C3_TextFadeIn
+    STX.w FieldAnimB.Unk7               ; and .Unk8
+    LDX.w #!C3_FadeAnimKind
+    STX.w FieldAnimB.Unk0               ; and .Unk1
+    LDX.w #!C3_Prog10FadeE1Colours
+    STX.w FieldAnimB.Unk1               ; and .Unk2
+    LDX.w #1
+    STX.w FieldAnimB.Unk3               ; and .Unk4
+    LDX.w #1
+    STX.w FieldAnimB.Unk5               ; and .Unk6
+    RTS
+
+; $7E:9FA9 — C3Mod_Prog13Whiten (31 bytes, $9FA9–$9FC7)
+; A script routine (opcode $F0): FieldAnimB record 0 = a kind-4 record
+; (PalAnim_FadeWhite) of colours $11-$1F, .Unk3 = 1, every frame,
+; .Unk6 = 0, level $E0 to 0 (.Unk7 / .Unk8 = $00E0); the same
+; overlapping stores (.Unk0 as $0040, then .Unk1 / .Unk2 as $0F11).
+; Callers note: script opcode $F0 at $9427 (C3Mod_Prog13End).
+; Entry: M=0 or 1, X=0, DP any, DB = $00 or $7E (FieldAnimB is low
+;        WRAM).
+; Exit:  X = 1; A, Y unchanged.
+C3Mod_Prog13Whiten:
+    LDX.w #!C3_Prog13WhitenLevels
+    STX.w FieldAnimB.Unk7               ; and .Unk8
+    LDX.w #!C3_WhitenAnimKind
+    STX.w FieldAnimB.Unk0               ; and .Unk1
+    LDX.w #!C3_Prog13WhitenColours
+    STX.w FieldAnimB.Unk1               ; and .Unk2
+    LDX.w #1
+    STX.w FieldAnimB.Unk3               ; and .Unk4
+    LDX.w #1
+    STX.w FieldAnimB.Unk5               ; and .Unk6
+    RTS
+
+; $7E:9FC8 — C3Mod_Prog10Fade01 (34 bytes, $9FC8–$9FE9)
+; A script routine (opcode $F0): FieldAnimB record 1 = a kind-5 fade of
+; colours $01-$40, .Unk3 = 1, .Unk5 = 2 (every other frame), level 0 to
+; $FF; .Unk0 an 8-bit store, the others 16-bit STX.
+; Callers note: script opcode $F0 at $9110 (C3Mod_Prog10TextScript) and
+;   $94A9 (C3Mod_Prog10TurnScript).
+; Entry: M=0 (8-bit set here), X=0, DP any, DB = $00 or $7E.
+; Exit:  M=0; A's low byte $50; X = 2; Y unchanged.
+C3Mod_Prog10Fade01:
+    SEP #$20
+    LDX.w #!C3_TextFadeIn
+    STX.w FieldAnimB.Unk7+!C3_AnimRec1  ; and .Unk8
+    LDA.b #!C3_FadeAnimKind
+    STA.w FieldAnimB.Unk0+!C3_AnimRec1
+    LDX.w #!C3_Prog10Fade01Colours
+    STX.w FieldAnimB.Unk1+!C3_AnimRec1  ; and .Unk2
+    LDX.w #1
+    STX.w FieldAnimB.Unk3+!C3_AnimRec1  ; and .Unk4
+    LDX.w #2
+    STX.w FieldAnimB.Unk5+!C3_AnimRec1  ; and .Unk6
+    REP #$20
+    RTS
+
+; $7E:9FEA — C3Mod_Prog10Fade41 (34 bytes, $9FEA–$A00B)
+; The same for FieldAnimB record 2: colours $41-$7F (.Unk2 = $3F).
+; Callers note: script opcode $F0 at $9114 (C3Mod_Prog10TextScript) and
+;   $94AC (C3Mod_Prog10TurnScript).
+; Entry: M=0 (8-bit set here), X=0, DP any, DB = $00 or $7E.
+; Exit:  M=0; A's low byte $50; X = 2; Y unchanged.
+C3Mod_Prog10Fade41:
+    SEP #$20
+    LDX.w #!C3_TextFadeIn
+    STX.w FieldAnimB.Unk7+!C3_AnimRec2 ; and .Unk8
+    LDA.b #!C3_FadeAnimKind
+    STA.w FieldAnimB.Unk0+!C3_AnimRec2
+    LDX.w #!C3_Prog10Fade41Colours
+    STX.w FieldAnimB.Unk1+!C3_AnimRec2 ; and .Unk2
+    LDX.w #1
+    STX.w FieldAnimB.Unk3+!C3_AnimRec2 ; and .Unk4
+    LDX.w #2
+    STX.w FieldAnimB.Unk5+!C3_AnimRec2 ; and .Unk6
+    REP #$20
+    RTS
+
+; $7E:A00C — C3Mod_Prog10Coldata (16 bytes, $A00C–$A01B)
+; C3Mod_Prog10HdmaGrid's indirect HDMA table for COLDATA (one register):
+; 8 lines of the $00 at $350B (C3Mod_FillBytes: no colour), 17 lines
+; down C3Mod_ColdataRamp's .down part (repeat mode, a byte a line:
+; $FF to $E0, all three channels 31 to 0), 87 and 87 lines of $350B's
+; $00, 17 lines up the ramp ($E0 to $FF); the end. 216 lines.
+C3Mod_Prog10Coldata:
+    db 8 : dw C3Mod_FillBytes+1
+    db !C3_HdmaRepeat|17 : dw C3Mod_ColdataRamp_down
+    db 87 : dw C3Mod_FillBytes+1
+    db 87 : dw C3Mod_FillBytes+1
+    db !C3_HdmaRepeat|17 : dw C3Mod_ColdataRamp
+    db 0
+
+; $7E:A01C — C3Mod_ColdataRamp (33 bytes, $A01C–$A03C)
+; COLDATA values for C3Mod_Prog10Coldata: $E0, $E2 .. $FE, then .down
+; ($A02C) $FF, $FD .. $E1, $E0; the up ramp's 17th line reads .down's
+; $FF, the down ramp's 17th the final $E0.
+C3Mod_ColdataRamp:
+    db $E0, $E2, $E4, $E6, $E8, $EA, $EC, $EE
+    db $F0, $F2, $F4, $F6, $F8, $FA, $FC, $FE
+.down:
+    db $FF, $FD, $FB, $F9, $F7, $F5, $F3, $F1
+    db $EF, $ED, $EB, $E9, $E7, $E5, $E3, $E1
+    db $E0
+
+; $7E:A03D — C3Mod_DrawFigure (92 bytes, $A03D–$A098)
+; Adds a sprite list (in bank $7E at A, read through WMDATA) to the OAM
+; shadow: a byte n + 1, then n records of tile, attribute, X, Y. X =
+; byte + C3_SprBaseX's low byte (8-bit, no X bit 8), Y = byte +
+; C3_SprBaseY (16-bit); a Y of $E0 or more skips the record (.check's
+; BCS: the slot keeps the tile, attribute and X just written and is
+; used by the next record) unless C3Mod_Prog10FigsTask made the BCS
+; NOP / NOP; a quirk: the BCS goes back with M=0, so the next record's
+; accesses are 16-bit until its own REP / SEP pair (C3_SprLeft
+; decremented as a word with $1A, so the BEQ needs $1A = 0 to end the
+; list; word reads of WMDATA, which take one list byte each, the high
+; byte being the write-only WMADDL's open bus; word stores that spill a
+; byte into the next field or slot, and an X add of the whole word
+; C3_SprBaseX); else the Y's low byte is stored and the sprite's high-table
+; bits are shifted in at the top of the byte at C3_OamHiPtr (LSR / SEC /
+; ROR: large, X bit 8 clear), the pointer moving on after every 4
+; sprites (the offset's low nibble 0). C3_OamPos and C3_OamHiPtr are
+; stored back at the end. .dead ($A090), LDA #$E0 after the BRA, is
+; reached by no path; C3Mod_Prog10FigsTask writes CMP #$E0 over it and
+; back.
+; Callers note: C3Mod_Prog10FigsTask ($9C36) and JMP from
+;   C3Mod_Prog10PicTask ($9CDF).
+; Entry: M=0 (A stored to WMADDL/M as a word; 8-bit set inside), X=0,
+;        DP=0 (C3_OamPos.., C3_SprBase*), DB = $00-$3F (the ports and the
+;        OAM shadow are absolute: $00 at both); A = the list's address.
+; Exit:  M=0, X=0; X = C3_OamHiPtr, Y = C3_OamPos (both advanced);
+;        C3_SprLeft = 0; WMADD after the list.
+C3Mod_DrawFigure:
+    STA.w WMADDL                        ; and WMADDM
+    SEP #$20
+    LDY.b !C3_OamPos
+    LDX.b !C3_OamHiPtr
+    STZ.w WMADDH
+    LDA.w WMDATA
+    STA.b !C3_SprLeft
+.record:
+    DEC.b !C3_SprLeft
+    BEQ .end
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+2,Y
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+3,Y
+    LDA.w WMDATA
+    CLC
+    ADC.b !C3_SprBaseX
+    STA.w !Oam_LowTable,Y
+    LDA.w WMDATA
+    REP #$21                            ; and C = 0
+    AND.w #!Eng_LowByteMask
+    ADC.b !C3_SprBaseY
+    CMP.w #!C3_OamHideY
+.check:
+    BCS .record
+    SEP #$20
+    STA.w !Oam_LowTable+1,Y
+    LDA.w !Eng_PtrBase,X
+    LSR A
+    SEC
+    ROR A
+    STA.w !Eng_PtrBase,X
+    INY
+    INY
+    INY
+    INY
+    TYA
+    AND.b #!C3_OamGroupMask
+    BNE .record
+    INX
+    BRA .record
+.dead:
+    LDA.b #!C3_OamHideY
+.end:
+    REP #$20
+    STX.b !C3_OamHiPtr
+    STY.b !C3_OamPos
+    RTS
+
+; $7E:A099 — C3Mod_Pic0Sprites (101 bytes, $A099–$A0FD)
+; C3Mod_DrawFigure's list of picture 0 (C3Mod_Prog10Pictures): a count
+; byte n + 1, then tile, attribute, X, Y of each sprite (large; tiles
+; $180 on with attribute bit 0, the second tile page). Records 23 and 24
+; are the animated ones (C3Mod_Prog10PicTask rewrites their tiles).
+C3Mod_Pic0Sprites:
+    db 26      ; 25 sprites
+    db $82, $33, $10, $00
+    db $84, $33, $20, $00
+    db $86, $33, $30, $00
+    db $88, $33, $00, $10
+    db $8A, $33, $10, $10
+    db $8C, $33, $20, $10
+    db $8E, $33, $30, $10
+    db $A0, $33, $00, $20
+    db $A2, $33, $10, $20
+    db $A4, $33, $20, $20
+    db $A6, $33, $30, $20
+    db $A8, $33, $00, $30
+    db $AA, $33, $10, $30
+    db $AC, $33, $20, $30
+    db $AE, $33, $08, $40
+    db $C0, $33, $18, $40
+    db $C2, $33, $28, $40
+    db $C4, $33, $10, $50
+    db $C6, $33, $20, $50
+    db $C8, $31, $10, $60
+    db $CA, $31, $10, $80
+    db $CC, $31, $20, $80
+    db $CE, $31, $10, $90
+    db $E0, $31, $10, $70
+    db $E2, $31, $20, $70
+
+; $7E:A0FE — C3Mod_Pic1Sprites (69 bytes, $A0FE–$A142)
+; Picture 1's list (as C3Mod_Pic0Sprites).
+C3Mod_Pic1Sprites:
+    db 18      ; 17 sprites
+    db $80, $33, $10, $00
+    db $82, $33, $20, $00
+    db $84, $33, $30, $00
+    db $86, $33, $08, $10
+    db $88, $33, $18, $10
+    db $8A, $33, $28, $10
+    db $8C, $33, $38, $10
+    db $8E, $33, $08, $20
+    db $A0, $33, $18, $20
+    db $A2, $33, $28, $20
+    db $A4, $33, $38, $20
+    db $A6, $31, $00, $30
+    db $A9, $33, $18, $30
+    db $A8, $31, $10, $30
+    db $AA, $33, $20, $30
+    db $AC, $31, $00, $40
+    db $AE, $31, $10, $40
+
+; $7E:A143 — C3Mod_Pic2Sprites (53 bytes, $A143–$A177)
+; Picture 2's list.
+C3Mod_Pic2Sprites:
+    db 14      ; 13 sprites
+    db $80, $33, $00, $00
+    db $82, $33, $10, $00
+    db $84, $33, $20, $00
+    db $86, $33, $00, $10
+    db $88, $33, $10, $10
+    db $8A, $33, $20, $10
+    db $8C, $33, $30, $10
+    db $8E, $33, $00, $20
+    db $A0, $33, $10, $20
+    db $A2, $33, $20, $20
+    db $A4, $33, $30, $20
+    db $A6, $33, $08, $30
+    db $A8, $33, $18, $30
+
+; $7E:A178 — C3Mod_Pic3Sprites (41 bytes, $A178–$A1A0)
+; Picture 3's list.
+C3Mod_Pic3Sprites:
+    db 11      ; 10 sprites
+    db $80, $23, $00, $00
+    db $82, $23, $10, $00
+    db $84, $23, $20, $00
+    db $86, $23, $00, $10
+    db $88, $23, $10, $10
+    db $8A, $23, $20, $10
+    db $8C, $23, $00, $20
+    db $8E, $23, $10, $20
+    db $A0, $21, $10, $30
+    db $A2, $21, $10, $40
+
+; $7E:A1A1 — C3Mod_Prog10LogoSprites (65 bytes, $A1A1–$A1E1)
+; C3Mod_Prog10LogoTask's list (C3_SprListLarge's format: n + 1, then
+; tile, attribute, X, Y): 16 large sprites, tiles $00-$2E, attribute $3D
+; (palette 6, priority 3, the second tile page).
+C3Mod_Prog10LogoSprites:
+    db 17      ; 16 sprites
+    db $00, $3D, $00, $00
+    db $02, $3D, $10, $00
+    db $04, $3D, $20, $00
+    db $06, $3D, $30, $00
+    db $20, $3D, $00, $10
+    db $22, $3D, $10, $10
+    db $24, $3D, $20, $10
+    db $26, $3D, $30, $10
+    db $08, $3D, $48, $00
+    db $0A, $3D, $58, $00
+    db $0C, $3D, $68, $00
+    db $0E, $3D, $78, $00
+    db $28, $3D, $48, $10
+    db $2A, $3D, $58, $10
+    db $2C, $3D, $68, $10
+    db $2E, $3D, $78, $10
+
+; $7E:A1E2 — C3Mod_Prog10QuadSprites (33 bytes, $A1E2–$A202)
+; C3Mod_Prog10QuadTask's list (C3Mod_SprListMixed's format: signed
+; offsets; attribute bit 4 picks the large size): 8 small sprites.
+C3Mod_Prog10QuadSprites:
+    db 9       ; 8 sprites
+    db $40, $0F, $08, $00
+    db $41, $0F, $10, $00
+    db $42, $0F, $18, $00
+    db $43, $0F, $20, $00
+    db $44, $0F, $00, $08
+    db $45, $0F, $08, $08
+    db $46, $0F, $10, $08
+    db $47, $0F, $08, $10
+
+; $7E:A203 — C3Mod_FigFrames (941 bytes, $A203–$A5AF)
+; The figures' frames (C3Mod_DrawFigure's lists, signed X and Y
+; offsets as bytes added to the figure's place): 29 lists, .f1 to .f28
+; after the first, which is empty (n + 1 = 1: the hidden figure).
+; .f23 ($A49A) is in no sequence, and .f18 ($A3BD) and .f19 ($A3EE) only
+; in C3Mod_FigSeqs' .s4, which is never picked.
+C3Mod_FigFrames:
+    db 1       ; 0 sprites
+.f1:
+    db 2       ; 1 sprite
+    db $80, $3E, $F9, $30
+.f2:
+    db 2       ; 1 sprite
+    db $82, $3E, $F7, $20
+.f3:
+    db 2       ; 1 sprite
+    db $84, $3E, $F8, $10
+.f4:
+    db 5       ; 4 sprites
+    db $2E, $3E, $00, $00
+    db $2C, $3E, $F0, $00
+    db $0E, $3E, $00, $F0
+    db $0C, $3E, $F0, $F0
+.f5:
+    db 2       ; 1 sprite
+    db $86, $3E, $F8, $F8
+.f6:
+    db 5       ; 4 sprites
+    db $E4, $7A, $FF, $F0
+    db $E4, $FA, $FF, $FF
+    db $E4, $BA, $F0, $FF
+    db $E4, $3A, $F0, $F0
+.f7:
+    db 5       ; 4 sprites
+    db $E6, $7A, $FF, $F1
+    db $E6, $FA, $FF, $00
+    db $E6, $BA, $F0, $00
+    db $E6, $3A, $F0, $F1
+.f8:
+    db 5       ; 4 sprites
+    db $E8, $7A, $FF, $F3
+    db $E8, $FA, $FF, $02
+    db $E8, $BA, $F0, $02
+    db $E8, $3A, $F0, $F3
+.f9:
+    db 5       ; 4 sprites
+    db $EA, $7A, $FF, $F6
+    db $EA, $FA, $FF, $05
+    db $EA, $BA, $F0, $05
+    db $EA, $3A, $F0, $F6
+.f10:
+    db 17      ; 16 sprites
+    db $2A, $BA, $F0, $FF
+    db $28, $BA, $E0, $FF
+    db $0A, $BA, $F0, $0F
+    db $08, $BA, $E0, $0F
+    db $2A, $FA, $FF, $FF
+    db $28, $FA, $0F, $FF
+    db $0A, $FA, $FF, $0F
+    db $08, $FA, $0F, $0F
+    db $2A, $7A, $FF, $F0
+    db $28, $7A, $0F, $F0
+    db $0A, $7A, $FF, $E0
+    db $08, $7A, $0F, $E0
+    db $2A, $3A, $F0, $F0
+    db $28, $3A, $E0, $F0
+    db $0A, $3A, $F0, $E0
+    db $08, $3A, $E0, $E0
+.f11:
+    db 17      ; 16 sprites
+    db $6A, $BA, $F0, $01
+    db $68, $BA, $E0, $01
+    db $4A, $BA, $F0, $11
+    db $48, $BA, $E0, $11
+    db $6A, $FA, $FF, $01
+    db $68, $FA, $0F, $01
+    db $4A, $FA, $FF, $11
+    db $48, $FA, $0F, $11
+    db $6A, $7A, $FF, $F2
+    db $68, $7A, $0F, $F2
+    db $4A, $7A, $FF, $E2
+    db $48, $7A, $0F, $E2
+    db $6A, $3A, $F0, $F2
+    db $68, $3A, $E0, $F2
+    db $4A, $3A, $F0, $E2
+    db $48, $3A, $E0, $E2
+.f12:
+    db 17      ; 16 sprites
+    db $AA, $FA, $FF, $03
+    db $A8, $FA, $0F, $03
+    db $8A, $FA, $FF, $13
+    db $88, $FA, $0F, $13
+    db $AA, $BA, $F0, $03
+    db $A8, $BA, $E0, $03
+    db $8A, $BA, $F0, $13
+    db $88, $BA, $E0, $13
+    db $AA, $7A, $FF, $F4
+    db $A8, $7A, $0F, $F4
+    db $8A, $7A, $FF, $E4
+    db $88, $7A, $0F, $E4
+    db $AA, $3A, $F0, $F4
+    db $A8, $3A, $E0, $F4
+    db $8A, $3A, $F0, $E4
+    db $88, $3A, $E0, $E4
+.f13:
+    db 2       ; 1 sprite
+    db $A6, $38, $F8, $F8
+.f14:
+    db 5       ; 4 sprites
+    db $C4, $78, $FF, $00
+    db $A4, $78, $FF, $F0
+    db $C4, $38, $F0, $00
+    db $A4, $38, $F0, $F0
+.f15:
+    db 13      ; 12 sprites
+    db $E2, $7A, $FF, $10
+    db $E0, $70, $0F, $10
+    db $C2, $7A, $FF, $00
+    db $C0, $7A, $0F, $00
+    db $A2, $7A, $FF, $F0
+    db $A0, $7A, $0F, $F0
+    db $E2, $3A, $F0, $10
+    db $E0, $30, $E0, $10
+    db $C2, $3A, $F0, $00
+    db $C0, $3A, $E0, $00
+    db $A2, $3A, $F0, $F0
+    db $A0, $3A, $E0, $F0
+.f16:
+    db 17      ; 16 sprites
+    db $62, $7A, $FF, $17
+    db $60, $7A, $0F, $17
+    db $42, $7A, $FF, $07
+    db $40, $7A, $0F, $07
+    db $22, $7A, $FF, $F7
+    db $20, $7A, $0F, $F7
+    db $02, $7A, $FF, $E7
+    db $00, $7A, $0F, $E7
+    db $62, $3A, $F0, $17
+    db $60, $3A, $E0, $17
+    db $42, $3A, $F0, $07
+    db $40, $3A, $E0, $07
+    db $22, $3A, $F0, $F7
+    db $20, $3A, $E0, $F7
+    db $02, $3A, $F0, $E7
+    db $00, $3A, $E0, $E7
+.f17:
+    db 2       ; 1 sprite
+    db $26, $38, $F8, $F8
+.f18:
+    db 13      ; 12 sprites
+    db $8E, $78, $FF, $10
+    db $8C, $70, $0F, $10
+    db $6E, $78, $FF, $00
+    db $6C, $78, $0F, $00
+    db $4E, $78, $FF, $F0
+    db $4C, $78, $0F, $F0
+    db $8E, $38, $F0, $10
+    db $8C, $30, $E0, $10
+    db $6E, $38, $F0, $00
+    db $6C, $38, $E0, $00
+    db $4E, $38, $F0, $F0
+    db $4C, $38, $E0, $F0
+.f19:
+    db 15      ; 14 sprites
+    db $66, $78, $FF, $18
+    db $46, $78, $FF, $08
+    db $64, $78, $0F, $18
+    db $44, $78, $0F, $08
+    db $24, $78, $0F, $F8
+    db $06, $78, $FF, $E8
+    db $04, $78, $0F, $E8
+    db $66, $38, $F0, $18
+    db $46, $38, $F0, $08
+    db $64, $38, $E0, $18
+    db $44, $38, $E0, $08
+    db $24, $38, $E0, $F8
+    db $06, $38, $F0, $E8
+    db $04, $38, $E0, $E8
+.f20:
+    db 13      ; 12 sprites
+    db $EE, $7A, $FF, $10
+    db $EC, $7A, $0F, $10
+    db $CE, $7A, $FF, $00
+    db $CC, $7A, $0F, $00
+    db $AE, $7A, $FF, $F0
+    db $AC, $7A, $0F, $F0
+    db $EE, $3A, $F0, $10
+    db $EC, $3A, $E0, $10
+    db $CE, $3A, $F0, $00
+    db $CC, $3A, $E0, $00
+    db $AE, $3A, $F0, $F0
+    db $AC, $3A, $E0, $F0
+.f21:
+    db 13      ; 12 sprites
+    db $CE, $7A, $FE, $05
+    db $EE, $7A, $FC, $13
+    db $CE, $3A, $F1, $06
+    db $AE, $7A, $FD, $F5
+    db $AE, $3A, $F1, $F6
+    db $CC, $3A, $E2, $05
+    db $CC, $7A, $0B, $05
+    db $EC, $7A, $0E, $12
+    db $AC, $7A, $0E, $F2
+    db $EE, $3A, $F0, $12
+    db $EC, $3A, $E0, $12
+    db $AC, $3A, $E0, $F2
+.f22:
+    db 5       ; 4 sprites
+    db $AE, $7A, $FE, $FE
+    db $CE, $3A, $F3, $0D
+    db $CE, $7A, $FE, $0F
+    db $AE, $3A, $EE, $FE
+.f23:
+    db 5       ; 4 sprites
+    db $AE, $7A, $F9, $06
+    db $AE, $3A, $F2, $0F
+    db $CE, $7A, $FA, $15
+    db $CE, $3A, $F3, $0F
+.f24:
+    db 13      ; 12 sprites
+    db $C8, $7A, $FF, $0C
+    db $C8, $7A, $0B, $05
+    db $C8, $3A, $E2, $06
+    db $C8, $7A, $04, $EE
+    db $C8, $3A, $EC, $EF
+    db $C6, $7A, $FF, $E7
+    db $C6, $3A, $F0, $E7
+    db $C6, $7A, $0F, $F0
+    db $CA, $7A, $FF, $00
+    db $C6, $3A, $E0, $F0
+    db $C8, $3A, $F0, $10
+    db $CA, $3A, $F0, $00
+.f25:
+    db 13      ; 12 sprites
+    db $C8, $3A, $F1, $15
+    db $C6, $7A, $06, $01
+    db $C8, $7A, $FA, $10
+    db $C8, $7A, $06, $09
+    db $C8, $3A, $E7, $0C
+    db $C6, $7A, $FC, $F1
+    db $C8, $7A, $FE, $FB
+    db $C8, $3A, $F1, $FA
+    db $C6, $3A, $F5, $F2
+    db $C6, $3A, $E5, $FB
+    db $CA, $7A, $FF, $00
+    db $CA, $3A, $F0, $00
+.f26:
+    db 13      ; 12 sprites
+    db $C7, $2A, $00, $00
+    db $DA, $2A, $08, $08
+    db $CB, $2A, $08, $10
+    db $D8, $2A, $F8, $08
+    db $C7, $2A, $F0, $00
+    db $D8, $2A, $00, $10
+    db $D7, $2A, $F8, $10
+    db $C8, $2A, $00, $08
+    db $DB, $2A, $08, $18
+    db $DA, $2A, $00, $18
+    db $D9, $2A, $F8, $18
+    db $C8, $2A, $F0, $10
+.f27:
+    db 13      ; 12 sprites
+    db $E2, $7A, $FF, $11
+    db $E0, $70, $0F, $11
+    db $C2, $7A, $FF, $01
+    db $C0, $7A, $0F, $01
+    db $A2, $7A, $FF, $F1
+    db $A0, $7A, $0F, $F1
+    db $E2, $3A, $F0, $11
+    db $E0, $30, $E0, $11
+    db $C2, $3A, $F0, $01
+    db $C0, $3A, $E0, $01
+    db $A2, $3A, $F0, $F1
+    db $A0, $3A, $E0, $F1
+.f28:
+    db 17      ; 16 sprites
+    db $62, $7A, $FF, $18
+    db $60, $7A, $0F, $18
+    db $42, $7A, $FF, $08
+    db $40, $7A, $0F, $08
+    db $22, $7A, $FF, $F8
+    db $20, $7A, $0F, $F8
+    db $02, $7A, $FF, $E8
+    db $00, $7A, $0F, $E8
+    db $62, $3A, $F0, $18
+    db $60, $3A, $E0, $18
+    db $42, $3A, $F0, $08
+    db $40, $3A, $E0, $08
+    db $22, $3A, $F0, $F8
+    db $20, $3A, $E0, $F8
+    db $02, $3A, $F0, $E8
+    db $00, $3A, $E0, $E8
+
+; $7E:A5B0 — C3Mod_FigSeqs (161 bytes, $A5B0–$A650)
+; The figures' sequences (C3Mod_Prog10FigsTask): a frame count and a
+; C3Mod_FigFrames list per entry, then 0 (C3Mod_Prog10FigPick picks the
+; next). Five sequences (C3Mod_Prog10FigSeqs points 2 before each); .s2
+; ends with 48 frames of the empty list, its last entry being .hidden
+; ($A60C), the sequence C3_Prog10FigsLeave picks. .s4 is never picked.
+C3Mod_FigSeqs:
+    db 6 : dw C3Mod_FigFrames_f1
+    db 6 : dw C3Mod_FigFrames_f2
+    db 6 : dw C3Mod_FigFrames_f3
+    db 6 : dw C3Mod_FigFrames_f4
+    db 6 : dw C3Mod_FigFrames_f5
+    db 7 : dw C3Mod_FigFrames_f6
+    db 8 : dw C3Mod_FigFrames_f10
+    db 8 : dw C3Mod_FigFrames_f11
+    db 8 : dw C3Mod_FigFrames_f12
+    db 0
+.s1:
+    db 6 : dw C3Mod_FigFrames_f1
+    db 6 : dw C3Mod_FigFrames_f2
+    db 6 : dw C3Mod_FigFrames_f3
+    db 6 : dw C3Mod_FigFrames_f4
+    db 6 : dw C3Mod_FigFrames_f5
+    db 7 : dw C3Mod_FigFrames_f6
+    db 8 : dw C3Mod_FigFrames_f7
+    db 8 : dw C3Mod_FigFrames_f8
+    db 8 : dw C3Mod_FigFrames_f9
+    db 0
+.s2:
+    db 6 : dw C3Mod_FigFrames_f1
+    db 6 : dw C3Mod_FigFrames_f2
+    db 6 : dw C3Mod_FigFrames_f3
+    db 6 : dw C3Mod_FigFrames_f4
+    db 6 : dw C3Mod_FigFrames_f5
+    db 7 : dw C3Mod_FigFrames_f13
+    db 8 : dw C3Mod_FigFrames_f14
+    db 9 : dw C3Mod_FigFrames_f15
+    db 9 : dw C3Mod_FigFrames_f27
+    db 8 : dw C3Mod_FigFrames_f20
+    db 7 : dw C3Mod_FigFrames_f21
+    db 7 : dw C3Mod_FigFrames_f22
+.hidden:
+    db 48 : dw C3Mod_FigFrames
+    db 0
+.s3:
+    db 6 : dw C3Mod_FigFrames_f1
+    db 6 : dw C3Mod_FigFrames_f2
+    db 6 : dw C3Mod_FigFrames_f3
+    db 6 : dw C3Mod_FigFrames_f4
+    db 6 : dw C3Mod_FigFrames_f5
+    db 7 : dw C3Mod_FigFrames_f17
+    db 8 : dw C3Mod_FigFrames_f14
+    db 9 : dw C3Mod_FigFrames_f15
+    db 10 : dw C3Mod_FigFrames_f16
+    db 9 : dw C3Mod_FigFrames_f28
+    db 9 : dw C3Mod_FigFrames_f24
+    db 8 : dw C3Mod_FigFrames_f25
+    db 7 : dw C3Mod_FigFrames_f26
+    db 0
+.s4:
+    db 32 : dw C3Mod_FigFrames_f17
+    db 32 : dw C3Mod_FigFrames_f18
+    db 16 : dw C3Mod_FigFrames_f24
+    db 16 : dw C3Mod_FigFrames_f25
+    db 32 : dw C3Mod_FigFrames_f19
+    db 8 : dw C3Mod_FigFrames_f26
+    db 32 : dw C3Mod_FigFrames_f19
+    db 16 : dw C3Mod_FigFrames
+    db 0
 
 ; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
 ; The staff credits the module shows, in two texts to the module's end:
