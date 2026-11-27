@@ -16455,13 +16455,16 @@ C3Mod_Prog10ScrollTask:
 ;     ($10, $14); C3Mod_Prog10Tasks, C3Mod_Prog10PicTask,
 ;     C3Mod_Prog10WobbleTask, NMI C3Mod_Prog10FlatNmi; picture 1; vars
 ;     3 and 4 $28, 1 -$58, 2 -$48, 0 $280; page $0B00's vars 1 and 2
-;     -$20 and $80; wobble 7; 384 x (var 0 - 1, five frames);
+;     -$20 and $80; wobble 7; 384 x (var 0 - 1, five frames); here
+;     C3Mod_Prog10WobbleTask is in the list twice (C3Mod_Prog10Tasks,
+;     called at $91BC, adds it at $933A, and the $FA at $91C2 again),
+;     so it runs twice a frame;
 ;     C3Mod_FadeOutTask, 16 frames;
 ;   - the strip scene: C3Mod_Prog10Strip; C3Mod_Prog10Tasks,
 ;     C3Mod_Prog10PicTask, NMI C3Mod_Prog10StripNmi and
 ;     C3Mod_Prog10FlatBg2Nmi; picture 3; page $0B00 to
 ;     C3Mod_Prog10PicDrift; wobble 4; vars 0 $140, 3 and 4 $28, 1 -$58,
-;     2 -$48, 5 $90; 426 x (var 7 - 1, var 1 - 2 over three frames);
+;     2 -$48, 5 $90; 426 x (var 7 - 1, var 1 - 2, four frames: 1,704);
 ;     page $0B00 to C3Mod_Prog10PicRiseB; 54 x (var 5 + 4, var 7 - 1,
 ;     var 1 - 2 over four frames);
 ;   - .stars ($925E; also where C3Mod_Prog10MainScript ends up): after
@@ -16742,8 +16745,9 @@ C3Mod_Prog10TextB:
 
 ; $7E:934A — C3Mod_Prog10PicDrift (60 bytes, $934A–$9385)
 ; Page $0B00 in the strip scene: vars 1 and 2 = $20 and $18; 512
-; frames; 96 x (vars 1 and 2 + 1, three frames); 32 x (var 1 + 2, var
-; 2 + 1, over seven frames); 32 x (var 1 + 1, three frames); wait.
+; frames; 96 x (vars 1 and 2 + 1, four frames: each pass of a $9x loop
+; also yields at the loop opcode); 32 x (var 1 + 2, var 2 + 1, eight
+; frames); 32 x (var 1 + 1, four frames); wait.
 C3Mod_Prog10PicDrift:
     db !C3Op_Set|1 : dw $0020
     db !C3Op_Set|2 : dw $0018
@@ -16778,7 +16782,7 @@ C3Mod_Prog10PicDrift:
     db !C3Op_JumpYield : dw .l9383
 
 ; $7E:9386 — C3Mod_Prog10PicSink (16 bytes, $9386–$9395)
-; Page $0B00: 160 x (vars 2 and 6 + 1, two frames); wait.
+; Page $0B00: 160 x (vars 2 and 6 + 1, three frames: 480); wait.
 C3Mod_Prog10PicSink:
     db !C3Op_Add|2 : dw $0001
     db !C3Op_Add|6 : dw $0001
@@ -16789,7 +16793,8 @@ C3Mod_Prog10PicSink:
     db !C3Op_JumpYield : dw .l9393
 
 ; $7E:9396 — C3Mod_Prog10PicRise (16 bytes, $9396–$93A5)
-; Page $0B00: 8 x (var 2 - 1, then 32 frames); wait.
+; Page $0B00: 8 x (var 2 - 1, then 32 frames, then the outer loop's
+; yield: 33 frames a pass, 264 in all); wait.
 C3Mod_Prog10PicRise:
     db !C3Op_Add|2 : dw -$1
 .l9399:
@@ -16904,7 +16909,7 @@ C3Mod_Prog13End:
 ;     C3Mod_Prog10Fade01 and Fade41; page $0B00 to
 ;     C3Mod_Prog10TurnOrbitB; 32 frames; place ($10, $10); 672 frames;
 ;   - the NMI task C3Mod_Return swapped for C3Mod_Prog10SprNmi;
-;     C3_Prog10FigsLeave = 1; 64 x (vars 0 and 2 + 1, three frames);
+;     C3_Prog10FigsLeave = 1; 64 x (vars 0 and 2 + 1, four frames);
 ;     C3Mod_Prog10FigsTask removed; 176 frames; C3Mod_FadeOutTask, 17
 ;     frames;
 ;   - C3Mod_Prog10Turn; the tasks C3Mod_Prog10ScrollTask and
@@ -16912,7 +16917,7 @@ C3Mod_Prog13End:
 ;     C3_HdmaEnable $7F; place ($10, $90); view var 0 $80, 1 $80, 2
 ;     $E0, 5 $200, 6 2, 8 0; page $0B00 to C3Mod_Prog10TurnZoomB; after
 ;     marker 3 C3Mod_FadeInTask; then 60 frames and var 0 and var 5
-;     steps over 1,488 frames (the loops below);
+;     steps over 1,388 frames (the loops below; 1,448 with the 60);
 ;   - C3Mod_Prog10FrameTask removed; after marker 4 place ($10, $50),
 ;     timer 64, 3 texts; C3Mod_Prog10FadeTo51 and C3Mod_PalFadeTask;
 ;     the NMI task C3Mod_Prog10SprNmi removed and added back as a task
@@ -16920,8 +16925,8 @@ C3Mod_Prog13End:
 ;     removed and added again (the same entry); place ($10, $38); vars
 ;     1 -$80, 2 -$70, 5 $200, 0 $80; C3_HdmaEnable $38, C3_Prog10Large
 ;     1, C3_Brightness 15, C3_Prog10Frame $0A00; page $0B00 to
-;     C3Mod_Prog10TurnEndB; 192 x (var 0 + 2, three frames);
-;     C3Mod_FadeOutExitTask; 16 more; wait.
+;     C3Mod_Prog10TurnEndB; 192 x (var 0 + 2, five frames);
+;     C3Mod_FadeOutExitTask; 16 more such passes; wait.
 C3Mod_Prog10TurnScript:
     db !C3Op_CallW : dw C3Mod_Prog10TurnB
     db !C3Op_NmiAdd : dw C3Mod_Return
@@ -17215,8 +17220,8 @@ C3Mod_Prog10Colours51:
 ; Page $0B00's script of the main scene: var 8 = -9
 ; (C3Mod_Prog10ScrollTask: page $0A00's var 2 - 9 a frame), var 2 =
 ; $50, var 1 = $80, var 6 = $40 (C3Mod_Prog10TurnNmi's radius), var 0 =
-; $C0 (the picture's step); after marker 6, 80 x (var 0 - 1, a frame);
-; wait.
+; $C0 (the picture's step); after marker 6, 80 x (var 0 - 1, two
+; frames); wait.
 C3Mod_Prog10MainB:
     db !C3Op_Set|8 : dw -$9
     db !C3Op_Set|2 : dw $0050
@@ -17233,8 +17238,8 @@ C3Mod_Prog10MainB:
 
 ; $7E:972C — C3Mod_Prog10UnusedB1 (43 bytes, $972C–$9756)
 ; A page $0B00 script nothing points to (no word $972C in the module):
-; vars 0 $60, 8 -9, 2 $50, 1 $80, 6 $0C; twice (64 x (var 0 - 1, two
-; frames), 64 x (var 0 + 1, two frames)); wait.
+; vars 0 $60, 8 -9, 2 $50, 1 $80, 6 $0C; twice (64 x (var 0 - 1, three
+; frames), 64 x (var 0 + 1, three frames)); wait.
 C3Mod_Prog10UnusedB1:
     db !C3Op_Set|0 : dw $0060
     db !C3Op_Set|8 : dw -$9
@@ -17402,7 +17407,8 @@ C3Mod_Prog10TurnZoomB:
 
 ; $7E:987B — C3Mod_Prog10TurnEndB (28 bytes, $987B–$9896)
 ; Page $0B00 at the turning scene's end: var 0 = $40, var 2 = $D3, var
-; 1 = $80; 208 x (var 2 - 1, var 0 + 1, four frames); wait.
+; 1 = $80; 208 x (var 2 - 1, var 0 + 1, five frames: the inner loop's
+; four and the outer one's yield); wait.
 C3Mod_Prog10TurnEndB:
     db !C3Op_Set|0 : dw $0040
     db !C3Op_Set|2 : dw $00D3
@@ -17561,8 +17567,10 @@ C3Mod_Prog10TextPlace:
 ; add); the shifts are LSRs (unsigned) of a signed value, so a negative
 ; product gives $0Fxx / $07xx (+ the centre), far off screen: a quirk;
 ; then A = -a - $301 (EOR / INC, SBC #$300 with the C = 0 the ADC #$70
-; left, as long as var 2 does not carry) into C3Mod_Prog10FrameTask's
-; .frame (JMP): the picture's frame by that angle.
+; left) into C3Mod_Prog10FrameTask's
+; .frame (JMP): the picture's frame by that angle. (Var 2 is at most
+; $07FF + $70 after five LSRs, so that ADC never carries: C = 0
+; always.)
 ; Callers note: a task added by script opcode $FA at $97B2 and removed
 ;   by $F9 at $97D6 (C3Mod_Prog10TurnOrbitB).
 ; Entry: a task: M=0, X=0, DP any (set to $0B00 here; C3Mod_RunTasks
@@ -17693,7 +17701,10 @@ C3Mod_Prog10StarsTask:
 ; / 256, each as |value| x r by C3Mod_Mul16 (its middle bytes) with
 ; the sign put back (EOR / INC under the PHP / PLP of the value's N):
 ; an X twice as fast as the Y, a figure eight. C3Mod_Prog10PicTask adds
-; them to the picture's place.
+; them to the picture's place. In the text scene's flat part it is in
+; the task list twice (C3Mod_Prog10Tasks, called at $91BC, adds it at
+; $933A, then the $FA at $91C2), so it runs twice a frame there (the
+; same values again).
 ; Callers note: a task added by script opcode $FA at $91C2
 ;   (C3Mod_Prog10TextScript) and $933A (C3Mod_Prog10Tasks).
 ; Entry: a task: M=0, X=0, DP=0, DB any (direct page only).
