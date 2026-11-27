@@ -379,9 +379,15 @@ class Pairs(unittest.TestCase):
             src.write_text('C2SceneRom_ListPacks:\n    dl $000000\n    dl SceneListPack_001\n    dl $000000\n')
             with self.assertRaisesRegex(scripts.ScriptsError, 'SceneListPack_001: .*No such file'):
                 scripts.scene_pairs_built(root)
-            (assets / 'packed_lz').mkdir()
-            (assets / 'packed_lz' / 'SceneListPack_001.bin').write_bytes(b'lists')
-            self.assertEqual(scripts.scene_pairs_built(root), {1: b'lists'})
+            import maps
+            lists = bytes([1] + [7] * 7 + [1, 3, 3, 3, 1, 4, 4, 4, 1, 2, 2])
+            (assets / 'maps').mkdir()
+            (assets / 'maps' / 'SceneListPack_001.slist').write_text(maps.render_scene_lists('SceneListPack_001',
+                                                                                             lists))
+            self.assertEqual(scripts.scene_pairs_built(root), {1: lists})      # assembled from its text
+            (assets / 'maps' / 'SceneListPack_001.slist').write_text('@scenelists X\n')
+            with self.assertRaisesRegex(scripts.ScriptsError, 'SceneListPack_001: .*the first line is @scenelists'):
+                scripts.scene_pairs_built(root)
 
 
 class FxStub(scripts.FxLang):
@@ -514,6 +520,165 @@ class AnimStub(scripts.AnimLang):
         return {'reads': [], 'control': [], 'outs': [('bad', 'not in the stub')], 'opaque': []}
 
 
+class AnimFrameStub(scripts.AnimLang):
+    """$00 n: next 2; $04 lo hi t: ShowFrame, next 4; $07: stay."""
+
+    def __init__(self):
+        self.name, self.count, self.timer = 'anim', 8, 0x0E
+        self.names = [f'Op{op:02X}_Stub' for op in range(8)]
+        self.handler_names = [f'C2Anim_H{op}' for op in range(8)]
+        self.handler_names[4] = 'C2Anim_OpShowFrame'
+        self.cache, self.specs, self.dirty = {}, {}, False
+        self.labels = {}
+
+    def head(self):
+        return 0
+
+    def _trace(self, known, ptr):
+        n = {0x00: 2, 0x04: 4, 0x07: 0}.get(known[ptr])
+        if n is None:
+            return {'reads': [], 'control': [], 'outs': [('bad', 'not in the stub')], 'opaque': []}
+        return {'reads': list(range(1, n)), 'control': [], 'outs': [('pos', n, False, (), None, None)],
+                'opaque': []}
+
+
+AN = 0xC30000
+ANDATA = bytes([0x04, 0x00, 0x05, 0x00])                       # entries $0004, $0005 (inside the first op)
+ANDATA += bytes([0x00, 0x07])                                   # $0004: op 0 $07 ($0005: the stay as an entry)
+ANDATA += bytes([0x04, 0x12, 0x00, 0x08, 0x07])                 # $0006: ShowFrame $0012 8, stay
+ANDATA += bytes([0x04, 0x17, 0x00, 0x02, 0x07])                 # $000B: ShowFrame $0017 (not reached: data)
+ANDATA += bytes([0x99, 0x99])                                   # $0010 data
+ANDATA += bytes([0x01, 0xF8, 0x10, 0x34, 0x12])                 # $0012: a frame of one piece
+ANDATA += bytes([0x01, 0x00, 0x00, 0x00, 0x00])                 # $0017: a frame no reached op names
+
+
+def anim_text():
+    return scripts.render_fx(AnimFrameStub(), 'AnTab', AN, ANDATA)
+
+
+class Anim(unittest.TestCase):
+
+    def test_round_trip(self):
+        text = anim_text()
+        self.assertEqual(scripts.assemble_fx(AnimFrameStub(), text, 'AnTab', AN, len(ANDATA)), ANDATA)
+        self.assertIn('    @frame -8,16:1234\n', text)
+        self.assertIn('@entry 1 L_C30005', text)                # an entry inside an opcode: its @inner label
+        self.assertEqual(scripts.stats(text)['frames'], 5)
+        self.assertIn('scene animation scripts', text)
+
+    def refused(self, old, new, why):
+        text = anim_text()
+        self.assertIn(old, text)
+        with self.assertRaisesRegex(scripts.ScriptsError, why):
+            scripts.assemble_fx(AnimFrameStub(), text.replace(old, new, 1), 'AnTab', AN, len(ANDATA))
+
+    def test_frame_refusals(self):
+        self.refused('    @frame -8,16:1234', '@bytes 01 F8 10 34 12', 'a ShowFrame names a frame here')
+        self.refused('    @frame -8,16:1234', '    @frame -8,16:12345', 'bad frame piece')
+        self.refused('    @frame -8,16:1234', '    @frame -129,16:1234', 'bad frame piece')
+        self.refused('    @frame -8,16:1234', '    @frame -8,16', 'bad frame piece')
+        self.refused('    @frame -8,16:1234', '    @frame', '@frame takes 1-255 pieces')
+        self.assertIn('@bytes 01 00 00 00 00', anim_text())
+
+    def test_frame_no_op_names_refused(self):
+        text = anim_text()
+        lines = text.splitlines()
+        k = max(i for i, x in enumerate(lines) if x.startswith('@bytes'))
+        lines[k:] = ['    @frame 0,0:0000 0,0:0000']
+        new = '\n'.join(lines) + '\n'
+        with self.assertRaisesRegex(scripts.ScriptsError, 'no ShowFrame names an @frame here|the scripts are'):
+            scripts.assemble_fx(AnimFrameStub(), new, 'AnTab', AN, len(ANDATA))
+
+    def test_entry_to_data_refused(self):
+        text = anim_text().replace('@bytes 04 17 00 02 07 99 99', 'D_X:\n@bytes 04 17 00 02 07 99 99', 1)
+        text = text.replace('@entry 1 L_C30005', '@entry 1 D_X')
+        with self.assertRaisesRegex(scripts.ScriptsError, 'D_X is not a script'):  # ... but no entry names it
+            scripts.assemble_fx(AnimFrameStub(), text, 'AnTab', AN, len(ANDATA))
+
+    def test_frames_found(self):
+        lang = AnimFrameStub()
+        known = {AN + i: b for i, b in enumerate(ANDATA)}
+        d = scripts._fx_disassembly(lang, AN, ANDATA)
+        self.assertEqual(scripts.anim_frames(lang, d, known, (AN + 4, AN + len(ANDATA))), {AN + 0x12: 5})
+        self.assertEqual(scripts.anim_frames(lang, d, known, (AN + 4, AN + 0x15)), {})       # runs past the region
+        zero = {**known, AN + 0x12: 0}
+        self.assertEqual(scripts.anim_frames(lang, d, zero, (AN + 4, AN + len(ANDATA))), {})
+        over = {**known, AN + 7: 0x05}                    # the frame at $0005 would overlap the opcodes
+        d2 = scripts._fx_disassembly(lang, AN, bytes(over[AN + i] for i in range(len(ANDATA))))
+        self.assertEqual(scripts.anim_frames(lang, d2, over, (AN + 4, AN + len(ANDATA))), {})
+
+    def test_overlapping_frames_stay_bytes(self):
+        data = bytearray(ANDATA)
+        data[0x0A] = 0x00                                       # the stay becomes op 0 $04: ShowFrame at $000C ...
+        data[0x0B:0x11] = bytes([0x04, 0x04, 0x17, 0x00, 0x07, 0x07])  # ... naming $0017, then stay
+        data[0x12] = 0x02                                       # $0012's frame now runs over $0017's
+        lang = AnimFrameStub()
+        known = {AN + i: b for i, b in enumerate(data)}
+        d = scripts._fx_disassembly(lang, AN, bytes(data))
+        frames = scripts.anim_frames(lang, d, known, (AN + 4, AN + len(data)))
+        self.assertEqual(frames, {})
+
+    def test_head_must_be_one_offset(self):
+        class Machine:
+            @staticmethod
+            def run(s, known):
+                return []
+        lang = AnimFrameStub()
+        lang.labels, lang.d, lang.machine = {'C2Scene_SetAnim': 0}, {'C2SceneRom_AnimTable': 0xC3E000,
+                                                                        'C2Scene_TaskCur': 0x0D}, Machine()
+        lang.task, lang.root = 0x1000, scripts.ROOT
+        with self.assertRaisesRegex(scripts.ScriptsError, 'C2Scene_SetAnim: no one start offset'):
+            scripts.AnimLang.head(lang)
+
+
+class JumpBackStub(scripts.AnimLang):
+    """Op $03 as C2Anim_OpJumpBack is traced (taint by whole register):
+    reads 1-2, both control bytes; a negative arg 1 jumps back by it, 0-$7F
+    stays. With `uses_byte2` its byte 2's bit 0 moves the target too."""
+
+    def __init__(self, uses_byte2=False):
+        self.name, self.count, self.timer = 'anim', 8, 0x0E
+        self.names = [f'Op{op:02X}_Stub' for op in range(8)]
+        self.handler_names = [f'C2Anim_H{op}' for op in range(8)]
+        self.handler_names[3] = 'C2Anim_OpJumpBack'
+        self.cache, self.specs, self.dirty = {}, {}, False
+        self.labels, self.d = {}, {'C2SceneRom_AnimTable': 0xC3E000}
+        self.uses_byte2 = uses_byte2
+
+    def _trace(self, known, ptr):
+        if known[ptr] != 0x03:
+            return {'reads': [], 'control': [], 'outs': [('bad', 'not in the stub')], 'opaque': []}
+        b = known[ptr + 1]
+        off = b - 256 if b & 0x80 else 0
+        if self.uses_byte2:
+            off -= known[ptr + 2] & 1
+        out = ('pos', off, True, (1, 2), None, ptr + off) if off else ('pos', 0, False, (), None, None)
+        return {'reads': [1, 2], 'control': [1, 2], 'outs': [out], 'opaque': []}
+
+
+class JumpBack(unittest.TestCase):
+
+    def test_length_is_the_operand_it_uses(self):
+        for b1 in (0x05, 0xFC):                              # stays; jumps back
+            o = scripts.classify(JumpBackStub(), {B: 0x03, B + 1: b1, B + 2: 0x99, B + 3: 0}, B)
+            self.assertEqual(o.length, 2, hex(b1))           # not 1 + its furthest read (3)
+
+    def test_a_handler_using_byte_2_is_refused(self):
+        with self.assertRaisesRegex(scripts.ScriptsError, 'C2Anim_OpJumpBack: its byte 2 changes where it goes'):
+            JumpBackStub(uses_byte2=True).jump_back_length(3)
+        stub = JumpBackStub()
+        saved = stub._trace
+        stub._trace = lambda known, ptr: dict(saved(known, ptr), reads=[1, 2, 3])
+        with self.assertRaisesRegex(scripts.ScriptsError, 'C2Anim_OpJumpBack: it reads operand byte 3'):
+            stub.jump_back_length(3)
+
+    def test_other_ops_keep_their_furthest_read(self):
+        stub = JumpBackStub()
+        stub.handler_names[3] = 'C2Anim_OpOther'
+        o = scripts.classify(stub, {B: 0x03, B + 1: 0x05, B + 2: 0x99, B + 3: 0}, B)
+        self.assertEqual(o.length, 3)
+
+
 class Locks(unittest.TestCase):
     """The checks behind TRUST's reasons: the static scan at every width,
     the animation ops' record bytes, the unpackers' room."""
@@ -594,6 +759,15 @@ class WithSource(unittest.TestCase):
         scene.ptr = scene.d['C2Anim_Ptr']                       # a byte C2Anim_Run does write
         self.assertTrue(any('C2Anim_Run' in x for x in scripts.trust_check(scene)))
 
+    def test_jump_back_from_its_handler(self):
+        lang = scripts.AnimLang()
+        op = lang.handler_names.index('C2Anim_OpJumpBack')
+        self.assertEqual(lang.jump_back_length(op), 2)
+        at = 0xC3E800
+        for b1 in (0x05, 0xFC):
+            o = scripts.classify(lang, {at: op, at + 1: b1, at + 2: 0x99, at + 3: 0}, at)
+            self.assertEqual(o.length, 2)
+
 
 @unittest.skipUnless(HAVE_ROM, 'needs the ROM and asar')
 class WithRom(unittest.TestCase):
@@ -631,6 +805,43 @@ class WithRom(unittest.TestCase):
             scripts.anim_check, scripts.unpack_check, scripts.trust_check = saved
         for x in ('anim lock ran', 'unpack lock ran', 'trust lock ran: scene', 'trust lock ran: fx'):
             self.assertIn(x, got)
+
+    def test_anim_piece(self):
+        lang = scripts.anim_lang()
+        self.assertEqual(lang.head(), 0)
+        p = [x for x in ed.read_manifest() if x['piece'] == 'anim']
+        self.assertEqual([(x['start'], x['asset']) for x in p], [('$C3:E000', 'anim/C2SceneRom_AnimTable.ban')])
+        self.assertEqual(scripts.ANIM_ROWS, {'$C3:E000'})
+        saved = scripts.EXITS['anim']
+        scripts.EXITS['anim'] = {'ret': {0x07}, 'ram': set(), 'done': set()}
+        try:
+            self.assertTrue(any(x.startswith('anim: the opcodes classed ret') for x in
+                                scripts.exits_check(ed.read_rom(), ed.read_manifest())))
+        finally:
+            scripts.EXITS['anim'] = saved
+
+    def test_anim_trusts_nothing(self):
+        real = scripts._fx_disassembly
+
+        def marked(lang, start, data):
+            d = real(lang, start, data)
+            if lang.name == 'anim':
+                next(iter(d['ops'].values())).trusted = ['C2Scene_Something']
+            return d
+        scripts._fx_disassembly = marked
+        try:
+            got = scripts.exits_check(ed.read_rom(), ed.read_manifest())
+        finally:
+            scripts._fx_disassembly = real
+        self.assertTrue(any(x.startswith('anim: an animation op needs a trusted callee') for x in got))
+
+    def test_anim_row_is_the_piece(self):
+        row = {'start': '$C3:E000', 'end': '$C3:E001', 'size': '2', 'bank': '$C3', 'kind': 'event_script',
+               'format': 'x', 'readers': '', 'confidence': 'confirmed', 'notes': 'x'}
+        self.assertEqual([(p['piece'], p['asset']) for p in ed.layout([row])],
+                         [('anim', 'anim/EvtScript_C3E000.ban')])
+        with self.assertRaisesRegex(ed.DataError, 'cannot be the animation scripts'):
+            ed.layout([dict(row, kind='table')])
 
     def test_round_trips_and_exits(self):
         self.assertEqual(scripts.check(ed.read_rom()), [])

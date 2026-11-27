@@ -76,11 +76,19 @@ ACT_FRAMES_TABLE = 'BattleRom_PcAttackFrames/ActFrames'   # tools/actframes.py's
 # C2Scene_LoadExtraPalette's pack (C2Scene_ExtraPalPack) unpacks into the
 # CGRAM shadow C2Scene_PaletteBuf, which the NMI uploads; scene_named adds it.
 SCENE_TABLES = {'C2SceneRom_MetatilePacks': ('scenemeta', 0x1000), 'C2SceneRom_MapPacks': ('scenemaps', 0x3000),
-                'C2SceneRom_Bg3MapPacks': ('scenebg3', 0x1000), 'C2SceneRom_PalettePacks': ('scenepal', None)}
+                'C2SceneRom_Bg3MapPacks': ('scenebg3', 0x1000), 'C2SceneRom_PalettePacks': ('scenepal', None),
+                'C2SceneRom_ListPacks': ('scenelists', None)}
 SCENE_NAMED = {'C2SceneRom_MetatilePacks': {0, 1, 2, 3, 4, 5}, 'C2SceneRom_MapPacks': {0, 1, 2, 3, 4, 5, 6, 7},
-               'C2SceneRom_Bg3MapPacks': {0, 1, 2, 3, 4}, 'C2SceneRom_PalettePacks': {3, 4, 5, 6, 7, 8, 9, 10}}
+               'C2SceneRom_Bg3MapPacks': {0, 1, 2, 3, 4}, 'C2SceneRom_PalettePacks': {3, 4, 5, 6, 7, 8, 9, 10},
+               'C2SceneRom_ListPacks': {0, 1, 2, 3, 4, 5, 6, 7}}
 SCENE_HDR = {'C2SceneRom_MetatilePacks': 'C2Scene_HdrMetatiles', 'C2SceneRom_MapPacks': 'C2Scene_HdrMaps',
-             'C2SceneRom_Bg3MapPacks': 'C2Scene_HdrBg3Map', 'C2SceneRom_PalettePacks': 'C2Scene_HdrPalettes'}
+             'C2SceneRom_Bg3MapPacks': 'C2Scene_HdrBg3Map', 'C2SceneRom_PalettePacks': 'C2Scene_HdrPalettes',
+             'C2SceneRom_ListPacks': 'C2Scene_HdrLists'}
+# The list packs (C2Scene_LoadLists, C2Scene_HdrLists): four lists, each a
+# count byte and that many entries of LIST_SIZES bytes (A, B, C, D), copied
+# to C2Scene_ListA-D; list_problems re-derives the sizes from its source.
+LISTS = 'ABCD'
+LIST_SIZES = (7, 3, 3, 2)
 PAL_ROW = 16                           # colours per CGRAM palette row
 SCENE_MAP_W, SCENE_MAP_H = 96, 64      # C2Scene_MapCols x C2Scene_MapRows, per layer (C2Scene_LayerMaps)
 SCENE_METATILES = 256                  # per layer: C2Scene_LayerMetatiles $3000 and $3800, 8 B each
@@ -468,6 +476,76 @@ def colour_value(t: str, where: str) -> int:
     return r | g << 5 | b << 10 | (0x8000 if m.group(4) else 0)
 
 
+def split_lists(data: bytes, where: str) -> list[list[bytes]]:
+    """The four lists of a list pack, as C2Scene_LoadLists copies them;
+    refuses a count of 0 (its loops would copy 65536 entries) and bytes
+    after list D."""
+    out, x = [], 0
+    for name, size in zip(LISTS, LIST_SIZES):
+        if x >= len(data):
+            raise MapsError(f'{where}: list {name}\'s count is past the data')
+        n = data[x]
+        if n == 0:
+            raise MapsError(f'{where}: list {name} has a count of 0 (C2Scene_LoadLists would copy 65536 entries)')
+        if x + 1 + n * size > len(data):
+            raise MapsError(f'{where}: list {name}\'s {n} entries run past the data')
+        out.append([data[x + 1 + k * size:x + 1 + (k + 1) * size] for k in range(n)])
+        x += 1 + n * size
+    if x != len(data):
+        raise MapsError(f'{where}: {len(data) - x} B after list D')
+    return out
+
+
+def render_scene_lists(label: str, data: bytes) -> str:
+    lists = split_lists(data, label)
+    out = [line.format(label=label, what='a scene\'s four lists (C2Scene_ListA-D)') for line in HEAD]
+    out.append(f'@scenelists {label}    ; per list: its entries, hex bytes in order (D: script addresses)')
+    for name, entries in zip(LISTS, lists):
+        out.append(f'@list {name} {len(entries)}')
+        for k, e in enumerate(entries):
+            out.append(f'{k:02X}: ' + ' '.join(f'{b:02X}' for b in e))
+    return '\n'.join(out) + '\n'
+
+
+def assemble_scene_lists(text: str, label: str, name: str = '<slist>') -> bytes:
+    lines = [(f'{name}:{no}', w) for no, w in _lines(text)]
+    if not lines or lines[0][1] != ['@scenelists', label]:
+        raise MapsError(f'{name}: the first line is @scenelists {label}')
+    out, i = bytearray(), 1
+    for lname, size in zip(LISTS, LIST_SIZES):
+        where, w = lines[i] if i < len(lines) else (name, ['(end)'])
+        if len(w) != 3 or w[:2] != ['@list', lname] or not w[2].isdigit() or not 1 <= int(w[2]) <= 255:
+            raise MapsError(f'{where}: expected @list {lname} N (N 1-255)')
+        n = int(w[2])
+        rows = lines[i + 1:i + 1 + n]
+        if len(rows) != n or any(r[1][0].startswith('@') for r in rows):
+            raise MapsError(f'{where}: list {lname} needs {n} entry lines')
+        out.append(n)
+        for k, (rw, cells) in enumerate(rows):
+            if cells[0] != f'{k:02X}:' or len(cells) != 1 + size:
+                raise MapsError(f'{rw}: expected {k:02X}: and {size} bytes')
+            out += bytes(_hex(c, rw, 2) for c in cells[1:])
+        i += 1 + n
+    if i != len(lines):
+        raise MapsError(f'{lines[i][0]}: a line after list D')
+    return bytes(out)
+
+
+def list_problems(root: Path = ROOT) -> list[str]:
+    """Where C2Scene_LoadLists' copies are not LIST_SIZES bytes per entry."""
+    src = (Path(root) / 'asm' / 'bankC2' / 'bankC2.asm').read_text()
+    try:
+        body = src[src.index('\nC2Scene_LoadLists:'):]
+        body = body[:body.index('\n; $C2:', 10)]
+        got = []
+        for name in LISTS:
+            i = body.index(f'.list_{name.lower()}:')
+            got.append(body[i:body.index('DEY', i)].count('STA.w WMDATA'))
+    except ValueError:
+        return ['bankC2.asm: C2Scene_LoadLists and its .list_a-d loops not found']
+    return [] if tuple(got) == LIST_SIZES else [f'C2Scene_LoadLists copies {got} B per entry, not {LIST_SIZES}']
+
+
 def render_scene_pal(label: str, data: bytes) -> str:
     if not data or len(data) % 2:
         raise MapsError(f'{label}: {len(data)} B is no whole number of colours')
@@ -528,6 +606,8 @@ def render_piece(p: dict, data: bytes) -> str:
         return render_bg3(p['label'], data)
     if p['piece'] == 'scenepal':
         return render_scene_pal(p['label'], data)
+    if p['piece'] == 'scenelists':
+        return render_scene_lists(p['label'], data)
     if p['piece'] == 'actframes':
         import actframes
         try:
@@ -548,6 +628,8 @@ def assemble_piece(p: dict, text: str) -> bytes:
         return assemble_bg3(text, p['label'], p['label'])
     if p['piece'] == 'scenepal':
         return assemble_scene_pal(text, p['label'], int(PACK_PARAM.match(p['param']).group(2)), p['label'])
+    if p['piece'] == 'scenelists':
+        return assemble_scene_lists(text, p['label'], p['label'])
     if p['piece'] == 'actframes':
         import actframes
         try:
@@ -557,9 +639,9 @@ def assemble_piece(p: dict, text: str) -> bytes:
     return assemble_meta(text, p['label'], meta_count(p), p['label'])
 
 
-PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'actframes')
+PIECES = ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'scenelists', 'actframes')
 ASSET_EXT = {'mapprops': 'map', 'metatiles': 'meta', 'scenemaps': 'smap', 'scenemeta': 'smeta', 'scenebg3': 'bg3',
-             'scenepal': 'spal', 'actframes': 'afr'}
+             'scenepal': 'spal', 'scenelists': 'slist', 'actframes': 'afr'}
 
 
 def asset_dir(piece: str) -> str:
@@ -570,10 +652,10 @@ def asset_dir(piece: str) -> str:
 def size_ok(kind: str, want: int | None, size: int) -> bool:
     """Whether a pack of `size` unpacked bytes is a piece of `kind`
     (kind_of's size: exact; None: any whole number of colours for
-    scenepal, any size for actframes)."""
+    scenepal, any size for actframes and scenelists)."""
     if want is not None:
         return size == want
-    return kind == 'actframes' or size % 2 == 0
+    return kind in ('actframes', 'scenelists') or size % 2 == 0
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
 
 
@@ -637,6 +719,8 @@ def check(rom: bytes, quiet: bool = True) -> list[str]:
     import data_survey
     import extract_data
     problems = named_problems(rom, data_survey.read_rows(), extract_data.read_manifest())
+    if any(p['piece'] == 'scenelists' for p in extract_data.read_manifest()):
+        problems += list_problems()
     if any(p['piece'] == 'actframes' for p in extract_data.read_manifest()):
         import actframes
         import battle
@@ -678,7 +762,7 @@ def main() -> int:
     n = {k: sum(1 for p in ps if p['piece'] == k) for k in PIECES}
     print(f'OK: all {n["mapprops"]} location maps, {n["metatiles"]} metatile packs and the scene layer packs '
           f'({n["scenemaps"]} maps, {n["scenemeta"]} metatile sets, {n["scenebg3"]} BG3 tilemaps, '
-          f'{n["scenepal"]} palette packs) convert to '
+          f'{n["scenepal"]} palette packs, {n["scenelists"]} list packs) convert to '
           f'text and assemble back byte-exact')
     return 0
 

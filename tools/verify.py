@@ -214,9 +214,10 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     for i in emitted:
         want[i] = 1
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
-               'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
+               'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0, 'anim_bytes': 0,
                'graphics_bytes': 0, 'gfxpack_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
-               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'scenepal_bytes': 0, 'actframes_bytes': 0, 'sprframes_bytes': 0,
+               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'scenepal_bytes': 0, 'scenelists_bytes': 0,
+               'actframes_bytes': 0, 'sprframes_bytes': 0,
                'animframes_bytes': 0, 'animtimes_bytes': 0, 'drawlist_bytes': 0,
                'music_bytes': 0}
     for p in pieces:
@@ -256,16 +257,16 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         problems.append(str(e))
         return figures, problems
     for p in pieces:
-        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
+        if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx', 'anim',
                               'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal',
-                              'actframes',
-                              'graphics', 'gfxpack', 'sprframes', 'music') and not extract_data.text_tool(p['piece']):
+                              'scenelists', 'actframes', 'graphics', 'gfxpack', 'sprframes', 'music') and not extract_data.text_tool(p['piece']):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz'
                 if p['piece'] in ('packed', 'events', 'scene', 'mapprops', 'metatiles', 'scenemaps', 'scenemeta',
-                                  'scenebg3', 'scenepal', 'actframes', 'gfxpack')
+                                  'scenebg3', 'scenepal', 'scenelists', 'actframes', 'gfxpack')
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
+                else extract_data.ANIM_OUT / f'{p["label"]}.bin' if p['piece'] == 'anim'
                 else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.SPRITES_OUT / f'{p["label"]}.bin' if p['piece'] == 'sprframes'
                 else extract_data.text_out(p) if extract_data.text_tool(p['piece'])
@@ -306,8 +307,12 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     figures['music_split'] = msplit
     # How much of the scene and layer-effect scripts nothing reaches (data).
     import scripts
-    ssplit = {'scene': 0, 'fx': 0, 'scene_unpacked': 0}
+    ssplit = {'scene': 0, 'fx': 0, 'anim': 0, 'anim_frames': 0, 'scene_unpacked': 0}
     for p in pieces:
+        if p['piece'] == 'anim':
+            st = scripts.stats((extract_data.ASSETS / p['asset']).read_text())
+            ssplit['anim'] += st['data']
+            ssplit['anim_frames'] += st['frames']
         if p['piece'] in ('scene', 'fx'):
             ssplit[p['piece']] += scripts.stats((extract_data.ASSETS / p['asset']).read_text())['data']
             if p['piece'] == 'scene':
@@ -327,7 +332,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     # The maps: their pieces and unpacked bytes.
     msplit = {'maps': 0, 'metas': 0, 'scene': 0, 'unpacked': 0}
     for p in pieces:
-        if p['piece'] in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal'):
+        if p['piece'] in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'scenelists'):
             msplit['maps' if p['piece'] == 'mapprops' else 'metas' if p['piece'] == 'metatiles' else 'scene'] += 1
             msplit['unpacked'] += int(extract_data.PACK_PARAM.match(p['param']).group(2))
     figures['maps_split'] = msplit
@@ -459,6 +464,11 @@ def main() -> int:
               f'assembled by the build from their disassembly (build/assets/fx/ -> build/fx/, incbin): '
               f'{data["fx_bytes"] - ss["fx"]:,} B read as scripts and table, {ss["fx"]:,} B nothing reaches '
               f'(data)')
+        print(f'  {"anim":<16} {data["anim_bytes"]:>9,} bytes of scene animation scripts, their table and the '
+              f'sprite frames they show, assembled by the build from their disassembly (build/assets/anim/ -> '
+              f'build/anim/, incbin): {ss["anim_frames"]:,} B of frames, '
+              f'{data["anim_bytes"] - ss["anim"] - ss["anim_frames"]:,} B read as scripts and table, '
+              f'{ss["anim"]:,} B nothing reaches (data)')
         gs = data['graphics_split']
         print(f'  {"graphics":<16} {data["graphics_bytes"]:>9,} bytes of tile graphics in {gs["regions"]} regions '
               f'encoded by the build from indexed images extracted from the ROM (build/assets/gfx/ -> '
@@ -470,7 +480,7 @@ def main() -> int:
               f'{gs["pack_tail"]:,} B past the tiles the readers read kept as bytes')
         ms = data['maps_split']
         mb = sum(data[k + '_bytes'] for k in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
-                                              'scenepal'))
+                                              'scenepal', 'scenelists'))
         print(f'  {"maps":<16} {mb:>9,} bytes of {ms["maps"]} location maps, {ms["metas"]} metatile packs and '
               f'{ms["scene"]} scene layer and palette packs packed by the build from text assembled to their unpacked '
               f'bytes (build/assets/maps/ -> build/maps/ -> build/packs/, incbin): {ms["unpacked"]:,} B unpacked')
