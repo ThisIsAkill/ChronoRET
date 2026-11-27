@@ -39,12 +39,17 @@ org $CE8294
 BattleScript_CE8294:
     incbin "../../build/battle/BattleScript_CE8294.bin"          ; battle scripts: actions/scripts
 
-; $CE:8870-$CE:D427 (19,384 B), table, confirmed: action object records (BattleRom_ActObjRec, 4
+; $CE:8870-$CE:D1BB (18,764 B), table, confirmed: action object records (BattleRom_ActObjRec, 4
 ; B)
 ; Read by BattleAct_LoadAttack, BattleAct_LoadKind3, BattleAct_LoadTech, BattleAct_StepObjAnim.
 org $CE8870
-Table_CE8870:
-    incbin "../../build/assets/table/Table_CE8870.bin"
+BattleRom_ActObjRec_Lists:
+    incbin "../../build/records/BattleRom_ActObjRec_Lists.bin"          ; records: table 4691 x 4 B
+
+; $CE:D1BC-$CE:D427 (620 B), unknown, unknown: 620 bytes shaped like object records
+org $CED1BC
+Unknown_CED1BC:
+    incbin "../../build/assets/unknown/Unknown_CED1BC.bin"
 
 ; $CE:D428-$CE:DC19 (2,034 B), battle_script, confirmed: subscripts (opcode $1E)
 ; Read by BattleAct_LoadScript and its loaders (BattleAct_Load*).
@@ -197,7 +202,7 @@ BattleRom_HdmaSetOfs:
 ; Read by BattleCD_FxOpHalfPlane.
 org $CEF28E
 BattleRom_HalfPlaneEdge:
-    incbin "../../build/assets/table/BattleRom_HalfPlaneEdge.bin"
+    incbin "../../build/records/BattleRom_HalfPlaneEdge.bin"          ; records: table 256 x 2 B
 
 ; $CE:F48E-$CE:F58D (256 B), table, confirmed: 256 B: |sine| scaled to 255, per angle
 ; Read by BattleCD_FxMiscSineOffsets, BattleCD_FxOpWaveTable, BattleCD_FxOpWaves,

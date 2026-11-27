@@ -15,13 +15,19 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $E4:0000-$E4:1FFF (8,192 B), table, confirmed: anim tables: word offset table at $E4:0000,
-; then lists
-; Read by Menu_LoadCharPalettes, Menu_SprLoad, Obj_AnimTickAndQueue, BattleAct_StepBattlerAnims,
-; Battle_RunPcPose, Battle_TickPcSlots, BankFF_LoadE4Palette.
+; $E4:0000-$E4:17FF (6,144 B), palette, confirmed: 256 x 12 colours (BGR555): sprite palettes by
+; a sprite record's palette byte
+; Read by Evt_LoadSpriteRec / Evt_Op82 / Evt_Op83 (Obj_PalSrc = palette x Pal_ObjColorBytes),
+; Menu_SprLoad and BankFF_LoadE4Palette (through MenuRom_E4Palettes).
 org $E40000
-Table_E40000:
-    incbin "../../build/assets/table/Table_E40000.bin"
+AnimRom_Palettes:
+    incbin "../../build/records/AnimRom_Palettes.bin"          ; records: palette 256 x 24 B
+
+; $E4:1800-$E4:1FFF (2,048 B), padding, probable: 2048 x $00
+org $E41800
+Padding_E41800:
+    fillbyte $00
+    fill 2048
 
 ; $E4:2000-$E4:22FF (768 B), table, confirmed: 256 x 3 B long pointers to sprite graphics packs
 ; Read by Battle_InitScene, Evt_Op82_InitWramSprite, Evt_Op83_InitEnemySprite, Menu_SprLoad.
@@ -288,7 +294,262 @@ BattleRom_SprTilesPtr:
 ; Read by Battle_InitScene, Spr_* (Field_E4Ptr1).
 org $E42300
 BattleRom_SprFramesPtr:
-    incbin "../../build/assets/table/BattleRom_SprFramesPtr.bin"
+    dl SprLayout_DC0000+$27B0             ; 0: a sprite set's first frame record
+    dl SprLayout_DC0000+$9AD8             ; 1: a sprite set's first frame record
+    dl SprLayout_DC0000+$4E70             ; 2: a sprite set's first frame record
+    dl SprLayout_DC0000+$C080             ; 3: a sprite set's first frame record
+    dl SprLayout_DC0000+$7490             ; 4: a sprite set's first frame record
+    dl SprLayout_DE0000                   ; 5
+    dl SprLayout_DC0000                   ; 6
+    dl SprLayout_DD0000+$B608             ; 7: a sprite set's first frame record
+    dl SprLayout_DDB900                   ; 8
+    dl SprLayout_DDB900+$280              ; 9: inside the piece: not a stream start
+    dl SprLayout_DDB900+$500              ; 10: inside the piece: not a stream start
+    dl SprLayout_DDC030                   ; 11
+    dl SprLayout_DDC030+$258              ; 12: a sprite set's first frame record
+    dl SprLayout_DDC030+$5F0              ; 13: a sprite set's first frame record
+    dl SprLayout_DDC030+$F78              ; 14: a sprite set's first frame record
+    dl SprLayout_DDC030+$30C0             ; 15: a sprite set's first frame record
+    dl SprLayout_DDC030+$1220             ; 16: a sprite set's first frame record
+    dl SprLayout_DDC030+$1568             ; 17: a sprite set's first frame record
+    dl SprLayout_DDC030+$1838             ; 18: a sprite set's first frame record
+    dl SprLayout_DDC030+$1AB8             ; 19: a sprite set's first frame record
+    dl SprLayout_DDC030+$1E78             ; 20: a sprite set's first frame record
+    dl SprLayout_DDC030+$2120             ; 21: a sprite set's first frame record
+    dl SprLayout_DDC030+$2508             ; 22: a sprite set's first frame record
+    dl SprLayout_E346A0+$9330             ; 23: a sprite set's first frame record
+    dl SprLayout_DDC030+$28A0             ; 24: a sprite set's first frame record
+    dl SprLayout_DDC030+$2D78             ; 25: a sprite set's first frame record
+    dl SprLayout_DE0000+$8818             ; 26: a sprite set's first frame record
+    dl SprLayout_DE0000+$2B48             ; 27: a sprite set's first frame record
+    dl SprLayout_DE0000+$2EE0             ; 28: a sprite set's first frame record
+    dl SprLayout_DE0000+$3138             ; 29: a sprite set's first frame record
+    dl SprLayout_DE0000+$3458             ; 30: a sprite set's first frame record
+    dl SprLayout_DE0000+$3638             ; 31: a sprite set's first frame record
+    dl SprLayout_DE0000+$27D8             ; 32: a sprite set's first frame record
+    dl SprLayout_DD0000                   ; 33
+    dl SprLayout_DD0000+$410              ; 34: a sprite set's first frame record
+    dl SprLayout_DD0000+$758              ; 35: a sprite set's first frame record
+    dl SprLayout_DD0000+$FC8              ; 36: a sprite set's first frame record
+    dl SprLayout_DE0000+$6860             ; 37: a sprite set's first frame record
+    dl SprLayout_DE0000+$5D48             ; 38: a sprite set's first frame record
+    dl SprLayout_DE0000+$54D8             ; 39: a sprite set's first frame record
+    dl SprLayout_DE0000+$5B68             ; 40: a sprite set's first frame record
+    dl SprLayout_DE0000+$4498             ; 41: a sprite set's first frame record
+    dl SprLayout_DE0000+$4DF8             ; 42: a sprite set's first frame record
+    dl SprLayout_DE0000+$5078             ; 43: a sprite set's first frame record
+    dl SprLayout_DD0000+$1220             ; 44: a sprite set's first frame record
+    dl SprLayout_DD0000+$17C0             ; 45: a sprite set's first frame record
+    dl SprLayout_DD0000+$1518             ; 46: a sprite set's first frame record
+    dl SprLayout_DD0000+$1F90             ; 47: a sprite set's first frame record
+    dl SprLayout_DD0000+$23F0             ; 48: a sprite set's first frame record
+    dl SprLayout_DD0000+$2558             ; 49: a sprite set's first frame record
+    dl SprLayout_E3E8A8+$898              ; 50: a sprite set's first frame record
+    dl SprLayout_DD0000+$29E0             ; 51: a sprite set's first frame record
+    dl SprLayout_DD0000+$2AD0             ; 52: a sprite set's first frame record
+    dl SprLayout_DD0000+$2DF0             ; 53: a sprite set's first frame record
+    dl SprLayout_DD0000+$3458             ; 54: a sprite set's first frame record
+    dl SprLayout_DD0000+$3610             ; 55: a sprite set's first frame record
+    dl SprLayout_DD0000+$3778             ; 56: a sprite set's first frame record
+    dl SprLayout_DD0000+$3B60             ; 57: a sprite set's first frame record
+    dl SprLayout_DD0000+$3F70             ; 58: a sprite set's first frame record
+    dl SprLayout_DD0000+$4330             ; 59: a sprite set's first frame record
+    dl SprLayout_DD0000+$4628             ; 60: a sprite set's first frame record
+    dl SprLayout_DD0000+$4A10             ; 61: a sprite set's first frame record
+    dl SprLayout_DD0000+$4C40             ; 62: a sprite set's first frame record
+    dl SprLayout_DD0000+$4FB0             ; 63: a sprite set's first frame record
+    dl SprLayout_DD0000+$53C0             ; 64: a sprite set's first frame record
+    dl SprLayout_DD0000+$55C8             ; 65: a sprite set's first frame record
+    dl SprLayout_DD0000+$5ED8             ; 66: a sprite set's first frame record
+    dl SprLayout_DD0000+$6018             ; 67: a sprite set's first frame record
+    dl SprLayout_DD0000+$6130             ; 68: a sprite set's first frame record
+    dl SprLayout_DD0000+$6338             ; 69: a sprite set's first frame record
+    dl SprLayout_DD0000+$66D0             ; 70: a sprite set's first frame record
+    dl SprLayout_DD0000+$6AE0             ; 71: a sprite set's first frame record
+    dl SprLayout_DD0000+$6EA0             ; 72: a sprite set's first frame record
+    dl SprLayout_DD0000+$7490             ; 73: a sprite set's first frame record
+    dl SprLayout_DD0000+$7850             ; 74: a sprite set's first frame record
+    dl SprLayout_DD0000+$7C38             ; 75: a sprite set's first frame record
+    dl SprLayout_DD0000+$7E68             ; 76: a sprite set's first frame record
+    dl SprLayout_DD0000+$84D0             ; 77: a sprite set's first frame record
+    dl SprLayout_DD0000+$8610             ; 78: a sprite set's first frame record
+    dl SprLayout_DD0000+$8750             ; 79: a sprite set's first frame record
+    dl SprLayout_DD0000+$8890             ; 80: a sprite set's first frame record
+    dl SprLayout_DD0000+$9100             ; 81: a sprite set's first frame record
+    dl SprLayout_DD0000+$9678             ; 82: a sprite set's first frame record
+    dl SprLayout_DD0000+$9A88             ; 83: a sprite set's first frame record
+    dl SprLayout_DD0000+$9E98             ; 84: a sprite set's first frame record
+    dl SprLayout_DD0000+$A6B8             ; 85: a sprite set's first frame record
+    dl SprLayout_DD0000+$AF28             ; 86: a sprite set's first frame record
+    dl SprLayout_DE0000+$3818             ; 87: a sprite set's first frame record
+    dl SprLayout_DE0000+$3890             ; 88: a sprite set's first frame record
+    dl SprLayout_DE0000+$3908             ; 89: a sprite set's first frame record
+    dl SprLayout_DE0000+$39A8             ; 90: a sprite set's first frame record
+    dl SprLayout_DE0000+$3A20             ; 91: a sprite set's first frame record
+    dl SprLayout_DE0000+$3A98             ; 92: a sprite set's first frame record
+    dl SprLayout_DE0000+$3B60             ; 93: a sprite set's first frame record
+    dl SprLayout_DE0000+$3BD8             ; 94: a sprite set's first frame record
+    dl SprLayout_DE0000+$3C28             ; 95: a sprite set's first frame record
+    dl SprLayout_DE0000+$3C78             ; 96: a sprite set's first frame record
+    dl SprLayout_DE0000+$3CC8             ; 97: a sprite set's first frame record
+    dl SprLayout_DE0000+$3D90             ; 98: a sprite set's first frame record
+    dl SprLayout_DE0000+$3E30             ; 99: a sprite set's first frame record
+    dl SprLayout_DE0000+$3F20             ; 100: a sprite set's first frame record
+    dl SprLayout_DE0000+$3F98             ; 101: a sprite set's first frame record
+    dl SprLayout_DE0000+$4010             ; 102: a sprite set's first frame record
+    dl SprLayout_DE0000+$40D8             ; 103: a sprite set's first frame record
+    dl SprLayout_DE0000+$4150             ; 104: a sprite set's first frame record
+    dl SprLayout_DE0000+$41C8             ; 105: a sprite set's first frame record
+    dl SprLayout_DE0000+$4240             ; 106: a sprite set's first frame record
+    dl SprLayout_DE0000+$4308             ; 107: a sprite set's first frame record
+    dl SprLayout_DE0000+$43F8             ; 108: a sprite set's first frame record
+    dl SprLayout_DE0000+$70D0             ; 109: a sprite set's first frame record
+    dl SprLayout_DE0000+$4628             ; 110: a sprite set's first frame record
+    dl SprLayout_DE0000+$4678             ; 111: a sprite set's first frame record
+    dl SprLayout_DE0000+$47B8             ; 112: a sprite set's first frame record
+    dl SprLayout_DE0000+$4830             ; 113: a sprite set's first frame record
+    dl SprLayout_DE0000+$4880             ; 114: a sprite set's first frame record
+    dl SprLayout_DE0000+$48D0             ; 115: a sprite set's first frame record
+    dl SprLayout_DE0000+$4948             ; 116: a sprite set's first frame record
+    dl SprLayout_DE0000+$4A60             ; 117: a sprite set's first frame record
+    dl SprLayout_E30000                   ; 118
+    dl SprLayout_E30000+$1068             ; 119: a sprite set's first frame record
+    dl SprLayout_DE0000+$4B00             ; 120: a sprite set's first frame record
+    dl SprLayout_DDC030+$988              ; 121: a sprite set's first frame record
+    dl SprLayout_DDC030+$C30              ; 122: a sprite set's first frame record
+    dl SprLayout_DE0000+$3778             ; 123: a sprite set's first frame record
+    dl SprLayout_DE0000+$6310             ; 124: a sprite set's first frame record
+    dl SprLayout_DE0000+$7120             ; 125: a sprite set's first frame record
+    dl SprLayout_DE0000+$7418             ; 126: a sprite set's first frame record
+    dl SprLayout_E30000+$1248             ; 127: a sprite set's first frame record
+    dl SprLayout_E346A0+$98F8             ; 128: a sprite set's first frame record
+    dl SprLayout_DE0000+$7558             ; 129: a sprite set's first frame record
+    dl SprLayout_DE0000+$85C0             ; 130: a sprite set's first frame record
+    dl SprLayout_DE0000+$8430             ; 131: a sprite set's first frame record
+    dl SprLayout_E30000+$2008             ; 132: a sprite set's first frame record
+    dl SprLayout_E30000+$1BF8             ; 133: a sprite set's first frame record
+    dl SprLayout_E30000+$2D28             ; 134: a sprite set's first frame record
+    dl SprLayout_E30000+$3598             ; 135: a sprite set's first frame record
+    dl SprLayout_E30000+$38B8             ; 136: a sprite set's first frame record
+    dl SprLayout_E30000+$3D68             ; 137: a sprite set's first frame record
+    dl SprLayout_E30000+$41C8             ; 138: a sprite set's first frame record
+    dl SprLayout_E30000+$4218             ; 139: a sprite set's first frame record
+    dl SprLayout_E342E0                   ; 140
+    dl SprLayout_E346A0                   ; 141
+    dl SprLayout_DE0000+$8C00             ; 142: a sprite set's first frame record
+    dl SprLayout_DE0000+$8D40             ; 143: a sprite set's first frame record
+    dl SprLayout_DE0000+$9010             ; 144: a sprite set's first frame record
+    dl SprLayout_DE0000+$9100             ; 145: a sprite set's first frame record
+    dl SprLayout_DE0000+$9178             ; 146: a sprite set's first frame record
+    dl SprLayout_E346A0+$3C0              ; 147: a sprite set's first frame record
+    dl SprLayout_E346A0+$DC0              ; 148: a sprite set's first frame record
+    dl SprLayout_DE0000+$91C8             ; 149: a sprite set's first frame record
+    dl SprLayout_DE0000+$9240             ; 150: a sprite set's first frame record
+    dl SprLayout_DE0000+$9290             ; 151: a sprite set's first frame record
+    dl SprLayout_DE0000+$96A0             ; 152: a sprite set's first frame record
+    dl SprLayout_E346A0+$4CB8             ; 153: a sprite set's first frame record
+    dl SprLayout_E346A0+$4DA8             ; 154: a sprite set's first frame record
+    dl SprLayout_E346A0+$53E8             ; 155: a sprite set's first frame record
+    dl SprLayout_E346A0+$1720             ; 156: a sprite set's first frame record
+    dl SprLayout_E346A0+$1CE8             ; 157: a sprite set's first frame record
+    dl SprLayout_E346A0+$2648             ; 158: a sprite set's first frame record
+    dl SprLayout_E346A0+$4128             ; 159: a sprite set's first frame record
+    dl SprLayout_DE0000+$9880             ; 160: a sprite set's first frame record
+    dl SprLayout_DE0000+$9AD8             ; 161: a sprite set's first frame record
+    dl SprLayout_DE0000+$9C18             ; 162: a sprite set's first frame record
+    dl SprLayout_E346A0+$4178             ; 163: a sprite set's first frame record
+    dl SprLayout_E346A0+$4628             ; 164: a sprite set's first frame record
+    dl SprLayout_E346A0+$8430             ; 165: a sprite set's first frame record
+    dl SprLayout_E346A0+$78F0             ; 166: a sprite set's first frame record
+    dl SprLayout_E346A0+$8250             ; 167: a sprite set's first frame record
+    dl SprLayout_DE0000+$9C90             ; 168: a sprite set's first frame record
+    dl SprLayout_DE0000+$9CE0             ; 169: a sprite set's first frame record
+    dl SprLayout_E346A0+$9A88             ; 170: a sprite set's first frame record
+    dl SprLayout_E346A0+$5618             ; 171: a sprite set's first frame record
+    dl SprLayout_DE0000+$3EA8             ; 172: a sprite set's first frame record
+    dl SprLayout_E346A0+$5668             ; 173: a sprite set's first frame record
+    dl SprLayout_DE0000+$9DD0             ; 174: a sprite set's first frame record
+    dl SprLayout_DE0000+$9E20             ; 175: a sprite set's first frame record
+    dl SprLayout_DE0000+$9F60             ; 176: a sprite set's first frame record
+    dl SprLayout_E346A0+$5848             ; 177: a sprite set's first frame record
+    dl SprLayout_E346A0+$58C0             ; 178: a sprite set's first frame record
+    dl SprLayout_E346A0+$6298             ; 179: a sprite set's first frame record
+    dl SprLayout_E346A0+$6798             ; 180: a sprite set's first frame record
+    dl SprLayout_E346A0+$68D8             ; 181: a sprite set's first frame record
+    dl SprLayout_E346A0+$6C48             ; 182: a sprite set's first frame record
+    dl SprLayout_DE0000+$A0A0             ; 183: a sprite set's first frame record
+    dl SprLayout_DE0000+$A1E0             ; 184: a sprite set's first frame record
+    dl SprLayout_DE0000+$A3E8             ; 185: a sprite set's first frame record
+    dl SprLayout_DE0000+$A4D8             ; 186: a sprite set's first frame record
+    dl SprLayout_DE0000+$A528             ; 187: a sprite set's first frame record
+    dl SprLayout_DE0000+$A668             ; 188: a sprite set's first frame record
+    dl SprLayout_DE0000+$A988             ; 189: a sprite set's first frame record
+    dl SprLayout_DE0000+$AA28             ; 190: a sprite set's first frame record
+    dl SprLayout_DE0000+$AB18             ; 191: a sprite set's first frame record
+    dl SprLayout_DE0000+$AE60             ; 192: a sprite set's first frame record
+    dl SprLayout_DE0000+$AED8             ; 193: a sprite set's first frame record
+    dl SprLayout_DE0000+$AF28             ; 194: a sprite set's first frame record
+    dl SprLayout_DE0000+$AF78             ; 195: a sprite set's first frame record
+    dl SprLayout_DE0000+$AFC8             ; 196: a sprite set's first frame record
+    dl SprLayout_DEB068                   ; 197
+    dl SprLayout_E346A0+$84F8             ; 198: a sprite set's first frame record
+    dl SprLayout_E346A0+$8570             ; 199: a sprite set's first frame record
+    dl SprLayout_E346A0+$86B0             ; 200: a sprite set's first frame record
+    dl SprLayout_E346A0+$87F0             ; 201: a sprite set's first frame record
+    dl SprLayout_E346A0+$8D90             ; 202: a sprite set's first frame record
+    dl SprLayout_DDC030+$3390             ; 203: a sprite set's first frame record
+    dl SprLayout_DDC030+$33E0             ; 204: a sprite set's first frame record
+    dl SprLayout_DDC030+$35E8             ; 205: a sprite set's first frame record
+    dl SprLayout_E346A0+$96F0             ; 206: a sprite set's first frame record
+    dl SprLayout_E346A0+$97E0             ; 207: a sprite set's first frame record
+    dl SprLayout_E1E000                   ; 208
+    dl SprLayout_DDC030+$3638             ; 209: a sprite set's first frame record
+    dl SprLayout_DDC030+$39F8             ; 210: a sprite set's first frame record
+    dl SprLayout_DDC030+$3BD8             ; 211: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$168              ; 212: a sprite set's first frame record
+    dl SprLayout_DEB0B8                   ; 213
+    dl SprLayout_DEB0B8+$50               ; 214: a sprite set's first frame record
+    dl SprLayout_E346A0+$9880             ; 215: a sprite set's first frame record
+    dl SprLayout_E3E858                   ; 216
+    dl SprLayout_E3E8A8                   ; 217
+    dl SprLayout_DEB0B8+$2A8              ; 218: a sprite set's first frame record
+    dl SprLayout_DDC030+$11D0             ; 219: a sprite set's first frame record
+    dl SprLayout_E3E8A8+$280              ; 220: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$348              ; 221: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$438              ; 222: a sprite set's first frame record
+    dl SprLayout_E3E8A8+$460              ; 223: a sprite set's first frame record
+    dl SprLayout_E3E8A8+$4D8              ; 224: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$8E8              ; 225: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$960              ; 226: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$9B0              ; 227: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$D20              ; 228: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$D98              ; 229: a sprite set's first frame record
+    dl SprLayout_DEB0B8+$E88              ; 230: a sprite set's first frame record
+    dl $000000                            ; 231: none
+    dl $000000                            ; 232: none
+    dl $000000                            ; 233: none
+    dl $000000                            ; 234: none
+    dl $000000                            ; 235: none
+    dl $000000                            ; 236: none
+    dl $000000                            ; 237: none
+    dl $000000                            ; 238: none
+    dl $000000                            ; 239: none
+    dl $000000                            ; 240: none
+    dl $000000                            ; 241: none
+    dl $000000                            ; 242: none
+    dl $000000                            ; 243: none
+    dl $000000                            ; 244: none
+    dl $000000                            ; 245: none
+    dl $000000                            ; 246: none
+    dl $000000                            ; 247: none
+    dl $000000                            ; 248: none
+    dl $000000                            ; 249: none
+    dl $000000                            ; 250: none
+    dl $000000                            ; 251: none
+    dl $000000                            ; 252: none
+    dl $000000                            ; 253: none
+    dl $000000                            ; 254: none
+    dl $000000                            ; 255: none
 
 ; $E4:2600-$E4:27FF (512 B), table, confirmed: 256 u16 offsets of animation frame-id lists
 ; Read by Battle_InitScene, Menu_SprLoad.
@@ -302,36 +563,68 @@ org $E42800
 BattleRom_SprAnimDurs:
     incbin "../../build/records/BattleRom_SprAnimDurs.bin"          ; records: table 256 x 2 B
 
-; $E4:2A00-$E4:2FFF (1,536 B), palette, probable: u16 offsets per sprite set, then 12-colour
-; palettes (BGR555)
-; Read by Menu_SprLoad (MenuRom_E4Palettes), Obj palette loaders (Field_E4Ptr*).
+; $E4:2A00-$E4:2BFF (512 B), table, confirmed: u16 per sprite palette number: offset of its 12
+; colours in bank $E4
+; Read by Menu_SprLoad, BankFF_LoadE4Palette (MenuRom_E4Palettes).
 org $E42A00
-Palette_E42A00:
-    incbin "../../build/assets/palette/Palette_E42A00.bin"
+MenuRom_E4PalOffsets:
+    incbin "../../build/records/MenuRom_E4PalOffsets.bin"          ; records: table 256 x 2 B
 
-; $E4:3000-$E4:A7FF (30,720 B), table, confirmed: animation frame-id lists ($FF-ended)
-; Read by Obj_AnimTickAndQueue, Battle anim tick (BattleRom_SprAnimFrames targets).
+; $E4:2C00-$E4:2FFF (1,024 B), padding, probable: 1024 x $00
+org $E42C00
+Padding_E42C00:
+    fillbyte $00
+    fill 1024
+
+; $E4:3000-$E4:A5EF (30,192 B), table, confirmed: animation frame-id lists: per animation four
+; facing blocks of (next offset - this) / 4 bytes, rows of 4 frame ids ($FF ends a row)
+; Read by Obj_AnimFrameLookup (Field_E4Ptr2), Battle_TickPcSlots / Battle_TickEnemyGroup /
+; BattleAct_StepBattlerAnims (BattleRom_SprAnimFrames), Menu_SprAnimate (MenuRom_E4AnimFrames).
 org $E43000
-Table_E43000:
-    incbin "../../build/assets/table/Table_E43000.bin"
+AnimRom_FrameLists:
+    incbin "../../build/anims/AnimRom_FrameLists.bin"          ; sprite animation frame-id lists
 
-; $E4:A800-$E4:EFFF (18,432 B), table, confirmed: animation duration lists
-; Read by Obj_AnimTickAndQueue, Battle anim tick (BattleRom_SprAnimDurs targets).
+; $E4:A5F0-$E4:A5F0 (1 B), unknown, unknown: 1 byte
+org $E4A5F0
+Unknown_E4A5F0:
+    incbin "../../build/assets/unknown/Unknown_E4A5F0.bin"
+
+; $E4:A5F1-$E4:A7FF (527 B), padding, probable: 527 x $00
+org $E4A5F1
+Padding_E4A5F1:
+    fillbyte $00
+    fill 527
+
+; $E4:A800-$E4:CC56 (9,303 B), table, confirmed: animation duration lists: per animation rows of
+; 4 durations (0 ends a row)
+; Read by Obj_AnimTickAndQueue (Field_E4Ptr3), Battle_TickPcSlots / Battle_TickEnemyGroup /
+; BattleAct_StepBattlerAnims (BattleRom_SprAnimDurs), Menu_SprAnimate (MenuRom_E4AnimTimes).
 org $E4A800
-Table_E4A800:
-    incbin "../../build/assets/table/Table_E4A800.bin"
+AnimRom_TimeLists:
+    incbin "../../build/anims/AnimRom_TimeLists.bin"          ; sprite animation duration lists
 
-; $E4:F000-$E4:F521 (1,314 B), table, confirmed: 5 B per sprite record (SprRec_Bytes)
-; Read by Evt_LoadSpriteRec.
+; $E4:CC57-$E4:CC57 (1 B), unknown, unknown: 1 byte
+org $E4CC57
+Unknown_E4CC57:
+    incbin "../../build/assets/unknown/Unknown_E4CC57.bin"
+
+; $E4:CC58-$E4:EFFF (9,128 B), padding, probable: 9128 x $00
+org $E4CC58
+Padding_E4CC58:
+    fillbyte $00
+    fill 9128
+
+; $E4:F000-$E4:F522 (1,315 B), table, confirmed: 5 B per sprite record (SprRec_Bytes)
+; Read by Evt_LoadSpriteRec, Evt_Op82_InitWramSprite, Menu_SprLoad.
 org $E4F000
 RomE4_SprRec:
-    incbin "../../build/assets/table/RomE4_SprRec.bin"
+    incbin "../../build/records/RomE4_SprRec.bin"          ; records: table 263 x 5 B
 
-; $E4:F522-$E4:F5FF (222 B), padding, probable: 222 x $00
-org $E4F522
-Padding_E4F522:
+; $E4:F523-$E4:F5FF (221 B), padding, confirmed: 221 x $00
+org $E4F523
+Padding_E4F523:
     fillbyte $00
-    fill 222
+    fill 221
 
 ; $E4:F600-$E4:FFDF (2,528 B), table, confirmed: 10 B per enemy sprite record
 ; Read by Evt_Op83_InitEnemySprite, Battle_InitScene.

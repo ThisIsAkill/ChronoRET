@@ -39,6 +39,8 @@ jobs:
           python3 tools/test_maps.py
           python3 tools/test_graphics.py
           python3 tools/test_sprites.py
+          python3 tools/test_anims.py
+          python3 tools/test_drawlists.py
 
   match:
     name: Reassemble and diff
