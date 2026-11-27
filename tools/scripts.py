@@ -506,6 +506,42 @@ class AnimLang(Lang):
         self.ret_bias = 0
         self.timer = struct_offsets(root, 'C2Scene_Task')['AnimTimer']
 
+    # C2Anim_OpJumpBack loads its operand 16-bit (LDA [C2Anim_Ptr],Y with
+    # Y = 1) and masks byte 2 off (AND #Eng_LowByteMask): absint's taint is
+    # by whole register, so byte 2 shows as read, as a control byte and in
+    # the target, and the op, which never advances, would take 1 + its
+    # furthest read, 3, for its length. Its length is the operand it uses:
+    # 2 (the handler's header says so), proved by jump_back_length.
+    JUMP_BACK = 'C2Anim_OpJumpBack'
+
+    def operand_length(self, op: int) -> int | None:
+        """The length of an op that never advances, where its furthest
+        read is not one it uses: C2Anim_OpJumpBack's (jump_back_length)."""
+        if op >= len(getattr(self, 'handler_names', ())) or self.handler_names[op] != self.JUMP_BACK:
+            return None
+        if getattr(self, '_jump_back', None) is None:
+            self._jump_back = self.jump_back_length(op)
+        return self._jump_back
+
+    def jump_back_length(self, op: int) -> int:
+        """2, once C2Anim_OpJumpBack is run with byte 2 at each of four
+        values for each of four arg-1 values (both signs, 0) and every run
+        with the same arg 1 goes to the same place: byte 2 is read and
+        thrown away. A handler whose byte 2 changes where it goes, or that
+        reads past it, is refused."""
+        at = (self.d['C2SceneRom_AnimTable'] & 0xFF0000) | 0x8000
+        for b1 in (0x00, 0x05, 0x80, 0xFC):
+            got = set()
+            for b2 in (0x00, 0x55, 0xAA, 0xFF):
+                res = self._trace({at: op, at + 1: b1, at + 2: b2, at + 3: 0x00}, at)
+                if max(res['reads'], default=0) > 2:
+                    raise ScriptsError(f'{self.JUMP_BACK}: it reads operand byte {max(res["reads"])}')
+                got.add(tuple(res['outs']))
+            if len(got) != 1:
+                raise ScriptsError(f'{self.JUMP_BACK}: its byte 2 changes where it goes (arg 1 ${b1:02X}), so '
+                                   f'its length is not 2')
+        return 2
+
     def entry(self, known: dict, ptr: int):
         """The handler's entry state for the opcode at ptr."""
         op = known[ptr]
@@ -632,6 +668,8 @@ def classify(lang: Lang, known: dict, ptr: int) -> 'Op':
         raise ScriptsError(f'{where}: it goes on at +{" and +".join(map(str, sorted(lengths)))}')
     o.fixed = bool(lengths)
     o.length = lengths.pop() if lengths else 1 + max(reads, default=0)
+    if not o.fixed and hasattr(lang, 'operand_length'):
+        o.length = lang.operand_length(o.op) or o.length          # (AnimLang.JUMP_BACK)
     o.next = bool(static or counted)
     o.stay = any(x[1] == 0 and not x[2] for x in poss)
     o.done = any(x[0] == 'done' for x in res['outs'])

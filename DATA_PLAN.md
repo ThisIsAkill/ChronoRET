@@ -563,8 +563,11 @@ source.
         (one `ShowFrame` of the frame after it, duration 0: it holds). A later write to that RAM
         is not traced.
       - Two things the interpreter takes as they are, neither touching the lock:
-        - op `$03` (JumpBack) reads a 16-bit word from its operand and masks it, so its stay
-          and jump paths read one byte past it;
+        - op `$03` (JumpBack) loads its operand 16-bit and masks byte 2 off. The interpreter's
+          taint is by whole register, so byte 2 shows as read; `AnimLang.jump_back_length` runs
+          the handler with byte 2 at four values for each of four operands, and since none
+          changes where it goes, the op is 2 bytes, as its header says (any other handler is
+          refused);
         - `$04` (ShowFrame) with duration 0 holds forever.
       - `check`'s own test asserts what the lock sees: 4 sources, 161, 1, 1 and 1 entries,
         708, 3, 4 and 1 opcodes. For the unpackers it asserts the 9 routines with their tables,
@@ -1041,21 +1044,21 @@ bytes.
   the script from there through `C2Anim_OpTable`. Each handler is traced: it returns the bytes to
   advance, or stops. `AnimLang.head()` runs `C2Scene_SetAnim` and finds that the script starts at
   the entry itself (offset 0).
-  - Some entries point inside another script's opcode; the text names them by their `@inner`
-    labels.
+  - Every entry and every jump lands on an opcode line (no `@inner` lines).
   - `EXITS['anim']` locks the opcode classes (none returns, reads a position from RAM, or ends a
     task). An animation op that needed a trusted callee would be reported: none does.
 - **The sprite frames.** `C2Anim_OpShowFrame` names a frame by its operand bytes 1-2, an address in
   the script's bank. `C2Scene_SprDrawNode` reads a frame as a count byte, then that many 4-byte
   pieces: signed X and Y, then a tile word.
-  - The frames the reached ShowFrame ops name are written as `@frame X,Y:TTTT ...` lines (264
-    frames).
+  - The frames the reached ShowFrame ops name are written as `@frame X,Y:TTTT ...` lines (all
+    277 frames they name).
   - A frame stays `@bytes` if it lies on the opcodes, runs past the piece, has a count of 0, or
     overlaps another frame.
   - The assembler refuses a frame a ShowFrame names that is written as bytes, and an `@frame` no
     ShowFrame names.
-- **Results.** The piece assembles back byte-exact: 663 opcode lines, 264 frames, 421 B that
-  nothing reaches (the tails of overlapping opcodes, and frames no reached op shows).
+- **Results.** The piece assembles back byte-exact: 708 opcode lines (no `@inner`: the 62
+  JumpBacks are 2 bytes, so the ops after them start where they do), 277 frames, 177 B that
+  nothing reaches (ops after a loop that no entry reaches, and frames no reached op shows).
 
 ## Scene lists and the unknown rows
 
