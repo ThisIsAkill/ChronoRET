@@ -21,14 +21,14 @@ SceneScriptPack_007,$C3:C805,$C3:CE43,1599,scene,scene/SceneScriptPack_007.scn,l
 ScenePalPack_000,$C3:CE44,$C3:CED9,150,packed,packed_lz/ScenePalPack_000.bin,lz11 -> 256 B
 ScenePalPack_001,$C3:CEDA,$C3:CF6B,146,packed,packed_lz/ScenePalPack_001.bin,lz11 -> 160 B
 ScenePalPack_002,$C3:CF6C,$C3:CFF4,137,packed,packed_lz/ScenePalPack_002.bin,lz12 -> 128 B
-ScenePalPack_003,$C3:CFF5,$C3:D01B,39,packed,packed_lz/ScenePalPack_003.bin,lz12 -> 32 B
-ScenePalPack_004,$C3:D01C,$C3:D1EB,464,packed,packed_lz/ScenePalPack_004.bin,lz11 -> 512 B
-ScenePalPack_005,$C3:D1EC,$C3:D35E,371,packed,packed_lz/ScenePalPack_005.bin,lz11 -> 512 B
-ScenePalPack_006,$C3:D35F,$C3:D4D7,377,packed,packed_lz/ScenePalPack_006.bin,lz11 -> 512 B
-ScenePalPack_007,$C3:D4D8,$C3:D644,365,packed,packed_lz/ScenePalPack_007.bin,lz11 -> 512 B
-ScenePalPack_008,$C3:D645,$C3:D7C2,382,packed,packed_lz/ScenePalPack_008.bin,lz11 -> 512 B
-ScenePalPack_009,$C3:D7C3,$C3:D937,373,packed,packed_lz/ScenePalPack_009.bin,lz11 -> 512 B
-ScenePalPack_010,$C3:D938,$C3:DAF1,442,packed,packed_lz/ScenePalPack_010.bin,lz11 -> 512 B
+ScenePalPack_003,$C3:CFF5,$C3:D01B,39,scenepal,maps/ScenePalPack_003.spal,lz12 -> 32 B
+ScenePalPack_004,$C3:D01C,$C3:D1EB,464,scenepal,maps/ScenePalPack_004.spal,lz11 -> 512 B
+ScenePalPack_005,$C3:D1EC,$C3:D35E,371,scenepal,maps/ScenePalPack_005.spal,lz11 -> 512 B
+ScenePalPack_006,$C3:D35F,$C3:D4D7,377,scenepal,maps/ScenePalPack_006.spal,lz11 -> 512 B
+ScenePalPack_007,$C3:D4D8,$C3:D644,365,scenepal,maps/ScenePalPack_007.spal,lz11 -> 512 B
+ScenePalPack_008,$C3:D645,$C3:D7C2,382,scenepal,maps/ScenePalPack_008.spal,lz11 -> 512 B
+ScenePalPack_009,$C3:D7C3,$C3:D937,373,scenepal,maps/ScenePalPack_009.spal,lz11 -> 512 B
+ScenePalPack_010,$C3:D938,$C3:DAF1,442,scenepal,maps/ScenePalPack_010.spal,lz11 -> 512 B
 ScenePalPack_011,$C3:DAF2,$C3:DB98,167,packed,packed_lz/ScenePalPack_011.bin,lz11 -> 352 B
 ScenePalPack_012,$C3:DB99,$C3:DC44,172,packed,packed_lz/ScenePalPack_012.bin,lz11 -> 256 B
 ScenePalPack_013,$C3:DC45,$C3:DCBD,121,packed,packed_lz/ScenePalPack_013.bin,lz11 -> 160 B
@@ -347,7 +347,7 @@ BattleRom_PcAttackNum,$CC:2583,$CC:2589,7,records,records/BattleRom_PcAttackNum.
 BattleRom_HpGrowth,$CC:258A,$CC:25C1,56,records,records/BattleRom_HpGrowth.tsv,table 7 x 8 B
 BattleRom_MpGrowth,$CC:25C2,$CC:25F9,56,records,records/BattleRom_MpGrowth.tsv,table 7 x 8 B
 BattleRom_StatGrowth,$CC:25FA,$CC:2631,56,extracted,table/BattleRom_StatGrowth.bin,
-BattleRom_ExpToLevel,$CC:2632,$CC:26F9,200,extracted,table/BattleRom_ExpToLevel.bin,
+BattleRom_ExpToLevel,$CC:2632,$CC:26F9,200,records,records/BattleRom_ExpToLevel.tsv,table 100 x 2 B
 BattleRom_TechTpCost,$CC:26FA,$CC:2769,112,records,records/BattleRom_TechTpCost.tsv,table 7 x 16 B
 BattleRom_CharTechs,$CC:276A,$CC:2777,14,records,records/BattleRom_CharTechs.tsv,table 7 x 2 B
 BattleRom_ComboTechs,$CC:2778,$CC:28DA,355,extracted,table/BattleRom_ComboTechs.bin,
@@ -373,13 +373,14 @@ BattleRom_TechInfoStrings,$CC:3A09,$CC:3AFA,242,text,text/TechInfo.txt,ptrs ptr
 Unknown_CC3AFB,$CC:3AFB,$CC:3B0C,18,extracted,unknown/Unknown_CC3AFB.bin,
 Text_CC3B0D,$CC:3B0D,$CC:43AE,2210,text,text/TechInfo.txt,strings
 Padding_CC43AF,$CC:43AF,$CC:46FF,849,fill,,$FF
-BattleRom_EnemyStats,$CC:4700,$CC:5DFF,5888,extracted,table/BattleRom_EnemyStats.bin,
+BattleRom_EnemyStats,$CC:4700,$CC:5DFF,5888,records,records/BattleRom_EnemyStats.tsv,table 256 x 23 B
 Table_CC5E00,$CC:5E00,$CC:64F8,1785,records,records/Table_CC5E00.tsv,table 255 x 7 B
 Unknown_CC64F9,$CC:64F9,$CC:64FF,7,extracted,unknown/Unknown_CC64F9.bin,
 BattleRom_EnemyNames,$CC:6500,$CC:6FC8,2761,text,text/EnemyNames.txt,records 11 $EF
 Unknown_CC6FC9,$CC:6FC9,$CC:6FCA,2,extracted,unknown/Unknown_CC6FC9.bin,
 BattleRom_UnkCC6FCB,$CC:6FCB,$CC:7AC8,2814,extracted,table/BattleRom_UnkCC6FCB.bin,
-BattleRom_EnemyEffectRecA,$CC:7AC9,$CC:86C8,3072,extracted,table/BattleRom_EnemyEffectRecA.bin,
+BattleRom_EnemyEffectRecA,$CC:7AC9,$CC:86BC,3060,records,records/BattleRom_EnemyEffectRecA.tsv,table 255 x 12 B
+Unknown_CC86BD,$CC:86BD,$CC:86C8,12,extracted,unknown/Unknown_CC86BD.bin,
 BattleRom_EnemyTechTarget,$CC:86C9,$CC:88C8,512,records,records/BattleRom_EnemyTechTarget.tsv,table 256 x 2 B
 Unknown_CC88C9,$CC:88C9,$CC:88CA,2,extracted,unknown/Unknown_CC88C9.bin,
 BattleRom_UnkCC88CB,$CC:88CB,$CC:89C5,251,extracted,table/BattleRom_UnkCC88CB.bin,
@@ -423,7 +424,7 @@ BattleRom_SlotTimes256,$CC:F67C,$CC:F693,24,extracted,table/BattleRom_SlotTimes2
 BattleRom_CellMapEdge,$CC:F694,$CC:F6D3,64,extracted,table/BattleRom_CellMapEdge.bin,
 Table_CCF6D4,$CC:F6D4,$CC:F753,128,extracted,table/Table_CCF6D4.bin,
 BattleRom_FxCycleList,$CC:F754,$CC:F77A,39,extracted,table/BattleRom_FxCycleList.bin,
-BattleRom_FxTintColours,$CC:F77B,$CC:F77E,4,extracted,palette/BattleRom_FxTintColours.bin,
+BattleRom_FxTintColours,$CC:F77B,$CC:F77E,4,records,records/BattleRom_FxTintColours.tsv,palette 1 x 4 B
 Table_CCF77F,$CC:F77F,$CC:F7BF,65,extracted,table/Table_CCF77F.bin,
 BattleRom_ActFrameBase,$CC:F7C0,$CC:F81F,96,extracted,table/BattleRom_ActFrameBase.bin,
 BattleRom_Times16,$CC:F820,$CC:F828,9,extracted,table/BattleRom_Times16.bin,
@@ -494,7 +495,7 @@ BattleRom_EnemyTechScripts,$CD:61F0,$CD:63EF,512,battle,battle/actions.bscr,acti
 BattleRom_Kind3Scripts,$CD:63F0,$CD:64AF,192,battle,battle/actions.bscr,actions/table
 BattleRom_PcAttackObjs,$CD:64B0,$CD:656D,190,extracted,table/BattleRom_PcAttackObjs.bin,
 BattleRom_TechObjs,$CD:656E,$CD:666D,256,extracted,table/BattleRom_TechObjs.bin,
-BattleRom_EnemyActObjs,$CD:666E,$CD:686D,512,extracted,table/BattleRom_EnemyActObjs.bin,
+BattleRom_EnemyActObjs,$CD:666E,$CD:686D,512,records,records/BattleRom_EnemyActObjs.tsv,table 256 x 2 B
 BattleRom_PcAttackPals,$CD:686E,$CD:692B,190,extracted,table/BattleRom_PcAttackPals.bin,
 BattleRom_PcTechPals,$CD:692C,$CD:6A2B,256,extracted,table/BattleRom_PcTechPals.bin,
 BattleRom_EnemyActPals,$CD:6A2C,$CD:6C2B,512,records,records/BattleRom_EnemyActPals.tsv,table 256 x 2 B
@@ -511,7 +512,8 @@ BattleRom_ActSubscripts,$CE:0000,$CE:00FF,256,battle,battle/actions.bscr,actions
 BattleRom_FxCycleColours,$CE:0100,$CE:037F,640,extracted,palette/BattleRom_FxCycleColours.bin,
 BattleScript_CE0380,$CE:0380,$CE:8293,32532,battle,battle/actions.bscr,actions/scripts
 BattleScript_CE8294,$CE:8294,$CE:886F,1500,battle,battle/actions.bscr,actions/scripts
-Table_CE8870,$CE:8870,$CE:D427,19384,extracted,table/Table_CE8870.bin,
+BattleRom_ActObjRec_Lists,$CE:8870,$CE:D1BB,18764,records,records/BattleRom_ActObjRec_Lists.tsv,table 4691 x 4 B
+Unknown_CED1BC,$CE:D1BC,$CE:D427,620,extracted,unknown/Unknown_CED1BC.bin,
 BattleScript_CED428,$CE:D428,$CE:DC19,2034,battle,battle/actions.bscr,actions/scripts
 Padding_CEDC1A,$CE:DC1A,$CE:DFFF,998,fill,,$FF
 BattleRom_MsgStrings,$CE:EF11,$CE:EFDF,207,text,text/BattleMessages.txt,strtable
@@ -535,13 +537,13 @@ BattleRom_DissolveRanges,$CE:F192,$CE:F1C1,48,extracted,table/BattleRom_Dissolve
 BattleRom_DissolveMask,$CE:F1C2,$CE:F1D1,16,records,records/BattleRom_DissolveMask.tsv,table 8 x 2 B
 BattleRom_FxBobSteps,$CE:F1D2,$CE:F24D,124,extracted,table/BattleRom_FxBobSteps.bin,
 BattleRom_HdmaSetOfs,$CE:F24E,$CE:F28D,64,extracted,table/BattleRom_HdmaSetOfs.bin,
-BattleRom_HalfPlaneEdge,$CE:F28E,$CE:F48D,512,extracted,table/BattleRom_HalfPlaneEdge.bin,
+BattleRom_HalfPlaneEdge,$CE:F28E,$CE:F48D,512,records,records/BattleRom_HalfPlaneEdge.tsv,table 256 x 2 B
 BattleRom_AbsSine,$CE:F48E,$CE:F58D,256,records,records/BattleRom_AbsSine.tsv,table 256 x 1 B
 BattleRom_HdmaSetRecs,$CE:F58E,$CE:FFFF,2674,extracted,table/BattleRom_HdmaSetRecs.bin,
 BattleRom_FxTileGfx,$CF:0000,$CF:7FFF,32768,extracted,graphics/BattleRom_FxTileGfx.bin,
 BattleRom_FxTileLists,$CF:8000,$CF:9FFF,8192,extracted,table/BattleRom_FxTileLists.bin,
-BattleRom_FxGfxLists,$CF:A000,$CF:DFFF,16384,extracted,table/BattleRom_FxGfxLists.bin,
-BattleRom_FxGfxColours,$CF:E000,$CF:E1FF,512,extracted,table/BattleRom_FxGfxColours.bin,
+BattleRom_FxGfxLists,$CF:A000,$CF:DFFF,16384,records,records/BattleRom_FxGfxLists.tsv,table 256 x 64 B
+BattleRom_FxGfxColours,$CF:E000,$CF:E1FF,512,records,records/BattleRom_FxGfxColours.tsv,table 256 x 2 B
 BattleRom_FxPalBits,$CF:E200,$CF:E27F,128,extracted,table/BattleRom_FxPalBits.bin,
 Padding_CFE280,$CF:E280,$CF:E2FF,128,fill,,$FF
 BattleRom_FxGfxSrc,$D0:0000,$D0:DEBF,57024,extracted,graphics/BattleRom_FxGfxSrc.bin,
@@ -554,140 +556,141 @@ BattleBgMapPack_003,$D0:EB00,$D0:ED8A,651,packed,packed_lz/BattleBgMapPack_003.b
 BattleBgMapPack_004,$D0:ED8B,$D0:F197,1037,packed,packed_lz/BattleBgMapPack_004.bin,lz11 -> 2048 B
 BattleBgMapPack_005,$D0:F198,$D0:F98E,2039,packed,packed_lz/BattleBgMapPack_005.bin,lz11 -> 2048 B
 Padding_D0F98F,$D0:F98F,$D0:F9FF,113,fill,,$00
-BattleRom_BgSetPalettes,$D0:FA00,$D0:FBE1,482,extracted,palette/BattleRom_BgSetPalettes.bin,
+BattleRom_BgSetPalettes,$D0:FA00,$D0:FBDF,480,records,records/BattleRom_BgSetPalettes.tsv,palette 15 x 32 B
+Unknown_D0FBE0,$D0:FBE0,$D0:FBE1,2,extracted,unknown/Unknown_D0FBE0.bin,
 BattleRom_GradColours,$D0:FBE2,$D0:FCFF,286,extracted,palette/BattleRom_GradColours.bin,
 Palette_D0FD00,$D0:FD00,$D0:FD5F,96,records,records/Palette_D0FD00.tsv,palette 48 x 2 B
 Padding_D0FD60,$D0:FD60,$D0:FFFF,672,fill,,$FF
 BattleRom_PcAttackFrames,$D1:0000,$D1:005F,96,table,,dw x 48
 BattleRom_ActFrames,$D1:0060,$D1:00FF,160,table,,dw x 80
-ActFramesPack_000,$D1:0100,$D1:015A,91,packed,packed_lz/ActFramesPack_000.bin,lz11 -> 101 B
-ActFramesPack_001,$D1:015B,$D1:01B9,95,packed,packed_lz/ActFramesPack_001.bin,lz11 -> 106 B
-ActFramesPack_002,$D1:01BA,$D1:0226,109,packed,packed_lz/ActFramesPack_002.bin,lz11 -> 140 B
-ActFramesPack_003,$D1:0227,$D1:029A,116,packed,packed_lz/ActFramesPack_003.bin,lz11 -> 127 B
-ActFramesPack_004,$D1:029B,$D1:02E1,71,packed,packed_lz/ActFramesPack_004.bin,lz11 -> 70 B
-ActFramesPack_005,$D1:02E2,$D1:031C,59,packed,packed_lz/ActFramesPack_005.bin,lz11 -> 84 B
-ActFramesPack_006,$D1:031D,$D1:03C8,172,packed,packed_lz/ActFramesPack_006.bin,lz11 -> 198 B
-ActFramesPack_007,$D1:03C9,$D1:043E,118,packed,packed_lz/ActFramesPack_007.bin,lz11 -> 198 B
-ActFramesPack_008,$D1:043F,$D1:04AF,113,packed,packed_lz/ActFramesPack_008.bin,lz11 -> 113 B
-ActFramesPack_009,$D1:04B0,$D1:04FB,76,packed,packed_lz/ActFramesPack_009.bin,lz11 -> 88 B
-ActFramesPack_010,$D1:04FC,$D1:0553,88,packed,packed_lz/ActFramesPack_010.bin,lz11 -> 107 B
-ActFramesPack_011,$D1:0554,$D1:058B,56,packed,packed_lz/ActFramesPack_011.bin,lz11 -> 78 B
-ActFramesPack_012,$D1:058C,$D1:0691,262,packed,packed_lz/ActFramesPack_012.bin,lz11 -> 273 B
-ActFramesPack_013,$D1:0692,$D1:073A,169,packed,packed_lz/ActFramesPack_013.bin,lz11 -> 238 B
-ActFramesPack_014,$D1:073B,$D1:079E,100,packed,packed_lz/ActFramesPack_014.bin,lz11 -> 126 B
-ActFramesPack_015,$D1:079F,$D1:0824,134,packed,packed_lz/ActFramesPack_015.bin,lz11 -> 165 B
-ActFramesPack_016,$D1:0825,$D1:0892,110,packed,packed_lz/ActFramesPack_016.bin,lz11 -> 140 B
-ActFramesPack_017,$D1:0893,$D1:091B,137,packed,packed_lz/ActFramesPack_017.bin,lz11 -> 205 B
-ActFramesPack_018,$D1:091C,$D1:095D,66,packed,packed_lz/ActFramesPack_018.bin,lz11 -> 80 B
-ActFramesPack_019,$D1:095E,$D1:09C5,104,packed,packed_lz/ActFramesPack_019.bin,lz11 -> 126 B
-ActFramesPack_020,$D1:09C6,$D1:0A48,131,packed,packed_lz/ActFramesPack_020.bin,lz11 -> 180 B
-ActFramesPack_021,$D1:0A49,$D1:0AAF,103,packed,packed_lz/ActFramesPack_021.bin,lz11 -> 115 B
-ActFramesPack_022,$D1:0AB0,$D1:0B28,121,packed,packed_lz/ActFramesPack_022.bin,lz11 -> 156 B
-ActFramesPack_023,$D1:0B29,$D1:0BB4,140,packed,packed_lz/ActFramesPack_023.bin,lz11 -> 184 B
-ActFramesPack_024,$D1:0BB5,$D1:0CEC,312,packed,packed_lz/ActFramesPack_024.bin,lz11 -> 375 B
-ActFramesPack_025,$D1:0CED,$D1:0D79,141,packed,packed_lz/ActFramesPack_025.bin,lz11 -> 156 B
-ActFramesPack_026,$D1:0D7A,$D1:0DB6,61,packed,packed_lz/ActFramesPack_026.bin,lz11 -> 126 B
-ActFramesPack_027,$D1:0DB7,$D1:0E30,122,packed,packed_lz/ActFramesPack_027.bin,lz11 -> 172 B
-ActFramesPack_028,$D1:0E31,$D1:0E91,97,packed,packed_lz/ActFramesPack_028.bin,lz11 -> 114 B
-ActFramesPack_029,$D1:0E92,$D1:0F4B,186,packed,packed_lz/ActFramesPack_029.bin,lz11 -> 235 B
-ActFramesPack_030,$D1:0F4C,$D1:1037,236,packed,packed_lz/ActFramesPack_030.bin,lz11 -> 320 B
-ActFramesPack_031,$D1:1038,$D1:10B3,124,packed,packed_lz/ActFramesPack_031.bin,lz11 -> 143 B
-ActFramesPack_032,$D1:10B4,$D1:111A,103,packed,packed_lz/ActFramesPack_032.bin,lz11 -> 121 B
-ActFramesPack_033,$D1:111B,$D1:11BB,161,packed,packed_lz/ActFramesPack_033.bin,lz11 -> 195 B
-ActFramesPack_034,$D1:11BC,$D1:126F,180,packed,packed_lz/ActFramesPack_034.bin,lz11 -> 248 B
-ActFramesPack_035,$D1:1270,$D1:1342,211,packed,packed_lz/ActFramesPack_035.bin,lz11 -> 232 B
-ActFramesPack_036,$D1:1343,$D1:13AB,105,packed,packed_lz/ActFramesPack_036.bin,lz11 -> 112 B
-ActFramesPack_037,$D1:13AC,$D1:1430,133,packed,packed_lz/ActFramesPack_037.bin,lz11 -> 170 B
-ActFramesPack_038,$D1:1431,$D1:1487,87,packed,packed_lz/ActFramesPack_038.bin,lz11 -> 108 B
-ActFramesPack_039,$D1:1488,$D1:1565,222,packed,packed_lz/ActFramesPack_039.bin,lz11 -> 271 B
-ActFramesPack_040,$D1:1566,$D1:15C6,97,packed,packed_lz/ActFramesPack_040.bin,lz11 -> 104 B
-ActFramesPack_041,$D1:15C7,$D1:1658,146,packed,packed_lz/ActFramesPack_041.bin,lz11 -> 152 B
-ActFramesPack_042,$D1:1659,$D1:16BD,101,packed,packed_lz/ActFramesPack_042.bin,lz11 -> 118 B
-ActFramesPack_043,$D1:16BE,$D1:1759,156,packed,packed_lz/ActFramesPack_043.bin,lz11 -> 180 B
-ActFramesPack_044,$D1:175A,$D1:182B,210,packed,packed_lz/ActFramesPack_044.bin,lz11 -> 216 B
-ActFramesPack_045,$D1:182C,$D1:18D8,173,packed,packed_lz/ActFramesPack_045.bin,lz11 -> 175 B
-ActFramesPack_046,$D1:18D9,$D1:19B7,223,packed,packed_lz/ActFramesPack_046.bin,lz11 -> 286 B
-ActFramesPack_047,$D1:19B8,$D1:1A03,76,packed,packed_lz/ActFramesPack_047.bin,lz11 -> 79 B
-ActFramesPack_048,$D1:1A04,$D1:1A34,49,packed,packed_lz/ActFramesPack_048.bin,lz11 -> 50 B
-ActFramesPack_049,$D1:1A35,$D1:1A65,49,packed,packed_lz/ActFramesPack_049.bin,lz11 -> 50 B
-ActFramesPack_050,$D1:1A66,$D1:1ADD,120,packed,packed_lz/ActFramesPack_050.bin,lz11 -> 152 B
-ActFramesPack_051,$D1:1ADE,$D1:1B2C,79,packed,packed_lz/ActFramesPack_051.bin,lz11 -> 87 B
-ActFramesPack_052,$D1:1B2D,$D1:1B45,25,packed,packed_lz/ActFramesPack_052.bin,lz11 -> 24 B
-ActFramesPack_053,$D1:1B46,$D1:1B6B,38,packed,packed_lz/ActFramesPack_053.bin,lz11 -> 48 B
-ActFramesPack_054,$D1:1B6C,$D1:1C98,301,packed,packed_lz/ActFramesPack_054.bin,lz11 -> 479 B
-ActFramesPack_055,$D1:1C99,$D1:1D0B,115,packed,packed_lz/ActFramesPack_055.bin,lz11 -> 134 B
-ActFramesPack_056,$D1:1D0C,$D1:1D24,25,packed,packed_lz/ActFramesPack_056.bin,lz11 -> 24 B
-ActFramesPack_057,$D1:1D25,$D1:1D55,49,packed,packed_lz/ActFramesPack_057.bin,lz11 -> 50 B
-ActFramesPack_058,$D1:1D56,$D1:1D9A,69,packed,packed_lz/ActFramesPack_058.bin,lz11 -> 102 B
-ActFramesPack_059,$D1:1D9B,$D1:1E1E,132,packed,packed_lz/ActFramesPack_059.bin,lz11 -> 173 B
-ActFramesPack_060,$D1:1E1F,$D1:1ED5,183,packed,packed_lz/ActFramesPack_060.bin,lz11 -> 198 B
-ActFramesPack_061,$D1:1ED6,$D1:1EEB,22,packed,packed_lz/ActFramesPack_061.bin,lz11 -> 18 B
-ActFramesPack_062,$D1:1EEC,$D1:1F14,41,packed,packed_lz/ActFramesPack_062.bin,lz11 -> 48 B
-ActFramesPack_063,$D1:1F15,$D1:1F2D,25,packed,packed_lz/ActFramesPack_063.bin,lz11 -> 24 B
-ActFramesPack_064,$D1:1F2E,$D1:1F90,99,packed,packed_lz/ActFramesPack_064.bin,lz11 -> 110 B
-ActFramesPack_065,$D1:1F91,$D1:1FFA,106,packed,packed_lz/ActFramesPack_065.bin,lz11 -> 122 B
-ActFramesPack_066,$D1:1FFB,$D1:2163,361,packed,packed_lz/ActFramesPack_066.bin,lz11 -> 688 B
-ActFramesPack_067,$D1:2164,$D1:21E7,132,packed,packed_lz/ActFramesPack_067.bin,lz11 -> 164 B
-ActFramesPack_068,$D1:21E8,$D1:2225,62,packed,packed_lz/ActFramesPack_068.bin,lz11 -> 98 B
-ActFramesPack_069,$D1:2226,$D1:2246,33,packed,packed_lz/ActFramesPack_069.bin,lz11 -> 30 B
-ActFramesPack_070,$D1:2247,$D1:2334,238,packed,packed_lz/ActFramesPack_070.bin,lz11 -> 310 B
-ActFramesPack_071,$D1:2335,$D1:238A,86,packed,packed_lz/ActFramesPack_071.bin,lz11 -> 108 B
-ActFramesPack_072,$D1:238B,$D1:23F8,110,packed,packed_lz/ActFramesPack_072.bin,lz11 -> 119 B
-ActFramesPack_073,$D1:23F9,$D1:248E,150,packed,packed_lz/ActFramesPack_073.bin,lz11 -> 215 B
-ActFramesPack_074,$D1:248F,$D1:252F,161,packed,packed_lz/ActFramesPack_074.bin,lz11 -> 169 B
-ActFramesPack_075,$D1:2530,$D1:255F,48,packed,packed_lz/ActFramesPack_075.bin,lz11 -> 66 B
-ActFramesPack_076,$D1:2560,$D1:2591,50,packed,packed_lz/ActFramesPack_076.bin,lz11 -> 39 B
-ActFramesPack_077,$D1:2592,$D1:25C8,55,packed,packed_lz/ActFramesPack_077.bin,lz11 -> 62 B
-ActFramesPack_078,$D1:25C9,$D1:263C,116,packed,packed_lz/ActFramesPack_078.bin,lz11 -> 158 B
-ActFramesPack_079,$D1:263D,$D1:268D,81,packed,packed_lz/ActFramesPack_079.bin,lz11 -> 110 B
-ActFramesPack_080,$D1:268E,$D1:26C3,54,packed,packed_lz/ActFramesPack_080.bin,lz11 -> 52 B
-ActFramesPack_081,$D1:26C4,$D1:2745,130,packed,packed_lz/ActFramesPack_081.bin,lz11 -> 131 B
-ActFramesPack_082,$D1:2746,$D1:27BD,120,packed,packed_lz/ActFramesPack_082.bin,lz11 -> 137 B
-ActFramesPack_083,$D1:27BE,$D1:2817,90,packed,packed_lz/ActFramesPack_083.bin,lz11 -> 111 B
-ActFramesPack_084,$D1:2818,$D1:2879,98,packed,packed_lz/ActFramesPack_084.bin,lz11 -> 130 B
-ActFramesPack_085,$D1:287A,$D1:2947,206,packed,packed_lz/ActFramesPack_085.bin,lz11 -> 288 B
-ActFramesPack_086,$D1:2948,$D1:29FD,182,packed,packed_lz/ActFramesPack_086.bin,lz11 -> 223 B
-ActFramesPack_087,$D1:29FE,$D1:2AB4,183,packed,packed_lz/ActFramesPack_087.bin,lz11 -> 228 B
-ActFramesPack_088,$D1:2AB5,$D1:2B5F,171,packed,packed_lz/ActFramesPack_088.bin,lz11 -> 231 B
-ActFramesPack_089,$D1:2B60,$D1:2B9F,64,packed,packed_lz/ActFramesPack_089.bin,lz11 -> 96 B
-ActFramesPack_090,$D1:2BA0,$D1:2BBE,31,packed,packed_lz/ActFramesPack_090.bin,lz11 -> 27 B
-ActFramesPack_091,$D1:2BBF,$D1:2C0F,81,packed,packed_lz/ActFramesPack_091.bin,lz11 -> 117 B
-ActFramesPack_092,$D1:2C10,$D1:2C73,100,packed,packed_lz/ActFramesPack_092.bin,lz11 -> 131 B
-ActFramesPack_093,$D1:2C74,$D1:2CD4,97,packed,packed_lz/ActFramesPack_093.bin,lz11 -> 104 B
-ActFramesPack_094,$D1:2CD5,$D1:2D3A,102,packed,packed_lz/ActFramesPack_094.bin,lz11 -> 111 B
-ActFramesPack_095,$D1:2D3B,$D1:2DDB,161,packed,packed_lz/ActFramesPack_095.bin,lz11 -> 195 B
-ActFramesPack_096,$D1:2DDC,$D1:2E2C,81,packed,packed_lz/ActFramesPack_096.bin,lz11 -> 94 B
-ActFramesPack_097,$D1:2E2D,$D1:2E82,86,packed,packed_lz/ActFramesPack_097.bin,lz11 -> 76 B
-ActFramesPack_098,$D1:2E83,$D1:2F3B,185,packed,packed_lz/ActFramesPack_098.bin,lz11 -> 280 B
-ActFramesPack_099,$D1:2F3C,$D1:2F5D,34,packed,packed_lz/ActFramesPack_099.bin,lz11 -> 36 B
-ActFramesPack_100,$D1:2F5E,$D1:2F87,42,packed,packed_lz/ActFramesPack_100.bin,lz11 -> 44 B
-ActFramesPack_101,$D1:2F88,$D1:3037,176,packed,packed_lz/ActFramesPack_101.bin,lz11 -> 194 B
-ActFramesPack_102,$D1:3038,$D1:308F,88,packed,packed_lz/ActFramesPack_102.bin,lz11 -> 86 B
-ActFramesPack_103,$D1:3090,$D1:30BB,44,packed,packed_lz/ActFramesPack_103.bin,lz11 -> 48 B
-ActFramesPack_104,$D1:30BC,$D1:3101,70,packed,packed_lz/ActFramesPack_104.bin,lz11 -> 95 B
-ActFramesPack_105,$D1:3102,$D1:3142,65,packed,packed_lz/ActFramesPack_105.bin,lz11 -> 67 B
-ActFramesPack_106,$D1:3143,$D1:31AF,109,packed,packed_lz/ActFramesPack_106.bin,lz11 -> 92 B
-ActFramesPack_107,$D1:31B0,$D1:3266,183,packed,packed_lz/ActFramesPack_107.bin,lz11 -> 285 B
-ActFramesPack_108,$D1:3267,$D1:32DE,120,packed,packed_lz/ActFramesPack_108.bin,lz11 -> 140 B
-ActFramesPack_109,$D1:32DF,$D1:3330,82,packed,packed_lz/ActFramesPack_109.bin,lz11 -> 80 B
-ActFramesPack_110,$D1:3331,$D1:3388,88,packed,packed_lz/ActFramesPack_110.bin,lz11 -> 96 B
-ActFramesPack_111,$D1:3389,$D1:33C1,57,packed,packed_lz/ActFramesPack_111.bin,lz11 -> 48 B
-ActFramesPack_112,$D1:33C2,$D1:3449,136,packed,packed_lz/ActFramesPack_112.bin,lz11 -> 136 B
-ActFramesPack_113,$D1:344A,$D1:3485,60,packed,packed_lz/ActFramesPack_113.bin,lz11 -> 59 B
-ActFramesPack_114,$D1:3486,$D1:3568,227,packed,packed_lz/ActFramesPack_114.bin,lz11 -> 208 B
-ActFramesPack_115,$D1:3569,$D1:35C1,89,packed,packed_lz/ActFramesPack_115.bin,lz11 -> 94 B
-ActFramesPack_116,$D1:35C2,$D1:3601,64,packed,packed_lz/ActFramesPack_116.bin,lz11 -> 94 B
-ActFramesPack_117,$D1:3602,$D1:36DC,219,packed,packed_lz/ActFramesPack_117.bin,lz11 -> 224 B
-ActFramesPack_118,$D1:36DD,$D1:3705,41,packed,packed_lz/ActFramesPack_118.bin,lz11 -> 39 B
-ActFramesPack_119,$D1:3706,$D1:3708,3,packed,packed_lz/ActFramesPack_119.bin,lz12 -> 0 B
-ActFramesPack_120,$D1:3709,$D1:370B,3,packed,packed_lz/ActFramesPack_120.bin,lz12 -> 0 B
-ActFramesPack_121,$D1:370C,$D1:370E,3,packed,packed_lz/ActFramesPack_121.bin,lz12 -> 0 B
-ActFramesPack_122,$D1:370F,$D1:3711,3,packed,packed_lz/ActFramesPack_122.bin,lz12 -> 0 B
-ActFramesPack_123,$D1:3712,$D1:3714,3,packed,packed_lz/ActFramesPack_123.bin,lz12 -> 0 B
-ActFramesPack_124,$D1:3715,$D1:3717,3,packed,packed_lz/ActFramesPack_124.bin,lz12 -> 0 B
-ActFramesPack_125,$D1:3718,$D1:371A,3,packed,packed_lz/ActFramesPack_125.bin,lz12 -> 0 B
-ActFramesPack_126,$D1:371B,$D1:371D,3,packed,packed_lz/ActFramesPack_126.bin,lz12 -> 0 B
-ActFramesPack_127,$D1:371E,$D1:3720,3,packed,packed_lz/ActFramesPack_127.bin,lz12 -> 0 B
+ActFramesPack_000,$D1:0100,$D1:015A,91,actframes,actframes/ActFramesPack_000.afr,lz11 -> 101 B
+ActFramesPack_001,$D1:015B,$D1:01B9,95,actframes,actframes/ActFramesPack_001.afr,lz11 -> 106 B
+ActFramesPack_002,$D1:01BA,$D1:0226,109,actframes,actframes/ActFramesPack_002.afr,lz11 -> 140 B
+ActFramesPack_003,$D1:0227,$D1:029A,116,actframes,actframes/ActFramesPack_003.afr,lz11 -> 127 B
+ActFramesPack_004,$D1:029B,$D1:02E1,71,actframes,actframes/ActFramesPack_004.afr,lz11 -> 70 B
+ActFramesPack_005,$D1:02E2,$D1:031C,59,actframes,actframes/ActFramesPack_005.afr,lz11 -> 84 B
+ActFramesPack_006,$D1:031D,$D1:03C8,172,actframes,actframes/ActFramesPack_006.afr,lz11 -> 198 B
+ActFramesPack_007,$D1:03C9,$D1:043E,118,actframes,actframes/ActFramesPack_007.afr,lz11 -> 198 B
+ActFramesPack_008,$D1:043F,$D1:04AF,113,actframes,actframes/ActFramesPack_008.afr,lz11 -> 113 B
+ActFramesPack_009,$D1:04B0,$D1:04FB,76,actframes,actframes/ActFramesPack_009.afr,lz11 -> 88 B
+ActFramesPack_010,$D1:04FC,$D1:0553,88,actframes,actframes/ActFramesPack_010.afr,lz11 -> 107 B
+ActFramesPack_011,$D1:0554,$D1:058B,56,actframes,actframes/ActFramesPack_011.afr,lz11 -> 78 B
+ActFramesPack_012,$D1:058C,$D1:0691,262,actframes,actframes/ActFramesPack_012.afr,lz11 -> 273 B
+ActFramesPack_013,$D1:0692,$D1:073A,169,actframes,actframes/ActFramesPack_013.afr,lz11 -> 238 B
+ActFramesPack_014,$D1:073B,$D1:079E,100,actframes,actframes/ActFramesPack_014.afr,lz11 -> 126 B
+ActFramesPack_015,$D1:079F,$D1:0824,134,actframes,actframes/ActFramesPack_015.afr,lz11 -> 165 B
+ActFramesPack_016,$D1:0825,$D1:0892,110,actframes,actframes/ActFramesPack_016.afr,lz11 -> 140 B
+ActFramesPack_017,$D1:0893,$D1:091B,137,actframes,actframes/ActFramesPack_017.afr,lz11 -> 205 B
+ActFramesPack_018,$D1:091C,$D1:095D,66,actframes,actframes/ActFramesPack_018.afr,lz11 -> 80 B
+ActFramesPack_019,$D1:095E,$D1:09C5,104,actframes,actframes/ActFramesPack_019.afr,lz11 -> 126 B
+ActFramesPack_020,$D1:09C6,$D1:0A48,131,actframes,actframes/ActFramesPack_020.afr,lz11 -> 180 B
+ActFramesPack_021,$D1:0A49,$D1:0AAF,103,actframes,actframes/ActFramesPack_021.afr,lz11 -> 115 B
+ActFramesPack_022,$D1:0AB0,$D1:0B28,121,actframes,actframes/ActFramesPack_022.afr,lz11 -> 156 B
+ActFramesPack_023,$D1:0B29,$D1:0BB4,140,actframes,actframes/ActFramesPack_023.afr,lz11 -> 184 B
+ActFramesPack_024,$D1:0BB5,$D1:0CEC,312,actframes,actframes/ActFramesPack_024.afr,lz11 -> 375 B
+ActFramesPack_025,$D1:0CED,$D1:0D79,141,actframes,actframes/ActFramesPack_025.afr,lz11 -> 156 B
+ActFramesPack_026,$D1:0D7A,$D1:0DB6,61,actframes,actframes/ActFramesPack_026.afr,lz11 -> 126 B
+ActFramesPack_027,$D1:0DB7,$D1:0E30,122,actframes,actframes/ActFramesPack_027.afr,lz11 -> 172 B
+ActFramesPack_028,$D1:0E31,$D1:0E91,97,actframes,actframes/ActFramesPack_028.afr,lz11 -> 114 B
+ActFramesPack_029,$D1:0E92,$D1:0F4B,186,actframes,actframes/ActFramesPack_029.afr,lz11 -> 235 B
+ActFramesPack_030,$D1:0F4C,$D1:1037,236,actframes,actframes/ActFramesPack_030.afr,lz11 -> 320 B
+ActFramesPack_031,$D1:1038,$D1:10B3,124,actframes,actframes/ActFramesPack_031.afr,lz11 -> 143 B
+ActFramesPack_032,$D1:10B4,$D1:111A,103,actframes,actframes/ActFramesPack_032.afr,lz11 -> 121 B
+ActFramesPack_033,$D1:111B,$D1:11BB,161,actframes,actframes/ActFramesPack_033.afr,lz11 -> 195 B
+ActFramesPack_034,$D1:11BC,$D1:126F,180,actframes,actframes/ActFramesPack_034.afr,lz11 -> 248 B
+ActFramesPack_035,$D1:1270,$D1:1342,211,actframes,actframes/ActFramesPack_035.afr,lz11 -> 232 B
+ActFramesPack_036,$D1:1343,$D1:13AB,105,actframes,actframes/ActFramesPack_036.afr,lz11 -> 112 B
+ActFramesPack_037,$D1:13AC,$D1:1430,133,actframes,actframes/ActFramesPack_037.afr,lz11 -> 170 B
+ActFramesPack_038,$D1:1431,$D1:1487,87,actframes,actframes/ActFramesPack_038.afr,lz11 -> 108 B
+ActFramesPack_039,$D1:1488,$D1:1565,222,actframes,actframes/ActFramesPack_039.afr,lz11 -> 271 B
+ActFramesPack_040,$D1:1566,$D1:15C6,97,actframes,actframes/ActFramesPack_040.afr,lz11 -> 104 B
+ActFramesPack_041,$D1:15C7,$D1:1658,146,actframes,actframes/ActFramesPack_041.afr,lz11 -> 152 B
+ActFramesPack_042,$D1:1659,$D1:16BD,101,actframes,actframes/ActFramesPack_042.afr,lz11 -> 118 B
+ActFramesPack_043,$D1:16BE,$D1:1759,156,actframes,actframes/ActFramesPack_043.afr,lz11 -> 180 B
+ActFramesPack_044,$D1:175A,$D1:182B,210,actframes,actframes/ActFramesPack_044.afr,lz11 -> 216 B
+ActFramesPack_045,$D1:182C,$D1:18D8,173,actframes,actframes/ActFramesPack_045.afr,lz11 -> 175 B
+ActFramesPack_046,$D1:18D9,$D1:19B7,223,actframes,actframes/ActFramesPack_046.afr,lz11 -> 286 B
+ActFramesPack_047,$D1:19B8,$D1:1A03,76,actframes,actframes/ActFramesPack_047.afr,lz11 -> 79 B
+ActFramesPack_048,$D1:1A04,$D1:1A34,49,actframes,actframes/ActFramesPack_048.afr,lz11 -> 50 B
+ActFramesPack_049,$D1:1A35,$D1:1A65,49,actframes,actframes/ActFramesPack_049.afr,lz11 -> 50 B
+ActFramesPack_050,$D1:1A66,$D1:1ADD,120,actframes,actframes/ActFramesPack_050.afr,lz11 -> 152 B
+ActFramesPack_051,$D1:1ADE,$D1:1B2C,79,actframes,actframes/ActFramesPack_051.afr,lz11 -> 87 B
+ActFramesPack_052,$D1:1B2D,$D1:1B45,25,actframes,actframes/ActFramesPack_052.afr,lz11 -> 24 B
+ActFramesPack_053,$D1:1B46,$D1:1B6B,38,actframes,actframes/ActFramesPack_053.afr,lz11 -> 48 B
+ActFramesPack_054,$D1:1B6C,$D1:1C98,301,actframes,actframes/ActFramesPack_054.afr,lz11 -> 479 B
+ActFramesPack_055,$D1:1C99,$D1:1D0B,115,actframes,actframes/ActFramesPack_055.afr,lz11 -> 134 B
+ActFramesPack_056,$D1:1D0C,$D1:1D24,25,actframes,actframes/ActFramesPack_056.afr,lz11 -> 24 B
+ActFramesPack_057,$D1:1D25,$D1:1D55,49,actframes,actframes/ActFramesPack_057.afr,lz11 -> 50 B
+ActFramesPack_058,$D1:1D56,$D1:1D9A,69,actframes,actframes/ActFramesPack_058.afr,lz11 -> 102 B
+ActFramesPack_059,$D1:1D9B,$D1:1E1E,132,actframes,actframes/ActFramesPack_059.afr,lz11 -> 173 B
+ActFramesPack_060,$D1:1E1F,$D1:1ED5,183,actframes,actframes/ActFramesPack_060.afr,lz11 -> 198 B
+ActFramesPack_061,$D1:1ED6,$D1:1EEB,22,actframes,actframes/ActFramesPack_061.afr,lz11 -> 18 B
+ActFramesPack_062,$D1:1EEC,$D1:1F14,41,actframes,actframes/ActFramesPack_062.afr,lz11 -> 48 B
+ActFramesPack_063,$D1:1F15,$D1:1F2D,25,actframes,actframes/ActFramesPack_063.afr,lz11 -> 24 B
+ActFramesPack_064,$D1:1F2E,$D1:1F90,99,actframes,actframes/ActFramesPack_064.afr,lz11 -> 110 B
+ActFramesPack_065,$D1:1F91,$D1:1FFA,106,actframes,actframes/ActFramesPack_065.afr,lz11 -> 122 B
+ActFramesPack_066,$D1:1FFB,$D1:2163,361,actframes,actframes/ActFramesPack_066.afr,lz11 -> 688 B
+ActFramesPack_067,$D1:2164,$D1:21E7,132,actframes,actframes/ActFramesPack_067.afr,lz11 -> 164 B
+ActFramesPack_068,$D1:21E8,$D1:2225,62,actframes,actframes/ActFramesPack_068.afr,lz11 -> 98 B
+ActFramesPack_069,$D1:2226,$D1:2246,33,actframes,actframes/ActFramesPack_069.afr,lz11 -> 30 B
+ActFramesPack_070,$D1:2247,$D1:2334,238,actframes,actframes/ActFramesPack_070.afr,lz11 -> 310 B
+ActFramesPack_071,$D1:2335,$D1:238A,86,actframes,actframes/ActFramesPack_071.afr,lz11 -> 108 B
+ActFramesPack_072,$D1:238B,$D1:23F8,110,actframes,actframes/ActFramesPack_072.afr,lz11 -> 119 B
+ActFramesPack_073,$D1:23F9,$D1:248E,150,actframes,actframes/ActFramesPack_073.afr,lz11 -> 215 B
+ActFramesPack_074,$D1:248F,$D1:252F,161,actframes,actframes/ActFramesPack_074.afr,lz11 -> 169 B
+ActFramesPack_075,$D1:2530,$D1:255F,48,actframes,actframes/ActFramesPack_075.afr,lz11 -> 66 B
+ActFramesPack_076,$D1:2560,$D1:2591,50,actframes,actframes/ActFramesPack_076.afr,lz11 -> 39 B
+ActFramesPack_077,$D1:2592,$D1:25C8,55,actframes,actframes/ActFramesPack_077.afr,lz11 -> 62 B
+ActFramesPack_078,$D1:25C9,$D1:263C,116,actframes,actframes/ActFramesPack_078.afr,lz11 -> 158 B
+ActFramesPack_079,$D1:263D,$D1:268D,81,actframes,actframes/ActFramesPack_079.afr,lz11 -> 110 B
+ActFramesPack_080,$D1:268E,$D1:26C3,54,actframes,actframes/ActFramesPack_080.afr,lz11 -> 52 B
+ActFramesPack_081,$D1:26C4,$D1:2745,130,actframes,actframes/ActFramesPack_081.afr,lz11 -> 131 B
+ActFramesPack_082,$D1:2746,$D1:27BD,120,actframes,actframes/ActFramesPack_082.afr,lz11 -> 137 B
+ActFramesPack_083,$D1:27BE,$D1:2817,90,actframes,actframes/ActFramesPack_083.afr,lz11 -> 111 B
+ActFramesPack_084,$D1:2818,$D1:2879,98,actframes,actframes/ActFramesPack_084.afr,lz11 -> 130 B
+ActFramesPack_085,$D1:287A,$D1:2947,206,actframes,actframes/ActFramesPack_085.afr,lz11 -> 288 B
+ActFramesPack_086,$D1:2948,$D1:29FD,182,actframes,actframes/ActFramesPack_086.afr,lz11 -> 223 B
+ActFramesPack_087,$D1:29FE,$D1:2AB4,183,actframes,actframes/ActFramesPack_087.afr,lz11 -> 228 B
+ActFramesPack_088,$D1:2AB5,$D1:2B5F,171,actframes,actframes/ActFramesPack_088.afr,lz11 -> 231 B
+ActFramesPack_089,$D1:2B60,$D1:2B9F,64,actframes,actframes/ActFramesPack_089.afr,lz11 -> 96 B
+ActFramesPack_090,$D1:2BA0,$D1:2BBE,31,actframes,actframes/ActFramesPack_090.afr,lz11 -> 27 B
+ActFramesPack_091,$D1:2BBF,$D1:2C0F,81,actframes,actframes/ActFramesPack_091.afr,lz11 -> 117 B
+ActFramesPack_092,$D1:2C10,$D1:2C73,100,actframes,actframes/ActFramesPack_092.afr,lz11 -> 131 B
+ActFramesPack_093,$D1:2C74,$D1:2CD4,97,actframes,actframes/ActFramesPack_093.afr,lz11 -> 104 B
+ActFramesPack_094,$D1:2CD5,$D1:2D3A,102,actframes,actframes/ActFramesPack_094.afr,lz11 -> 111 B
+ActFramesPack_095,$D1:2D3B,$D1:2DDB,161,actframes,actframes/ActFramesPack_095.afr,lz11 -> 195 B
+ActFramesPack_096,$D1:2DDC,$D1:2E2C,81,actframes,actframes/ActFramesPack_096.afr,lz11 -> 94 B
+ActFramesPack_097,$D1:2E2D,$D1:2E82,86,actframes,actframes/ActFramesPack_097.afr,lz11 -> 76 B
+ActFramesPack_098,$D1:2E83,$D1:2F3B,185,actframes,actframes/ActFramesPack_098.afr,lz11 -> 280 B
+ActFramesPack_099,$D1:2F3C,$D1:2F5D,34,actframes,actframes/ActFramesPack_099.afr,lz11 -> 36 B
+ActFramesPack_100,$D1:2F5E,$D1:2F87,42,actframes,actframes/ActFramesPack_100.afr,lz11 -> 44 B
+ActFramesPack_101,$D1:2F88,$D1:3037,176,actframes,actframes/ActFramesPack_101.afr,lz11 -> 194 B
+ActFramesPack_102,$D1:3038,$D1:308F,88,actframes,actframes/ActFramesPack_102.afr,lz11 -> 86 B
+ActFramesPack_103,$D1:3090,$D1:30BB,44,actframes,actframes/ActFramesPack_103.afr,lz11 -> 48 B
+ActFramesPack_104,$D1:30BC,$D1:3101,70,actframes,actframes/ActFramesPack_104.afr,lz11 -> 95 B
+ActFramesPack_105,$D1:3102,$D1:3142,65,actframes,actframes/ActFramesPack_105.afr,lz11 -> 67 B
+ActFramesPack_106,$D1:3143,$D1:31AF,109,actframes,actframes/ActFramesPack_106.afr,lz11 -> 92 B
+ActFramesPack_107,$D1:31B0,$D1:3266,183,actframes,actframes/ActFramesPack_107.afr,lz11 -> 285 B
+ActFramesPack_108,$D1:3267,$D1:32DE,120,actframes,actframes/ActFramesPack_108.afr,lz11 -> 140 B
+ActFramesPack_109,$D1:32DF,$D1:3330,82,actframes,actframes/ActFramesPack_109.afr,lz11 -> 80 B
+ActFramesPack_110,$D1:3331,$D1:3388,88,actframes,actframes/ActFramesPack_110.afr,lz11 -> 96 B
+ActFramesPack_111,$D1:3389,$D1:33C1,57,actframes,actframes/ActFramesPack_111.afr,lz11 -> 48 B
+ActFramesPack_112,$D1:33C2,$D1:3449,136,actframes,actframes/ActFramesPack_112.afr,lz11 -> 136 B
+ActFramesPack_113,$D1:344A,$D1:3485,60,actframes,actframes/ActFramesPack_113.afr,lz11 -> 59 B
+ActFramesPack_114,$D1:3486,$D1:3568,227,actframes,actframes/ActFramesPack_114.afr,lz11 -> 208 B
+ActFramesPack_115,$D1:3569,$D1:35C1,89,actframes,actframes/ActFramesPack_115.afr,lz11 -> 94 B
+ActFramesPack_116,$D1:35C2,$D1:3601,64,actframes,actframes/ActFramesPack_116.afr,lz11 -> 94 B
+ActFramesPack_117,$D1:3602,$D1:36DC,219,actframes,actframes/ActFramesPack_117.afr,lz11 -> 224 B
+ActFramesPack_118,$D1:36DD,$D1:3705,41,actframes,actframes/ActFramesPack_118.afr,lz11 -> 39 B
+ActFramesPack_119,$D1:3706,$D1:3708,3,actframes,actframes/ActFramesPack_119.afr,lz12 -> 0 B
+ActFramesPack_120,$D1:3709,$D1:370B,3,actframes,actframes/ActFramesPack_120.afr,lz12 -> 0 B
+ActFramesPack_121,$D1:370C,$D1:370E,3,actframes,actframes/ActFramesPack_121.afr,lz12 -> 0 B
+ActFramesPack_122,$D1:370F,$D1:3711,3,actframes,actframes/ActFramesPack_122.afr,lz12 -> 0 B
+ActFramesPack_123,$D1:3712,$D1:3714,3,actframes,actframes/ActFramesPack_123.afr,lz12 -> 0 B
+ActFramesPack_124,$D1:3715,$D1:3717,3,actframes,actframes/ActFramesPack_124.afr,lz12 -> 0 B
+ActFramesPack_125,$D1:3718,$D1:371A,3,actframes,actframes/ActFramesPack_125.afr,lz12 -> 0 B
+ActFramesPack_126,$D1:371B,$D1:371D,3,actframes,actframes/ActFramesPack_126.afr,lz12 -> 0 B
+ActFramesPack_127,$D1:371E,$D1:3720,3,actframes,actframes/ActFramesPack_127.afr,lz12 -> 0 B
 Padding_D13721,$D1:3721,$D1:38F0,464,fill,,$00
 Unknown_D138F1,$D1:38F1,$D1:38F1,1,extracted,unknown/Unknown_D138F1.bin,
 BattleRom_UnkColours38F2,$D1:38F2,$D1:38F7,6,records,records/BattleRom_UnkColours38F2.tsv,palette 3 x 2 B
@@ -1098,16 +1101,22 @@ SprLayout_E346A0,$E3:46A0,$E3:E857,41400,sprframes,sprites/SprLayout_E346A0.spr,
 SprLayout_E3E858,$E3:E858,$E3:E8A7,80,extracted,sprite_layout/SprLayout_E3E858.bin,
 SprLayout_E3E8A8,$E3:E8A8,$E3:F90F,4200,sprframes,sprites/SprLayout_E3E8A8.spr,
 Padding_E3F910,$E3:F910,$E3:FFFF,1776,fill,,$00
-Table_E40000,$E4:0000,$E4:1FFF,8192,extracted,table/Table_E40000.bin,
+AnimRom_Palettes,$E4:0000,$E4:17FF,6144,records,records/AnimRom_Palettes.tsv,palette 256 x 24 B
+Padding_E41800,$E4:1800,$E4:1FFF,2048,fill,,$00
 BattleRom_SprTilesPtr,$E4:2000,$E4:22FF,768,table,,dl x 256
-BattleRom_SprFramesPtr,$E4:2300,$E4:25FF,768,extracted,table/BattleRom_SprFramesPtr.bin,
+BattleRom_SprFramesPtr,$E4:2300,$E4:25FF,768,table,,dl x 256
 BattleRom_SprAnimFrames,$E4:2600,$E4:27FF,512,records,records/BattleRom_SprAnimFrames.tsv,table 256 x 2 B
 BattleRom_SprAnimDurs,$E4:2800,$E4:29FF,512,records,records/BattleRom_SprAnimDurs.tsv,table 256 x 2 B
-Palette_E42A00,$E4:2A00,$E4:2FFF,1536,extracted,palette/Palette_E42A00.bin,
-Table_E43000,$E4:3000,$E4:A7FF,30720,extracted,table/Table_E43000.bin,
-Table_E4A800,$E4:A800,$E4:EFFF,18432,extracted,table/Table_E4A800.bin,
-RomE4_SprRec,$E4:F000,$E4:F521,1314,extracted,table/RomE4_SprRec.bin,
-Padding_E4F522,$E4:F522,$E4:F5FF,222,fill,,$00
+MenuRom_E4PalOffsets,$E4:2A00,$E4:2BFF,512,records,records/MenuRom_E4PalOffsets.tsv,table 256 x 2 B
+Padding_E42C00,$E4:2C00,$E4:2FFF,1024,fill,,$00
+AnimRom_FrameLists,$E4:3000,$E4:A5EF,30192,animframes,anims/AnimRom_FrameLists.anf,
+Unknown_E4A5F0,$E4:A5F0,$E4:A5F0,1,extracted,unknown/Unknown_E4A5F0.bin,
+Padding_E4A5F1,$E4:A5F1,$E4:A7FF,527,fill,,$00
+AnimRom_TimeLists,$E4:A800,$E4:CC56,9303,animtimes,anims/AnimRom_TimeLists.ant,
+Unknown_E4CC57,$E4:CC57,$E4:CC57,1,extracted,unknown/Unknown_E4CC57.bin,
+Padding_E4CC58,$E4:CC58,$E4:EFFF,9128,fill,,$00
+RomE4_SprRec,$E4:F000,$E4:F522,1315,records,records/RomE4_SprRec.tsv,table 263 x 5 B
+Padding_E4F523,$E4:F523,$E4:F5FF,221,fill,,$00
 RomE4_EnemySprRec,$E4:F600,$E4:FFDF,2528,extracted,table/RomE4_EnemySprRec.bin,
 Table_E4FFE0,$E4:FFE0,$E4:FFED,14,records,records/Table_E4FFE0.tsv,table 7 x 2 B
 Padding_E4FFEE,$E4:FFEE,$E4:FFFF,18,fill,,$00
@@ -1602,12 +1611,13 @@ MapData_F5F402,$F5:F402,$F5:F7E5,996,records,records/MapData_F5F402.tsv,map 249 
 Unknown_F5F7E6,$F5:F7E6,$F5:FE03,1566,extracted,unknown/Unknown_F5F7E6.bin,
 Padding_F5FE04,$F5:FE04,$F5:FFFF,508,fill,,$00
 Table_F60000,$F6:0000,$F6:1BFF,7168,records,records/Table_F60000.tsv,table 512 x 14 B
-LocGfx_Lists,$F6:1C00,$F6:1DFF,512,extracted,table/LocGfx_Lists.bin,
+LocGfx_Lists,$F6:1C00,$F6:1DAF,432,records,records/LocGfx_Lists.tsv,table 54 x 8 B
+Table_F61DB0,$F6:1DB0,$F6:1DFF,80,extracted,table/Table_F61DB0.bin,
 Map_PropsPtrs,$F6:1E00,$F6:20FF,768,table,,dl x 256
 LocGfx_Meta12Ptrs,$F6:2100,$F6:21BF,192,table,,dl x 64
 LocGfx_Meta3Ptrs,$F6:21C0,$F6:221F,96,table,,dl x 32
 LocGfx_PackPtrs,$F6:2220,$F6:24BF,672,table,,dl x 224
-LocPal_Rom,$F6:24C0,$F6:6CEF,18480,extracted,palette/LocPal_Rom.bin,
+LocPal_Rom,$F6:24C0,$F6:6CEF,18480,records,records/LocPal_Rom.tsv,palette 616 x 30 B
 Palette_F66CF0,$F6:6CF0,$F6:7B7F,3728,extracted,palette/Palette_F66CF0.bin,
 Padding_F67B80,$F6:7B80,$F6:7FFF,1152,fill,,$00
 LocGfxPack_211,$F6:8000,$F6:8D58,3417,packed,packed_lz/LocGfxPack_211.bin,lz11 -> 5408 B
@@ -2158,66 +2168,69 @@ BattleRom_ObjTilePieces,$FF:9CF0,$FF:9DEF,256,graphics,gfx/BattleRom_ObjTilePiec
 MenuRom_ObjPal,$FF:9DF0,$FF:9E09,26,records,records/MenuRom_ObjPal.tsv,palette 13 x 2 B
 BattleRom_ColoursC,$FF:9E0A,$FF:9E0F,6,records,records/BattleRom_ColoursC.tsv,palette 3 x 2 B
 MenuRom_WindowGfx,$FF:9E10,$FF:B20F,5120,graphics,gfx/MenuRom_WindowGfx.png,4bpp 160 tiles
-FieldRom_PalRow0Sets,$FF:B210,$FF:B30F,256,extracted,palette/FieldRom_PalRow0Sets.bin,
+FieldRom_PalRow0Sets,$FF:B210,$FF:B29F,144,records,records/FieldRom_PalRow0Sets.tsv,palette 9 x 16 B
+Palette_FFB2A0,$FF:B2A0,$FF:B30F,112,extracted,palette/Palette_FFB2A0.bin,
 MenuRom_ItemTextPtrs,$FF:B310,$FF:BD17,2568,extracted,text/MenuRom_ItemTextPtrs.bin,
 MenuRom_DrawArgLens,$FF:BD18,$FF:BD2D,22,extracted,table/MenuRom_DrawArgLens.bin,
-MenuRom_MainIconList,$FF:BD2E,$FF:BD50,35,extracted,table/MenuRom_MainIconList.bin,
-MenuRom_MainConfirmList,$FF:BD51,$FF:BD5B,11,extracted,table/MenuRom_MainConfirmList.bin,
+MenuRom_MainIconList,$FF:BD2E,$FF:BD50,35,drawlist,menu/MenuRom_MainIconList.mdl,
+MenuRom_MainConfirmList,$FF:BD51,$FF:BD5B,11,drawlist,menu/MenuRom_MainConfirmList.mdl,
 MenuRom_MainIconOam,$FF:BD5C,$FF:BD73,24,extracted,table/MenuRom_MainIconOam.bin,
-MenuRom_Icon0List,$FF:BD74,$FF:BDCC,89,extracted,table/MenuRom_Icon0List.bin,
-MenuRom_Mode01List,$FF:BDCD,$FF:BDEE,34,extracted,table/MenuRom_Mode01List.bin,
-MenuRom_SlotsCloseList,$FF:BDEF,$FF:BE0D,31,extracted,table/MenuRom_SlotsCloseList.bin,
-MenuRom_MemberRowList,$FF:BE0E,$FF:BE14,7,extracted,table/MenuRom_MemberRowList.bin,
-MenuRom_EmptyRowList,$FF:BE15,$FF:BE1B,7,extracted,table/MenuRom_EmptyRowList.bin,
-MenuRom_StatusList,$FF:BE1C,$FF:BE25,10,extracted,table/MenuRom_StatusList.bin,
-MenuRom_SlotsSlideInList,$FF:BE26,$FF:BE5A,53,extracted,table/MenuRom_SlotsSlideInList.bin,
-MenuRom_SlotsSlideOutList,$FF:BE5B,$FF:BE6C,18,extracted,table/MenuRom_SlotsSlideOutList.bin,
-MenuRom_SlotsOpenList,$FF:BE6D,$FF:BEA3,55,extracted,table/MenuRom_SlotsOpenList.bin,
-MenuRom_ItemsSlideInList,$FF:BEA4,$FF:BEBC,25,extracted,table/MenuRom_ItemsSlideInList.bin,
-MenuRom_ItemsSlideOutList,$FF:BEBD,$FF:BEE1,37,extracted,table/MenuRom_ItemsSlideOutList.bin,
-MenuRom_CompareList,$FF:BEE2,$FF:BEEB,10,extracted,table/MenuRom_CompareList.bin,
-MenuRom_ItemsOpenList,$FF:BEEC,$FF:BF04,25,extracted,table/MenuRom_ItemsOpenList.bin,
-MenuRom_XchgListA,$FF:BF05,$FF:BF47,67,extracted,table/MenuRom_XchgListA.bin,
-MenuRom_XchgListB,$FF:BF48,$FF:BF7A,51,extracted,table/MenuRom_XchgListB.bin,
-MenuRom_XchgList,$FF:BF7B,$FF:BF9F,37,extracted,table/MenuRom_XchgList.bin,
-MenuRom_Icon2List,$FF:BFA0,$FF:BFD9,58,extracted,table/MenuRom_Icon2List.bin,
-MenuRom_Mode03List,$FF:BFDA,$FF:C01E,69,extracted,table/MenuRom_Mode03List.bin,
-MenuRom_TechRowList,$FF:C01F,$FF:C025,7,extracted,table/MenuRom_TechRowList.bin,
-MenuRom_TechNextList,$FF:C026,$FF:C02F,10,extracted,table/MenuRom_TechNextList.bin,
-MenuRom_TechEmptyRowList,$FF:C030,$FF:C036,7,extracted,table/MenuRom_TechEmptyRowList.bin,
-MenuRom_Icon2RedrawList,$FF:C037,$FF:C041,11,extracted,table/MenuRom_Icon2RedrawList.bin,
-MenuRom_TechMembersList,$FF:C042,$FF:C055,20,extracted,table/MenuRom_TechMembersList.bin,
-MenuRom_TechTargetList,$FF:C056,$FF:C05C,7,extracted,table/MenuRom_TechTargetList.bin,
-MenuRom_Icon1List,$FF:C05D,$FF:C0A5,73,extracted,table/MenuRom_Icon1List.bin,
-MenuRom_Mode02List,$FF:C0A6,$FF:C0D4,47,extracted,table/MenuRom_Mode02List.bin,
-MenuRom_EquipInfoList,$FF:C0D5,$FF:C0E3,15,extracted,table/MenuRom_EquipInfoList.bin,
-MenuRom_UseTargetsList,$FF:C0E4,$FF:C0EC,9,extracted,table/MenuRom_UseTargetsList.bin,
-MenuRom_LoadList,$FF:C0ED,$FF:C137,75,extracted,table/MenuRom_LoadList.bin,
-MenuRom_SaveList,$FF:C138,$FF:C15D,38,extracted,table/MenuRom_SaveList.bin,
-MenuRom_SlotDetailList,$FF:C15E,$FF:C167,10,extracted,table/MenuRom_SlotDetailList.bin,
-MenuRom_SlotMemberList,$FF:C168,$FF:C16E,7,extracted,table/MenuRom_SlotMemberList.bin,
-MenuRom_SaveAskList,$FF:C16F,$FF:C190,34,extracted,table/MenuRom_SaveAskList.bin,
-MenuRom_LoadAskClose,$FF:C191,$FF:C19B,11,extracted,table/MenuRom_LoadAskClose.bin,
-MenuRom_Icon3List,$FF:C19C,$FF:C1B8,29,extracted,table/MenuRom_Icon3List.bin,
-MenuRom_Icon3ListB,$FF:C1B9,$FF:C1F5,61,extracted,table/MenuRom_Icon3ListB.bin,
-MenuRom_Mode04List,$FF:C1F6,$FF:C212,29,extracted,table/MenuRom_Mode04List.bin,
-MenuRom_ShopList,$FF:C213,$FF:C2AF,157,extracted,table/MenuRom_ShopList.bin,
-MenuRom_ShopCloseList,$FF:C2B0,$FF:C2C0,17,extracted,table/MenuRom_ShopCloseList.bin,
-MenuRom_ShopBuyList,$FF:C2C1,$FF:C2CA,10,extracted,table/MenuRom_ShopBuyList.bin,
-MenuRom_ShopSellList,$FF:C2CB,$FF:C2D4,10,extracted,table/MenuRom_ShopSellList.bin,
-MenuRom_ShopMembersList,$FF:C2D5,$FF:C2DD,9,extracted,table/MenuRom_ShopMembersList.bin,
-MenuRom_ShopQtyList,$FF:C2DE,$FF:C2E7,10,extracted,table/MenuRom_ShopQtyList.bin,
-MenuRom_ShopQtyListA,$FF:C2E8,$FF:C2F4,13,extracted,table/MenuRom_ShopQtyListA.bin,
-MenuRom_ShopQtyListB,$FF:C2F5,$FF:C301,13,extracted,table/MenuRom_ShopQtyListB.bin,
-MenuRom_ShopQtyListC,$FF:C302,$FF:C308,7,extracted,table/MenuRom_ShopQtyListC.bin,
-MenuRom_ShopEquipList,$FF:C309,$FF:C317,15,extracted,table/MenuRom_ShopEquipList.bin,
-MenuRom_ShopCompareList,$FF:C318,$FF:C321,10,extracted,table/MenuRom_ShopCompareList.bin,
-MenuRom_LoadRowsList,$FF:C322,$FF:C36A,73,extracted,table/MenuRom_LoadRowsList.bin,
-MenuRom_LoadRow3List,$FF:C36B,$FF:C390,38,extracted,table/MenuRom_LoadRow3List.bin,
-MenuRom_LoadAskList,$FF:C391,$FF:C3BB,43,extracted,table/MenuRom_LoadAskList.bin,
-MenuRom_NameList,$FF:C3BC,$FF:C41E,99,extracted,table/MenuRom_NameList.bin,
-MenuRom_NameShowList,$FF:C41F,$FF:C428,10,extracted,table/MenuRom_NameShowList.bin,
-MenuRom_NameChoiceList,$FF:C429,$FF:C456,46,extracted,table/MenuRom_NameChoiceList.bin,
+MenuRom_Icon0List,$FF:BD74,$FF:BDCC,89,drawlist,menu/MenuRom_Icon0List.mdl,
+MenuRom_Mode01List,$FF:BDCD,$FF:BDEE,34,drawlist,menu/MenuRom_Mode01List.mdl,
+MenuRom_SlotsCloseList,$FF:BDEF,$FF:BE0D,31,drawlist,menu/MenuRom_SlotsCloseList.mdl,
+MenuRom_MemberRowList,$FF:BE0E,$FF:BE14,7,drawlist,menu/MenuRom_MemberRowList.mdl,
+MenuRom_EmptyRowList,$FF:BE15,$FF:BE1B,7,drawlist,menu/MenuRom_EmptyRowList.mdl,
+MenuRom_StatusList,$FF:BE1C,$FF:BE25,10,drawlist,menu/MenuRom_StatusList.mdl,
+MenuRom_SlotsSlideInList,$FF:BE26,$FF:BE5A,53,drawlist,menu/MenuRom_SlotsSlideInList.mdl,
+MenuRom_SlotsSlideOutList,$FF:BE5B,$FF:BE6C,18,drawlist,menu/MenuRom_SlotsSlideOutList.mdl,
+MenuRom_SlotsOpenList,$FF:BE6D,$FF:BEA3,55,drawlist,menu/MenuRom_SlotsOpenList.mdl,
+MenuRom_ItemsSlideInList,$FF:BEA4,$FF:BEBC,25,drawlist,menu/MenuRom_ItemsSlideInList.mdl,
+MenuRom_ItemsSlideOutList,$FF:BEBD,$FF:BEE1,37,drawlist,menu/MenuRom_ItemsSlideOutList.mdl,
+MenuRom_CompareList,$FF:BEE2,$FF:BEEB,10,drawlist,menu/MenuRom_CompareList.mdl,
+MenuRom_ItemsOpenList,$FF:BEEC,$FF:BF04,25,drawlist,menu/MenuRom_ItemsOpenList.mdl,
+MenuRom_XchgListA,$FF:BF05,$FF:BF39,53,drawlist,menu/MenuRom_XchgListA.mdl,
+Unknown_FFBF3A,$FF:BF3A,$FF:BF47,14,extracted,unknown/Unknown_FFBF3A.bin,
+MenuRom_XchgListB,$FF:BF48,$FF:BF7A,51,drawlist,menu/MenuRom_XchgListB.mdl,
+MenuRom_XchgList,$FF:BF7B,$FF:BF9F,37,drawlist,menu/MenuRom_XchgList.mdl,
+MenuRom_Icon2List,$FF:BFA0,$FF:BFD9,58,drawlist,menu/MenuRom_Icon2List.mdl,
+MenuRom_Mode03List,$FF:BFDA,$FF:C01E,69,drawlist,menu/MenuRom_Mode03List.mdl,
+MenuRom_TechRowList,$FF:C01F,$FF:C025,7,drawlist,menu/MenuRom_TechRowList.mdl,
+MenuRom_TechNextList,$FF:C026,$FF:C02F,10,drawlist,menu/MenuRom_TechNextList.mdl,
+MenuRom_TechEmptyRowList,$FF:C030,$FF:C036,7,drawlist,menu/MenuRom_TechEmptyRowList.mdl,
+MenuRom_Icon2RedrawList,$FF:C037,$FF:C041,11,drawlist,menu/MenuRom_Icon2RedrawList.mdl,
+MenuRom_TechMembersList,$FF:C042,$FF:C04A,9,drawlist,menu/MenuRom_TechMembersList.mdl,
+Unknown_FFC04B,$FF:C04B,$FF:C055,11,extracted,unknown/Unknown_FFC04B.bin,
+MenuRom_TechTargetList,$FF:C056,$FF:C05C,7,drawlist,menu/MenuRom_TechTargetList.mdl,
+MenuRom_Icon1List,$FF:C05D,$FF:C0A5,73,drawlist,menu/MenuRom_Icon1List.mdl,
+MenuRom_Mode02List,$FF:C0A6,$FF:C0D4,47,drawlist,menu/MenuRom_Mode02List.mdl,
+MenuRom_EquipInfoList,$FF:C0D5,$FF:C0E3,15,drawlist,menu/MenuRom_EquipInfoList.mdl,
+MenuRom_UseTargetsList,$FF:C0E4,$FF:C0EC,9,drawlist,menu/MenuRom_UseTargetsList.mdl,
+MenuRom_LoadList,$FF:C0ED,$FF:C137,75,drawlist,menu/MenuRom_LoadList.mdl,
+MenuRom_SaveList,$FF:C138,$FF:C15D,38,drawlist,menu/MenuRom_SaveList.mdl,
+MenuRom_SlotDetailList,$FF:C15E,$FF:C167,10,drawlist,menu/MenuRom_SlotDetailList.mdl,
+MenuRom_SlotMemberList,$FF:C168,$FF:C16E,7,drawlist,menu/MenuRom_SlotMemberList.mdl,
+MenuRom_SaveAskList,$FF:C16F,$FF:C190,34,drawlist,menu/MenuRom_SaveAskList.mdl,
+MenuRom_LoadAskClose,$FF:C191,$FF:C19B,11,drawlist,menu/MenuRom_LoadAskClose.mdl,
+MenuRom_Icon3List,$FF:C19C,$FF:C1B8,29,drawlist,menu/MenuRom_Icon3List.mdl,
+MenuRom_Icon3ListB,$FF:C1B9,$FF:C1F5,61,drawlist,menu/MenuRom_Icon3ListB.mdl,
+MenuRom_Mode04List,$FF:C1F6,$FF:C212,29,drawlist,menu/MenuRom_Mode04List.mdl,
+MenuRom_ShopList,$FF:C213,$FF:C2AF,157,drawlist,menu/MenuRom_ShopList.mdl,
+MenuRom_ShopCloseList,$FF:C2B0,$FF:C2C0,17,drawlist,menu/MenuRom_ShopCloseList.mdl,
+MenuRom_ShopBuyList,$FF:C2C1,$FF:C2CA,10,drawlist,menu/MenuRom_ShopBuyList.mdl,
+MenuRom_ShopSellList,$FF:C2CB,$FF:C2D4,10,drawlist,menu/MenuRom_ShopSellList.mdl,
+MenuRom_ShopMembersList,$FF:C2D5,$FF:C2DD,9,drawlist,menu/MenuRom_ShopMembersList.mdl,
+MenuRom_ShopQtyList,$FF:C2DE,$FF:C2E7,10,drawlist,menu/MenuRom_ShopQtyList.mdl,
+MenuRom_ShopQtyListA,$FF:C2E8,$FF:C2F4,13,drawlist,menu/MenuRom_ShopQtyListA.mdl,
+MenuRom_ShopQtyListB,$FF:C2F5,$FF:C301,13,drawlist,menu/MenuRom_ShopQtyListB.mdl,
+MenuRom_ShopQtyListC,$FF:C302,$FF:C308,7,drawlist,menu/MenuRom_ShopQtyListC.mdl,
+MenuRom_ShopEquipList,$FF:C309,$FF:C317,15,drawlist,menu/MenuRom_ShopEquipList.mdl,
+MenuRom_ShopCompareList,$FF:C318,$FF:C321,10,drawlist,menu/MenuRom_ShopCompareList.mdl,
+MenuRom_LoadRowsList,$FF:C322,$FF:C36A,73,drawlist,menu/MenuRom_LoadRowsList.mdl,
+MenuRom_LoadRow3List,$FF:C36B,$FF:C390,38,drawlist,menu/MenuRom_LoadRow3List.mdl,
+MenuRom_LoadAskList,$FF:C391,$FF:C3BB,43,drawlist,menu/MenuRom_LoadAskList.mdl,
+MenuRom_NameList,$FF:C3BC,$FF:C41E,99,drawlist,menu/MenuRom_NameList.mdl,
+MenuRom_NameShowList,$FF:C41F,$FF:C428,10,drawlist,menu/MenuRom_NameShowList.mdl,
+MenuRom_NameChoiceList,$FF:C429,$FF:C456,46,drawlist,menu/MenuRom_NameChoiceList.mdl,
 MenuRom_StringPtrs,$FF:C457,$FF:C969,1299,extracted,text/MenuRom_StringPtrs.bin,
 MenuRom_EquipLabel3,$FF:C96A,$FF:C970,7,extracted,text/MenuRom_EquipLabel3.bin,
 MenuRom_EquipLabel0,$FF:C971,$FF:C979,9,extracted,text/MenuRom_EquipLabel0.bin,
@@ -2262,7 +2275,7 @@ MenuRom_NumLimits,$FF:CF33,$FF:CF3A,8,extracted,table/MenuRom_NumLimits.bin,
 MenuRom_NameStrings,$FF:CF3B,$FF:D023,233,text,text/MenuNameTexts.txt,strtable
 Unknown_FFD024,$FF:D024,$FF:D03D,26,extracted,unknown/Unknown_FFD024.bin,
 MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,text,text/MenuSlotTexts.txt,strtable
-MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,extracted,table/MenuRom_SlotEraNibbles.bin,
+MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,records,records/MenuRom_SlotEraNibbles.tsv,table 256 x 1 B
 MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,text,text/MenuEraTexts.txt,strtable
 MenuRom_CfgTextTable,$FF:D3FE,$FF:D553,342,text,text/MenuSettingsTexts.txt,strtable
 MenuRom_ButtonLetters,$FF:D554,$FF:D561,14,extracted,table/MenuRom_ButtonLetters.bin,
