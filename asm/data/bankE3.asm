@@ -15,9 +15,9 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $E3:0000-$E3:42DF (17,120 B), sprite_layout, confirmed: frame records: N tile words (tile in
-; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
-; 16/32/48/96) by the set's sprite record size
+; $E3:0000-$E3:42DF (17,120 B), sprite_layout, confirmed (extent inferred): frame records: N
+; tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16
+; sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
 ; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
 ; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
 ; (MenuRom_E4FramePtrs).
@@ -31,9 +31,9 @@ org $E342E0
 SprLayout_E342E0:
     incbin "../../build/assets/sprite_layout/SprLayout_E342E0.bin"
 
-; $E3:46A0-$E3:E857 (41,400 B), sprite_layout, confirmed: frame records: N tile words (tile in
-; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
-; 16/32/48/96) by the set's sprite record size
+; $E3:46A0-$E3:E857 (41,400 B), sprite_layout, confirmed (extent inferred): frame records: N
+; tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16
+; sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
 ; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
 ; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
 ; (MenuRom_E4FramePtrs).
@@ -47,9 +47,9 @@ org $E3E858
 SprLayout_E3E858:
     incbin "../../build/assets/sprite_layout/SprLayout_E3E858.bin"
 
-; $E3:E8A8-$E3:F90F (4,200 B), sprite_layout, confirmed: frame records: N tile words (tile in
-; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
-; 16/32/48/96) by the set's sprite record size
+; $E3:E8A8-$E3:F90F (4,200 B), sprite_layout, confirmed (extent inferred): frame records: N tile
+; words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites;
+; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
 ; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
 ; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
 ; (MenuRom_E4FramePtrs).

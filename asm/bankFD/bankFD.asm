@@ -3382,11 +3382,13 @@ MainInit:
 ; the main screen, color math adding the sub screen, and the fixed color
 ; black. It is the field's layout: LocLoad_DrawMap (from Scene_ReloadStep,
 ; after each location load and each return from bank $C2) calls it before
-; drawing the map; no other field code writes BG12NBA or BG34NBA.
+; drawing the map; no other field code writes BG12NBA or BG34NBA. The only
+; other writers are MainInit (at boot), M7Scene_InitPpu (the mode-7 scenes,
+; which leave through ReentryVectors), bank $C2 (BankC2_InitHwRegs,
+; Menu_InitPpuAndRam) and the $C3 module.
 ; Callers (1 JSL site): LocLoad_DrawMap ($C0:0A5D).
-; Callers note: JSL from $C0:0A5D (unmatched; in a routine at $C0:0A50,
-;   called by JSR from $C0:286F, that
-;   runs a DP=$1D00 step first and more setup after).
+; Callers note: LocLoad_DrawMap calls it between Map_LoadTreasureTiles
+;   (with DP=$1D00) and Ppu_ApplyMapScreens.
 ; Entry: M=1 (8-bit A; the immediates are 8-bit), X either width, DP any
 ;        (saved and restored), DB any (all stores are direct page)
 ; Exit:  M=1, DP restored, DB unchanged; A = COLDATA_AllZero ($E0); X, Y

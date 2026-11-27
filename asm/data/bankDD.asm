@@ -15,9 +15,9 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
-; $DD:0000-$DD:B8FF (47,360 B), sprite_layout, confirmed: frame records: N tile words (tile in
-; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
-; 16/32/48/96) by the set's sprite record size
+; $DD:0000-$DD:B8FF (47,360 B), sprite_layout, confirmed (extent inferred): frame records: N
+; tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16
+; sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
 ; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
 ; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
 ; (MenuRom_E4FramePtrs).
@@ -31,9 +31,9 @@ org $DDB900
 SprLayout_DDB900:
     incbin "../../build/assets/sprite_layout/SprLayout_DDB900.bin"
 
-; $DD:C030-$DD:FD47 (15,640 B), sprite_layout, confirmed: frame records: N tile words (tile in
-; bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16 sprites; 40/80/120/240 B (N
-; 16/32/48/96) by the set's sprite record size
+; $DD:C030-$DD:FD47 (15,640 B), sprite_layout, confirmed (extent inferred): frame records: N
+; tile words (tile in bits 0-10, bit 14 mirrored), then N/4 signed (x, y) pairs of 16x16
+; sprites; 40/80/120/240 B (N 16/32/48/96) by the set's sprite record size
 ; Read by Obj_BuildFrame4/8/12 and Spr_LoadLargeObj (Field_E4Ptr1),
 ; Battle_DrawBattlerFrameAnyLayout (BattleRom_SprFramesPtr), Menu_SprAnimate
 ; (MenuRom_E4FramePtrs).
