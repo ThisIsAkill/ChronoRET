@@ -30,6 +30,11 @@ runs these and reports them the same way (a finding keeps the routine at
          named by its address ($XXXX) on the header's `Callers note:`
          lines (or the lines continuing them).
          Needs the ROM. Cannot be opted out of.
+  RAWLABEL a local label is not a raw address (REVIEW.md rule 3, `.e952_loop`):
+         no `.label` whose name is a letter at most, then four hex digits
+         holding a decimal digit (`.l9117`, `.e952_loop`), with or without
+         a suffix; scripts' loop and jump targets are named for what
+         happens there. Cannot be opted out of.
   KERNEL the module is assembled apart from asm/main.asm, so it reaches
          kernel and engine labels through defines named after them
          (module.inc, `!C3_ModuleFrame = $C308D0`), and the kernel reaches
@@ -215,6 +220,25 @@ def rom_labels():
     return out
 
 
+RAW_LABEL = re.compile(r'^\.([A-Za-z]?_?(?=[A-Fa-f]*[0-9])[0-9A-Fa-f]{4}(?:_\w*)?)(?::|\s|$)')
+GLOBAL = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):')
+
+
+def raw_label_findings(path: Path):
+    """RAWLABEL: (function, line, rule, text) for each local label of the
+    file that is a raw address."""
+    out, function = [], '<file>'
+    for no, line in enumerate(path.read_text().splitlines(), 1):
+        g = GLOBAL.match(line)
+        if g:
+            function = g.group(1)
+        m = RAW_LABEL.match(line)
+        if m:
+            out.append((function, no, 'RAWLABEL',
+                        f'.{m.group(1)} is a raw address: name it for what happens there'))
+    return out
+
+
 def findings(rows=None, sites=None, labels=None):
     """(path, function, line, rule, text) for the module's source."""
     import lint_readability as L
@@ -223,7 +247,7 @@ def findings(rows=None, sites=None, labels=None):
         path = Path(name)
         if not path.exists():
             continue
-        found = L.lint_file(path) + header_findings(path, rows, sites)
+        found = L.lint_file(path) + header_findings(path, rows, sites) + raw_label_findings(path)
         out += [(str(path), f, no, rule, text) for f, no, rule, text in found]
     if labels is not None:
         out += kernel_findings(*labels)

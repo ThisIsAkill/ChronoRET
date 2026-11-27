@@ -87,6 +87,17 @@ class Rules(unittest.TestCase):
         found = self.findings({0x3000: [0x4002]})
         self.assertIn(('C3Mod_First', 'CALLERS'), found)
 
+    def test_raw_labels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'module.asm'
+            path.write_text('C3Mod_Script:\n.l9117:\n    db 0\n.e952_loop:\n.L98B8: db 0\n'
+                            '.fade:\n.wait_60:\n.up_004E:\n.hold:\n')
+            found = lint_c3module.raw_label_findings(path)
+            self.assertEqual([(f, no, rule) for f, no, rule, _ in found],
+                             [('C3Mod_Script', 2, 'RAWLABEL'), ('C3Mod_Script', 4, 'RAWLABEL'),
+                              ('C3Mod_Script', 5, 'RAWLABEL')])
+        self.assertEqual(lint_c3module.raw_label_findings(Path(lint_c3module.SOURCE_FILES[0])), [])
+
     def test_kernel(self):
         module = {'C3Mod_RunTasks': 0x7E398A}
         rom = {'C3_ModuleFrame': 0xC308D0, 'ReentryVectors': 0xC00000}
