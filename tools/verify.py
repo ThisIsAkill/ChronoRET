@@ -215,7 +215,7 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     figures = {'fill_bytes': 0, 'table_bytes': 0, 'extracted_bytes': 0, 'packed_bytes': 0, 'text_bytes': 0, 'events_bytes': 0,
                'records_bytes': 0, 'battle_bytes': 0, 'scene_bytes': 0, 'fx_bytes': 0,
                'graphics_bytes': 0, 'gfxpack_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
-               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'sprframes_bytes': 0,
+               'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'scenepal_bytes': 0, 'actframes_bytes': 0, 'sprframes_bytes': 0,
                'animframes_bytes': 0, 'animtimes_bytes': 0, 'drawlist_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
@@ -254,13 +254,14 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
         return figures, problems
     for p in pieces:
         if p['piece'] not in ('extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx',
-                              'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
+                              'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal',
+                              'actframes',
                               'graphics', 'gfxpack', 'sprframes') and not extract_data.text_tool(p['piece']):
             continue
         path = (extract_data.ASSETS / p['asset'] if p['piece'] == 'extracted'
                 else extract_data.PACKS / f'{p["label"]}.lz'
                 if p['piece'] in ('packed', 'events', 'scene', 'mapprops', 'metatiles', 'scenemaps', 'scenemeta',
-                                  'scenebg3', 'gfxpack')
+                                  'scenebg3', 'scenepal', 'actframes', 'gfxpack')
                 else extract_data.FX_OUT / f'{p["label"]}.bin' if p['piece'] == 'fx'
                 else extract_data.GFX_OUT / f'{p["label"]}.bin' if p['piece'] == 'graphics'
                 else extract_data.SPRITES_OUT / f'{p["label"]}.bin' if p['piece'] == 'sprframes'
@@ -315,10 +316,13 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
     # The maps: their pieces and unpacked bytes.
     msplit = {'maps': 0, 'metas': 0, 'scene': 0, 'unpacked': 0}
     for p in pieces:
-        if p['piece'] in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3'):
+        if p['piece'] in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal'):
             msplit['maps' if p['piece'] == 'mapprops' else 'metas' if p['piece'] == 'metatiles' else 'scene'] += 1
             msplit['unpacked'] += int(extract_data.PACK_PARAM.match(p['param']).group(2))
     figures['maps_split'] = msplit
+    figures['actframes_split'] = {'packs': sum(1 for p in pieces if p['piece'] == 'actframes'),
+                                  'unpacked': sum(int(extract_data.PACK_PARAM.match(p['param']).group(2))
+                                                  for p in pieces if p['piece'] == 'actframes')}
     # The sprite frame records: frames and runs.
     import sprites
     psplit = {'frames': 0, 'runs': 0, 'pieces': 0}
@@ -449,9 +453,10 @@ def main() -> int:
               f'build/gfxpack/ -> build/packs/, incbin): unpacked, {gs["pack_tiles"]:,} B in tiles, '
               f'{gs["pack_tail"]:,} B past the tiles the readers read kept as bytes')
         ms = data['maps_split']
-        mb = sum(data[k + '_bytes'] for k in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3'))
+        mb = sum(data[k + '_bytes'] for k in ('mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3',
+                                              'scenepal'))
         print(f'  {"maps":<16} {mb:>9,} bytes of {ms["maps"]} location maps, {ms["metas"]} metatile packs and '
-              f'{ms["scene"]} scene layer packs packed by the build from text assembled to their unpacked '
+              f'{ms["scene"]} scene layer and palette packs packed by the build from text assembled to their unpacked '
               f'bytes (build/assets/maps/ -> build/maps/ -> build/packs/, incbin): {ms["unpacked"]:,} B unpacked')
         ps = data['sprites_split']
         print(f'  {"sprite frames":<16} {data["sprframes_bytes"]:>9,} bytes of {ps["frames"]:,} sprite frame records '
@@ -465,6 +470,10 @@ def main() -> int:
         print(f'  {"draw lists":<16} {data["drawlist_bytes"]:>9,} bytes of menu draw lists (Menu_RunDrawList '
               f'commands) assembled by the build from text extracted from the ROM (build/assets/menu/ -> '
               f'build/menulists/, incbin)')
+        af = data['actframes_split']
+        print(f'  {"action frames":<16} {data["actframes_bytes"]:>9,} bytes of {af["packs"]} battle action-frame '
+              f'packs packed by the build from text assembled to their unpacked bytes (build/assets/actframes/ '
+              f'-> build/maps/ -> build/packs/, incbin): {af["unpacked"]:,} B unpacked')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')

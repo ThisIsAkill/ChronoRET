@@ -292,6 +292,15 @@ PALETTES: dict[str, tuple[int, int]] = {
     '$FF:CBC4': (1, 8), '$FF:CBE4': (1, 24), '$FF:CC14': (1, 8), '$FF:CC34': (1, 8),
     '$FF:CC64': (1, 8), '$FF:CC74': (1, 8), '$FF:CDF4': (1, 8), '$FF:CE04': (1, 8),
     '$FF:CE30': (1, 16), '$FF:CE9A': (1, 16),
+    '$F6:24C0': (15, 616),      # LocPal_Rom: LocLoad_Unk7084 copies 7 rows of colours 1-15 (LocPal_RowBytes each) of
+                                # entry LocRom.Palette (x LocPal_SetBytes) to Pal_Buf rows 1-7, which Pal_LoadUnkRow0
+                                # copies to Pal_CgramBuf and Pal_UploadCgram DMAs to CGRAM: 88 entries (DERIVED)
+    '$D0:FA00': (16, 15),       # BattleRom_BgSetPalettes: BattleFx_LoadBgSet copies 3 rows of 16 colours from
+                                # BattleFx_BgSetPalOfs[set] (sets 0-5) to BG palette rows 2-4 (DERIVED)
+    '$FF:B210': (8, 9),         # MenuRom_WindowPals: Menu_LoadWindowPal copies 8 colours of style 0-7 (x 16 B),
+                                # Pal_LoadUnkRow0 15 colours from style x 16 + 2 (styles 0-7): 144 B (DERIVED)
+    '$CC:F77B': (2, 1),         # BattleRom_FxTintColours: Battle_FxOverlay2Tint writes its 4 bytes into live
+                                # palette bytes 6-9 (colours 3-4)
     '$E4:0000': (12, 256),      # the sprite palettes: a sprite record's palette byte x Pal_ObjColorBytes (Obj_PalSrc,
                                 # the field's 24-byte copy of colours 1-12; MenuRom_E4Palettes' offsets the same)
 }
@@ -412,20 +421,59 @@ def _struct(name: str) -> tuple[int, dict[str, int], int]:
     raise RecordsError(f'no struct {name} in asm/include/')
 
 
-def _loc_tilesets(rom: bytes, d: dict, code=None) -> int:
-    """Entries of LocGfx_Lists the locations name: 1 + the largest
-    LocRom.Tileset12 other than LocRom_SetNone, over the LocRom records
-    (struct LocRom gives the base, the record size, which must be
-    LocRom_RecSize, and .Tileset12's offset; STRUCTS the record count)."""
-    base, fields, size = _struct('LocRom')
+def _loc_field(rom: bytes, d: dict, field: str, rows: list[dict] | None = None) -> list[int]:
+    """Every LocRom record's `field`: struct LocRom gives the base, the
+    record size, which must be LocRom_RecSize, and the field's offset and
+    width; the count is the records' survey row's size over the record
+    size (as maps.derive_named reads them)."""
+    base, offsets, size = _struct('LocRom')
     if size != d['LocRom_RecSize']:
         raise RecordsError(f'struct LocRom is {size} B, LocRom_RecSize {d["LocRom_RecSize"]}')
-    row = f'${base >> 16:02X}:{base & 0xFFFF:04X}'
-    if STRUCTS.get(row, (None,))[0] != 'LocRom':
-        raise RecordsError(f'struct LocRom is at {row}, which is not its STRUCTS row')
-    count = STRUCTS[row][1]
-    used = [rom[base - 0xC00000 + size * k + fields['Tileset12']] for k in range(count)]
-    return 1 + max(v for v in used if v != d['LocRom_SetNone'])
+    start = f'${base >> 16:02X}:{base & 0xFFFF:04X}'
+    if STRUCTS.get(start, (None,))[0] != 'LocRom':
+        raise RecordsError(f'struct LocRom is at {start}, which is not its STRUCTS row')
+    if rows is None:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import data_survey
+        rows = data_survey.read_rows()
+    row = next((r for r in rows if r['start'] == start), None)
+    if row is None or int(row['size']) % size:
+        raise RecordsError(f'no survey row of whole LocRom records at {start}')
+    at, w = offsets[field], width(dict(_struct_fields('LocRom'))[field])
+    return [int.from_bytes(rom[base - 0xC00000 + k * size + at:base - 0xC00000 + k * size + at + w], 'little')
+            for k in range(int(row['size']) // size)]
+
+
+def _loc_tilesets(rom: bytes, d: dict, code=None, rows: list[dict] | None = None) -> int:
+    """Entries of LocGfx_Lists the locations name: 1 + the largest
+    LocRom.Tileset12 other than LocRom_SetNone, over the LocRom records
+    (_loc_field)."""
+    return 1 + max(v for v in _loc_field(rom, d, 'Tileset12', rows) if v != d['LocRom_SetNone'])
+
+
+def _loc_palettes(rom: bytes, d: dict, code=None, rows: list[dict] | None = None) -> int:
+    """Rows of 15 colours in LocPal_Rom the locations name: 7 per entry,
+    1 + the largest LocRom.Palette entries (LocRom's only reader of it is
+    LocLoad_Unk7084)."""
+    if d['LocPal_SetBytes'] != 7 * d['LocPal_RowBytes'] or d['LocPal_RowBytes'] != 30:
+        return -1
+    return 7 * (1 + max(_loc_field(rom, d, 'Palette', rows)))
+
+
+def _bg_set_rows(path: Path = ROOT / 'asm' / 'bankD1' / 'bankD1.asm') -> int:
+    """Rows of 16 colours BattleFx_LoadBgSet reaches: the source's
+    BattleFx_BgSetPalOfs (one word per background set) + 3 rows."""
+    lines = path.read_text().splitlines()
+    try:
+        i = lines.index('BattleFx_BgSetPalOfs:')
+    except ValueError:
+        raise RecordsError('bankD1.asm: no BattleFx_BgSetPalOfs') from None
+    m = re.match(r'^\s+dw\s+([^;]*)', lines[i + 1])
+    if not m:
+        raise RecordsError('BattleFx_BgSetPalOfs: expected a dw line')
+    ofs = [int(v.strip().lstrip('$'), 16) for v in m.group(1).split(',')]
+    return (max(ofs) + 3 * 32) // 32
+
 
 
 # ── Bounds from the readers' code ───────────────────────────────────────────
@@ -762,6 +810,11 @@ DERIVED = {
     '$E4:2A00': ('Menu_SprLoad run for each palette byte', _reader('$E4:2A00')),
     '$E4:F000': ('SprRec_FirstNpc + 256 records', lambda rom, d, code=None: d['SprRec_FirstNpc'] + 256),
     '$F6:1C00': ('1 + the largest LocRom.Tileset12', _loc_tilesets),
+    '$F6:24C0': ('7 rows x (1 + the largest LocRom.Palette)', _loc_palettes),
+    '$D0:FA00': ('rows up to the last BattleFx_BgSetPalOfs + 3 rows', lambda rom, d, code=None: _bg_set_rows()),
+    '$FF:B210': ('8-colour rows up to style Pal_Row0SetMask x 16 + 2 + 30 B',
+                 lambda rom, d, code=None: (d['Pal_Row0SetMask'] * 16 + 2 + 30) // 16
+                 if d['Menu_WinStyleMask'] == d['Pal_Row0SetMask'] else -1),
     '$FF:D296': ('the location word (Menu_ReadSlotSummary: AND Menu_SramUnk05F3Mask) / 2',
                  lambda rom, d, code=None: (d['Menu_SramUnk05F3Mask'] + 1) // 2),
 }

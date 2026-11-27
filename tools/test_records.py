@@ -263,7 +263,45 @@ class Derived(unittest.TestCase):
 
     def test_every_counted_row_is_derived(self):
         self.assertEqual(set(records.READERS) - set(records.DERIVED), set())
-        self.assertEqual(len(records.DERIVED), 13)
+        self.assertEqual(len(records.DERIVED), 16)
+
+    def test_loc_palettes(self):
+        rom = bytearray(0x400000)
+        rom[F(0xF60000) + 14 * 300 + 3] = 87
+        self.assertEqual(records._loc_palettes(bytes(rom), D), 7 * 88)
+        self.assertEqual(records._loc_palettes(bytes(rom), dict(D, LocPal_RowBytes=28)), -1)
+        self.assertEqual(records._loc_palettes(bytes(rom), dict(D, LocPal_SetBytes=0xD0)), -1)
+
+    def test_loc_fields_from_the_struct_and_survey(self):
+        rom = bytearray(0x400000)
+        rows = [{'start': '$F6:0000', 'size': str(14 * 4)}]                # four records
+        rom[F(0xF60000) + 14 * 3 + 3] = 5                                   # record 3's Palette (struct offset 3)
+        rom[F(0xF60000) + 14 * 4 + 3] = 9                                   # past the survey's records
+        rom[F(0xF60000) + 14 * 3 + 1] = 6                                   # record 3's Tileset12
+        self.assertEqual(records._loc_palettes(bytes(rom), D, rows=rows), 7 * 6)
+        self.assertEqual(records._loc_tilesets(bytes(rom), D, rows=rows), 7)
+        rom[F(0xF60000) + 14 * 2 + 4:F(0xF60000) + 14 * 2 + 6] = bytes([0x02, 0x01])   # MapProps: u16 at 4
+        self.assertEqual(records._loc_field(bytes(rom), D, 'MapProps', rows), [0, 0, 0x102, 0])
+        with self.assertRaisesRegex(records.RecordsError, 'struct LocRom is 14 B, LocRom_RecSize 16'):
+            records._loc_palettes(bytes(rom), dict(D, LocRom_RecSize=16), rows=rows)
+        with self.assertRaisesRegex(records.RecordsError, 'no survey row of whole LocRom records'):
+            records._loc_palettes(bytes(rom), D, rows=[{'start': '$F6:0000', 'size': '15'}])
+        with self.assertRaisesRegex(records.RecordsError, 'no survey row of whole LocRom records'):
+            records._loc_palettes(bytes(rom), D, rows=[])
+
+    def test_bg_set_rows_from_the_source(self):
+        self.assertEqual(records._bg_set_rows(), 15)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'd1.asm'
+            path.write_text('BattleFx_BgSetPalOfs:\n    dw $0000, $01E0  ; sets\n')
+            self.assertEqual(records._bg_set_rows(path), 18)
+            path.write_text('BattleFx_BgSetPalOfsX:\n    dw $0000\n')
+            with self.assertRaisesRegex(records.RecordsError, 'no BattleFx_BgSetPalOfs'):
+                records._bg_set_rows(path)
+            path.write_text('BattleFx_BgSetPalOfs:\n    db $00\n')
+            with self.assertRaisesRegex(records.RecordsError, 'expected a dw line'):
+                records._bg_set_rows(path)
 
     def test_derived_counts(self):
         rom = ed.read_rom() if HAVE_ROM else None
@@ -274,7 +312,9 @@ class Derived(unittest.TestCase):
                                    ('Pal_ObjColorBytes', 22, '$E4:0000'),
                                    ('SprRec_FirstNpc', 8, '$E4:F000'), ('LocRom_SetNone', 53, '$F6:1C00'),
                                    ('LocRom_RecSize', 15, '$F6:1C00'), ('Menu_SramUnk05F3Mask', 0x3FF, '$FF:D296'),
-                                   ('Battle_ActObjects', 15, '$CE:8870'), ('Battle_FacingRight', 30, '$CE:8870')):
+                                   ('Battle_ActObjects', 15, '$CE:8870'), ('Battle_FacingRight', 30, '$CE:8870'),
+                                   ('LocPal_RowBytes', 28, '$F6:24C0'),
+                                   ('Pal_Row0SetMask', 8, '$FF:B210'), ('Menu_WinStyleMask', 3, '$FF:B210')):
             got = records.derived_problems(rom, dict(D, **{name: value}), ed.read_manifest())
             self.assertTrue(any(x.startswith(start) for x in got), (name, got))
         no_piece = [p for p in ed.read_manifest() if p['label'] != 'BattleRom_ActObjRec_Lists']

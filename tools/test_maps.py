@@ -197,12 +197,41 @@ class SceneLayers(unittest.TestCase):
         with self.assertRaisesRegex(maps.MapsError, '2 screens are 66 lines'):
             maps.assemble_bg3(text + '000/0\n', 'S')
 
+    def test_scene_palettes(self):
+        data = bytes(range(64)) + bytes([0xFF, 0xFF])           # 33 colours: two rows and one, bit 15 in the last
+        text = maps.render_scene_pal('S', data)
+        self.assertEqual(maps.assemble_scene_pal(text, 'S', len(data)), data)
+        self.assertIn('\n02: 31,31,31!\n', text)
+        self.assertEqual(maps.colour_text(0x7FFF), '31,31,31')
+        self.assertEqual(maps.colour_value('1,2,3', 'x'), 1 | 2 << 5 | 3 << 10)
+        for bad in ('32,0,0', '1,2', '1,2,3!!', '1,2,3?', '-1,0,0', '100,0,0'):
+            with self.assertRaisesRegex(maps.MapsError, 'bad colour'):
+                maps.colour_value(bad, 'x')
+        for n in (0, 3):
+            with self.assertRaisesRegex(maps.MapsError, 'no whole number of colours'):
+                maps.render_scene_pal('S', bytes(n))
+        row1 = text.split('\n01: ')[1].split('\n')[0]
+        for new_text, size, why in ((text.replace('@scenepal S 33', '@scenepal T 33'), len(data), 'first line is'),
+                                    (text, len(data) + 2, 'first line is @scenepal S 34'),
+                                    (text, 65, 'first line is'),
+                                    (text.replace('01: ', '03: '), len(data), 'expected 01: and 16 colours'),
+                                    (text.replace('01: ' + row1, '01: ' + row1 + ' 0,0,0'), len(data),
+                                     'expected 01: and 16 colours'),
+                                    (text + '03: 0,0,0\n', len(data), '33 colours are 3 rows; there are 4'),
+                                    (text.replace('01: 0,', '01: 32,'), len(data), 'bad colour')):
+            with self.subTest(why=why):
+                with self.assertRaisesRegex(maps.MapsError, why):
+                    maps.assemble_scene_pal(new_text, 'S', size)
+
     def test_scene_named_skips_bit7(self):
+        import battle
+        D = battle.defines(ed.ROOT)
         rom = bytearray(ed.ROM_SIZE)
         rom[0x06FD00:0x06FD02] = bytes([0x02, 0xFD])          # one scene header, at $C6:FD02
         rom[0x06FD02 + 0x10], rom[0x06FD02 + 0x11], rom[0x06FD02 + 0x14] = 3, 0x85, 2   # maps: bit 7
+        rom[0x06FD02 + 0x0A] = 4                                                          # palettes
         self.assertEqual(maps.scene_named(bytes(rom)), {'C2SceneRom_MetatilePacks': {3}, 'C2SceneRom_MapPacks': set(),
-                                                        'C2SceneRom_Bg3MapPacks': {2}})
+                                                        'C2SceneRom_Bg3MapPacks': {2}, 'C2SceneRom_PalettePacks': {4, D['C2Scene_ExtraPalPack']}})
 
     def test_build_checks_the_unpacked_size(self):
         import tempfile
@@ -228,6 +257,8 @@ class SceneLayers(unittest.TestCase):
                 build_rom.extract_data.read_manifest = saved
 
     def test_only_named_scene_packs(self):
+        self.assertEqual(maps.kind_of('via C2SceneRom_PalettePacks[3]; x'), ('scenepal', None))
+        self.assertIsNone(maps.kind_of('via C2SceneRom_PalettePacks[2]; x'))
         self.assertEqual(maps.kind_of('via C2SceneRom_Bg3MapPacks[4]; x'), ('scenebg3', 0x1000))
         self.assertIsNone(maps.kind_of('via C2SceneRom_Bg3MapPacks[5]; x'))     # no header names it
 def fake_rows(packs, records=4):
@@ -282,6 +313,26 @@ class Named(unittest.TestCase):
         self.assertIn('$F0:0050: converted in the manifest, and no location record names it', got)
 
 
+class ActFramesPieces(unittest.TestCase):
+    """The actframes pieces go through maps' piece functions, which give
+    tools/actframes.py's refusals as MapsError (build_maps and check catch
+    only that)."""
+
+    P = {'label': 'A', 'piece': 'actframes', 'asset': 'maps/A.afr', 'param': 'lz11 -> 4 B'}
+
+    def test_round_trip(self):
+        data = bytes([0x01, 0x80, 0x12, 0x34, 0x00, 0x00])        # one frame: one row, one sprite, the skip
+        self.assertEqual(maps.assemble_piece(self.P, maps.render_piece(self.P, data)), data)
+
+    def test_render_refusal_is_maps_error(self):
+        with self.assertRaisesRegex(maps.MapsError, 'A: byte 0: a 0 header ends the frames'):
+            maps.render_piece(self.P, bytes([0, 0]))
+
+    def test_assemble_refusal_is_maps_error(self):
+        with self.assertRaisesRegex(maps.MapsError, 'A: the first line must be @actframes A N'):
+            maps.assemble_piece(self.P, '@actframes B 0\n')
+
+
 class Source(unittest.TestCase):
 
     def test_manifest_pieces(self):
@@ -289,8 +340,13 @@ class Source(unittest.TestCase):
         pieces = [p for p in ed.read_manifest() if p['piece'] in maps.PIECES]
         self.assertEqual(sum(p['piece'] == 'mapprops' for p in pieces), 197)
         self.assertEqual(sum(p['piece'] == 'metatiles' for p in pieces), 71)
-        scene = [p for p in ed.read_manifest() if p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3')]
+        scene = [p for p in ed.read_manifest() if p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3', 'scenepal')]
         self.assertEqual(sorted(p['piece'] for p in scene).count('scenebg3'), 5)
+        self.assertEqual([p['label'] for p in scene if p['piece'] == 'scenepal'],
+                         [f'ScenePalPack_{k:03d}' for k in range(3, 11)])
+        row = dict(rows[[p for p in scene if p['piece'] == 'scenepal'][0]['start']])
+        self.assertEqual([p['piece'] for p in ed.layout([row])], ['scenepal'])
+        self.assertEqual([p['piece'] for p in ed.layout([dict(row, format='lz12 -> 33 B: odd')])], ['packed'])
         unnamed = {(t, i) for t, ns in maps.UNNAMED.items() for i in ns}
         via = {p['start']: re.search(r'via (\w+)\[(\d+)\]', rows.get(p['start'], {'notes': ''})['notes']) for p in ed.read_manifest()}
         kept = [p for p in ed.read_manifest() if via[p['start']]
@@ -313,6 +369,25 @@ class WithRom(unittest.TestCase):
     def test_round_trips(self):
         self.assertEqual(maps.check(ed.read_rom()), [])
 
+    def test_check_reports_each_failure(self):
+        import extract_data
+        rom = ed.read_rom()
+        saved = (extract_data.unpack_piece, maps.assemble_piece, maps.render_piece)
+        try:
+            extract_data.unpack_piece = lambda r, p: (None, f'{p["label"]}: no stream')
+            self.assertIn('ScenePalPack_003: no stream', maps.check(rom))
+            extract_data.unpack_piece = saved[0]
+            maps.assemble_piece = lambda p, t: b''
+            self.assertIn('ScenePalPack_003: does not assemble back', maps.check(rom))
+            maps.assemble_piece = saved[1]
+
+            def fail(p, d):
+                raise maps.MapsError(f'{p["label"]}: refused')
+            maps.render_piece = fail
+            self.assertIn('ScenePalPack_003: refused', maps.check(rom))
+        finally:
+            extract_data.unpack_piece, maps.assemble_piece, maps.render_piece = saved
+
     def test_scene_packs_are_the_headers(self):
         self.assertEqual(maps.scene_named(ed.read_rom()), maps.SCENE_NAMED)
         saved = maps.SCENE_NAMED
@@ -321,6 +396,10 @@ class WithRom(unittest.TestCase):
             self.assertTrue(any('the scene headers name' in x for x in maps.check(ed.read_rom())))
         finally:
             maps.SCENE_NAMED = saved
+        import battle
+        d = battle.defines(ed.ROOT)
+        self.assertIn(d['C2Scene_ExtraPalPack'], maps.scene_named(ed.read_rom())['C2SceneRom_PalettePacks'])
+        self.assertNotIn(d['C2Scene_ExtraPalPack'], {4, 5, 6, 7, 8, 9, 10})
 
 
 if __name__ == '__main__':

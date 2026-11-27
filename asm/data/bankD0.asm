@@ -82,12 +82,17 @@ Padding_D0F98F:
     fillbyte $00
     fill 113
 
-; $D0:FA00-$D0:FBE1 (482 B), palette, confirmed: background sets' palette rows
-; (BattleFx_BgSetPalOfs gives the offsets)
+; $D0:FA00-$D0:FBDF (480 B), palette, confirmed: 15 rows of 16 colours (BGR555): background
+; sets' BG palette rows 2-4
 ; Read by BattleFx_LoadBgSet.
 org $D0FA00
 BattleRom_BgSetPalettes:
-    incbin "../../build/assets/palette/BattleRom_BgSetPalettes.bin"
+    incbin "../../build/records/BattleRom_BgSetPalettes.bin"          ; records: palette 15 x 32 B
+
+; $D0:FBE0-$D0:FBE1 (2 B), unknown, unknown: 2 bytes
+org $D0FBE0
+Unknown_D0FBE0:
+    incbin "../../build/assets/unknown/Unknown_D0FBE0.bin"
 
 ; $D0:FBE2-$D0:FCFF (286 B), palette, confirmed: 9 sets of 14 colours, $20 apart
 ; Read by BattleFx_FindGradStart, BattleFx_HpGradientTick.
