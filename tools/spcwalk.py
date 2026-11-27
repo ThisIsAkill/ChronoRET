@@ -827,7 +827,7 @@ def load_source(root: Path = ROOT) -> Source:
     return Source((root / DRIVER).read_text(), [(root / p).read_text() for p in INCLUDES])
 
 
-def derive(src: Source | None = None, root: Path = ROOT) -> dict:
+def derive(src: Source | None = None, root: Path = ROOT, commands_only: bool = False) -> dict:
     """What each byte $00-$FF of a track does, from the walk. Every byte
     below !Spc_SeqFirstCmd must take one byte and return (the track waits a
     pass). A command ($C4-$FF) gets:
@@ -838,7 +838,8 @@ def derive(src: Source | None = None, root: Path = ROOT) -> dict:
                  plus the song's move (two adjacent operands);
       end        it can return with the track ended;
       elsewhere  it can set the pointer from anything else;
-      handler    its entry of Spc_SeqCmdTable."""
+      handler    its entry of Spc_SeqCmdTable.
+    commands_only walks the commands alone (the notes are left out)."""
     src = src or load_source(root)
     w = Walker(src)
     first_cmd = src.define('Spc_SeqFirstCmd')
@@ -846,7 +847,7 @@ def derive(src: Source | None = None, root: Path = ROOT) -> dict:
     if table is None or len(table) != 2 * (256 - first_cmd):
         raise WalkError('Spc_SeqCmdTable is not one word per command')
     out = {}
-    for b in range(256):
+    for b in range(first_cmd if commands_only else 0, 256):
         outs = w.run(b)
         if b < first_cmd:
             if outs != [('return', ('rel', 1))]:

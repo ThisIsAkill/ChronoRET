@@ -950,7 +950,7 @@ def _stamp_key(rom_sha: str) -> str:
                  'disasm.py', 'music.py', 'spcwalk.py', 'spc700.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
     for src in [music.spcwalk.DRIVER] + music.spcwalk.INCLUDES:      # the music format's source
-        h.update((ROOT / src).read_bytes())
+        h.update((music.ROOT / src).read_bytes())
     return h.hexdigest()
 
 

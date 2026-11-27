@@ -859,7 +859,11 @@ On the `data-music` branch. `tools/music.py` makes one readable file per song of
     the pointer. An indexed store with an unknown index is taken to reach its base to base+$FF,
     not wrapping in the direct page.
   - Every derived length equals `Spc_SeqOperandCounts` + 1 (`test_music.py` checks it against
-    the source table and against a written-out table of every command).
+    the source table and against a written-out table of every command). A mutation sweep of the
+    driver source deletes each of the 19 operand reads and pointer steps in the command
+    handlers, and turns each operand count to or from zero. Every mutant changes the derived
+    format or is refused. (The step reads a count only as zero or not; the look-ahead skips by
+    its value.)
   - The result is cached in `build/music/format.json` with a sha256 key; a changed file is
     refused.
 - **The layout** comes from the same source.

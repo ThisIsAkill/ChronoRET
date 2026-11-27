@@ -8,7 +8,9 @@ gives the format).
 
 Without the ROM (and without asar): the format, derived from the matched
 driver source, against the table below and the driver's own operand-count
-table (every command's length tied to its handler); the walk on synthetic
+table, and a mutation sweep of the driver (every operand read, pointer step
+and count deleted or changed alters the format or is refused: every
+command's length is tied to its handler); the walk on synthetic
 handlers (a variable length, a jump word that is not two adjacent
 operands, an unmodelled instruction, a RET to an unknown address, a half
 set pointer, a branch onto an operand byte); a synthetic song and effect
@@ -96,6 +98,35 @@ class DriverFormat(unittest.TestCase):
         self.assertEqual((fmt.first_tie, fmt.first_rest, fmt.first_cmd, fmt.nd), (0xA8, 0xB6, 0xC4, 14))
         self.assertEqual(fmt.durations, [192, 96, 64, 72, 48, 32, 36, 24, 16, 12, 8, 6, 4, 3])
         self.assertEqual(fmt.layout['num_tracks'], 8)
+
+    def test_handler_mutation_sweep(self):
+        """Each length comes from the handler code: deleting any one operand
+        read (`call Spc_ReadSeqByte`) or pointer step (`inc.b
+        !Spc_TrackPtr+x`) in the command handlers, or any one entry of the
+        operand-count table, changes what the walk finds or makes it
+        refuse."""
+        text = (ROOT / spcwalk.DRIVER).read_text()
+        includes = [(ROOT / p).read_text() for p in spcwalk.INCLUDES]
+        base = spcwalk.derive(spcwalk.Source(text, includes), commands_only=True)['commands']
+        lines = text.split('\n')
+        first = next(i for i, ln in enumerate(lines) if ln.startswith('Spc_SeqTempo:'))
+        targets = [i for i, ln in enumerate(lines) if i > first and ln.strip().split(';')[0].strip() in
+                   ('call Spc_ReadSeqByte', 'inc.b !Spc_TrackPtr+x')]
+        self.assertGreaterEqual(len(targets), 15)        # 19 in the matched driver
+        counts = next(i for i, ln in enumerate(lines) if ln.startswith('Spc_SeqOperandCounts:'))
+        mutants = [lines[:i] + lines[i + 1:] for i in targets]
+        for k in range(1, 6):                              # each db line: one count changed
+            row = lines[counts + k].split(';')[0].split(None, 1)[1].split(',')
+            for j in range(len(row)):
+                changed = list(row)
+                changed[j] = "0" if int(changed[j]) else "1"   # (the step reads it as zero or not)
+                mutants.append(lines[:counts + k] + ['    db ' + ','.join(changed)] + lines[counts + k + 1:])
+        for m in mutants:
+            try:
+                got = spcwalk.derive(spcwalk.Source('\n'.join(m), includes), commands_only=True)['commands']
+            except spcwalk.WalkError:
+                continue
+            self.assertNotEqual(got, base, 'a mutated driver gave the same format')
 
     def test_names_from_the_handler_table(self):
         fmt = real_format()
