@@ -39,6 +39,9 @@ jobs:
           python3 tools/test_maps.py
           python3 tools/test_graphics.py
           python3 tools/test_sprites.py
+          python3 tools/test_anims.py
+          python3 tools/test_drawlists.py
+          python3 tools/test_actframes.py
           python3 tools/test_music.py
 
   match:

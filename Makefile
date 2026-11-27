@@ -91,8 +91,11 @@ test-hooks:
 # layer-effect scripts' (tools/test_scripts.py), the tile graphics as
 # images (tools/test_graphics.py), the location maps and metatiles as
 # text (tools/test_maps.py), the sprite frame records as text
-# (tools/test_sprites.py), and the music sequences' readable form with the
-# driver walk that gives their format (tools/test_music.py).
+# (tools/test_sprites.py), the sprite animation lists as text
+# (tools/test_anims.py), the menu draw lists as text
+# (tools/test_drawlists.py), the battle action frames as text
+# (tools/test_actframes.py), and the music sequences' readable form with
+# the driver walk that gives their format (tools/test_music.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -113,6 +116,9 @@ test-tools:
 	python3 tools/test_maps.py
 	python3 tools/test_graphics.py
 	python3 tools/test_sprites.py
+	python3 tools/test_anims.py
+	python3 tools/test_drawlists.py
+	python3 tools/test_actframes.py
 	python3 tools/test_music.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:

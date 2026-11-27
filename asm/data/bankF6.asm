@@ -24,11 +24,16 @@ org $F60000
 Table_F60000:
     incbin "../../build/records/Table_F60000.bin"          ; records: table 512 x 14 B
 
-; $F6:1C00-$F6:1DFF (512 B), table, confirmed: 64 x 8 B graphics pack numbers per tileset
+; $F6:1C00-$F6:1DAF (432 B), table, confirmed: 54 x 8 B graphics pack numbers per tileset
 ; Read by LocLoad_Unk0960.
 org $F61C00
 LocGfx_Lists:
-    incbin "../../build/assets/table/LocGfx_Lists.bin"
+    incbin "../../build/records/LocGfx_Lists.bin"          ; records: table 54 x 8 B
+
+; $F6:1DB0-$F6:1DFF (80 B), table, probable: 8 B entries: pack numbers $D3, $CC, $D4, then $FF
+org $F61DB0
+Table_F61DB0:
+    incbin "../../build/assets/table/Table_F61DB0.bin"
 
 ; $F6:1E00-$F6:20FF (768 B), table, confirmed: 256 x 3 B long pointers (201 used, 202-255
 ; $000000)
@@ -631,7 +636,7 @@ LocGfx_PackPtrs:
 ; Read by LocLoad_Unk7084.
 org $F624C0
 LocPal_Rom:
-    incbin "../../build/assets/palette/LocPal_Rom.bin"
+    incbin "../../build/records/LocPal_Rom.bin"          ; records: palette 616 x 30 B
 
 ; $F6:6CF0-$F6:7B7F (3,728 B), palette, probable: BGR555 colours (every word has bit 15 clear)
 ; Read by PalAnim_CopyListFrame, PalAnim_CopyRomFrame (kinds 1 and 8, offsets from

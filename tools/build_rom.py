@@ -39,6 +39,10 @@ assets, with no copy of the original.
      sidecar (build/assets/gfx/) with tools/graphics.py to build/gfx/,
      every `gfxpack` piece the same way to its unpacked bytes in
      build/gfxpack/, before step 3 packs them.
+  6e. The text tools' pieces (extract_data.TEXT_TOOLS: the sprite
+     animation lists, tools/anims.py, and the menu draw lists,
+     tools/drawlists.py): each is assembled from its text by its tool to
+     build/<OUT>/<label>.bin, the same way.
   6d. The sprite frame records: every `sprframes` piece is assembled from
      its text (build/assets/sprites/<label>.spr) with tools/sprites.py to
      build/sprites/<label>.bin (a file is rewritten only when its bytes
@@ -304,6 +308,28 @@ def build_sprites(root: Path = ROOT) -> int:
     return written
 
 
+def build_text_tools(root: Path = ROOT) -> int:
+    """Assemble every piece of the text tools (extract_data.TEXT_TOOLS)
+    from its text to build/<OUT>/<label>.bin; returns how many files were
+    written."""
+    root = Path(root)
+    written = 0
+    for p in extract_data.read_manifest():
+        t = extract_data.text_tool(p['piece'])
+        if not t:
+            continue
+        try:
+            data = t.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
+        except (OSError, t.ERROR) as e:
+            raise BuildError(f'{t.__name__}: {e}') from None
+        path = root / extract_data.text_out(p)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists() or path.read_bytes() != data:
+            c3pack._write(path, data)
+            written += 1
+    return written
+
+
 def build_maps(root: Path = ROOT) -> int:
     """Assemble every maps piece (maps.PIECES) from its text
     (build/assets/maps/, tools/maps.py) to its unpacked bytes in
@@ -474,6 +500,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_records(root)
     build_battle(root)
     build_sprites(root)
+    build_text_tools(root)
     build_music(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
