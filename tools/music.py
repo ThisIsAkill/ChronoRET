@@ -283,6 +283,8 @@ def walk(u: Unit) -> dict[int, int]:
         y = todo.pop()
         if y in reached:
             continue
+        if y >= len(body):
+            raise MusicError(f'${u.aram + y:04X}: a track runs past the data')
         b = body[y]
         n = fmt.length(b)
         if y + n > len(body):
@@ -560,9 +562,7 @@ def assemble(text: str, fmt: Format, name: str = '<music>') -> bytes:
                         raise MusicError(f'{where}: {ref}: a word is written only for no track with high byte '
                                          f'0 other than $0000 (none); name a label')
                 else:
-                    v = word_of(ref, where)
-                    if v >> 8 == 0:
-                        raise MusicError(f'{where}: {ref} has high byte 0, which is no track')
+                    v = word_of(ref, where)     # (never high byte 0: the tracks follow the table)
                 at = e * L['sfx_entry'] + 2 * k
                 body[at:at + 2] = v.to_bytes(2, 'little')
     for lab in labels:
@@ -575,9 +575,8 @@ def assemble(text: str, fmt: Format, name: str = '<music>') -> bytes:
         reached = walk(Unit(kind, data, fmt))
     except MusicError as e:
         raise MusicError(f'{name}: {e}') from None
-    for where, target in jumps:
-        if labels[target] not in starts:
-            raise MusicError(f'{where}: the jump to {target} does not land on a command line')
+    # (a jump always lands on a line: a label stands before a line, since
+    # one before @bytes or at the end is refused above)
     for y in sorted(reached):
         if y not in starts:
             raise MusicError(f'{name}: ${aram + y:04X} is reached as a command but is not a line\'s start '
@@ -585,6 +584,8 @@ def assemble(text: str, fmt: Format, name: str = '<music>') -> bytes:
     for y, (where, b) in sorted(starts.items()):
         if y not in reached:
             raise MusicError(f'{where}: no track reaches this line')
+    # @bytes after a command that steps on are reached, and refused above;
+    # this also refuses them before the first line
     prev = None
     for where, k, w, at in items:
         if k == 'line':

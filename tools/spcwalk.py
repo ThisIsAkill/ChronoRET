@@ -29,8 +29,8 @@ index, to every nonzero entry of the table), and `label+N` targets (a
 branch onto an operand byte, the driver's two quirks) run the instruction
 that byte encodes (tools/spc700.py's table). States that meet at one
 instruction with the same stack and pointer are joined (a value both agree
-on is kept, any other becomes unknown), so loops and the note step's many
-paths converge. A walk ends:
+on is kept, any other becomes unknown; a known X is kept apart), so loops
+and the note step's many paths converge. A walk ends:
 
   step     at Spc_TrackStep again with the stack as it began (the loop
            reads the track's next byte),
@@ -41,9 +41,9 @@ and leaves the pointer either at byte k (moved by INC only), or set by a
 store: from a word of two operand bytes plus !Spc_Scratch00 (a jump), or
 from anything else (a place the stream's bytes do not give: a saved loop
 start, an effect's track). An instruction the walk does not model, a store
-through an unknown address that may reach the track pointer (an indexed
-store with an unknown index is taken to reach its base to base+$FF, not
-wrapping in the direct page), a RET to an
+through an unknown address that may reach the track pointer (a direct-page
+store with an unknown index reaches the whole page, as the index wraps
+there; an absolute one its base to base+$FF), a RET to an
 unknown address or too many states stops it with WalkError.
 
     python3 tools/spcwalk.py [BYTE ...]     print what each byte does
@@ -59,7 +59,7 @@ import spc700  # noqa: E402
 
 DRIVER = Path('asm/spc700/driver.asm')
 INCLUDES = [Path('asm/include/constants_engine.inc'), Path('asm/spc700/spc700.inc')]
-MAX_STATES = 400000
+MAX_STATES = 8000                   # the matched driver's walk peaks at 3,022 (a note byte)
 
 
 class WalkError(Exception):
@@ -103,7 +103,7 @@ TARGETED = BRANCHES | {'jmp', 'call', 'cbne', 'dbnz', 'bbs', 'bbc'}
 
 
 class Insn:
-    __slots__ = ('idx', 'line', 'mnem', 'ops', 'text', 'target', 'scope')
+    __slots__ = ('idx', 'line', 'mnem', 'width', 'ops', 'text', 'target', 'scope')
 
     def __repr__(self):
         return f'{self.line}: {self.text}'
@@ -218,7 +218,7 @@ class Source:
                 continue
             ins = Insn()
             ins.idx, ins.line, ins.text, ins.scope, ins.target = len(self.insns), no, s, glob, None
-            ins.mnem = w[0].split('.', 1)[0]        # (the .b/.w width: one ARAM space with P=0)
+            ins.mnem, _, ins.width = w[0].partition('.')    # width: 'b' direct page, 'w' absolute
             ins.ops = _split_ops(w[1]) if len(w) > 1 else []
             for name in pending:
                 self.labels[name] = ins.idx
@@ -226,7 +226,7 @@ class Source:
             table = None
             self.insns.append(ins)
         for ins in list(self.insns):
-            if ins.mnem in TARGETED:
+            if ins.mnem in TARGETED and not ins.ops[-1].startswith('('):    # (jmp (abs+x): refused when run)
                 try:
                     ins.target = self._target(ins.ops[-1], ins)
                 except WalkError as e:
@@ -254,7 +254,7 @@ class Source:
             raise WalkError(f'line {ins.line}: {t} lands on ${op:02X}, not a 1-byte instruction')
         mnem, template, _ = spc700.OPCODES[op]
         v = Insn()
-        v.idx, v.line, v.scope, v.target = len(self.insns), host.line, host.scope, None
+        v.idx, v.line, v.scope, v.target, v.width = len(self.insns), host.line, host.scope, None, ''
         v.mnem, v.ops = mnem, _split_ops(template) if template else []
         v.text = f'{mnem} {template}'.strip() + f' (the byte ${op:02X} of {host.text})'
         self.insns.append(v)
@@ -334,7 +334,7 @@ class Walker:
         self.first = 0
 
     # locations: ('reg', r) | ('imm', v) | ('mem', addr) | ('x', base) | ('tab', Lbl, index) |
-    # ('stream',) | ('unk', base or None)
+    # ('stream',) | ('unk', base or None, wraps in the direct page)
     def loc(self, s: State, op: str, ins: Insn):
         if op in ('a', 'x', 'y'):
             return ('reg', op)
@@ -346,15 +346,15 @@ class Walker:
                 return ('imm', v)
             raise WalkError(f'line {ins.line}: immediate {op!r}')
         if op in ('(x)', '(x+)'):
-            return ('mem', s.x) if _i(s.x) else ('unk', None)
+            return ('mem', s.x) if _i(s.x) else ('unk', None, True)
         if re.fullmatch(r'\((.*)\)\+y', op):
-            return ('unk', None)                    # (dp)+y: a pointer the walk does not follow
+            return ('unk', None, False)             # (dp)+y: a pointer the walk does not follow
         m = re.fullmatch(r'\((.*)\+x\)', op)
         if m:
             base = self.src.eval(m.group(1))
             if base == self.ptr and s.x == TRACK:
                 return ('stream',)
-            return ('unk', None)
+            return ('unk', None, False)
         m = re.fullmatch(r'(.*)\+([xy])', op)
         if m:
             base = self.src.eval(m.group(1))
@@ -363,9 +363,10 @@ class Walker:
                 return ('tab', base, ix)
             if m.group(2) == 'x' and ix == TRACK:
                 return ('x', base)
+            page = ins.width != 'w'                 # a direct-page index wraps in the page ($00-$FF, P=0)
             if _i(ix):
-                return ('mem', (base + ix) & 0xFFFF)
-            return ('unk', base)
+                return ('mem', (base + ix) & (0xFF if page else 0xFFFF))
+            return ('unk', base, page)
         base = self.src.eval(op)
         if isinstance(base, Lbl):
             return ('tab', base, 0)
@@ -438,14 +439,17 @@ class Walker:
             else:
                 s.mem[loc] = v
         elif kind == 'unk':
-            base = loc[1]
-            # an indexed store with an unknown index reaches base..base+$FF
-            # (taken as not wrapping in the direct page)
-            if base is None or base <= self.ptr + 1 and self.ptr < base + 0x100:
+            # an indexed store with an unknown index: a direct-page one (.b)
+            # reaches the whole page (the index wraps there), an absolute one
+            # (.w) base..base+$FF; one through a pointer, anywhere
+            base, page = loc[1], loc[2]
+            lo, hi = (0, 0x100) if page else (base, base + 0x100) if base is not None else (0, 0x10000)
+            if lo <= self.ptr + 1 and self.ptr < hi:
                 raise WalkError(f'line {ins.line}: {ins.text}: a store the walk cannot place, which may '
                                 f'reach the track pointer')
             for key in list(s.mem):
-                if _i(key) and base <= key < base + 0x100:
+                b = key if _i(key) else key[1]      # (an ('x', base) key: the track's byte at base)
+                if lo <= b < hi:
                     del s.mem[key]
         else:
             raise WalkError(f'line {ins.line}: {ins.text}: a store into the driver')
@@ -478,7 +482,9 @@ class Walker:
                     outs.add(('step', self._ptr(s)))
                     break
                 first_step = False
-                point = (s.i, s.stack, s.k, s.lo, s.hi, s.carry)
+                # (a known X is kept apart: an index loop such as Spc_SeqFir's
+                # then stays known, and its direct-page stores are placed)
+                point = (s.i, s.stack, s.k, s.lo, s.hi, s.carry, s.x if _i(s.x) else None)
                 old = at.get(point)
                 if old is not None:
                     j = _join(old, s)
@@ -886,8 +892,8 @@ def derive(src: Source | None = None, root: Path = ROOT, commands_only: bool = F
         if any(k > length for k in reads) or any(e == 'return' and p[0] == 'rel' and p[1] != length
                                                  for e, p in outs):
             raise WalkError(f'command ${b:02X}: it reads {reads} bytes, its length is {length}')
-        if jumps and min(jumps) + 1 >= length:
-            raise WalkError(f'command ${b:02X}: its jump word is past its length')
+        # (a jump word past the length needs no check of its own: a jump path
+        # reads both its bytes, so the reads check above refuses it)
         h = table[2 * (b - first_cmd)]
         out[b] = {'length': length, 'next': bool(nexts), 'jump': min(jumps) if jumps else None,
                   'end': ends, 'elsewhere': elsewhere, 'handler': h[1] if isinstance(h, tuple) else None}

@@ -1055,8 +1055,12 @@ On the `data-music` branch. `tools/music.py` makes one readable file per song of
     start) and `$E9`/`$EA` (an effect's track).
   - The walk refuses a command whose length differs between paths, a jump word that is not two
     adjacent operands, a half-set pointer, an unmodelled instruction, and a store that may reach
-    the pointer. An indexed store with an unknown index is taken to reach its base to base+$FF,
-    not wrapping in the direct page.
+    the pointer. A direct-page (`.b`) store with an unknown index reaches the whole page, as the
+    index wraps there, and an absolute (`.w`) one its base to base+$FF. A known X is kept apart
+    when states are joined, so `Spc_SeqFir`'s index loop stays known and its stores are placed.
+  - Each refusal, the table RET, the join and the instructions whose model matters (DBNZ,
+    INCW/DECW) have a synthetic test. So does the note check: a driver whose note path reads a
+    byte is refused.
   - Every derived length equals `Spc_SeqOperandCounts` + 1 (`test_music.py` checks it against
     the source table and against a written-out table of every command). A mutation sweep of the
     driver source deletes each of the 19 operand reads and pointer steps in the command
