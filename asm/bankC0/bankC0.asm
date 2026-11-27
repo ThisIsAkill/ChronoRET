@@ -29215,8 +29215,8 @@ Field_WinPulseDraw:
 ;   and sets Field_MapRedrawDone bit 5, so the NMI sends it
 ;   (its routine at $C0:EC77). A byte >= $80 ends the block: bit 4 is
 ;   cleared, the line sent, and Credits_Row counted once more (a blank
-;   line). The text at Credits_Text ("PRODUCER//KAZUHIKO AOKI"...) is
-;   what identifies this as the staff credits.
+;   line). The text at Credits_Text (it opens with the producer's
+;   credit) is what identifies this as the staff credits.
 ; - bit 2 or 3 (Field54_MapReq): copies them, shifted left once, into
 ;   Field_MapRedrawDone bits 3-4 (which the NMI handler acts on), runs
 ;   Map_ClearBufC800 and clears them.

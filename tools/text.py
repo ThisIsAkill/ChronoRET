@@ -231,6 +231,8 @@ UNITS: dict[str, list[tuple[str, str]]] = {
     'TechNames': [('$CC:15C4', 'records 11 $EF')],
     'EnemyNames': [('$CC:6500', 'records 11 $EF')],
     'Credits': [('$FD:A000', 'ascii')],
+    'C3StaffText': [('$C3:0E36', 'ascii')],
+    'C3EndMarker': [('$C3:10C0', 'ascii')],
 }
 ROWS = {start: (unit, fmt) for unit, rows in UNITS.items() for start, fmt in rows}
 DICTIONARY_UNIT = 'Dictionary'
@@ -612,7 +614,8 @@ def extract_unit(rom: bytes, unit: str, pieces: list[dict], dic: Dictionary | No
             if s + n * size < e:
                 regs.append((s + n * size, e, 'bytes', None))
         elif fmt[0] == 'ascii':
-            last = max((o for o in range(s, e) if rom[o] == ASCII_BLOCK_END), default=s - 1) + 1
+            # to the last block end, or the whole row when it has none
+            last = max((o for o in range(s, e) if rom[o] == ASCII_BLOCK_END), default=e - 1) + 1
             regs.append((s, last, 'ascii', None))
             if last < e:
                 regs.append((last, e, 'bytes', None))

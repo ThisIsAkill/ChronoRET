@@ -8731,14 +8731,14 @@ C3Mod_WaveNmiTask:
 
 %C3ModOrg($7E6248)
 ; ============================================================
-; Programs 7 and 8: "BUT... THE FUTURE REFUSED TO CHANGE."
+; Programs 7 and 8: a three-line caption on a still picture
 ; ($6248–$66DC)
 ; ============================================================
 
 ; $7E:6248 — C3Mod_Prog7 (245 bytes, $6248–$633C)
 ; The program of C3Mod_ProgramTable entries 7 and 8: a still picture
 ; with sparks, a palette that fades towards a second one, then the
-; text "BUT... THE FUTURE REFUSED TO CHANGE." in sprites; a button
+; three-line caption (C3Mod_Prog7Text) in sprites; a button
 ; ends it with a soft reset (C3Mod_ResetWaitTask).
 ;   - VMAIN = $80; C3Mod_DestBitmapSrc (the packs to $7F:0200); pack 33 (a
 ;     2bpp font) made 4bpp at VRAM word $4000 (C3Mod_Font2To4, $80
@@ -9470,12 +9470,14 @@ C3Mod_SparkSprite:
 
 ; $7E:6644 — C3Mod_Prog7Text (44 bytes, $6644–$666F)
 ; The text C3Mod_TextTask draws (C3Mod_DrawText's codes; "[" is the
-; full stop): "BUT..." at 16, 112, "THE FUTURE REFUSED" at 24, 132 and
-; "TO CHANGE." at 144, 152.
+; full stop): three lines, each a place code with its X and Y (16, 112;
+; 24, 132; 144, 152) and the line's characters (%C3ModText: from your
+; ROM at build time, never in the repository; 6, 18 and 10 of them),
+; then the end code.
 C3Mod_Prog7Text:
-    db !C3_TextPlace, $10, $70, "BUT[[["
-    db !C3_TextPlace, $18, $84, "THE FUTURE REFUSED"
-    db !C3_TextPlace, $90, $98, "TO CHANGE[", !C3_TextEnd
+    db !C3_TextPlace, $10, $70 : %C3ModText($7E6647, $7E664D)
+    db !C3_TextPlace, $18, $84 : %C3ModText($7E6650, $7E6662)
+    db !C3_TextPlace, $90, $98 : %C3ModText($7E6665, $7E666F) : db !C3_TextEnd
 
 ; $7E:6670 — C3Mod_FontWidths (32 bytes, $6670–$668F)
 ; C3Mod_DrawText's glyph widths in pixels for the codes $41-$60 ("A" to
@@ -10541,67 +10543,67 @@ C3Mod_CreditsRoles:
 ; byte first: $0528 is row 9, column 8 of the map at $0400), then the
 ; text and a 0; $FF ends the list.
 C3Mod_Credits1Names:
-    dw $0528 : db "KAZUHIKO AOKI", 0
-    dw $05A8 : db "TAKASHI TOKITA", 0
-    dw $05C8 : db "YOSHINORI KITASE", 0
-    dw $05E8 : db "AKIHIKO MATSUI", 0
+    dw $0528 : %C3ModText($7E6CC2, $7E6CCF) : db 0
+    dw $05A8 : %C3ModText($7E6CD2, $7E6CE0) : db 0
+    dw $05C8 : %C3ModText($7E6CE3, $7E6CF3) : db 0
+    dw $05E8 : %C3ModText($7E6CF6, $7E6D04) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6D06 — C3Mod_Credits1Roles (23 bytes, $6D06–$6D1C)
 ; Page 1's roles: each record X, Y, the text, a 0; $FF ends it.
 C3Mod_Credits1Roles:
-    db $36, $3C, "PRODUCER", 0
-    db $36, $5C, "DIRECTER", 0
+    db $36, $3C : %C3ModText($7E6D08, $7E6D10) : db 0
+    db $36, $5C : %C3ModText($7E6D13, $7E6D1B) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6D1D — C3Mod_Credits2Names (52 bytes, $6D1D–$6D50)
 C3Mod_Credits2Names:
-    dw $0528 : db "AKIRA TORIYAMA", 0
-    dw $05A8 : db "YUJI HORII", 0
-    dw $05C8 : db "HIRONOBU SAKAGUCHI", 0
+    dw $0528 : %C3ModText($7E6D1F, $7E6D2D) : db 0
+    dw $05A8 : %C3ModText($7E6D30, $7E6D3A) : db 0
+    dw $05C8 : %C3ModText($7E6D3D, $7E6D4F) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6D51 — C3Mod_Credits2Roles (33 bytes, $6D51–$6D71)
 C3Mod_Credits2Roles:
-    db $36, $3C, "CHARACTER DESIGN", 0
-    db $36, $5C, "SUPERVISOR", 0
+    db $36, $3C : %C3ModText($7E6D53, $7E6D63) : db 0
+    db $36, $5C : %C3ModText($7E6D66, $7E6D70) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6D72 — C3Mod_Credits3Names (50 bytes, $6D72–$6DA3)
 C3Mod_Credits3Names:
-    dw $0528 : db "YASUNORI MITSUDA", 0
-    dw $05A8 : db "MINORU AKAO", 0
-    dw $0628 : db "EIJI NAKAMURA", 0
+    dw $0528 : %C3ModText($7E6D74, $7E6D84) : db 0
+    dw $05A8 : %C3ModText($7E6D87, $7E6D92) : db 0
+    dw $0628 : %C3ModText($7E6D95, $7E6DA2) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6DA4 — C3Mod_Credits3Roles (42 bytes, $6DA4–$6DCD)
 C3Mod_Credits3Roles:
-    db $36, $3C, "MUSIC", 0
-    db $36, $5C, "SOUND PROGRAM", 0
-    db $36, $7C, "SOUND ENGINEER", 0
+    db $36, $3C : %C3ModText($7E6DA6, $7E6DAB) : db 0
+    db $36, $5C : %C3ModText($7E6DAE, $7E6DBB) : db 0
+    db $36, $7C : %C3ModText($7E6DBE, $7E6DCC) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6DCE — C3Mod_Credits4Names (36 bytes, $6DCE–$6DF1)
 C3Mod_Credits4Names:
-    dw $0588 : db "KEIZO KOKUBO", 0
-    dw $05A8 : db "KATSUHISA HIGUCHI", 0
+    dw $0588 : %C3ModText($7E6DD0, $7E6DDC) : db 0
+    dw $05A8 : %C3ModText($7E6DDF, $7E6DF0) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6DF2 — C3Mod_Credits4Roles (11 bytes, $6DF2–$6DFC)
 C3Mod_Credits4Roles:
-    db $36, $54, "PROGRAM", 0
+    db $36, $54 : %C3ModText($7E6DF4, $7E6DFB) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6DFD — C3Mod_Credits5Names (58 bytes, $6DFD–$6E36)
 C3Mod_Credits5Names:
-    dw $0588 : db "YASUHIKO KAMATA", 0
-    dw $05A8 : db "MASANORI HOSHINO", 0
-    dw $05C8 : db "TETSUYA TAKAHASHI", 0
+    dw $0588 : %C3ModText($7E6DFF, $7E6E0E) : db 0
+    dw $05A8 : %C3ModText($7E6E11, $7E6E21) : db 0
+    dw $05C8 : %C3ModText($7E6E24, $7E6E35) : db 0
     db !C3_CreditsEnd
 
 ; $7E:6E37 — C3Mod_Credits5Roles (11 bytes, $6E37–$6E41)
 C3Mod_Credits5Roles:
-    db $36, $54, "GRAPHIC", 0
+    db $36, $54 : %C3ModText($7E6E39, $7E6E40) : db 0
     db !C3_CreditsEnd
 
 %C3ModOrg($7E6E42)
@@ -15814,8 +15816,8 @@ C3Mod_Prog10Grid:
 ; fixed source, one register, VMDATAH; VMAIN = $80): a 32 x 32 map of
 ; tile 0 with attribute $20 (priority); the HDMA channel of
 ; C3Mod_Prog10HdmaGrid (0: COLDATA), C3_HdmaEnable = channel 0;
-; C3_Prog10TextPtr = $B099 (in C3Mod_StaffTexts' second text, at its
-; "//////TRANSLATOR" part), C3_Prog10TextY = -$20 (16-bit, DP = 0); DP =
+; C3_Prog10TextPtr = $B099 (in C3Mod_StaffTexts' second text, right
+; after its first stop code: the translators' part), C3_Prog10TextY = -$20 (16-bit, DP = 0); DP =
 ; DP_PPU: BG2HOFS = 0 (both bytes, TDC), BG12NBA = $46, BG34NBA = 0,
 ; BG1SC = $44, BG2SC = $48, BG3SC = $60, BGMODE = 4, CGADSUB = $82
 ; (subtract, on BG2), TM = $13 (BG1, BG2 and the sprites), TS = 0,
@@ -16051,8 +16053,8 @@ C3Mod_Prog12:
 ;     byte), BG12NBA = $05, BG34NBA = $04, BG1SC = $60, BG3SC = $48,
 ;     BGMODE = 1, CGADSUB = $84 (subtract, on BG3), TM = $14 (BG3 and
 ;     the sprites), TS = 0, TMW = TSW = 0; DP = 0: C3_Prog10TextPtr =
-;     $AB1A (in C3Mod_StaffTexts' second text, at its
-;     "PRODUCER//KAZUHIKO AOKI" part), C3_Prog10TextY = -$20 (16-bit
+;     $AB1A (in C3Mod_StaffTexts' second text, at the producer's
+;     credit), C3_Prog10TextY = -$20 (16-bit
 ;     absolute stores); song $1B (C3Mod_PlaySong).
 ; Sub-entry: .setup ($8EBE), from C3Mod_Prog12 (BRA).
 ; Callers note: C3Mod_ProgramTable entry 13 (C3Mod_Start's JSR (table,X)
@@ -19471,102 +19473,89 @@ C3Mod_FigSeqs:
     db 0
 
 ; $7E:A651 — C3Mod_StaffTexts (3,886 bytes, $A651–$B57E)
-; The staff credits the module shows, in two texts to the module's end:
-;   - $A651-$AADA: "PRODUCER/KAZU`KO AOKI@DIRECTOR/..." up to "...KANAME
-;     TANAKA@" and a $00: names after their job, "/" between names, "@"
-;     between jobs, "`" standing for HI (and "[", "]", "^", "_" for
-;     other pairs of letters, probably); C3Mod_Prog10 ($86BF, $86D1)
-;     stores $A651 in C3_ResultWord ($0382) when C3_EntryArg bits 0-3
-;     are $A ($86BF) or $B ($86D1);
-;   - $AADB on: a $1C, then "XEXECUTIVE PRODUCER/..." to the end, the
-;     same list with "/" between names, then "CHRONO TRIGGER", the
-;     translators, test players and special thanks ("X" and the $1C
-;     are probably control bytes); C3_Prog10TextPtr gets $AB1A
-;     (C3Mod_Prog13: its "PRODUCER//KAZUHIKO AOKI" part) or $B099
-;     (C3Mod_Prog10GridNmi: "//////TRANSLATOR"), for
-;     C3Mod_CreditLineTask ($9E9F), which stops at the first $5C ("\")
-;     after its start: from C3Mod_Prog13's $AB1A that is the one at
-;     $B098, just before $B099's part; from C3Mod_Prog10GridNmi's $B099
-;     the one at $B573, before "CODE END", which only that start
-;     reaches; C3Mod_Prog10TextTask reads the texts from
-;     C3_ResultWord ($9B59) and stops at $AB1A ($9B76);
-;   - it ends with the module's end marker "\CODE END 7E" (as the kernel
-;     ends with "CODE END C3").
+; The staff credits the module shows, in two texts to the module's end.
+; Their characters are the game's text: %C3ModText takes them at build
+; time from your ROM (never stored here; the build writes them readable
+; to build/assets/c3module_text/module.txt); the control bytes between
+; the runs are source:
+;   - $A651-$AADA: C3Mod_DrawText texts, a job and its names each ("/"
+;     between names; C3Mod_DrawText's letter-pair codes such as "`"),
+;     each ended by C3_TextEnd ($40, as source), then a $00;
+;     C3Mod_Prog10 ($86BF, $86D1) stores $A651 in C3_ResultWord ($0382)
+;     when C3_EntryArg bits 0-3 are $A ($86BF) or $B ($86D1), and
+;     C3Mod_Prog10TextTask reads the texts from C3_ResultWord ($9B59)
+;     and stops at $AB1A ($9B76);
+;   - $AADB on: a $1C, then the credit roll's text, lines ended by "/",
+;     for C3Mod_CreditLineTask ($9E9F); C3_Prog10TextPtr gets $AB1A
+;     (C3Mod_Prog13: the producer's credit) or $B099
+;     (C3Mod_Prog10GridNmi: the translators' part). The roll stops at the
+;     first C3_TextStop ($5C, as source) after its start: from $AB1A
+;     the one at $B098, right before $B099; from $B099 the one at $B573,
+;     which only that start reaches;
+;   - after it the module's ASCII end marker ($B574-$B57E), as the
+;     kernel ends with one of its own.
 ; The copy code C3_BuildCopyCode writes at run time ($B574) overwrites
 ; the last bytes (GENERATED in tools/c3module.py).
 %C3ModOrg($7EA651)
 C3Mod_StaffTexts:
-    db "PRODUCER/KAZU`KO AOKI@DIRECTOR/TAKAS` TOKITA/YOS`NORI KI"
-    db "TASE/AKI`KO MATSUI@CHARACTER DESIGN/AKIRA TORIYAMA@SUPER"
-    db "VISOR/YUJI HORII/`RONOBU SAKAGUC`@MUSIC/YASUNORI MITSUDA"
-    db "/NOBUO UEMATSU@MAIN PROGRAM/KEIZO KOKUBO/KATSU`SA `GUC`@"
-    db "SOUND PROGRAM/MINORU AKAO@SOUND ENGINEER/EIJI NAKAMURA@G"
-    db "RAP`C DIRECTOR/YASU`KO KAMATA/MASANORI HOS`NO/TETSUYA TA"
-    db "K]^_`@STORY PLAN/MASATO KATO@EVENT PLAN/`ROYUKI ITOU/KEI"
-    db "SUKE MATSUHARA/`ROKI C`BA@FIELD PLAN/KEITA ETO/KENIC` NI"
-    db "S`@BATTLE PLAN/MAKOTO S`MAMOTO/HARUYUKI NIS`DA/TOS`AKI S"
-    db "UZUKI@BATTLE PROGRAM/TOS`O ENDO/KIYOS` YOS`I@WORLDMAP PR"
-    db "OGRAM/KAZUMI KOBAYAS`@MENU PROGRAM/AKI`RO S`MIZU@VISUAL "
-    db "PROGRAM/KOJI SUGIMOTO/KEN NARITA@EFFECT GRAP`C/`ROKATSU "
-    db "SASAKI/YUKIO NAKATANI@FIELD GRAP`C/S`NIC`RO OKANIWA/MANA"
-    db "BU DAIS`MA/TOS`YA HASUI/MATSUZO ITAKURA@FIELD GRAP`C/TET"
-    db "SUYA NOMURA/KAZU`RO OKAWA/YOS`NORI OGURA@FIELD GRAP`C/YU"
-    db "SUKE NAORA/TAKAMIC` S`BUYA/S`NIC`RO HAMASAKA/AKIYOS` MAS"
-    db "UDA@FIELD GRAP`C/MASAAKI HAYAS`/TAKAYUKI ODAC`/YASUYUKI "
-    db "HONNE@CHARACTER GRAP`C/`ROS` UC`YAMA/TAIZO INUKAI/FUMI N"
-    db "AKAS`MA@MONSTER GRAP`C/KOUIC` EBE/TSUTOMU TERADA/TADA`RO"
-    db " USUDA@MAP DESIGN/MAMI KAWAI/AKANE HARUKI/`ROTO YAMAMOTO"
-    db "@MAP DESIGN/`DETOS` KEZUKA/KANAME TANAKA@"
+    %C3ModText($7EA651, $7EA666)
+    db !C3_TextEnd
+    %C3ModText($7EA667, $7EA69B)
+    db !C3_TextEnd
+    %C3ModText($7EA69C, $7EA6BB)
+    db !C3_TextEnd
+    %C3ModText($7EA6BC, $7EA6E2)
+    db !C3_TextEnd
+    %C3ModText($7EA6E3, $7EA707)
+    db !C3_TextEnd
+    %C3ModText($7EA708, $7EA730)
+    db !C3_TextEnd
+    %C3ModText($7EA731, $7EA74A)
+    db !C3_TextEnd
+    %C3ModText($7EA74B, $7EA767)
+    db !C3_TextEnd
+    %C3ModText($7EA768, $7EA7A6)
+    db !C3_TextEnd
+    %C3ModText($7EA7A7, $7EA7BD)
+    db !C3_TextEnd
+    %C3ModText($7EA7BE, $7EA7F2)
+    db !C3_TextEnd
+    %C3ModText($7EA7F3, $7EA813)
+    db !C3_TextEnd
+    %C3ModText($7EA814, $7EA84E)
+    db !C3_TextEnd
+    %C3ModText($7EA84F, $7EA875)
+    db !C3_TextEnd
+    %C3ModText($7EA876, $7EA896)
+    db !C3_TextEnd
+    %C3ModText($7EA897, $7EA8B1)
+    db !C3_TextEnd
+    %C3ModText($7EA8B2, $7EA8D9)
+    db !C3_TextEnd
+    %C3ModText($7EA8DA, $7EA906)
+    db !C3_TextEnd
+    %C3ModText($7EA907, $7EA950)
+    db !C3_TextEnd
+    %C3ModText($7EA951, $7EA989)
+    db !C3_TextEnd
+    %C3ModText($7EA98A, $7EA9D4)
+    db !C3_TextEnd
+    %C3ModText($7EA9D5, $7EAA0E)
+    db !C3_TextEnd
+    %C3ModText($7EAA0F, $7EAA48)
+    db !C3_TextEnd
+    %C3ModText($7EAA49, $7EAA7F)
+    db !C3_TextEnd
+    %C3ModText($7EAA80, $7EAAB1)
+    db !C3_TextEnd
+    %C3ModText($7EAAB2, $7EAAD9)
+    db !C3_TextEnd
     db $00
     db $1C
-    db "XEXECUTIVE PRODUCER/TETSUO MIZUNO/`TOS` TAKEMURA/`SAS` S"
-    db "UZUKI@PRODUCER//KAZUHIKO AOKI/////DIRECTOR//TAKASHI TOKI"
-    db "TA/YOSHINORI KITASE/AKIHIKO MATSUI/////CHARACTER DESIGN/"
-    db "/AKIRA TORIYAMA/////SUPERVISOR//YUJI HORII/HIRONOBU SAKA"
-    db "GUCHI/////MUSIC//YASUNORI MITSUDA/NOBUO UEMATSU/////MAIN"
-    db " PROGRAM//KEIZO KOKUBO/KATSUHISA HIGUCHI/////SOUND PROGR"
-    db "AM//MINORU AKAO/////SOUND ENGINEER//EIJI NAKAMURA/////GR"
-    db "APHIC DIRECTOR//YASUHIKO KAMATA/MASANORI HOSHINO/TETSUYA"
-    db " TAKAHASHI/////STORY PLAN//MASATO KATO/////EVENT PLAN//H"
-    db "IROYUKI ITOU/KEISUKE MATSUHARA/HIROKI CHIBA/////FIELD PL"
-    db "AN//KEITA ETO/KENICHI NISHI/////BATTLE PLAN//MAKOTO SHIM"
-    db "AMOTO/HARUYUKI NISHIDA/TOSHIAKI SUZUKI/////BATTLE PROGRA"
-    db "M//TOSHIO ENDO/KIYOSHI YOSHII/////WORLDMAP PROGRAM//KAZU"
-    db "MI KOBAYASHI/////MENU PROGRAM//AKIHIRO SHIMIZU/////VISUA"
-    db "L PROGRAM//KOJI SUGIMOTO/KEN NARITA/////EFFECT GRAPHIC//"
-    db "HIROKATSU SASAKI/YUKIO NAKATANI/////FIELD GRAPHIC//SHINI"
-    db "CHIRO OKANIWA/MANABU DAISHIMA/TOSHIYA HASUI/MATSUZO ITAK"
-    db "URA//TETSUYA NOMURA/KAZUHIRO OKAWA/YOSHINORI OGURA/YUSUK"
-    db "E NAORA/TAKAMICHI SHIBUYA/SHINICHIRO HAMASAKA/AKIYOSHI M"
-    db "ASUDA/MASAAKI HAYASHI/TAKAYUKI ODACHI/YASUYUKI HONNE////"
-    db "/CHARACTER GRAPHIC//HIROSHI UCHIYAMA/TAIZO INUKAI/FUMI N"
-    db "AKASHIMA/////MONSTER GRAPHIC//KOUICHI EBE/TSUTOMU TERADA"
-    db "/TADAHIRO USUDA/////MAP DESIGN//MAMI KAWAI/AKANE HARUKI/"
-    db "HIROTO YAMAMOTO/HIDETOSHI KEZUKA/KANAME TANAKA/////EXECU"
-    db "TIVE PRODUCER//TETSUO MIZUNO/HITOSHI TAKEMURA/HISASHI SU"
-    db "ZUKI//////////////////////////////////      CHRONO TRIGG"
-    db "ER//////////\\//////TRANSLATOR//TED WOOLSEY//WEIMIN LI/"
-    db "AIKO ITO/RIKA MARUYA/NORIKO WADA/////SOUND EFFECT//YOSHITA"
-    db "KA HIROTA/CHIHARU MINEKAWA/TADAKAZU OKANO/YASUAKI YABUTA"
-    db "/////TEST PLAYER//KENICHI SHINODA/KEN SAKUYAMA/TOMOKO MO"
-    db "RIYASU/HARUO OGURA/HIROTSUGU YAMAMOTO/REO NOMOTO/AKIHIRO"
-    db " ICHIKAWA/AKITOSHI TAKAHASHI/////////ADVERTISEMENT//K[YA"
-    db "MASHITA/Y[HIRATA/T[NOMURA/K[SOUSUI/T[TSURUZONO/M[OKAMIYA"
-    db "/N[WATANABE/K[MAEDA/M[MIZUSHIMA/////SYSTEM ADMINISTER//M"
-    db "[NAKAJIMA/M[OGURA/Y[ORIKASA/Y[OHDAIRA/////TEST COORDINAT"
-    db "OR//S[KAJITANI/R[KODA/K[INAGI/N[HANADA/H[MASUDA/N[KANAI/"
-    db "H[SAKURAI/////SPECIAL THANKS//K[TORISHIMA///N[HORIE/F[TA"
-    db "KEDA/T[TAKAHASHI/T[KONDOH//S[HASHIMOTO////K[ADACHI/Y[KUW"
-    db "AHARA/H[OKAWA/Y[UENISHI///N[MATSUEDA/I[DOBASHI/M[SAITO/H"
-    db "[KAWAI///S[MORIYA/K[SUZUKI/T[KONDO/S[TANAKA////K[TANIKAW"
-    db "A/J[SAITO/S[HIDAKI/K[OOGO/H[SUZUKI/M[ITOH/R[MIYAMOTO///H"
-    db "[YOKOTA/M[YUMOTO/N[ISHIKAWA/H[KIZUKA/S[ARAI/K[MATSUMOTO/"
-    db "K[HIRATA/M[KOUNO/R[TSUKAKOSHI/K[KANEKO/H[SHIMODAIRA/M[NO"
-    db "UMURA/A[HINO/H[HAMADA///T[OHNO/H[NOGUCHI/M[HORIE/M[MORI/"
-    db "M[KOBAYASHI///M[KANESHIGE/M[SOMENO/Y[TANAKA/R[TAKEDA///T"
-    db "[MORITA/Y[SUEMITSU/W[SATO/H[NAKAMURA/S[AOYAMA/H[NAGAHARA"
-    db "/H[SHINGU///R[SILVEIRA/J[YANAGIHARA/T[HORII/D[SMITH/C[CH"
-    db "AMBERLAIN/E[GREGORY/D[ABRAHAM/C[BUDD/M[FREGUIA//////////"
-    db "///////////////////////\\CODE END 7E"
+    %C3ModText($7EAADC, $7EB098)
+    db !C3_TextStop
+    %C3ModText($7EB099, $7EB573)
+    db !C3_TextStop
+    %C3ModText($7EB574, $7EB57F)
 
 incsrc "unmatched.asm"

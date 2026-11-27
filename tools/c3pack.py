@@ -380,8 +380,30 @@ def build(root: Path = Path('.'), quiet: bool = True) -> Path:
         first = next(i for i in range(MODULE_SIZE) if a[i] != original[i])
         print(f'c3pack: the module differs from the ROM\'s from $7E:{(MODULE_BASE + first) & 0xFFFF:04X} '
               f'(unpacked); the packed bytes will not match', file=sys.stderr)
+    write_texts(root, original)
     _write(stamp, key.encode())
     return root / MODULE_LZ
+
+
+TEXT_SPAN = re.compile(r'%C3ModText\(\$7E([0-9A-Fa-f]{4}), \$7E([0-9A-Fa-f]{4})\)')
+TEXT_OUT = Path('build/assets/c3module_text/module.txt')
+
+
+def write_texts(root: Path, module: bytes) -> Path:
+    """The module's text spans (%C3ModText: its characters come from the
+    user's ROM, never from the repository), readable, one line each, to
+    build/assets/c3module_text/module.txt, for a reader of the source."""
+    lines = ['; The $C3 module\'s text, from your ROM (tools/c3pack.py; never committed).']
+    for m in TEXT_SPAN.finditer((root / MODULE_SOURCE).read_text()):
+        lo, hi = int(m.group(1), 16), int(m.group(2), 16)
+        data = module[lo - (MODULE_BASE & 0xFFFF):hi - (MODULE_BASE & 0xFFFF)]
+        text = ''.join(chr(c) if 0x20 <= c < 0x7F and c not in (0x7B, 0x7D) else f'{{${c:02X}}}'
+                       for c in data)
+        lines.append(f'$7E:{lo:04X}-$7E:{hi - 1:04X} {text}')
+    out = root / TEXT_OUT
+    out.parent.mkdir(parents=True, exist_ok=True)
+    _write(out, ('\n'.join(lines) + '\n').encode())
+    return out
 
 
 def _write(path: Path, data: bytes) -> None:

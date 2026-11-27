@@ -15,6 +15,16 @@
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
+; $C3:0E36-$C3:0EF9 (196 B), text, probable: staff text in ASCII: $0A ends a line
+org $C30E36
+BankC3_StaffText:
+    incbin "../../build/text/BankC3_StaffText.bin"          ; text unit C3StaffText (ascii)
+
+; $C3:10C0-$C3:10CA (11 B), text, probable: end-of-code marker in ASCII
+org $C310C0
+BankC3_EndMarker:
+    incbin "../../build/text/BankC3_EndMarker.bin"          ; text unit C3EndMarker (ascii)
+
 ; $C3:10CB-$C3:11FF (309 B), padding, confirmed: 309 x $00
 org $C310CB
 Padding_C310CB:

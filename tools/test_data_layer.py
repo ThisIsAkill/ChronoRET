@@ -138,6 +138,28 @@ class Lint(unittest.TestCase):
         import lint_readability as L
         self.assertEqual(L.file_read_findings(), [])
 
+    def test_no_game_text(self):
+        import lint_readability as L
+        self.assertEqual(L.text_findings(), [])
+
+    def test_planted_text_refused(self):
+        # A db string literal of game text anywhere under asm/ is a TEXT
+        # finding; the ROM header's identifiers and file paths are not.
+        import lint_readability as L
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'asm'
+            (root / 'bank00').mkdir(parents=True)
+            (root / 'bankC3' / 'packed').mkdir(parents=True)
+            (root / 'bank00' / 'bank00.asm').write_text('    db "ACTE"\n    incsrc "../x/abc.inc"\n')
+            self.assertEqual(L.text_findings(root), [])
+            for line in ('    db $0A,"SOME WORDS",$0A', '    dw $0528 : db "NAME", 0',
+                         'Label: db "abc"', '    %M("TEXT")'):
+                (root / 'bankC3' / 'packed' / 'module.asm').write_text(line + '\n')
+                found = L.text_findings(root)
+                self.assertEqual([f[3] for f in found], ['TEXT'], line)
+            (root / 'bankC3' / 'packed' / 'module.asm').write_text('    db "AB", 0  ; "ABCDEF"\n')
+            self.assertEqual(L.text_findings(root), [])
+
     def test_planted_reads_refused(self):
         import lint_readability as L
         for case in plants(ROOT):

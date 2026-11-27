@@ -2,8 +2,8 @@
 ; Bank $C3 — the bank $C3 kernel (decompressor, module boot, window effects)
 ; File offset 0x030000 (bank $C3 = ROM offset $30000)
 ;
-; $C3:0000-$C3:10BF is 65816 code, closed by the ASCII marker "CODE END
-; C3" ($C3:10C0-$C3:10CA). Other banks enter it only through the vector
+; $C3:0000-$C3:10BF is 65816 code, closed by an ASCII end-of-code
+; marker ($C3:10C0-$C3:10CA, a text piece of the data layer). Other banks enter it only through the vector
 ; table at $C3:0000-$C3:0013 (BankC3_Entry0000, Decomp_ToWramVec,
 ; BankC3_Entry0008/000E/0011). The rest of the bank is data and stays as
 ; ROM bytes: $00 fill to $C3:11FF, two packed blocks in Decomp_ToWram's
@@ -2744,19 +2744,9 @@ C3_FindDivisor:
     BCS C3_FindDivisor
     RTL
 
-; $C3:0E36 — BankC3_StaffText (196 bytes, $0E36–$0EF9)
-; ASCII, lines ended by $0A (the text starts with a $0A, so its first
-; line is empty): the staff of the jet-bike race (the module), as in
-; the ROM ("JONNY" spelt so). No reader was found in the
-; kernel or the unpacked module (no reference to $0E36).
-BankC3_StaffText:
-    db $0A,"-- JET BIKE RACE --",$0A
-    db "BIKE OBJECT  :MAMI KAWAI",$0A
-    db "JONNY OBJECT :TAYZO INUKAI",$0A
-    db "MODE7 ROAD   :KANAME TANAKA",$0A
-    db "BACK GROUND  :AKANE HARUKI",$0A
-    db "PANEL & FONT :HIROTO YAMAMOTO",$0A
-    db "THANK YOU FOR 5(!) GRAPHIC DESIGNERS.",$0A
+; $C3:0E36-$0EF9: the jet-bike race's staff text (ASCII, lines ended by
+; $0A), which no code reads: a text piece of the data layer
+; (BankC3_StaffText, asm/data/bankC3.asm), from your ROM.
 
 ; ============================================================
 ; Window tables: the quadrilateral ($C3:0EFA–$C3:10BF)
@@ -3102,14 +3092,10 @@ WinFx_QuadExit:                         ; header: see WinFx_QuadEdge
 ; End of the kernel ($C3:10C0–$C3:10CA)
 ; ============================================================
 
-; $C3:10C0 — BankC3_EndMarker (11 bytes, $10C0–$10CA)
-; ASCII "CODE END C3" right after the kernel's last RTL ($C3:10BF,
-; WinFx_QuadExit's, where WinFx_QuadEdge and WinFx_BuildQuad end),
-; probably left by the build to mark the end of the code. Followed by
-; $00 fill up to the packed block at $C3:1200 (not emitted here).
-org $C310C0
-BankC3_EndMarker:
-    db "CODE END C3"
+; $C3:10C0-$10CA: the end-of-code marker right after the kernel's last
+; RTL ($C3:10BF, WinFx_QuadExit's), probably left by the build: a text
+; piece of the data layer (BankC3_EndMarker, asm/data/bankC3.asm), from
+; your ROM. $00 fill follows up to the packed block at $C3:1200.
 
 ; ============================================================
 ; The packed module ($C3:1313–$C3:7A2B)

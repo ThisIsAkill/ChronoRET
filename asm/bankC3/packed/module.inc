@@ -35,6 +35,17 @@ macro C3ModRomBytes(start, end)
     incbin "!C3Mod_RomImage":<start>-!C3Mod_Code..<end>-!C3Mod_Code
 endmacro
 
+; The game's text in the module (credits, captions, the end marker):
+; never stored in the repository (README, "Legal"), its characters are
+; taken at build time from the user's ROM, as the unpacked module that
+; tools/c3pack.py writes to build/c3pack/rom_module.bin (module
+; addresses start to end-1, at the current position). The labels, the
+; places and the control bytes around it stay in the source. The build
+; also writes each span readable to build/assets/c3module_text/.
+macro C3ModText(start, end)
+    %C3ModRomBytes(<start>, <end>)
+endmacro
+
 ; ------------------------------------------------------------
 ; Kernel and engine entry points the module calls. The module is
 ; assembled apart from asm/main.asm, so their labels are not visible
@@ -669,7 +680,7 @@ endmacro
 !C3_OffsetMask = $03FF                   ; an offset-per-tile entry's offset
 !C3_OffsetBg1 = $2000                    ; ... bit 13: it applies to BG1
 !C3_Prog2Bg3Hofs = $0044                 ; 16-bit: BG3HOFS (C3Mod_WaveNmiTask; C3_Prog9's byte)
-; Programs 7 and 8 ("BUT... THE FUTURE REFUSED TO CHANGE.").
+; Programs 7 and 8 (a three-line caption on a still picture).
 !C3_Prog7FontTiles = $0080               ; pack 33's 2bpp tiles made 4bpp (C3Mod_Font2To4)
 !C3_Prog7Tiles2 = $4800                  ; VRAM word of pack 31
 !C3_Prog7FadeA = $B574                   ; $7E: pack 29's colours (a fade target)
@@ -1135,8 +1146,8 @@ endmacro
 !C3_Prog10GridTileBytes = $0200
 !C3_Prog10GridBgMap = $4800              ; VRAM word of BG2's (BG3's in program 13) map
 !C3_Prog10GridMapBytes = $0400
-!C3_Prog10TextA = $B099                  ; in C3Mod_StaffTexts' second text ("//////TRANSLATOR")
-!C3_Prog10TextB = $AB1A                  ; ... ("PRODUCER//KAZUHIKO AOKI")
+!C3_Prog10TextA = $B099                  ; in C3Mod_StaffTexts' second text (the translators' part)
+!C3_Prog10TextB = $AB1A                  ; ... (the producer's credit)
 !C3_Prog10TextPtr = $4A                  ; dp, 16-bit: the credit text's next line (C3Mod_CreditLineTask)
 !C3_Prog10TextY = $48                    ; dp, 16-bit: the VRAM word of the credit row (C3Mod_CreditLineNmi)
 !C3_Prog10TextYStart = $FFE0
