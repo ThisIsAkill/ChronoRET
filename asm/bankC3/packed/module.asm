@@ -19478,15 +19478,18 @@ C3Mod_FigSeqs:
 ; time from your ROM (never stored here; the build writes them readable
 ; to build/assets/c3module_text/module.txt); the control bytes between
 ; the runs are source:
-;   - $A651-$AADA: C3Mod_DrawText texts, a job and its names each ("/"
-;     between names; C3Mod_DrawText's letter-pair codes such as "`"),
-;     each ended by C3_TextEnd ($40, as source), then a $00;
-;     C3Mod_Prog10 ($86BF, $86D1) stores $A651 in C3_ResultWord ($0382)
-;     when C3_EntryArg bits 0-3 are $A ($86BF) or $B ($86D1), and
-;     C3Mod_Prog10TextTask reads the texts from C3_ResultWord ($9B59)
-;     and stops at $AB1A ($9B76);
-;   - $AADB on: a $1C, then the credit roll's text, lines ended by "/",
-;     for C3Mod_CreditLineTask ($9E9F); C3_Prog10TextPtr gets $AB1A
+;   - $A651-$AB19: 27 C3Mod_DrawText texts, a job and its names each
+;     ("/" between names; C3Mod_DrawText's letter-pair codes such as
+;     "`"), each ended by C3_TextEnd ($40, as source): 26 drawn at the
+;     place in C3Mod_DrawText's .line_x / .line_y operands (what
+;     C3Mod_Prog10TextPlace put there), then the 27th, $AADA-$AB19,
+;     which starts with its own place code (C3_TextPlace, X $1C, Y $58,
+;     also written over those operands); C3Mod_Prog10 ($86BF, $86D1) stores $A651 in C3_ResultWord
+;     ($0382) when C3_EntryArg bits 0-3 are $A ($86BF) or $B ($86D1), and
+;     C3Mod_Prog10TextTask reads the texts from C3_ResultWord ($9B59):
+;     after the 27th, X = $AB1A, so its CPX ($9B76) ends the task;
+;   - $AB1A on: the credit roll's text, lines ended by "/", for
+;     C3Mod_CreditLineTask ($9E9F); C3_Prog10TextPtr gets $AB1A
 ;     (C3Mod_Prog13: the producer's credit) or $B099
 ;     (C3Mod_Prog10GridNmi: the translators' part). The roll stops at the
 ;     first C3_TextStop ($5C, as source) after its start: from $AB1A
@@ -19550,9 +19553,7 @@ C3Mod_StaffTexts:
     db !C3_TextEnd
     %C3ModText($7EAAB2, $7EAAD9)
     db !C3_TextEnd
-    db $00
-    db $1C
-    %C3ModText($7EAADC, $7EB098)
+    db !C3_TextPlace, $1C, $58 : %C3ModText($7EAADD, $7EAB19) : db !C3_TextEnd : %C3ModText($7EAB1A, $7EB098)
     db !C3_TextStop
     %C3ModText($7EB099, $7EB573)
     db !C3_TextStop
