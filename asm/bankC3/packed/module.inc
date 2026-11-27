@@ -35,6 +35,17 @@ macro C3ModRomBytes(start, end)
     incbin "!C3Mod_RomImage":<start>-!C3Mod_Code..<end>-!C3Mod_Code
 endmacro
 
+; The game's text in the module (credits, captions, the end marker):
+; never stored in the repository (README, "Legal"), its characters are
+; taken at build time from the user's ROM, as the unpacked module that
+; tools/c3pack.py writes to build/c3pack/rom_module.bin (module
+; addresses start to end-1, at the current position). The labels, the
+; places and the control bytes around it stay in the source. The build
+; also writes each span readable to build/assets/c3module_text/.
+macro C3ModText(start, end)
+    %C3ModRomBytes(<start>, <end>)
+endmacro
+
 ; ------------------------------------------------------------
 ; Kernel and engine entry points the module calls. The module is
 ; assembled apart from asm/main.asm, so their labels are not visible
@@ -59,6 +70,7 @@ endmacro
 !C3_MulSigned = $C3094C                  ; bankC3.asm: 16 x 8-bit signed multiply (JSL)
 !C3_FindDivisor = $C30E29                ; bankC3.asm: counts a divisor up (JSL)
 !C3_SprListLarge = $C30D5E              ; bankC3.asm: a list of large sprites (JSL)
+!WinFx_BuildQuad = $C30EFA               ; bankC3.asm: a four-point window shape (JSL; BankC3_Entry0011's)
 !C3_SprOneSmall = $C30DBC                ; bankC3.asm: one small sprite (JSL)
 !C3_ScaleBitmap = $C30307                ; bankC3.asm: scales a bitmap (JSL)
 
@@ -668,7 +680,7 @@ endmacro
 !C3_OffsetMask = $03FF                   ; an offset-per-tile entry's offset
 !C3_OffsetBg1 = $2000                    ; ... bit 13: it applies to BG1
 !C3_Prog2Bg3Hofs = $0044                 ; 16-bit: BG3HOFS (C3Mod_WaveNmiTask; C3_Prog9's byte)
-; Programs 7 and 8 ("BUT... THE FUTURE REFUSED TO CHANGE.").
+; Programs 7 and 8 (a three-line caption on a still picture).
 !C3_Prog7FontTiles = $0080               ; pack 33's 2bpp tiles made 4bpp (C3Mod_Font2To4)
 !C3_Prog7Tiles2 = $4800                  ; VRAM word of pack 31
 !C3_Prog7FadeA = $B574                   ; $7E: pack 29's colours (a fade target)
@@ -1051,11 +1063,8 @@ endmacro
 !C3_Prog10Colours10 = $2020              ; $7E: its colour $10
 !C3_Prog10Black = $2200                  ; $7E: C3_PaletteBuf, zeroed ...
 !C3_Prog10BlackBytes = $EF               ; ... the MVN's bytes after the first
-!C3_Prog10Word81 = $81                   ; dp words of program 10 read by code not matched yet
-!C3_Prog10Word7D = $7D
-!C3_Prog10Word7DStart = $0040
-!C3_Prog10Word7F = $7F
-!C3_Prog10Word7FStart = $0140
+!C3_Prog10TextGapStart = $0040          ; C3_Prog10TextGap as C3Mod_Prog10 sets it ...
+!C3_Prog10TextShowStart = $0140         ; ... and C3_Prog10TextShow
 !C3_Prog10HdmaOn = $1F                   ; C3_HdmaEnable: channels 0-4
 !C3_Prog10Fade = $0101                   ; C3_FadeStep and C3_FadeTimer
 !C3_Prog10M7Sel = $C0                    ; M7SEL: outside the map, character 0
@@ -1137,10 +1146,10 @@ endmacro
 !C3_Prog10GridTileBytes = $0200
 !C3_Prog10GridBgMap = $4800              ; VRAM word of BG2's (BG3's in program 13) map
 !C3_Prog10GridMapBytes = $0400
-!C3_Prog10TextA = $B099                  ; in C3Mod_StaffTexts' second text ("//////TRANSLATOR")
-!C3_Prog10TextB = $AB1A                  ; ... ("PRODUCER//KAZUHIKO AOKI")
-!C3_Prog10TextPtr = $4A                  ; dp, 16-bit: a text pointer (code not matched yet reads it)
-!C3_Prog10TextY = $48                    ; dp, 16-bit
+!C3_Prog10TextA = $B099                  ; in C3Mod_StaffTexts' second text (the translators' part)
+!C3_Prog10TextB = $AB1A                  ; ... (the producer's credit)
+!C3_Prog10TextPtr = $4A                  ; dp, 16-bit: the credit text's next line (C3Mod_CreditLineTask)
+!C3_Prog10TextY = $48                    ; dp, 16-bit: the VRAM word of the credit row (C3Mod_CreditLineNmi)
 !C3_Prog10TextYStart = $FFE0
 !C3_Prog10GridTiles12 = $46              ; BG12NBA
 !C3_Prog10GridBg1Sc = $44
@@ -1151,10 +1160,8 @@ endmacro
 !C3_Prog10PalBytes = $0020
 !C3_Prog10PalF0 = $21E0                  ; $7E: C3_PaletteWork's colour $F0
 !C3_Prog10PalClear = $23C0               ; $7E: C3_PaletteBuf's colour $E0
-!C3_Prog10Word71 = $0071                 ; dp 0 words written absolute (read by code not matched yet)
-!C3_Prog10Word71Start = $00E0
-!C3_Prog10Word73 = $0073
-!C3_Prog10WordsStart = $0080
+!C3_Prog10QuadXStart = $00E0             ; C3_Prog10QuadX as C3Mod_Prog10Palette sets it ...
+!C3_Prog10QuadYStart = $0080             ; ... and the four quad Ys
 !C3_Prog10Mode4Sub = $12                 ; TS: BG2 and the sprites
 !C3_Prog10Mode4Bg2Sc = $4C
 !C3_Prog10Mode4Tiles = $06               ; BG12NBA
@@ -1177,6 +1184,135 @@ endmacro
 !C3_Prog13Song = $1B
 !Op_NOP = $EA                            ; 65816 opcodes written into code
 !Op_INX = $E8
+; Programs 10, 12 and 13's scripts and tasks ($90C1-$A650)
+; Page $0A00's variables in program 10 (dp offsets in the page):
+!C3_Prog10ViewScale = $00                ; var 0: the plane's scale (C3_M7Scale; M7A / M7D of the flat plane)
+!C3_Prog10ViewX = $02                    ; var 1: the plane's X scroll
+!C3_Prog10ViewY = $04                    ; var 2: its Y scroll
+!C3_Prog10CentreX = $06                  ; var 3: M7X (C3Mod_Prog10M7Nmi / C3Mod_Prog10FlatNmi)
+!C3_Prog10CentreY = $08                  ; var 4: M7Y
+!C3_Prog10Angle = $0A                    ; var 5: the plane's angle (C3_M7Angle)
+!C3_Prog10Horizon = $0C                  ; var 6: the horizon (split) line
+!C3_Prog10Bg2Scroll = $0E                ; var 7: BG2HOFS (C3Mod_Prog10FlatBg2Nmi)
+!C3_Prog10FirstDiv = $10                 ; var 8: C3Mod_BuildM7Tables' first divisor
+!C3_Prog10TurnRadius = $1E               ; var 15: the scroll offset turned by the angle
+!C3_Prog10Built = $30                    ; 4 words: vars 0, 5, 6 and 8 as last built
+; Page $0B00's variables in program 10 (with C3_Prog10SprX / SprY):
+!C3_Prog10OrbitAngle = $0A               ; var 5: C3Mod_Prog10OrbitTask's angle
+!C3_Prog10Radius = $0C                   ; var 6: copied to page $0A00's var 15
+!C3_Prog10ScrollStep = $10               ; var 8: added to page $0A00's var 2 (C3Mod_Prog10ScrollTask);
+                                         ; C3Mod_Prog10OrbitTask's radius
+!C3_Prog10ScrollMask = $03FF
+!C3_Prog10OrbitX = $0080                 ; C3Mod_Prog10OrbitTask: the orbit's centre X ...
+!C3_Prog10OrbitY = $0070                 ; ... and Y
+!C3_Prog10OrbitTurn = $0300              ; ... the frame angle's offset
+; Program 10's mode-7 words ($00:1400-$1413, with C3_Prog10LowHofs..):
+!C3_Prog10ScrollX = $1400                ; 16-bit: page $0A00's var 1 + the turned offset's X
+!C3_Prog10ScrollY = $1402                ; 16-bit: var 2 + its Y
+!C3_Prog10M7X = $1408                    ; 16-bit: M7X (the scroll + C3_Prog10M7CentreX)
+!C3_Prog10M7Y = $140A                    ; 16-bit: M7Y (the scroll + C3_Prog10M7CentreY)
+!C3_Prog10TurnX = $1410                  ; 16-bit: the turned offset's X
+!C3_Prog10TurnY = $1412                  ; ... and Y
+!C3_Prog10M7CentreX = $0080
+!C3_Prog10M7CentreY = $00E0
+!C3_Prog10SkyBase = $0027                ; C3_Prog10TopVofs = this - the horizon
+; Program 10's dp words (DP=0):
+!C3_CreditScroll = $46                   ; 16-bit: the credit lines' BG vertical scroll
+!C3_Prog13TimerX = $58                   ; 16-bit: frames to the next random DriftX
+!C3_Prog13TimerY = $5A                   ; ... DriftY
+!C3_Prog13TimerSpeed = $5C               ; ... C3_StarSpeed
+!C3_Prog10TextPlace = $64                ; 2 bytes: the X and Y C3Mod_Prog10TextPlace puts in C3Mod_DrawText
+!C3_Prog10TextDone = $6A                 ; 8-bit: set when the credit lines reach their end code
+!C3_Prog10Wobble = $6B                   ; 16-bit: the wobble's radius (scripts write its low byte)
+!C3_Prog10WobbleX = $6D                  ; 16-bit: the wobble's X offset (C3Mod_Prog10WobbleTask)
+!C3_Prog10WobbleY = $6F                  ; 16-bit: its Y offset
+!C3_Prog10QuadX = $71                    ; 16-bit: C3Mod_Prog10QuadTask's left X
+!C3_Prog10QuadYA = $73                   ; 16-bit: its Y values x 4: point 0's ...
+!C3_Prog10QuadYB = $75                   ; ... point 3's ...
+!C3_Prog10QuadYC = $77                   ; ... point 2's ...
+!C3_Prog10QuadYD = $79                   ; ... point 1's
+!C3_Prog10TextGap = $7D                  ; 16-bit: C3Mod_Prog10TextTask's frames between texts
+!C3_Prog10TextShow = $7F                 ; 16-bit: ... frames a text shows
+!C3_Prog10TextTimer = $81                ; 16-bit: ... frames left in this phase
+!C3_Prog10TextPhase = $83                ; 16-bit: ... odd while a text shows
+!C3_Prog10TextsLeft = $85                ; 16-bit: ... texts still to show (0: the task waits)
+!C3_Prog10FigTimer = $87                 ; 2 words: C3Mod_Prog10FigsTask's frames left per figure
+!C3_Prog10FigSeq = $8F                   ; 2 words: its sequence pointers
+!C3_Prog10FigPos = $97                   ; 2 words: the figures' X and Y bytes
+!C3_Prog10FigsLeave = $9F                ; 16-bit (read as a word): nonzero: the next sequences are empty
+!C3_Prog10Picture = $A3                  ; 8-bit: the picture shown (0-3)
+!C3_Prog10PicShown = $A5                 ; 8-bit: the picture whose tiles were sent
+!C3_Prog10PicFrame = $A7                 ; 8-bit: picture 0's animated tiles' frame (0-2)
+!C3_Prog10PicTimer = $A9                 ; 8-bit: frames to the next one
+!C3_Prog10PicWidth = $AB                 ; 8-bit: the picture's width (the window's)
+!C3_Prog10PicHeight = $AC                ; 8-bit: its height
+!C3_Prog10QuadSprX = $000C               ; C3Mod_Prog10QuadTask: the sprites' X is QuadX - this
+!C3_Prog10QuadRight = $FF                ; ... points 2 and 3's X
+!C3_Prog10QuadTop = $0008                ; ... added to points 0 and 1's Y
+!C3_Prog10QuadEnd = $0390                ; ... the Y values stop at this
+!C3_Prog10TextFadeAt = $0020             ; C3Mod_Prog10TextTask: the fade out starts with this many frames left
+!C3_TextFadeIn = $FF00                   ; FieldAnimB .Unk7 / .Unk8 as a word: level 0 to $FF ...
+!C3_TextFadeOut = $00FF                  ; ... $FF to 0
+!C3_TextFadeColours = $04F0              ; .Unk1 / .Unk2: colours $F0-$F3
+!C3_TextFadeStep = $0008                 ; .Unk3 / .Unk4: step 8
+!C3_Prog10Fig0Pos = $7080                ; figure 0 at X $80, Y $70
+!C3_Prog10Fig1Pos = $60A0                ; figure 1 at X $A0, Y $60
+!C3_FigSeqMask = $0003                   ; a random sequence of four
+!C3_FigSeqCount = $0005                  ; C3Mod_Prog10FigPick's bound (five entries)
+!C3_Prog10Figs = $0004                   ; two figures' word offsets
+!C3_PicMask = $0003                      ; C3_Prog10Picture: four pictures
+!C3_PicFrames = $03                      ; picture 0's tile frames
+!C3_PicFrameTime = $04                   ; frames per tile frame
+!C3_PicTileBase = $E0                    ; the first animated tile
+!C3_PicTileBytes = $0800                 ; a picture's tiles (64)
+!C3_CreditRow = $1414                    ; $00: a BG map row's 32 tile bytes for C3Mod_CreditLineNmi
+!C3_CreditRowText = $141C                ; ... the text from its column 8
+!C3_CreditRowBytes = $0020
+!C3_CreditRowMask = $03E0                ; the map rows of a 32 x 32 map
+!C3_CreditTileBase = $40                 ; a credit character's tile = the character - this
+!C3_TextStop = $5C                       ; a credit text's end code ('\')
+!C3_CreditFastStep = $0008               ; C3_CreditScroll's step in program 13's roll (C3_Prog13Count set)
+!C3_Prog13DriftMask = $0007              ; C3Mod_Prog13DriftRandom: a drift of -4 to 3 ...
+!C3_Prog13DriftBias = $0004
+!C3_Prog13TimeMask = $03FF               ; ... after 1 to $400 frames
+!C3_Prog10FadeSteps = $0020              ; C3Mod_Prog10FadeTo51..: C3_PalFadeLeft
+!C3_Prog10FadeColours = $0070            ; ... C3_PalFadeCount
+!C3_Prog10Colours51Bytes = $0100         ; C3Mod_Prog10Colours51's MVN count (A; 257 bytes moved)
+!C3_Prog10LogoX = $003C                  ; C3Mod_Prog10LogoTask's place
+!C3_Prog10LogoY = $0090
+!C3_Prog10GridMapVram = $4C00            ; VRAM word of the grid map (C3Mod_Prog10GridMapNmi)
+!C3_Prog10GridMapSend = $0800
+!C3_Prog10Pack47Bytes = $0A00
+!C3_Prog10Pack64Bytes = $0100
+!C3_Prog10ClearVram = $20A0              ; C3Mod_Prog10ClearNmi: VRAM words $20A0-$23FF zeroed
+!C3_Prog10ClearBytes = $06C0
+!C3_AnimRec1 = $0C                       ; FieldAnimB record 1's offset (record 2: twice this)
+!C3_Flash14 = $0028                      ; C3Mod_Prog10FlashTask's colour words: colour $14 ...
+!C3_Flash15 = $002A                      ; ... $15
+!C3_Flash11 = $0022
+!C3_Flash12 = $0024
+!C3_Flash0D = $001A
+!C3_Flash2D = $005A
+!C3_Flash0E = $001C
+!C3_Flash2E = $005C
+!C3_AnimRec2 = $18                       ; FieldAnimB record 2's offset
+!C3_PicAnimTileA = $5D                   ; C3Mod_Pic0Sprites: record 23's tile byte ...
+!C3_PicAnimTileB = $61                   ; ... and record 24's
+!C3_Prog10StarsHigh = $0910              ; Oam_HighTable's byte of sprite 64
+!C3_SndTimer = $F6                       ; Spc_CmdTimer: the song's fast-forward (Arg0 nonzero: on)
+!Op_CMPImm = $C9                         ; 65816 opcode CMP #
+!C3_Prog10StarsFrom = $0100              ; C3Mod_Prog10StarsTask: the stars from sprite 64 on
+!C3_Prog10PlaneCentre = $0080            ; C3Mod_Prog10M7Nmi: vars 3 / 4 = vars 1 / 2 + this
+!C3_Prog10FlashEvery = $0007             ; C3Mod_Prog10FlashTask: a swap every 8 frames
+!C3_PaletteBufLow = $2200                ; $7E: C3_PaletteBuf as a bank-$7E address
+!C3_Unk000E = $000E                      ; a word only C3Mod_Prog10DeadInc (never run) adds to
+!C3_Bank7EBase = $7E0000                 ; long base of bank $7E (C3Mod_CreditLineTask's text reads)
+!C3_CreditLineEvery = $000F              ; C3Mod_CreditLineTask: a line every 16 frames
+!C3_Prog10FadeE1Colours = $0FE1          ; FieldAnimB .Unk1 / .Unk2: colours $E1-$EF
+!C3_Prog13WhitenLevels = $00E0           ; .Unk7 / .Unk8: level $E0 to 0
+!C3_Prog13WhitenColours = $0F11          ; colours $11-$1F
+!C3_Prog10Fade01Colours = $4001          ; colours $01-$40
+!C3_Prog10Fade41Colours = $3F41          ; colours $41-$7F
 ; C3_RunScript's opcodes (bankC3.asm's header has the operands): the
 ; variable ones take the variable n in bits 0-3, the loops the counter.
 !C3Op_Set = $00                          ; var n = word

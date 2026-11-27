@@ -312,16 +312,25 @@ def spc700_functions(emitted: set[int], aram: dict[str, int]) -> list[dict]:
     return rows
 
 
+def c3module_text() -> set[int]:
+    """The module offsets of its %C3ModText spans (the game's text)."""
+    base = c3pack.MODULE_BASE & 0xFFFF
+    return {a - base for m in c3pack.TEXT_SPAN.finditer(C3MODULE_SOURCE.read_text())
+            for a in range(int(m.group(1), 16), int(m.group(2), 16))}
+
+
 def c3module_functions(source_bytes: set[int], labels: dict[str, int]) -> list[dict]:
     """Rows for the packed $C3 module's labels (asm/bankC3/packed/module.asm),
     as analyse() makes them for the 65816 code: from each label, the bytes
     its source writes itself (not incbin'd from the ROM's module) that equal
-    the ROM's unpacked module, up to the next label."""
+    the ROM's unpacked module, up to the next label. The game's text in it
+    (%C3ModText spans: the characters come from the user's ROM, never from
+    the repository) belongs to the row around it."""
     if not C3MODULE_SOURCE.exists():
         return []
     original = c3pack.ROM_MODULE.read_bytes()
     built = c3pack.MODULE_BIN.read_bytes()
-    good = {i for i in source_bytes if built[i] == original[i]}
+    good = {i for i in source_bytes if built[i] == original[i]} | c3module_text()
     base = c3pack.MODULE_BASE
     source = {r.name: r for r in asm_source.file_regions(C3MODULE_SOURCE)}
     starts = sorted((a - base, n) for n, a in labels.items()
@@ -465,7 +474,8 @@ def analyse() -> dict:
             'spc700_functions': spc_rows,
             'file_check': isolated.run_mode(),
             'c3module': {'emitted_bytes': pack_emitted, 'unpacked_bytes': c3pack.MODULE_SIZE,
-                         'source_bytes': len(mod_source), **c3module_code(c3_rows),
+                         'source_bytes': len(mod_source), 'text_bytes': len(c3module_text()),
+                         **c3module_code(c3_rows),
                          'totals': level_totals(c3_rows)},
             'c3module_functions': c3_rows}
 
@@ -590,7 +600,8 @@ def render_c3module_line(result) -> str:
             f'{t["readable"]["functions"]} of those meet the readability standard and '
             f'{t["verified"]["functions"]} are verified by independent review. Its code bytes are '
             f'those its trace reaches (tools/c3module.py) and the matched code, so far; '
-            f'{s["source_bytes"]:,} of its {s["unpacked_bytes"]:,} unpacked bytes are from source, '
+            f'{s["source_bytes"]:,} of its {s["unpacked_bytes"]:,} unpacked bytes are from source '
+            f'and {s.get("text_bytes", 0):,} are its text, taken from your ROM, '
             f'packed back to the {s["emitted_bytes"]:,} bytes in ROM.')
 
 

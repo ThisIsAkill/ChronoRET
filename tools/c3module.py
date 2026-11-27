@@ -95,8 +95,8 @@ CALL_EXITS = {
 # Data no path may enter: (first, last, what). A path that reaches it is
 # dropped as an anomaly.
 DATA_RANGES = [
-    (0xA651, 0xB57E, 'the staff texts: "PRODUCER/KAZU`KO AOKI@..." ($A651-$AADB, "`" for HI),'
-                     ' then "EXECUTIVE PRODUCER/..." to "CODE END 7E"'),
+    (0xA651, 0xB57E, 'the staff texts: C3Mod_DrawText texts ($A651-$AADB), then the credit'
+                     ' roll\'s text and the module\'s end marker'),
 ]
 
 # Code the module writes at run time and calls: (address, what), not traced

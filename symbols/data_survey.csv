@@ -12,6 +12,8 @@
 #   reader found; unknown = not explained.
 # Holds offsets, sizes, names, formats and counts only, never ROM bytes.
 start,end,size,bank,kind,format,readers,confidence,notes
+$C3:0E36,$C3:0EF9,196,$C3,text,"staff text in ASCII: $0A ends a line",,probable,named BankC3_StaffText; no reader found (nothing refers to $C3:0E36); the jet-bike race's graphic designers (tools/text.py)
+$C3:10C0,$C3:10CA,11,$C3,text,"end-of-code marker in ASCII",,probable,named BankC3_EndMarker; right after the kernel's last RTL; probably left by the build (tools/text.py)
 $C3:10CB,$C3:11FF,309,$C3,padding,309 x $00,,confirmed,uniform fill; nothing points into it
 $C3:1200,$C3:1312,275,$C3,packed_lz,"lz12 -> 1024 B: data for the $C3 module (graphics, tile maps, tables; PR #106)","C3_BootModule (entry 1); the unpacked $C3 module (others, PR #106)",confirmed,via C3Rom_PackPtrs[0]; repacks byte-exact (c3pack)
 $C3:7A2C,$C3:7FFF,1492,$C3,padding,1492 x $00,,confirmed,uniform fill; nothing points into it
