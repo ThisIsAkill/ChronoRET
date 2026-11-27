@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$7E:A651,C3Mod_StaffTexts,2026-11-27,rev206a,approved,21dfea27f828,"Fix checked: $AADA place code (X $1C, Y $58) and the $40 at $AB19 now source; 27 texts end in $40 up to $AB19; no control byte in the 57 spans; X=$AB1A ends TextTask (CPX $9B76); module matches."
