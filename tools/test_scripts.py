@@ -631,6 +631,54 @@ class Anim(unittest.TestCase):
             scripts.AnimLang.head(lang)
 
 
+class JumpBackStub(scripts.AnimLang):
+    """Op $03 as C2Anim_OpJumpBack is traced (taint by whole register):
+    reads 1-2, both control bytes; a negative arg 1 jumps back by it, 0-$7F
+    stays. With `uses_byte2` its byte 2's bit 0 moves the target too."""
+
+    def __init__(self, uses_byte2=False):
+        self.name, self.count, self.timer = 'anim', 8, 0x0E
+        self.names = [f'Op{op:02X}_Stub' for op in range(8)]
+        self.handler_names = [f'C2Anim_H{op}' for op in range(8)]
+        self.handler_names[3] = 'C2Anim_OpJumpBack'
+        self.cache, self.specs, self.dirty = {}, {}, False
+        self.labels, self.d = {}, {'C2SceneRom_AnimTable': 0xC3E000}
+        self.uses_byte2 = uses_byte2
+
+    def _trace(self, known, ptr):
+        if known[ptr] != 0x03:
+            return {'reads': [], 'control': [], 'outs': [('bad', 'not in the stub')], 'opaque': []}
+        b = known[ptr + 1]
+        off = b - 256 if b & 0x80 else 0
+        if self.uses_byte2:
+            off -= known[ptr + 2] & 1
+        out = ('pos', off, True, (1, 2), None, ptr + off) if off else ('pos', 0, False, (), None, None)
+        return {'reads': [1, 2], 'control': [1, 2], 'outs': [out], 'opaque': []}
+
+
+class JumpBack(unittest.TestCase):
+
+    def test_length_is_the_operand_it_uses(self):
+        for b1 in (0x05, 0xFC):                              # stays; jumps back
+            o = scripts.classify(JumpBackStub(), {B: 0x03, B + 1: b1, B + 2: 0x99, B + 3: 0}, B)
+            self.assertEqual(o.length, 2, hex(b1))           # not 1 + its furthest read (3)
+
+    def test_a_handler_using_byte_2_is_refused(self):
+        with self.assertRaisesRegex(scripts.ScriptsError, 'C2Anim_OpJumpBack: its byte 2 changes where it goes'):
+            JumpBackStub(uses_byte2=True).jump_back_length(3)
+        stub = JumpBackStub()
+        saved = stub._trace
+        stub._trace = lambda known, ptr: dict(saved(known, ptr), reads=[1, 2, 3])
+        with self.assertRaisesRegex(scripts.ScriptsError, 'C2Anim_OpJumpBack: it reads operand byte 3'):
+            stub.jump_back_length(3)
+
+    def test_other_ops_keep_their_furthest_read(self):
+        stub = JumpBackStub()
+        stub.handler_names[3] = 'C2Anim_OpOther'
+        o = scripts.classify(stub, {B: 0x03, B + 1: 0x05, B + 2: 0x99, B + 3: 0}, B)
+        self.assertEqual(o.length, 3)
+
+
 class Locks(unittest.TestCase):
     """The checks behind TRUST's reasons: the static scan at every width,
     the animation ops' record bytes, the unpackers' room."""
@@ -710,6 +758,15 @@ class WithSource(unittest.TestCase):
             self.assertEqual(scripts.trust_check(lang), [])
         scene.ptr = scene.d['C2Anim_Ptr']                       # a byte C2Anim_Run does write
         self.assertTrue(any('C2Anim_Run' in x for x in scripts.trust_check(scene)))
+
+    def test_jump_back_from_its_handler(self):
+        lang = scripts.AnimLang()
+        op = lang.handler_names.index('C2Anim_OpJumpBack')
+        self.assertEqual(lang.jump_back_length(op), 2)
+        at = 0xC3E800
+        for b1 in (0x05, 0xFC):
+            o = scripts.classify(lang, {at: op, at + 1: b1, at + 2: 0x99, at + 3: 0}, at)
+            self.assertEqual(o.length, 2)
 
 
 @unittest.skipUnless(HAVE_ROM, 'needs the ROM and asar')
