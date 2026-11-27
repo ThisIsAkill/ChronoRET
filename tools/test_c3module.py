@@ -100,10 +100,20 @@ ABS_MODULE = str(Path('build/c3pack/rom_module.bin').resolve())
 HOLE = re.compile(r'^    %C3ModRomBytes\(\$7E([0-9A-F]{4}), \$7E([0-9A-F]{4})\)$', re.M)
 
 
+# With the whole module matched there is no block of ROM bytes left; the
+# planters then take the body of a matched table instead (the same bytes,
+# $9D25-$9D44, nothing labelled inside it).
+STAND_IN = re.compile(r'^C3Mod_Prog10Pictures:\n((?:    dw .*\n){4})', re.M)
+
+
 def first_hole(text):
-    """The first block of ROM bytes in module.asm: (line, start, end)."""
+    """The first block of ROM bytes in module.asm, or the stand-in table's
+    body when none is left: (text, start, end)."""
     m = HOLE.search(text)
-    return m.group(0), int(m.group(1), 16), int(m.group(2), 16)
+    if m:
+        return m.group(0), int(m.group(1), 16), int(m.group(2), 16)
+    m = STAND_IN.search(text)
+    return m.group(1).rstrip('\n'), 0x9D25, 0x9D45
 
 
 def plant(root: Path, case: str) -> None:
@@ -142,6 +152,8 @@ def plant(root: Path, case: str) -> None:
                         '; A pack. Entry: none. Exit: none.\norg $C31200\nC3Rom_Pack0:\n'
                         '    %DataBlock($31200, $31313)\n')
     elif case == 'N1':      # the image define set again after module.inc
+        if not HOLE.search(mod.read_text()):    # a block for the macro to read
+            module_hole(f'    %C3ModRomBytes($7E{lo:04X}, $7E{hi:04X})')
         src = mod.read_text().replace('incsrc "module.inc"\n',
                                       f'incsrc "module.inc"\n!C3Mod_RomImage = "{ABS_MODULE}"\n')
         mod.write_text(src)

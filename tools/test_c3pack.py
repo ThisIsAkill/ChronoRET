@@ -33,7 +33,7 @@ HAVE_ASAR = shutil.which('asar') is not None
 def samples():
     rnd = random.Random(1995)
     noise = bytes(rnd.randrange(256) for _ in range(6000))
-    text = b'CODE END C3 ' * 40
+    text = b'REPEATED BLOCK ' * 40
     return {
         'empty': b'',
         'one': b'\x42',

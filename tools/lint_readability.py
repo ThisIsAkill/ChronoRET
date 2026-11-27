@@ -48,6 +48,14 @@ asm/include/ and are exempt):
          and CI requires it. Cannot be opted out of. tools/isolated.py enforces the same at
          assembly time (verify.py and c3pack.source_bytes assemble a copy of
          asm/ that cannot reach the ROM).
+  TEXT   no game text in the source (README, "Legal"): in every file
+         under asm/, no string literal with three or more letters in a
+         line's code, but in incsrc/incbin/table paths, a define holding a
+         file path, and the ROM's internal header in bank00.asm (its game
+         code and title, TEXT_ALLOWED: format identifiers). The text is
+         extracted from the user's ROM at build time instead (the data
+         layer's text pieces; the $C3 module's %C3ModText). Cannot be opted
+         out of.
   HEADER every routine's header (the comment block tools/asm_source.py
          attributes to its label) has an Entry line and an Exit line: a
          comment line starting `Entry`, `On entry`, `Exit` or `Entry/Exit`,
@@ -321,6 +329,9 @@ def _xref():
     return _XREF[0]
 
 
+DATA_MACROS = ('%C3ModText(', '%C3ModRomBytes(')    # macros that emit data only
+
+
 def is_table(region) -> bool:
     """A label whose body emits only data (no instruction or macro line)."""
     for raw in region.body_lines:
@@ -331,6 +342,8 @@ def is_table(region) -> bool:
         if not code:
             continue
         word = code.split()[0]
+        if word.startswith(DATA_MACROS):
+            continue                    # bytes from the ROM (the $C3 module's text): data
         if word.startswith('%') or (INSTR.match(code) and word[:3].upper() in MNEMONICS):
             return False
     return True
@@ -702,6 +715,45 @@ def file_read_findings(root: Path = Path('asm')):
 DATA_INCBIN = re.compile(r'^incbin "([^"]+)"$')
 
 
+# TEXT: the string literals the source may hold: the ROM's internal header
+# (bank00.asm), whose game code and title are format identifiers.
+TEXT_ALLOWED = {
+    ('asm/bank00/bank00.asm', 'db "ACTE"'),
+    ('asm/bank00/bank00.asm', 'db "CHRONO TRIGGER       "'),
+}
+STRING_LITERAL = re.compile(r'"([^"]*)"')
+TEXT_LETTERS = 3
+
+
+def text_findings(root: Path = Path('asm')):
+    """TEXT: (path, function, line, rule, text). A string literal with
+    TEXT_LETTERS or more letters in a line's code anywhere under asm/ is
+    game text stored in the repository, which never may be (README,
+    "Legal"); paths of incsrc/incbin/table, a define holding a file path
+    and TEXT_ALLOWED apart. Cannot be opted out of."""
+    out = []
+    for path in sorted(root.rglob('*')):
+        if path.is_symlink() or not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
+            continue
+        rel = f'asm/{path.relative_to(root).as_posix()}'
+        for no, raw in enumerate(path.read_text(errors='replace').splitlines(), 1):
+            code = split_comment(raw)[0].strip()
+            if not code or '"' not in code or (rel, code) in TEXT_ALLOWED:
+                continue
+            words = code.split()
+            if words[0].lower() in ('incsrc', 'incbin', 'table'):
+                continue
+            d = DEFINE_SET.match(code)
+            if d and PATH_STRING.search(d.group(2)):
+                continue
+            for m in STRING_LITERAL.finditer(code):
+                if sum(ch.isalpha() for ch in m.group(1)) >= TEXT_LETTERS:
+                    out.append((str(path), '<file>', no, 'TEXT',
+                                f'game text belongs in the user\'s ROM, not the source: {code}'))
+                    break
+    return out
+
+
 def _data_incbins(root: Path, out: list) -> set[tuple[str, str]]:
     """{(asm/data/bankXX.asm, incbin path)} the manifest allows; a problem
     with the manifest becomes a finding in `out` (and allows nothing)."""
@@ -724,7 +776,8 @@ def collect():
             findings.append((str(path), function, no, rule, text))
     import lint_spc700          # the SPC700 driver, asm/spc700/ (its rules: lint_spc700.py)
     import lint_c3module        # the packed $C3 module, asm/bankC3/packed/ (lint_c3module.py)
-    return findings + lint_spc700.collect() + lint_c3module.collect() + file_read_findings()
+    return (findings + lint_spc700.collect() + lint_c3module.collect() + file_read_findings()
+            + text_findings())
 
 
 def by_function(findings):
