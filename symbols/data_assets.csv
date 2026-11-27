@@ -6,6 +6,8 @@
 # packs them in the mode of param to build/packs/<label>.lz). The assets are written
 # from the user's own ROM into the ignored build/ directory; holds no ROM bytes.
 label,start,end,size,piece,asset,param
+BankC3_StaffText,$C3:0E36,$C3:0EF9,196,text,text/C3StaffText.txt,ascii
+BankC3_EndMarker,$C3:10C0,$C3:10CA,11,text,text/C3EndMarker.txt,ascii
 Padding_C310CB,$C3:10CB,$C3:11FF,309,fill,,$00
 C3Pack_000,$C3:1200,$C3:1312,275,packed,packed_lz/C3Pack_000.bin,lz12 -> 1024 B
 Padding_C37A2C,$C3:7A2C,$C3:7FFF,1492,fill,,$00

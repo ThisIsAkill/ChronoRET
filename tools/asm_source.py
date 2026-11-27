@@ -95,7 +95,7 @@ class Region:
             word = line_word(line)
             if word is None or word in NON_EMITTING:
                 continue
-            if word in DATA_DIRECTIVES:
+            if word in DATA_DIRECTIVES or word.startswith(DATA_MACROS):
                 has_data = True
                 continue
             return 'code'
@@ -110,6 +110,8 @@ class Region:
 
 
 DATA_DIRECTIVES = {'db', 'dw', 'dl', 'dd', 'fill', 'fillbyte', 'incbin', 'pad', 'padbyte', 'skip'}
+# Macros that emit data only: the $C3 module's bytes from the ROM (its text).
+DATA_MACROS = ('%c3modtext(', '%c3modrombytes(')
 # Assembler lines that emit nothing (a body made of these and data is data).
 NON_EMITTING = {'org', 'base', 'warnpc', 'assert', 'print', 'namespace', 'table', 'cleartable',
                 'pushpc', 'pullpc', 'pushbase', 'pullbase', 'optimize', 'check', 'math', 'arch',

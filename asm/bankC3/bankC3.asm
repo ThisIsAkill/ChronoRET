@@ -2,8 +2,8 @@
 ; Bank $C3 — the bank $C3 kernel (decompressor, module boot, window effects)
 ; File offset 0x030000 (bank $C3 = ROM offset $30000)
 ;
-; $C3:0000-$C3:10BF is 65816 code, closed by the ASCII marker "CODE END
-; C3" ($C3:10C0-$C3:10CA). Other banks enter it only through the vector
+; $C3:0000-$C3:10BF is 65816 code, closed by an ASCII end-of-code
+; marker ($C3:10C0-$C3:10CA, a text piece of the data layer). Other banks enter it only through the vector
 ; table at $C3:0000-$C3:0013 (BankC3_Entry0000, Decomp_ToWramVec,
 ; BankC3_Entry0008/000E/0011). The rest of the bank is data and stays as
 ; ROM bytes: $00 fill to $C3:11FF, two packed blocks in Decomp_ToWram's
@@ -658,9 +658,14 @@ WinFx_StepWipe:
 ; back. Which byte each counter read gives is not fixed: OPHCT and
 ; OPVCT each return the low byte or bit 8 (with open bus in bits 1-7)
 ; by a flip-flop that every read toggles and only a STAT78 read clears,
-; and nothing on this path reads STAT78 (the module's one read, at
-; $7E:9AB3, is elsewhere). At M=1 OPHCT is read once a call, so it
-; alternates from call to call (bit 8 and open bus every other call),
+; and nothing on this path reads STAT78 (the module's reads, at
+; $7E:9AB3 in C3Mod_Prog10QuadTask and $7E:9EDF in C3Mod_CreditLineTask,
+; a word read of STAT77 whose high byte is STAT78, are elsewhere, but
+; each clears the flip-flop: in program 12, C3Mod_CreditLineTask's slow
+; roll reads it every frame while C3Mod_StarsTask calls here, so the
+; phase is reset each frame there). At M=1 OPHCT is read once a call,
+; so, between such resets, it alternates from call to call (bit 8 and
+; open bus every other call),
 ; and OPVCT twice, keeping the phase it had (low then high from a clear
 ; flip-flop); at M=0 the word reads also take the next register
 ; (OPHCT's read takes OPVCT, OPVCT's STAT77), so H is read once and V
@@ -725,7 +730,8 @@ C3_RandomByte:
 ; $7E:520D it comes from a 14-byte MVN copy of a record at $1400 or
 ; $140E into $1F-$2C, whose first word the module sets to 4
 ; ($7E:502A) and 3 ($7E:50B6) respectively (other writes to those
-; words, at $7E:9B2B and $7E:9E15, not traced to this use; $7E:8BA5,
+; words, at $7E:9B2B and $7E:9E15, are C3Mod_Prog10TurnNmi's and
+; C3Mod_Prog10M7Nmi's mode-7 scroll words, not records; $7E:8BA5,
 ; C3Mod_Prog10StripNmi, writes $140E as BG1's scroll for an HDMA table,
 ; not as a record).
 ; Quirks (carries not set or cleared first):
@@ -2572,14 +2578,14 @@ C3_SprListSmall:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, C3Mod_Prog6Sprites
 ;   at $7E:8245, C3Mod_Prog10SprNmi at $7E:88A0 and $7E:88B4, and
-;   $7E:9A07).
+;   C3Mod_Prog10LogoTask at $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (0 at
 ;        $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245,
-;        $7E:88A0 and $7E:88B4; $7E:9A07's not traced), DB = a bank
+;        $7E:88A0, $7E:88B4 and $7E:9A07), DB = a bank
 ;        that maps the I/O registers and low WRAM ($00-$3F or $80-$BF:
 ;        WMADDL/H, WMDATA and the OAM shadow are absolute; $00 at those
-;        eight, under a task, an NMI task or C3Mod_Prog6; $7E:9A07's
-;        not traced); A = the list's address.
+;        nine, under a task, an NMI task or C3Mod_Prog6); A = the
+;        list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:
@@ -2738,19 +2744,9 @@ C3_FindDivisor:
     BCS C3_FindDivisor
     RTL
 
-; $C3:0E36 — BankC3_StaffText (196 bytes, $0E36–$0EF9)
-; ASCII, lines ended by $0A (the text starts with a $0A, so its first
-; line is empty): the staff of the jet-bike race (the module), as in
-; the ROM ("JONNY" spelt so). No reader was found in the
-; kernel or the unpacked module (no reference to $0E36).
-BankC3_StaffText:
-    db $0A,"-- JET BIKE RACE --",$0A
-    db "BIKE OBJECT  :MAMI KAWAI",$0A
-    db "JONNY OBJECT :TAYZO INUKAI",$0A
-    db "MODE7 ROAD   :KANAME TANAKA",$0A
-    db "BACK GROUND  :AKANE HARUKI",$0A
-    db "PANEL & FONT :HIROTO YAMAMOTO",$0A
-    db "THANK YOU FOR 5(!) GRAPHIC DESIGNERS.",$0A
+; $C3:0E36-$0EF9: the jet-bike race's staff text (ASCII, lines ended by
+; $0A), which no code reads: a text piece of the data layer
+; (BankC3_StaffText, asm/data/bankC3.asm), from your ROM.
 
 ; ============================================================
 ; Window tables: the quadrilateral ($C3:0EFA–$C3:10BF)
@@ -3096,14 +3092,10 @@ WinFx_QuadExit:                         ; header: see WinFx_QuadEdge
 ; End of the kernel ($C3:10C0–$C3:10CA)
 ; ============================================================
 
-; $C3:10C0 — BankC3_EndMarker (11 bytes, $10C0–$10CA)
-; ASCII "CODE END C3" right after the kernel's last RTL ($C3:10BF,
-; WinFx_QuadExit's, where WinFx_QuadEdge and WinFx_BuildQuad end),
-; probably left by the build to mark the end of the code. Followed by
-; $00 fill up to the packed block at $C3:1200 (not emitted here).
-org $C310C0
-BankC3_EndMarker:
-    db "CODE END C3"
+; $C3:10C0-$10CA: the end-of-code marker right after the kernel's last
+; RTL ($C3:10BF, WinFx_QuadExit's), probably left by the build: a text
+; piece of the data layer (BankC3_EndMarker, asm/data/bankC3.asm), from
+; your ROM. $00 fill follows up to the packed block at $C3:1200.
 
 ; ============================================================
 ; The packed module ($C3:1313–$C3:7A2B)

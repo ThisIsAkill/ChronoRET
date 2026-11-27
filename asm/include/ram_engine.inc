@@ -1413,8 +1413,8 @@ if !ram_engine_inc == 0
                                          ; it as a word
 
 ; --- Staff credits (Field_ServiceUnk54) ---
-!Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO
-                                         ; AOKI"...): '/' ends a line, a byte >= $80 ends a block
+!Credits_Text = $FDA000                  ; ROM: staff credits in ASCII (the producer's credit
+                                         ; first): '/' ends a line, a byte >= $80 ends a block
 !Map_BufC800 = $7EC800                   ; 2 KB WRAM buffer ($7E:C800-$CFFF) that Field_BuildC800Mode1/2/4
                                          ; write through WMDATA; Map_ClearBufC800 zeroes it. The
                                          ; layer-1 edge builders write a row at its start and a

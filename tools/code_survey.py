@@ -137,7 +137,7 @@ TABLES = [('$C7:0A98', '$C7:0D52', 'APU interface tables: the sample table $C7:0
 # or a pointer table. The sound tables $C7:0AEA/$C7:0D18 are read by the
 # unmatched sound driver ($C7:050F, $0666, $0773), not by matched code.
 CONTENT = {
-    '$C3': '$C3:0000-$10CA kernel, all from source (ends with the ASCII marker "CODE END C3"); '
+    '$C3': '$C3:0000-$10CA kernel, from source but its ASCII staff text and end marker (text pieces); '
            '$C3:1200-$1312 another pack (C3Rom_PackPtrs entry 0, user not traced; unpacks to data, '
            'per an independent review, PR #106); the packed '
            'module (compressed_bytes); data after it',
