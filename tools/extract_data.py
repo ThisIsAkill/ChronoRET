@@ -56,6 +56,14 @@ How each piece's bytes are made (the manifest's `piece` column):
              unit it cannot follow fails the extraction); the build
              assembles it to build/battle/<label>.bin, which is incbin'd.
              param: <unit>/<role>. Counted as "battle scripts".
+  music      a row of a song of Audio_SongTable or a sound-effect block
+             (tools/music.py's units; a song may span two rows, at a bank
+             end): the unit's readable file goes to build/assets/music/
+             <unit>.mus (checked to assemble back, its structure walked as
+             the SPC700 driver reads it, when it is written; a unit it
+             cannot follow fails the extraction); the build assembles it to
+             build/music/<label>.bin per piece, which is incbin'd. param:
+             "<song|effects>, part I of N". Counted as "music sequences".
   scene      a scene script pack (a Decomp_ToWram stream reached through
              C2SceneRom_ScriptPacks): build/assets/scene/<label>.scn holds
              its disassembly (tools/scripts.py; checked to assemble back
@@ -157,6 +165,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'tools'))
 import battle  # noqa: E402
 import maps  # noqa: E402
+import music  # noqa: E402
 import graphics  # noqa: E402
 import scripts  # noqa: E402
 import sprites  # noqa: E402
@@ -175,6 +184,7 @@ PACKS = Path('build/packs')
 TEXT_OUT = Path('build/text')          # the encoded text pieces (tools/build_rom.py)
 RECORDS_OUT = Path('build/records')    # the encoded records pieces (tools/build_rom.py)
 BATTLE_OUT = Path('build/battle')      # the assembled battle script pieces (tools/build_rom.py)
+MUSIC_OUT = Path('build/music')        # the assembled music pieces (tools/build_rom.py)
 MAPS_OUT = Path('build/maps')          # the assembled (unpacked) maps and metatiles (tools/build_rom.py)
 SCENE_OUT = Path('build/scene')        # the assembled (unpacked) scene scripts (tools/build_rom.py)
 FX_OUT = Path('build/fx')              # the assembled layer-effect scripts (tools/build_rom.py)
@@ -191,6 +201,7 @@ PACK_PREFIX = '../../build/packs/'
 TEXT_PREFIX = '../../build/text/'
 RECORDS_PREFIX = '../../build/records/'
 BATTLE_PREFIX = '../../build/battle/'
+MUSIC_PREFIX = '../../build/music/'
 FX_PREFIX = '../../build/fx/'
 GFX_PREFIX = '../../build/gfx/'
 SPRITES_PREFIX = '../../build/sprites/'
@@ -199,7 +210,7 @@ MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx', 'anim',
           'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'scenelists',
           'actframes',
-          'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist')
+          'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist', 'music')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
 TEXT_ASSET = re.compile(r'^text/([A-Za-z_][A-Za-z0-9_]*)\.txt$')
@@ -214,6 +225,8 @@ GFX_ASSET = re.compile(r'^gfx/([A-Za-z_][A-Za-z0-9_]*)\.png$')
 SPRITES_ASSET = re.compile(r'^sprites/([A-Za-z_][A-Za-z0-9_]*)\.spr$')
 FX_ASSET = re.compile(r'^fx/([A-Za-z_][A-Za-z0-9_]*)\.bfx$')
 BATTLE_PARAM = re.compile(r'^([a-z]+)/([a-z]+)$')
+MUSIC_ASSET = re.compile(r'^music/([A-Za-z_][A-Za-z0-9_]*)\.mus$')
+MUSIC_PARAM = re.compile(r'^(song|effects), part (\d+) of (\d+)$')
 RECORDS_ASSET = re.compile(r'^records/([A-Za-z_][A-Za-z0-9_]*)\.tsv$')
 RECORDS_PARAM = re.compile(r'^(table|palette|map) (\d+) x (\d+) B$')
 PACK_PARAM = re.compile(r'^lz(11|12) -> (\d+) B$')
@@ -436,16 +449,30 @@ def layout(rows: list[dict] | None = None) -> list[dict]:
             asset = f'gfx/{label}.png'
         elif piece == 'sprframes':
             asset = f'sprites/{label}.spr'
+        elif piece == 'music':
+            asset = f'music/{param[0]}.mus'
+            param = param[1]
         elif text_tool(piece):
             asset = f'{text_tool(piece).ASSET_DIR}/{label}.{text_tool(piece).ASSET_EXT[piece]}'
         pieces.append({'label': label, 'start': addr(s), 'end': addr(e - 1), 'size': str(e - s),
                        'piece': piece, 'asset': asset, 'param': param,
                        'offset': s, 'stop': e, 'row': row})
 
+    # the music units' rows, counted first (a song may span two rows)
+    parts: dict[str, list[str]] = {}
+    for row in rows:
+        unit = music.unit_of_row(row, row_label(row, data_survey.parse_addr(row['start'])))
+        if unit:
+            parts.setdefault(unit[0], []).append(row['start'])
     for row in rows:
         s, e = data_survey.parse_addr(row['start']), data_survey.parse_addr(row['end']) + 1
         label = row_label(row, s)
         kind = row['kind']
+        unit = music.unit_of_row(row, label)
+        if unit:
+            k, n = parts[unit[0]].index(row['start']) + 1, len(parts[unit[0]])
+            add(label, s, e, 'music', param=(unit[0], f'{unit[1]}, part {k} of {n}'), row=row)
+            continue
         if kind == 'padding':
             m = FILL.match(row['format'])
             if not m or int(m.group(1)) != e - s:
@@ -619,6 +646,11 @@ def manifest_problems(path: Path = MANIFEST) -> list[str]:
                     or mp.group(2) not in battle.ROLES:
                 problems.append(f'{where}: a battle piece\'s asset is battle/<unit>.bscr of a unit of '
                                 f'tools/battle.py and its param "<unit>/<role>": {p["asset"]!r}, {p["param"]!r}')
+        elif p['piece'] == 'music':
+            m, mp = MUSIC_ASSET.match(p['asset']), MUSIC_PARAM.match(p['param'])
+            if not m or not mp or not 1 <= int(mp.group(2)) <= int(mp.group(3)):
+                problems.append(f'{where}: a music piece\'s asset is music/<unit>.mus and its param '
+                                f'"<song|effects>, part I of N": {p["asset"]!r}, {p["param"]!r}')
         elif p['piece'] == 'records':
             m = RECORDS_ASSET.match(p['asset'])
             if not m or m.group(1) != p['label'] or not RECORDS_PARAM.match(p['param']):
@@ -667,6 +699,8 @@ def allowed_incbins(pieces: list[dict]) -> dict[str, dict]:
             out[f'{RECORDS_PREFIX}{p["label"]}.bin'] = p
         elif p['piece'] == 'battle':
             out[f'{BATTLE_PREFIX}{p["label"]}.bin'] = p
+        elif p['piece'] == 'music':
+            out[f'{MUSIC_PREFIX}{p["label"]}.bin'] = p
     return out
 
 
@@ -696,6 +730,8 @@ def placeholder_files(pieces: list[dict]) -> dict[Path, int]:
             out[RECORDS_OUT / f'{p["label"]}.bin'] = int(p['size'])
         elif p['piece'] == 'battle':
             out[BATTLE_OUT / f'{p["label"]}.bin'] = int(p['size'])
+        elif p['piece'] == 'music':
+            out[MUSIC_OUT / f'{p["label"]}.bin'] = int(p['size'])
     return out
 
 
@@ -820,8 +856,9 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
         '; makes from one in build/packs/ (event scripts assembled from',
         '; their disassembly first), text or records it encodes into',
         '; build/text/ and build/records/, battle and layer-effect',
-        '; scripts it assembles into build/battle/ and build/fx/, or',
-        '; graphics it encodes from images into build/gfx/',
+        '; scripts it assembles into build/battle/ and build/fx/, music',
+        '; sequences it assembles into build/music/, or graphics it',
+        '; encodes from images into build/gfx/',
         '; (symbols/data_assets.csv lists them; nothing here is ROM data).',
         '; ============================================================',
     ]
@@ -878,6 +915,8 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{RECORDS_PREFIX}{p["label"]}.bin"          ; records: {p["param"]}')
         elif p['piece'] == 'battle':
             out.append(f'    incbin "{BATTLE_PREFIX}{p["label"]}.bin"          ; battle scripts: {p["param"]}')
+        elif p['piece'] == 'music':
+            out.append(f'    incbin "{MUSIC_PREFIX}{p["label"]}.bin"          ; music: {p["param"]}')
         elif p['piece'] == 'text':
             out.append(f'    incbin "{TEXT_PREFIX}{p["label"]}.bin"          ; text unit '
                        f'{Path(p["asset"]).stem} ({p["param"]})')
@@ -981,8 +1020,10 @@ def _stamp_key(rom_sha: str) -> str:
     h.update(Path(text.__file__).read_bytes())         # the readable text's format
     h.update(Path(records.__file__).read_bytes())      # the records' layouts
     for tool in ('events.py', 'battle.py', 'scripts.py', 'graphics.py', 'maps.py', 'actframes.py', 'sprites.py', 'anims.py',
-                 'drawlists.py', 'absint.py', 'disasm.py'):
+                 'drawlists.py', 'absint.py', 'disasm.py', 'music.py', 'spcwalk.py', 'spc700.py'):
         h.update((ROOT / 'tools' / tool).read_bytes())
+    for src in [music.spcwalk.DRIVER] + music.spcwalk.INCLUDES:      # the music format's source
+        h.update((music.ROOT / src).read_bytes())
     return h.hexdigest()
 
 
@@ -1018,6 +1059,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
     problems = extract_text(rom, out_dir, pieces) + extract_records(rom, out_dir, pieces)
     problems += extract_events(rom, out_dir, pieces, root, quiet)
     problems += extract_battle(rom, out_dir, pieces, root)
+    problems += extract_music(rom, out_dir, pieces, root)
     problems += extract_scripts(rom, out_dir, pieces, root)
     problems += extract_sprites(rom, out_dir, pieces)
     problems += extract_text_tools(rom, out_dir, pieces)
@@ -1030,7 +1072,7 @@ def extract(root: Path = ROOT, quiet: bool = True) -> Path:
             continue
         if p['piece'] in ('table', 'text', 'records'):
             continue
-        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'anim', 'sprframes') or text_tool(p['piece']):
+        if p['piece'] in ('events', 'battle', 'scene', 'fx', 'anim', 'sprframes', 'music') or text_tool(p['piece']):
             continue
         if p['piece'] in maps.PIECES:
             data, why = unpack_piece(rom, p)
@@ -1151,6 +1193,34 @@ def extract_events(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = R
         if not quiet and k % 100 == 0:
             print(f'extract_data: {k} event scripts disassembled')
     interp.save(Path(root))
+    return problems
+
+
+def extract_music(rom: bytes, out_dir: Path, pieces: list[dict], root: Path = ROOT) -> list[str]:
+    """Write the readable file of every music unit (tools/music.py), each
+    disassembled afresh and checked to assemble back to the ROM's bytes, its
+    structure walked as the SPC700 driver reads it; the problems. A unit the
+    tool cannot follow is a problem, never kept as bytes. The format the
+    driver's score reader gives is kept between runs (build/music/format.*,
+    refused when changed by hand)."""
+    import c3pack
+    units = music.unit_pieces(pieces)
+    if not units:
+        return []
+    try:
+        fmt = music.load_format(Path(root))
+    except music.MusicError as e:
+        return [f'music: {e}']
+    problems = []
+    for unit, ps in sorted(units.items()):
+        try:
+            text_ = music.extract_unit(unit, rom, ps, fmt)
+        except music.MusicError as e:
+            problems.append(f'music: {e}')
+            continue
+        dest = out_dir / f'music/{unit}.mus'
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        c3pack._write(dest, text_.encode())
     return problems
 
 

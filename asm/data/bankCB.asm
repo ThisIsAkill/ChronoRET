@@ -10,8 +10,9 @@
 ; makes from one in build/packs/ (event scripts assembled from
 ; their disassembly first), text or records it encodes into
 ; build/text/ and build/records/, battle and layer-effect
-; scripts it assembles into build/battle/ and build/fx/, or
-; graphics it encodes from images into build/gfx/
+; scripts it assembles into build/battle/ and build/fx/, music
+; sequences it assembles into build/music/, or graphics it
+; encodes from images into build/gfx/
 ; (symbols/data_assets.csv lists them; nothing here is ROM data).
 ; ============================================================
 
@@ -20,413 +21,413 @@
 ; Read by Audio_SendSongData.
 org $CB0000
 AudioSong_18_Cont:
-    incbin "../../build/assets/music_sequence/AudioSong_18_Cont.bin"
+    incbin "../../build/music/AudioSong_18_Cont.bin"          ; music: song, part 2 of 2
 
 ; $CB:010C-$CB:0193 (136 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB010C
 AudioSong_19:
-    incbin "../../build/assets/music_sequence/AudioSong_19.bin"
+    incbin "../../build/music/AudioSong_19.bin"          ; music: song, part 1 of 1
 
 ; $CB:0194-$CB:0220 (141 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB0194
 AudioSong_1A:
-    incbin "../../build/assets/music_sequence/AudioSong_1A.bin"
+    incbin "../../build/music/AudioSong_1A.bin"          ; music: song, part 1 of 1
 
 ; $CB:0221-$CB:05E2 (962 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB0221
 AudioSong_1B:
-    incbin "../../build/assets/music_sequence/AudioSong_1B.bin"
+    incbin "../../build/music/AudioSong_1B.bin"          ; music: song, part 1 of 1
 
 ; $CB:05E3-$CB:0787 (421 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB05E3
 AudioSong_1C:
-    incbin "../../build/assets/music_sequence/AudioSong_1C.bin"
+    incbin "../../build/music/AudioSong_1C.bin"          ; music: song, part 1 of 1
 
 ; $CB:0788-$CB:0B31 (938 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB0788
 AudioSong_1D:
-    incbin "../../build/assets/music_sequence/AudioSong_1D.bin"
+    incbin "../../build/music/AudioSong_1D.bin"          ; music: song, part 1 of 1
 
 ; $CB:0B32-$CB:10F3 (1,474 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB0B32
 AudioSong_1E:
-    incbin "../../build/assets/music_sequence/AudioSong_1E.bin"
+    incbin "../../build/music/AudioSong_1E.bin"          ; music: song, part 1 of 1
 
 ; $CB:10F4-$CB:13F1 (766 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB10F4
 AudioSong_1F:
-    incbin "../../build/assets/music_sequence/AudioSong_1F.bin"
+    incbin "../../build/music/AudioSong_1F.bin"          ; music: song, part 1 of 1
 
 ; $CB:13F2-$CB:1455 (100 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB13F2
 AudioSong_20:
-    incbin "../../build/assets/music_sequence/AudioSong_20.bin"
+    incbin "../../build/music/AudioSong_20.bin"          ; music: song, part 1 of 1
 
 ; $CB:1456-$CB:14D5 (128 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB1456
 AudioSong_21:
-    incbin "../../build/assets/music_sequence/AudioSong_21.bin"
+    incbin "../../build/music/AudioSong_21.bin"          ; music: song, part 1 of 1
 
 ; $CB:14D6-$CB:156B (150 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB14D6
 AudioSong_22:
-    incbin "../../build/assets/music_sequence/AudioSong_22.bin"
+    incbin "../../build/music/AudioSong_22.bin"          ; music: song, part 1 of 1
 
 ; $CB:156C-$CB:1A30 (1,221 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB156C
 AudioSong_23:
-    incbin "../../build/assets/music_sequence/AudioSong_23.bin"
+    incbin "../../build/music/AudioSong_23.bin"          ; music: song, part 1 of 1
 
 ; $CB:1A31-$CB:1AF1 (193 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB1A31
 AudioSong_24:
-    incbin "../../build/assets/music_sequence/AudioSong_24.bin"
+    incbin "../../build/music/AudioSong_24.bin"          ; music: song, part 1 of 1
 
 ; $CB:1AF2-$CB:1C15 (292 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB1AF2
 AudioSong_25:
-    incbin "../../build/assets/music_sequence/AudioSong_25.bin"
+    incbin "../../build/music/AudioSong_25.bin"          ; music: song, part 1 of 1
 
 ; $CB:1C16-$CB:1D58 (323 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB1C16
 AudioSong_26:
-    incbin "../../build/assets/music_sequence/AudioSong_26.bin"
+    incbin "../../build/music/AudioSong_26.bin"          ; music: song, part 1 of 1
 
 ; $CB:1D59-$CB:22E0 (1,416 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB1D59
 AudioSong_27:
-    incbin "../../build/assets/music_sequence/AudioSong_27.bin"
+    incbin "../../build/music/AudioSong_27.bin"          ; music: song, part 1 of 1
 
 ; $CB:22E1-$CB:2C05 (2,341 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB22E1
 AudioSong_28:
-    incbin "../../build/assets/music_sequence/AudioSong_28.bin"
+    incbin "../../build/music/AudioSong_28.bin"          ; music: song, part 1 of 1
 
 ; $CB:2C06-$CB:340E (2,057 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB2C06
 AudioSong_29:
-    incbin "../../build/assets/music_sequence/AudioSong_29.bin"
+    incbin "../../build/music/AudioSong_29.bin"          ; music: song, part 1 of 1
 
 ; $CB:340F-$CB:3A37 (1,577 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB340F
 AudioSong_2A:
-    incbin "../../build/assets/music_sequence/AudioSong_2A.bin"
+    incbin "../../build/music/AudioSong_2A.bin"          ; music: song, part 1 of 1
 
 ; $CB:3A38-$CB:3B0A (211 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB3A38
 AudioSong_2B:
-    incbin "../../build/assets/music_sequence/AudioSong_2B.bin"
+    incbin "../../build/music/AudioSong_2B.bin"          ; music: song, part 1 of 1
 
 ; $CB:3B0B-$CB:3E25 (795 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB3B0B
 AudioSong_2C:
-    incbin "../../build/assets/music_sequence/AudioSong_2C.bin"
+    incbin "../../build/music/AudioSong_2C.bin"          ; music: song, part 1 of 1
 
 ; $CB:3E26-$CB:4274 (1,103 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB3E26
 AudioSong_2D:
-    incbin "../../build/assets/music_sequence/AudioSong_2D.bin"
+    incbin "../../build/music/AudioSong_2D.bin"          ; music: song, part 1 of 1
 
 ; $CB:4275-$CB:430D (153 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB4275
 AudioSong_2E:
-    incbin "../../build/assets/music_sequence/AudioSong_2E.bin"
+    incbin "../../build/music/AudioSong_2E.bin"          ; music: song, part 1 of 1
 
 ; $CB:430E-$CB:4795 (1,160 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB430E
 AudioSong_2F:
-    incbin "../../build/assets/music_sequence/AudioSong_2F.bin"
+    incbin "../../build/music/AudioSong_2F.bin"          ; music: song, part 1 of 1
 
 ; $CB:4796-$CB:4A22 (653 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB4796
 AudioSong_30:
-    incbin "../../build/assets/music_sequence/AudioSong_30.bin"
+    incbin "../../build/music/AudioSong_30.bin"          ; music: song, part 1 of 1
 
 ; $CB:4A23-$CB:4F0D (1,259 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB4A23
 AudioSong_31:
-    incbin "../../build/assets/music_sequence/AudioSong_31.bin"
+    incbin "../../build/music/AudioSong_31.bin"          ; music: song, part 1 of 1
 
 ; $CB:4F0E-$CB:5A69 (2,908 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB4F0E
 AudioSong_32:
-    incbin "../../build/assets/music_sequence/AudioSong_32.bin"
+    incbin "../../build/music/AudioSong_32.bin"          ; music: song, part 1 of 1
 
 ; $CB:5A6A-$CB:60B0 (1,607 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB5A6A
 AudioSong_33:
-    incbin "../../build/assets/music_sequence/AudioSong_33.bin"
+    incbin "../../build/music/AudioSong_33.bin"          ; music: song, part 1 of 1
 
 ; $CB:60B1-$CB:613E (142 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB60B1
 AudioSong_34:
-    incbin "../../build/assets/music_sequence/AudioSong_34.bin"
+    incbin "../../build/music/AudioSong_34.bin"          ; music: song, part 1 of 1
 
 ; $CB:613F-$CB:61FA (188 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB613F
 AudioSong_35:
-    incbin "../../build/assets/music_sequence/AudioSong_35.bin"
+    incbin "../../build/music/AudioSong_35.bin"          ; music: song, part 1 of 1
 
 ; $CB:61FB-$CB:6589 (911 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB61FB
 AudioSong_36:
-    incbin "../../build/assets/music_sequence/AudioSong_36.bin"
+    incbin "../../build/music/AudioSong_36.bin"          ; music: song, part 1 of 1
 
 ; $CB:658A-$CB:6626 (157 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB658A
 AudioSong_37:
-    incbin "../../build/assets/music_sequence/AudioSong_37.bin"
+    incbin "../../build/music/AudioSong_37.bin"          ; music: song, part 1 of 1
 
 ; $CB:6627-$CB:6F25 (2,303 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB6627
 AudioSong_38:
-    incbin "../../build/assets/music_sequence/AudioSong_38.bin"
+    incbin "../../build/music/AudioSong_38.bin"          ; music: song, part 1 of 1
 
 ; $CB:6F26-$CB:7C4F (3,370 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB6F26
 AudioSong_39:
-    incbin "../../build/assets/music_sequence/AudioSong_39.bin"
+    incbin "../../build/music/AudioSong_39.bin"          ; music: song, part 1 of 1
 
 ; $CB:7C50-$CB:7D56 (263 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB7C50
 AudioSong_3A:
-    incbin "../../build/assets/music_sequence/AudioSong_3A.bin"
+    incbin "../../build/music/AudioSong_3A.bin"          ; music: song, part 1 of 1
 
 ; $CB:7D57-$CB:8400 (1,706 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB7D57
 AudioSong_3B:
-    incbin "../../build/assets/music_sequence/AudioSong_3B.bin"
+    incbin "../../build/music/AudioSong_3B.bin"          ; music: song, part 1 of 1
 
 ; $CB:8401-$CB:8B4F (1,871 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB8401
 AudioSong_3C:
-    incbin "../../build/assets/music_sequence/AudioSong_3C.bin"
+    incbin "../../build/music/AudioSong_3C.bin"          ; music: song, part 1 of 1
 
 ; $CB:8B50-$CB:8C60 (273 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB8B50
 AudioSong_3D:
-    incbin "../../build/assets/music_sequence/AudioSong_3D.bin"
+    incbin "../../build/music/AudioSong_3D.bin"          ; music: song, part 1 of 1
 
 ; $CB:8C61-$CB:9063 (1,027 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB8C61
 AudioSong_3E:
-    incbin "../../build/assets/music_sequence/AudioSong_3E.bin"
+    incbin "../../build/music/AudioSong_3E.bin"          ; music: song, part 1 of 1
 
 ; $CB:9064-$CB:A337 (4,820 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CB9064
 AudioSong_3F:
-    incbin "../../build/assets/music_sequence/AudioSong_3F.bin"
+    incbin "../../build/music/AudioSong_3F.bin"          ; music: song, part 1 of 1
 
 ; $CB:A338-$CB:A453 (284 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBA338
 AudioSong_40:
-    incbin "../../build/assets/music_sequence/AudioSong_40.bin"
+    incbin "../../build/music/AudioSong_40.bin"          ; music: song, part 1 of 1
 
 ; $CB:A454-$CB:A56A (279 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBA454
 AudioSong_41:
-    incbin "../../build/assets/music_sequence/AudioSong_41.bin"
+    incbin "../../build/music/AudioSong_41.bin"          ; music: song, part 1 of 1
 
 ; $CB:A56B-$CB:A6CC (354 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBA56B
 AudioSong_42:
-    incbin "../../build/assets/music_sequence/AudioSong_42.bin"
+    incbin "../../build/music/AudioSong_42.bin"          ; music: song, part 1 of 1
 
 ; $CB:A6CD-$CB:A728 (92 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBA6CD
 AudioSong_43:
-    incbin "../../build/assets/music_sequence/AudioSong_43.bin"
+    incbin "../../build/music/AudioSong_43.bin"          ; music: song, part 1 of 1
 
 ; $CB:A729-$CB:AFA2 (2,170 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBA729
 AudioSong_44:
-    incbin "../../build/assets/music_sequence/AudioSong_44.bin"
+    incbin "../../build/music/AudioSong_44.bin"          ; music: song, part 1 of 1
 
 ; $CB:AFA3-$CB:B604 (1,634 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBAFA3
 AudioSong_45:
-    incbin "../../build/assets/music_sequence/AudioSong_45.bin"
+    incbin "../../build/music/AudioSong_45.bin"          ; music: song, part 1 of 1
 
 ; $CB:B605-$CB:BFD5 (2,513 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBB605
 AudioSong_46:
-    incbin "../../build/assets/music_sequence/AudioSong_46.bin"
+    incbin "../../build/music/AudioSong_46.bin"          ; music: song, part 1 of 1
 
 ; $CB:BFD6-$CB:C185 (432 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBBFD6
 AudioSong_47:
-    incbin "../../build/assets/music_sequence/AudioSong_47.bin"
+    incbin "../../build/music/AudioSong_47.bin"          ; music: song, part 1 of 1
 
 ; $CB:C186-$CB:C2F8 (371 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBC186
 AudioSong_48:
-    incbin "../../build/assets/music_sequence/AudioSong_48.bin"
+    incbin "../../build/music/AudioSong_48.bin"          ; music: song, part 1 of 1
 
 ; $CB:C2F9-$CB:CC52 (2,394 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBC2F9
 AudioSong_49:
-    incbin "../../build/assets/music_sequence/AudioSong_49.bin"
+    incbin "../../build/music/AudioSong_49.bin"          ; music: song, part 1 of 1
 
 ; $CB:CC53-$CB:CD4B (249 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBCC53
 AudioSong_4A:
-    incbin "../../build/assets/music_sequence/AudioSong_4A.bin"
+    incbin "../../build/music/AudioSong_4A.bin"          ; music: song, part 1 of 1
 
 ; $CB:CD4C-$CB:CDBC (113 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBCD4C
 AudioSong_4B:
-    incbin "../../build/assets/music_sequence/AudioSong_4B.bin"
+    incbin "../../build/music/AudioSong_4B.bin"          ; music: song, part 1 of 1
 
 ; $CB:CDBD-$CB:CE32 (118 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBCDBD
 AudioSong_4C:
-    incbin "../../build/assets/music_sequence/AudioSong_4C.bin"
+    incbin "../../build/music/AudioSong_4C.bin"          ; music: song, part 1 of 1
 
 ; $CB:CE33-$CB:D314 (1,250 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBCE33
 AudioSong_4D:
-    incbin "../../build/assets/music_sequence/AudioSong_4D.bin"
+    incbin "../../build/music/AudioSong_4D.bin"          ; music: song, part 1 of 1
 
 ; $CB:D315-$CB:E03F (3,371 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBD315
 AudioSong_4E:
-    incbin "../../build/assets/music_sequence/AudioSong_4E.bin"
+    incbin "../../build/music/AudioSong_4E.bin"          ; music: song, part 1 of 1
 
 ; $CB:E040-$CB:E13D (254 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBE040
 AudioSong_4F:
-    incbin "../../build/assets/music_sequence/AudioSong_4F.bin"
+    incbin "../../build/music/AudioSong_4F.bin"          ; music: song, part 1 of 1
 
 ; $CB:E13E-$CB:E88E (1,873 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBE13E
 AudioSong_50:
-    incbin "../../build/assets/music_sequence/AudioSong_50.bin"
+    incbin "../../build/music/AudioSong_50.bin"          ; music: song, part 1 of 1
 
 ; $CB:E88F-$CB:EE20 (1,426 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBE88F
 AudioSong_51:
-    incbin "../../build/assets/music_sequence/AudioSong_51.bin"
+    incbin "../../build/music/AudioSong_51.bin"          ; music: song, part 1 of 1
 
 ; $CB:EE21-$CB:F163 (835 B), music_sequence, confirmed: u16 length + SPC700 song data (ARAM
 ; !AudioAram_Song)
 ; Read by Audio_SendSongData.
 org $CBEE21
 AudioSong_52:
-    incbin "../../build/assets/music_sequence/AudioSong_52.bin"
+    incbin "../../build/music/AudioSong_52.bin"          ; music: song, part 1 of 1
 
 ; $CB:F164-$CB:FF90 (3,629 B), music_sequence, probable: song data without a length word (same
 ; command bytes as the songs)

@@ -47,6 +47,12 @@ assets, with no copy of the original.
      its text (build/assets/sprites/<label>.spr) with tools/sprites.py to
      build/sprites/<label>.bin (a file is rewritten only when its bytes
      change; a text that does not make its piece's bytes count fails).
+  6e. The music: every unit of `music` pieces (a song or a sound-effect
+     block) is assembled from its readable file (build/assets/music/
+     <unit>.mus) with tools/music.py, its structure walked as the SPC700
+     driver reads it, to build/music/<label>.bin per piece (a file is
+     rewritten only when its bytes change; a piece whose size differs fails
+     the build).
   7. asar assembles asm/rom.asm (asm/main.asm, then the data layer
      asm/data/) onto a blank 4 MB image of $00 and again onto one of $FF.
      The two must be identical, which proves the source and the assets
@@ -399,6 +405,41 @@ def build_battle(root: Path = ROOT) -> int:
     return written
 
 
+def build_music(root: Path = ROOT) -> int:
+    """Assemble every music unit (see the docstring); returns how many
+    files were written."""
+    import music
+    root = Path(root)
+    units = music.unit_pieces(extract_data.read_manifest())
+    if not units:
+        return 0
+    try:
+        fmt = music.load_format(root)            # every line is checked against the driver's score reader
+    except music.MusicError as e:
+        raise BuildError(f'music: {e}') from None
+    out_dir = root / extract_data.MUSIC_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written, wrong = 0, []
+    for unit, ps in sorted(units.items()):
+        text_ = (root / extract_data.ASSETS / f'music/{unit}.mus').read_text()
+        try:
+            out = music.assemble_unit(unit, text_, ps, fmt)
+        except music.MusicError as e:
+            raise BuildError(f'music: {e}') from None
+        for p in ps:
+            data = out[p['label']]
+            if len(data) != int(p['size']):
+                wrong.append(f'{p["label"]}: {len(data)} B, its piece {p["size"]} B')
+                continue
+            path = out_dir / f'{p["label"]}.bin'
+            if not path.exists() or path.read_bytes() != data:
+                c3pack._write(path, data)
+                written += 1
+    if wrong:
+        raise BuildError('music that does not fit its place:\n  ' + '\n  '.join(wrong))
+    return written
+
+
 def build_records(root: Path = ROOT) -> int:
     """Encode every `records` piece (see the docstring); returns how many
     files were written."""
@@ -463,6 +504,7 @@ def build(out: Path = OUT_ROM, root: Path = ROOT, quiet: bool = True) -> Path:
     build_battle(root)
     build_sprites(root)
     build_text_tools(root)
+    build_music(root)
     out = root / out
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out.parent) as tmp:

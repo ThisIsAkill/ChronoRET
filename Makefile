@@ -93,8 +93,9 @@ test-hooks:
 # text (tools/test_maps.py), the sprite frame records as text
 # (tools/test_sprites.py), the sprite animation lists as text
 # (tools/test_anims.py), the menu draw lists as text
-# (tools/test_drawlists.py), and the battle action frames as text
-# (tools/test_actframes.py).
+# (tools/test_drawlists.py), the battle action frames as text
+# (tools/test_actframes.py), and the music sequences' readable form with
+# the driver walk that gives their format (tools/test_music.py).
 # They need the ROM and asar (skipped otherwise); about a minute together.
 # CI's ROM job runs this.
 test-tools:
@@ -118,6 +119,7 @@ test-tools:
 	python3 tools/test_anims.py
 	python3 tools/test_drawlists.py
 	python3 tools/test_actframes.py
+	python3 tools/test_music.py
 
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]
