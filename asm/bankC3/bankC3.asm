@@ -658,9 +658,11 @@ WinFx_StepWipe:
 ; back. Which byte each counter read gives is not fixed: OPHCT and
 ; OPVCT each return the low byte or bit 8 (with open bus in bits 1-7)
 ; by a flip-flop that every read toggles and only a STAT78 read clears,
-; and nothing on this path reads STAT78 (the module's one read, at
-; $7E:9AB3, is elsewhere). At M=1 OPHCT is read once a call, so it
-; alternates from call to call (bit 8 and open bus every other call),
+; and nothing on this path reads STAT78 (the module's reads, at
+; $7E:9AB3 in C3Mod_Prog10QuadTask and $7E:9EDF in C3Mod_CreditLineTask,
+; a word read of STAT77 whose high byte is STAT78, are elsewhere). At
+; M=1 OPHCT is read once a call, so it alternates from call to call
+; (bit 8 and open bus every other call),
 ; and OPVCT twice, keeping the phase it had (low then high from a clear
 ; flip-flop); at M=0 the word reads also take the next register
 ; (OPHCT's read takes OPVCT, OPVCT's STAT77), so H is read once and V
@@ -725,7 +727,8 @@ C3_RandomByte:
 ; $7E:520D it comes from a 14-byte MVN copy of a record at $1400 or
 ; $140E into $1F-$2C, whose first word the module sets to 4
 ; ($7E:502A) and 3 ($7E:50B6) respectively (other writes to those
-; words, at $7E:9B2B and $7E:9E15, not traced to this use; $7E:8BA5,
+; words, at $7E:9B2B and $7E:9E15, are C3Mod_Prog10TurnNmi's and
+; C3Mod_Prog10M7Nmi's mode-7 scroll words, not records; $7E:8BA5,
 ; C3Mod_Prog10StripNmi, writes $140E as BG1's scroll for an HDMA table,
 ; not as a record).
 ; Quirks (carries not set or cleared first):
@@ -2572,14 +2575,14 @@ C3_SprListSmall:
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, C3Mod_Prog6Sprites
 ;   at $7E:8245, C3Mod_Prog10SprNmi at $7E:88A0 and $7E:88B4, and
-;   $7E:9A07).
+;   C3Mod_Prog10LogoTask at $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (0 at
 ;        $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245,
-;        $7E:88A0 and $7E:88B4; $7E:9A07's not traced), DB = a bank
+;        $7E:88A0, $7E:88B4 and $7E:9A07), DB = a bank
 ;        that maps the I/O registers and low WRAM ($00-$3F or $80-$BF:
 ;        WMADDL/H, WMDATA and the OAM shadow are absolute; $00 at those
-;        eight, under a task, an NMI task or C3Mod_Prog6; $7E:9A07's
-;        not traced); A = the list's address.
+;        nine, under a task, an NMI task or C3Mod_Prog6); A = the
+;        list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:

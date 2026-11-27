@@ -1052,11 +1052,8 @@ endmacro
 !C3_Prog10Colours10 = $2020              ; $7E: its colour $10
 !C3_Prog10Black = $2200                  ; $7E: C3_PaletteBuf, zeroed ...
 !C3_Prog10BlackBytes = $EF               ; ... the MVN's bytes after the first
-!C3_Prog10Word81 = $81                   ; dp words of program 10 read by code not matched yet
-!C3_Prog10Word7D = $7D
-!C3_Prog10Word7DStart = $0040
-!C3_Prog10Word7F = $7F
-!C3_Prog10Word7FStart = $0140
+!C3_Prog10TextGapStart = $0040          ; C3_Prog10TextGap as C3Mod_Prog10 sets it ...
+!C3_Prog10TextShowStart = $0140         ; ... and C3_Prog10TextShow
 !C3_Prog10HdmaOn = $1F                   ; C3_HdmaEnable: channels 0-4
 !C3_Prog10Fade = $0101                   ; C3_FadeStep and C3_FadeTimer
 !C3_Prog10M7Sel = $C0                    ; M7SEL: outside the map, character 0
@@ -1140,8 +1137,8 @@ endmacro
 !C3_Prog10GridMapBytes = $0400
 !C3_Prog10TextA = $B099                  ; in C3Mod_StaffTexts' second text ("//////TRANSLATOR")
 !C3_Prog10TextB = $AB1A                  ; ... ("PRODUCER//KAZUHIKO AOKI")
-!C3_Prog10TextPtr = $4A                  ; dp, 16-bit: a text pointer (code not matched yet reads it)
-!C3_Prog10TextY = $48                    ; dp, 16-bit
+!C3_Prog10TextPtr = $4A                  ; dp, 16-bit: the credit text's next line (C3Mod_CreditLineTask)
+!C3_Prog10TextY = $48                    ; dp, 16-bit: the VRAM word of the credit row (C3Mod_CreditLineNmi)
 !C3_Prog10TextYStart = $FFE0
 !C3_Prog10GridTiles12 = $46              ; BG12NBA
 !C3_Prog10GridBg1Sc = $44
@@ -1152,10 +1149,8 @@ endmacro
 !C3_Prog10PalBytes = $0020
 !C3_Prog10PalF0 = $21E0                  ; $7E: C3_PaletteWork's colour $F0
 !C3_Prog10PalClear = $23C0               ; $7E: C3_PaletteBuf's colour $E0
-!C3_Prog10Word71 = $0071                 ; dp 0 words written absolute (read by code not matched yet)
-!C3_Prog10Word71Start = $00E0
-!C3_Prog10Word73 = $0073
-!C3_Prog10WordsStart = $0080
+!C3_Prog10QuadXStart = $00E0             ; C3_Prog10QuadX as C3Mod_Prog10Palette sets it ...
+!C3_Prog10QuadYStart = $0080             ; ... and the four quad Ys
 !C3_Prog10Mode4Sub = $12                 ; TS: BG2 and the sprites
 !C3_Prog10Mode4Bg2Sc = $4C
 !C3_Prog10Mode4Tiles = $06               ; BG12NBA
