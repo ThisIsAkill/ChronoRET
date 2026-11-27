@@ -38,7 +38,7 @@ ScenePalPack_016,$C3:DD85,$C3:DEB1,301,packed,packed_lz/ScenePalPack_016.bin,lz1
 ScenePalPack_017,$C3:DEB2,$C3:DF3D,140,packed,packed_lz/ScenePalPack_017.bin,lz11 -> 256 B
 ScenePalPack_018,$C3:DF3E,$C3:DFE0,163,packed,packed_lz/ScenePalPack_018.bin,lz11 -> 224 B
 Padding_C3DFE1,$C3:DFE1,$C3:DFFF,31,fill,,$00
-C2SceneRom_AnimTable,$C3:E000,$C3:FF09,7946,extracted,event_script/C2SceneRom_AnimTable.bin,
+C2SceneRom_AnimTable,$C3:E000,$C3:FF09,7946,anim,anim/C2SceneRom_AnimTable.ban,
 Padding_C3FF0A,$C3:FF0A,$C3:FFFF,246,fill,,$00
 SceneBgPack_000,$C4:0000,$C4:0EB7,3768,gfxpack,gfx/SceneBgPack_000.png,lz12 -> 4096 B; 4bpp 128 tiles
 SceneBgPack_001,$C4:0EB8,$C4:1D39,3714,gfxpack,gfx/SceneBgPack_001.png,lz12 -> 4096 B; 4bpp 128 tiles
@@ -95,14 +95,14 @@ SceneObjPack_012,$C6:07B6,$C6:0E99,1764,gfxpack,gfx/SceneObjPack_012.png,lz12 ->
 SceneObjPack_013,$C6:0E9A,$C6:1E70,4055,packed,packed_lz/SceneObjPack_013.bin,lz12 -> 6144 B
 Padding_C61E71,$C6:1E71,$C6:1FFF,399,fill,,$00
 SceneDialPack_002,$C6:2000,$C6:2410,1041,packed,packed_lz/SceneDialPack_002.bin,lz12 -> 8192 B
-SceneListPack_000,$C6:2411,$C6:25DE,462,packed,packed_lz/SceneListPack_000.bin,lz12 -> 574 B
-SceneListPack_001,$C6:25DF,$C6:2798,442,packed,packed_lz/SceneListPack_001.bin,lz12 -> 530 B
-SceneListPack_002,$C6:2799,$C6:2833,155,packed,packed_lz/SceneListPack_002.bin,lz12 -> 152 B
-SceneListPack_003,$C6:2834,$C6:28E3,176,packed,packed_lz/SceneListPack_003.bin,lz12 -> 187 B
-SceneListPack_004,$C6:28E4,$C6:2921,62,packed,packed_lz/SceneListPack_004.bin,lz12 -> 61 B
-SceneListPack_005,$C6:2922,$C6:2990,111,packed,packed_lz/SceneListPack_005.bin,lz12 -> 110 B
-SceneListPack_006,$C6:2991,$C6:29D9,73,packed,packed_lz/SceneListPack_006.bin,lz12 -> 61 B
-SceneListPack_007,$C6:29DA,$C6:29EB,18,packed,packed_lz/SceneListPack_007.bin,lz12 -> 19 B
+SceneListPack_000,$C6:2411,$C6:25DE,462,scenelists,maps/SceneListPack_000.slist,lz12 -> 574 B
+SceneListPack_001,$C6:25DF,$C6:2798,442,scenelists,maps/SceneListPack_001.slist,lz12 -> 530 B
+SceneListPack_002,$C6:2799,$C6:2833,155,scenelists,maps/SceneListPack_002.slist,lz12 -> 152 B
+SceneListPack_003,$C6:2834,$C6:28E3,176,scenelists,maps/SceneListPack_003.slist,lz12 -> 187 B
+SceneListPack_004,$C6:28E4,$C6:2921,62,scenelists,maps/SceneListPack_004.slist,lz12 -> 61 B
+SceneListPack_005,$C6:2922,$C6:2990,111,scenelists,maps/SceneListPack_005.slist,lz12 -> 110 B
+SceneListPack_006,$C6:2991,$C6:29D9,73,scenelists,maps/SceneListPack_006.slist,lz12 -> 61 B
+SceneListPack_007,$C6:29DA,$C6:29EB,18,scenelists,maps/SceneListPack_007.slist,lz12 -> 19 B
 SceneMetatilePack_000,$C6:29EC,$C6:3725,3386,scenemeta,maps/SceneMetatilePack_000.smeta,lz11 -> 4096 B
 SceneMetatilePack_001,$C6:3726,$C6:4111,2540,scenemeta,maps/SceneMetatilePack_001.smeta,lz11 -> 4096 B
 SceneMetatilePack_002,$C6:4112,$C6:4B7C,2667,scenemeta,maps/SceneMetatilePack_002.smeta,lz11 -> 4096 B
@@ -2273,7 +2273,7 @@ MenuRom_StatOrder,$FF:CF2C,$FF:CF31,6,extracted,table/MenuRom_StatOrder.bin,
 MenuRom_StatItemCap,$FF:CF32,$FF:CF32,1,extracted,table/MenuRom_StatItemCap.bin,
 MenuRom_NumLimits,$FF:CF33,$FF:CF3A,8,extracted,table/MenuRom_NumLimits.bin,
 MenuRom_NameStrings,$FF:CF3B,$FF:D023,233,text,text/MenuNameTexts.txt,strtable
-Unknown_FFD024,$FF:D024,$FF:D03D,26,extracted,unknown/Unknown_FFD024.bin,
+Table_FFD024,$FF:D024,$FF:D03D,26,records,records/Table_FFD024.tsv,table 26 x 1 B
 MenuRom_SlotStrings,$FF:D03E,$FF:D295,600,text,text/MenuSlotTexts.txt,strtable
 MenuRom_SlotEraNibbles,$FF:D296,$FF:D395,256,records,records/MenuRom_SlotEraNibbles.tsv,table 256 x 1 B
 MenuRom_SlotEraStrings,$FF:D396,$FF:D3FD,104,text,text/MenuEraTexts.txt,strtable

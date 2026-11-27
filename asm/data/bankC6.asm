@@ -53,49 +53,49 @@ SceneDialPack_002:
 ; Read by C2Scene_LoadLists.
 org $C62411
 SceneListPack_000:
-    incbin "../../build/packs/SceneListPack_000.lz"          ; lz12 -> 574 B
+    incbin "../../build/packs/SceneListPack_000.lz"          ; lz12 -> 574 B, scene layer data
 
 ; $C6:25DF-$C6:2798 (442 B), packed_lz, confirmed: lz12 -> 530 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C625DF
 SceneListPack_001:
-    incbin "../../build/packs/SceneListPack_001.lz"          ; lz12 -> 530 B
+    incbin "../../build/packs/SceneListPack_001.lz"          ; lz12 -> 530 B, scene layer data
 
 ; $C6:2799-$C6:2833 (155 B), packed_lz, confirmed: lz12 -> 152 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C62799
 SceneListPack_002:
-    incbin "../../build/packs/SceneListPack_002.lz"          ; lz12 -> 152 B
+    incbin "../../build/packs/SceneListPack_002.lz"          ; lz12 -> 152 B, scene layer data
 
 ; $C6:2834-$C6:28E3 (176 B), packed_lz, confirmed: lz12 -> 187 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C62834
 SceneListPack_003:
-    incbin "../../build/packs/SceneListPack_003.lz"          ; lz12 -> 187 B
+    incbin "../../build/packs/SceneListPack_003.lz"          ; lz12 -> 187 B, scene layer data
 
 ; $C6:28E4-$C6:2921 (62 B), packed_lz, confirmed: lz12 -> 61 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C628E4
 SceneListPack_004:
-    incbin "../../build/packs/SceneListPack_004.lz"          ; lz12 -> 61 B
+    incbin "../../build/packs/SceneListPack_004.lz"          ; lz12 -> 61 B, scene layer data
 
 ; $C6:2922-$C6:2990 (111 B), packed_lz, confirmed: lz12 -> 110 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C62922
 SceneListPack_005:
-    incbin "../../build/packs/SceneListPack_005.lz"          ; lz12 -> 110 B
+    incbin "../../build/packs/SceneListPack_005.lz"          ; lz12 -> 110 B, scene layer data
 
 ; $C6:2991-$C6:29D9 (73 B), packed_lz, confirmed: lz12 -> 61 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C62991
 SceneListPack_006:
-    incbin "../../build/packs/SceneListPack_006.lz"          ; lz12 -> 61 B
+    incbin "../../build/packs/SceneListPack_006.lz"          ; lz12 -> 61 B, scene layer data
 
 ; $C6:29DA-$C6:29EB (18 B), packed_lz, confirmed: lz12 -> 19 B: scene lists
 ; Read by C2Scene_LoadLists.
 org $C629DA
 SceneListPack_007:
-    incbin "../../build/packs/SceneListPack_007.lz"          ; lz12 -> 19 B
+    incbin "../../build/packs/SceneListPack_007.lz"          ; lz12 -> 19 B, scene layer data
 
 ; $C6:29EC-$C6:3725 (3,386 B), packed_lz, confirmed: lz11 -> 4096 B: scene metatiles
 ; Read by C2Scene_LoadMetatiles.

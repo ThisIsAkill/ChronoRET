@@ -273,6 +273,8 @@ ARRAYS: dict[str, tuple[list[tuple[str, str]], int]] = {
                                                               # LocGfx_ListSize, $FF none; the only source of the index is
                                                               # LocRom, whose values reach entry 53 (DERIVED)
     '$FF:D296': (_f('Nibbles'), 256),                         # MenuRom_SlotEraNibbles: Menu_UnkD36C, a 9-bit location / 2
+    '$FF:D024': (_f('Bound'), 26),                            # MenuRom_SlotLocBounds: Menu_SlotLocName, X from
+                                                              # Menu_SlotLocCount down (DERIVED)
 }
 
 # Palette rows: row start -> (colours per record, record count). Only rows
@@ -808,6 +810,8 @@ DERIVED = {
                  lambda rom, d, code=None: 256 if d['Pal_ObjColorBytes'] == d['ObjPal_CopyCount'] + 1
                  == layout_for('$E4:0000', 'palette').size else -1),
     '$E4:2A00': ('Menu_SprLoad run for each palette byte', _reader('$E4:2A00')),
+    '$FF:D024': ('Menu_SlotLocName counting down from Menu_SlotLocCount',
+                 lambda rom, d, code=None: d['Menu_SlotLocCount']),
     '$E4:F000': ('SprRec_FirstNpc + 256 records', lambda rom, d, code=None: d['SprRec_FirstNpc'] + 256),
     '$F6:1C00': ('1 + the largest LocRom.Tileset12', _loc_tilesets),
     '$F6:24C0': ('7 rows x (1 + the largest LocRom.Palette)', _loc_palettes),

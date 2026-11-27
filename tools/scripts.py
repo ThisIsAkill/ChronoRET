@@ -468,9 +468,31 @@ class AnimLang(Lang):
     (C2Anim_OpTable) runs with M=0, A = X = the opcode * 2, C2Anim_Ptr (DP
     $52) on the opcode, C2Scene_TaskCur a task record; it returns Z=0 with
     the bytes to add to C2Anim_Ptr in A, or Z=1 to stop there (the next
-    frame runs the same opcode). Read here only for check()'s lock on the
-    record bytes ops write (anim_check)."""
+    frame runs the same opcode). It disassembles the animation scripts of
+    C2SceneRom_AnimTable (ANIM_ROWS: an `anim` piece) and holds check()'s
+    lock on the record bytes ops write (anim_check)."""
     name = 'anim'
+
+    def head(self) -> int:
+        """The bytes before a script's first step: where C2Scene_SetAnim
+        puts .AnimPtr, from the table entry (C2Anim_Run starts there)."""
+        s = self._state()
+        s.pc = self.labels['C2Scene_SetAnim']
+        s.a, s.b, s.x, s.y = 0x12, 0, 0, 0
+        s.d, s.db, s.m, s.xf = 0, 0x00, True, False
+        t = self.d['C2SceneRom_AnimTable'] + 2 * 0x12
+        tk = self.d['C2Scene_TaskCur']
+        s.mem.update({absint._wram(0x7E0000 | tk): self.task & 0xFF, absint._wram(0x7E0000 | tk + 1): self.task >> 8})
+        ends = self.machine.run(s, {t: 0x34, t + 1: 0x12})
+        f = struct_offsets(self.root, 'C2Scene_Task')['AnimPtr']
+        got = set()
+        for st, how in ends:
+            v = [st.mem.get(absint._wram(0x7E0000 | self.task + f + i)) for i in range(2)]
+            if None not in v:
+                got.add((v[0] | v[1] << 8) - 0x1234)
+        if len(got) != 1:
+            raise ScriptsError('C2Scene_SetAnim: no one start offset')
+        return got.pop()
 
     def __init__(self, root: Path = ROOT):
         super().__init__(root)
@@ -483,6 +505,42 @@ class AnimLang(Lang):
         self.task = self.d['C2Scene_TaskRecords'] + 4 * self.d['C2Scene_TaskSize']   # record 4
         self.ret_bias = 0
         self.timer = struct_offsets(root, 'C2Scene_Task')['AnimTimer']
+
+    # C2Anim_OpJumpBack loads its operand 16-bit (LDA [C2Anim_Ptr],Y with
+    # Y = 1) and masks byte 2 off (AND #Eng_LowByteMask): absint's taint is
+    # by whole register, so byte 2 shows as read, as a control byte and in
+    # the target, and the op, which never advances, would take 1 + its
+    # furthest read, 3, for its length. Its length is the operand it uses:
+    # 2 (the handler's header says so), proved by jump_back_length.
+    JUMP_BACK = 'C2Anim_OpJumpBack'
+
+    def operand_length(self, op: int) -> int | None:
+        """The length of an op that never advances, where its furthest
+        read is not one it uses: C2Anim_OpJumpBack's (jump_back_length)."""
+        if op >= len(getattr(self, 'handler_names', ())) or self.handler_names[op] != self.JUMP_BACK:
+            return None
+        if getattr(self, '_jump_back', None) is None:
+            self._jump_back = self.jump_back_length(op)
+        return self._jump_back
+
+    def jump_back_length(self, op: int) -> int:
+        """2, once C2Anim_OpJumpBack is run with byte 2 at each of four
+        values for each of four arg-1 values (both signs, 0) and every run
+        with the same arg 1 goes to the same place: byte 2 is read and
+        thrown away. A handler whose byte 2 changes where it goes, or that
+        reads past it, is refused."""
+        at = (self.d['C2SceneRom_AnimTable'] & 0xFF0000) | 0x8000
+        for b1 in (0x00, 0x05, 0x80, 0xFC):
+            got = set()
+            for b2 in (0x00, 0x55, 0xAA, 0xFF):
+                res = self._trace({at: op, at + 1: b1, at + 2: b2, at + 3: 0x00}, at)
+                if max(res['reads'], default=0) > 2:
+                    raise ScriptsError(f'{self.JUMP_BACK}: it reads operand byte {max(res["reads"])}')
+                got.add(tuple(res['outs']))
+            if len(got) != 1:
+                raise ScriptsError(f'{self.JUMP_BACK}: its byte 2 changes where it goes (arg 1 ${b1:02X}), so '
+                                   f'its length is not 2')
+        return 2
 
     def entry(self, known: dict, ptr: int):
         """The handler's entry state for the opcode at ptr."""
@@ -610,6 +668,8 @@ def classify(lang: Lang, known: dict, ptr: int) -> 'Op':
         raise ScriptsError(f'{where}: it goes on at +{" and +".join(map(str, sorted(lengths)))}')
     o.fixed = bool(lengths)
     o.length = lengths.pop() if lengths else 1 + max(reads, default=0)
+    if not o.fixed and hasattr(lang, 'operand_length'):
+        o.length = lang.operand_length(o.op) or o.length          # (AnimLang.JUMP_BACK)
     o.next = bool(static or counted)
     o.stay = any(x[1] == 0 and not x[2] for x in poss)
     o.done = any(x[0] == 'done' for x in res['outs'])
@@ -830,8 +890,10 @@ def _lab(lang: Lang, a: int) -> str:
 
 
 def render_body(lang: Lang, d: dict, known: dict, regions: list[tuple[str, int, int]],
-                labels: dict[int, str]) -> list[str]:
-    """The lines of the regions: labels, opcode lines, inner lines, data."""
+                labels: dict[int, str], frames: dict[int, int] | None = None) -> list[str]:
+    """The lines of the regions: labels, opcode lines, inner lines, data;
+    `frames` {address: size}: data written as @frame lines (anim_frames)."""
+    frames = frames or {}
     ops = d['ops']
     primary, inner = _layout(ops)
     inners: dict[int, list[int]] = {}
@@ -888,13 +950,64 @@ def render_body(lang: Lang, d: dict, known: dict, regions: list[tuple[str, int, 
                     out.append(f'    @inner +{z - y} {labels[z]} ' + line(ops[z]))
                 y += o.length
                 continue
+            if y in frames:
+                out.append('    @frame ' + ' '.join(frame_text(known, y + 1 + 4 * k)
+                                                    for k in range(known[y])))
+                y += frames[y]
+                continue
             z = y + 1
-            while z < stop and z not in covered and z not in labels:
+            while z < stop and z not in covered and z not in labels and z not in frames:
                 z += 1
             chunk = bytes(known[a] for a in range(y, z))
             for k in range(0, len(chunk), 16):
                 out.append('@bytes ' + ' '.join(f'{b:02X}' for b in chunk[k:k + 16]))
             y = z
+    return out
+
+
+# ── Sprite frames (the animation scripts' data) ──────────────────────────
+# C2Anim_OpShowFrame (op 4) shows the frame at its operand bytes 1-2, an
+# address in the script's bank. C2Scene_SprDrawNode reads a frame as a
+# count byte, then that many 4-byte pieces: signed X and Y offsets and a
+# tile word (a count of 0 would run 65536 pieces).
+PIECE = re.compile(r'^(-?\d{1,3}),(-?\d{1,3}):([0-9A-F]{4})$')
+
+
+def frame_text(known: dict, a: int) -> str:
+    sx = lambda v: v - 256 if v & 0x80 else v     # noqa: E731
+    return f'{sx(known[a])},{sx(known[a + 1])}:{known[a + 2] | known[a + 3] << 8:04X}'
+
+
+def frame_value(t: str, where: str) -> bytes:
+    m = PIECE.match(t)
+    if not m or not all(-128 <= int(v) <= 127 for v in m.groups()[:2]):
+        raise ScriptsError(f'{where}: bad frame piece {t!r} (X,Y:TTTT, X and Y -128..127)')
+    return bytes([int(m.group(1)) & 0xFF, int(m.group(2)) & 0xFF]) + int(m.group(3), 16).to_bytes(2, 'little')
+
+
+def anim_frames(lang: Lang, d: dict, known: dict, region: tuple[int, int]) -> dict[int, int]:
+    """{address: size} of the frames the ShowFrame ops of a disassembly
+    name that lie in `region` clear of the opcodes, have a count of 1 or
+    more and overlap no other such frame; what is left stays @bytes."""
+    show = lang.handler_names.index('C2Anim_OpShowFrame')
+    primary, _ = _layout(d['ops'])
+    covered = set()
+    for y in primary:
+        covered.update(range(y, y + d['ops'][y].length))
+    spans = {}
+    for a, o in d['ops'].items():
+        if o.op != show:
+            continue
+        f = (a & 0xFF0000) | known[a + 1] | known[a + 2] << 8
+        if not region[0] <= f < region[1] or not known.get(f):
+            continue
+        n = 1 + 4 * known[f]
+        if f + n <= region[1] and not covered & set(range(f, f + n)):
+            spans[f] = n
+    out = {}
+    for f, n in spans.items():
+        if not any(g != f and g < f + n and f < g + m for g, m in spans.items()):
+            out[f] = n
     return out
 
 
@@ -953,6 +1066,9 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
         if w[0] == '@bytes':
             size = len(w) - 1
             body.append(('bytes', w, where, pos))
+        elif w[0] == '@frame':
+            size = 1 + 4 * (len(w) - 1)
+            body.append(('frame', w, where, pos))
         elif w[0] == '@head':
             size = len(w) - 1
             body.append(('head', w, where, pos))
@@ -1022,6 +1138,10 @@ def assemble_body(lang: Lang, lines: list[tuple[str, list[str]]], regions: dict[
             b = bytes(int(t, 16) for t in w[1:])
         elif kind == 'head':
             b = bytes(_byte(t, where) for t in w[1:])
+        elif kind == 'frame':
+            if not 1 <= len(w) - 1 <= 255:
+                raise ScriptsError(f'{where}: @frame takes 1-255 pieces')
+            b = bytes([len(w) - 1]) + b''.join(frame_value(t, where) for t in w[1:])
         else:
             b, refd = encode(w, at, where)
             op_lines.append((where, w[0], at, len(b), refd))
@@ -1136,7 +1256,7 @@ def assemble_scene(lang: SceneLang, text: str, label: str, size: int, entries_wa
 
 # ── The fx scripts ────────────────────────────────────────────────────────
 
-def render_fx(lang: FxLang, label: str, start: int, data: bytes) -> str:
+def render_fx(lang: 'FxLang | AnimLang', label: str, start: int, data: bytes) -> str:
     known = {start + i: b for i, b in enumerate(data)}
     head = lang.head()
     n = 0
@@ -1151,15 +1271,17 @@ def render_fx(lang: FxLang, label: str, start: int, data: bytes) -> str:
         raise ScriptsError(f'{label}: the table does not end where the first script starts')
     region = (start + 2 * n, start + len(data))
     scripts = sorted({t for t in table if region[0] <= t < region[1]})
-    d = disassemble(lang, known, [region], {t + head for t in scripts}, {t: head for t in scripts})
+    d = disassemble(lang, known, [region], {t + head for t in scripts}, {t: head for t in scripts} if head else {})
     labels = {t: f'F_{t:06X}' for t in scripts}
     labels.update({t + head: _lab(lang, t + head) for t in scripts})
-    out = [line.format(title=label, what='the battle layer-effect scripts') for line in HEAD]
+    what = 'the scene animation scripts' if lang.name == 'anim' else 'the battle layer-effect scripts'
+    out = [line.format(title=label, what=what) for line in HEAD]
     out.append(f'@table {label} ${start:06X}')
     out += render_specs(lang, d)
     for i, t in enumerate(table):
         out.append(f'@entry {i} ' + (labels[t] if t in labels else f'${t & 0xFFFF:04X}'))
-    out += render_body(lang, d, known, [(label + '_Scripts', *region)], labels)
+    frames = anim_frames(lang, d, known, region) if lang.name == 'anim' else None
+    out += render_body(lang, d, known, [(label + '_Scripts', *region)], labels, frames)
     return '\n'.join(out) + '\n'
 
 
@@ -1188,8 +1310,10 @@ def assemble_fx(lang: FxLang, text: str, label: str, start: int, size: int, name
             if t not in labels:
                 raise ScriptsError(f'{where}: no label {t}')
             a = labels[t]
-            if kinds.get(a) != 'head':
+            if head and kinds.get(a) != 'head':
                 raise ScriptsError(f'{where}: {t} is not a script (a @head line)')
+            if not head and kinds.get(a) not in ('op', None):
+                raise ScriptsError(f'{where}: {t} is not a script (an opcode or an @inner label)')
             heads[a] = head
         table += (a & 0xFFFF).to_bytes(2, 'little')
     for at, k in kinds.items():
@@ -1199,8 +1323,15 @@ def assemble_fx(lang: FxLang, text: str, label: str, start: int, size: int, name
         raise ScriptsError(f'{name}: the scripts are {len(image)} bytes; they are {size - 2 * n}')
     data = bytes(table) + bytes(image[rstart + i] for i in range(size - 2 * n))
     known = {start + i: b for i, b in enumerate(data)}
-    d = disassemble(lang, known, [(rstart, start + size)], {h + head for h in heads}, heads)
+    d = disassemble(lang, known, [(rstart, start + size)], {h + head for h in heads}, heads if head else {})
     check_structure(lang, d, op_lines, kinds, specs, name)
+    if lang.name == 'anim':
+        want = anim_frames(lang, d, known, (rstart, start + size))
+        got = {a for a, k in kinds.items() if k == 'frame'}
+        if got != set(want):
+            a = min(got ^ set(want))
+            raise ScriptsError(f'{name}: ${a:06X}: ' + ('a ShowFrame names a frame here: write it as @frame'
+                                                        if a in want else 'no ShowFrame names an @frame here'))
     return data
 
 
@@ -1209,7 +1340,8 @@ def assemble_fx(lang: FxLang, text: str, label: str, start: int, size: int, name
 def stats(text: str) -> dict:
     data = sum(len(w) - 1 for _, w in battle._lines(text) if w[0] == '@bytes')
     ops = sum(1 for _, w in battle._lines(text) if not w[0].startswith('@') and not w[0].endswith(':'))
-    return {'data': data, 'lines': ops}
+    frames = sum(1 + 4 * (len(w) - 1) for _, w in battle._lines(text) if w[0] == '@frame')
+    return {'data': data, 'lines': ops, 'frames': frames}
 
 
 def _pairs(headers: bytes, base: int, list_pack, root: Path) -> dict[int, bytes]:
@@ -1283,11 +1415,16 @@ def scene_pairs_built(root: Path = ROOT) -> dict[int, bytes]:
         if i >= len(names) or names[i].startswith('$'):
             return None
         p = pieces.get(names[i])
-        if p is None or p['piece'] != 'packed':
+        if p is None or p['piece'] not in ('packed', 'scenelists'):
             raise ScriptsError(f'C2SceneRom_ListPacks entry {i}: {names[i]} is not a packed piece')
+        import maps
         try:
+            if p['piece'] == 'scenelists':                  # its text, assembled here (tools/maps.py)
+                return maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
             return (root / extract_data.ASSETS / p['asset']).read_bytes()
         except OSError as e:
+            raise ScriptsError(f'{names[i]}: {e}') from None
+        except maps.MapsError as e:
             raise ScriptsError(f'{names[i]}: {e}') from None
     try:
         headers = (root / extract_data.ASSETS / hp['asset']).read_bytes()
@@ -1297,13 +1434,15 @@ def scene_pairs_built(root: Path = ROOT) -> dict[int, bytes]:
 
 
 FX_ROWS = {'$D1:646C'}          # BattleRom_FxScriptPtrs and the scripts after it (one piece)
+ANIM_ROWS = {'$C3:E000'}        # C2SceneRom_AnimTable and the animation scripts after it (one piece)
 
 # What the scripts are known to hold (DATA_PLAN.md): the opcodes classed
 # return, ram (a position from other RAM) and done over the real data. A
 # change in any of them is a change in how the interpreter reads the
 # handlers, and check() reports it.
 EXITS = {'scene': {'ret': {0x37}, 'ram': set(), 'done': {0x52}},
-         'fx': {'ret': {0x92}, 'ram': {0x84, 0x86, 0xD0}, 'done': {0xFF}}}
+         'fx': {'ret': {0x92}, 'ram': {0x84, 0x86, 0xD0}, 'done': {0xFF}},
+         'anim': {'ret': set(), 'ram': set(), 'done': set()}}
 
 
 # Callees the interpreter cannot follow (an indirect jump through RAM or a
@@ -1469,6 +1608,12 @@ def trust_check(lang: 'Lang') -> list[str]:
     return out
 
 
+def anim_lang(root: Path = ROOT) -> 'AnimLang':
+    anim = AnimLang(root)
+    anim.load(root)
+    return anim
+
+
 def langs(root: Path = ROOT) -> tuple[SceneLang, FxLang]:
     scene, fx = SceneLang(root), FxLang(root)
     scene.load(root)
@@ -1480,7 +1625,7 @@ def piece_index(label: str) -> int:
     return int(label.rsplit('_', 1)[1])
 
 
-def _fx_disassembly(lang: FxLang, start: int, data: bytes) -> dict:
+def _fx_disassembly(lang: 'FxLang | AnimLang', start: int, data: bytes) -> dict:
     head = lang.head()
     n, first = 0, None
     while first is None or start + 2 * n < first:
@@ -1490,7 +1635,7 @@ def _fx_disassembly(lang: FxLang, start: int, data: bytes) -> dict:
     region = (start + 2 * n, start + len(data))
     tab = sorted({(start & 0xFF0000) | data[2 * k] | data[2 * k + 1] << 8 for k in range(n)} & set(range(*region)))
     known = {start + k: b for k, b in enumerate(data)}
-    return disassemble(lang, known, [region], {t + head for t in tab}, {t: head for t in tab})
+    return disassemble(lang, known, [region], {t + head for t in tab}, {t: head for t in tab} if head else {})
 
 
 def extract_all(rom: bytes, pieces: list[dict], root: Path = ROOT, problems: list | None = None):
@@ -1498,10 +1643,11 @@ def extract_all(rom: bytes, pieces: list[dict], root: Path = ROOT, problems: lis
     assemble back to its bytes; what fails goes to `problems`."""
     import extract_data
     problems = [] if problems is None else problems
-    todo = [p for p in pieces if p['piece'] in ('scene', 'fx')]
+    todo = [p for p in pieces if p['piece'] in ('scene', 'fx', 'anim')]
     if not todo:
         return
     scene, fx = langs(root)
+    anim = anim_lang(root)
     pairs = scene_pairs(rom, root)
     try:
         for p in todo:
@@ -1516,9 +1662,10 @@ def extract_all(rom: bytes, pieces: list[dict], root: Path = ROOT, problems: lis
                     back = assemble_scene(scene, text, p['label'], len(data),
                                           scene_entries(pairs, piece_index(p['label']), len(data)), p['label'])
                 else:
+                    lang = anim if p['piece'] == 'anim' else fx
                     data = rom[p['offset']:p['stop']]
-                    text = render_fx(fx, p['label'], 0xC00000 + p['offset'], data)
-                    back = assemble_fx(fx, text, p['label'], 0xC00000 + p['offset'], len(data))
+                    text = render_fx(lang, p['label'], 0xC00000 + p['offset'], data)
+                    back = assemble_fx(lang, text, p['label'], 0xC00000 + p['offset'], len(data))
             except ScriptsError as e:
                 problems.append(f'{p["label"]}: {e}')
                 continue
@@ -1529,6 +1676,7 @@ def extract_all(rom: bytes, pieces: list[dict], root: Path = ROOT, problems: lis
     finally:
         scene.save(root)
         fx.save(root)
+        anim.save(root)
 
 
 def assemble_piece(lang: Lang, text: str, p: dict, pairs: dict[int, bytes] | None = None) -> bytes:
@@ -1544,12 +1692,17 @@ def assemble_piece(lang: Lang, text: str, p: dict, pairs: dict[int, bytes] | Non
     return assemble_fx(lang, text, p['label'], 0xC00000 + p['offset'], int(p['size']), p['label'])
 
 
+def lang_of(p: dict, scene: 'SceneLang', fx: 'FxLang', anim: 'AnimLang'):
+    return scene if p['piece'] == 'scene' else anim if p['piece'] == 'anim' else fx
+
+
 def exits_check(rom: bytes, pieces: list[dict], root: Path = ROOT) -> list[str]:
     import extract_data
     scene, fx = langs(root)
+    anim = anim_lang(root)
     pairs = scene_pairs(rom, root)
-    got = {'scene': {k: set() for k in EXITS['scene']}, 'fx': {k: set() for k in EXITS['fx']}}
-    trusted = {'scene': {}, 'fx': {}}
+    got = {lang: {k: set() for k in want} for lang, want in EXITS.items()}
+    trusted = {lang: {} for lang in EXITS}
     for p in pieces:
         if p['piece'] == 'scene':
             data, _ = extract_data.unpack_piece(rom, p)
@@ -1557,9 +1710,9 @@ def exits_check(rom: bytes, pieces: list[dict], root: Path = ROOT) -> list[str]:
             d = disassemble(scene, known, [(SCENE_BUF, SCENE_BUF + len(data))],
                             scene_entries(pairs, piece_index(p['label']), len(data)))
             lang = 'scene'
-        elif p['piece'] == 'fx':
-            d = _fx_disassembly(fx, 0xC00000 + p['offset'], rom[p['offset']:p['stop']])
-            lang = 'fx'
+        elif p['piece'] in ('fx', 'anim'):
+            lang = p['piece']
+            d = _fx_disassembly(fx if lang == 'fx' else anim, 0xC00000 + p['offset'], rom[p['offset']:p['stop']])
         else:
             continue
         for o in d['ops'].values():
@@ -1569,6 +1722,8 @@ def exits_check(rom: bytes, pieces: list[dict], root: Path = ROOT) -> list[str]:
             for t in o.trusted:
                 trusted[lang].setdefault(t, set()).add(o.op)
     out = []
+    if trusted['anim']:
+        out.append(f'anim: an animation op needs a trusted callee ({sorted(trusted["anim"])}); none is trusted')
     for lang, want in TRUST.items():
         w = {n: v[0] for n, v in want.items()}
         if trusted[lang] != w:

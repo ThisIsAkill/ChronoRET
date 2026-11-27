@@ -241,7 +241,7 @@ Padding_C3DFE1:
 ; Read by C2Scene_SetAnim.
 org $C3E000
 C2SceneRom_AnimTable:
-    incbin "../../build/assets/event_script/C2SceneRom_AnimTable.bin"
+    incbin "../../build/anim/C2SceneRom_AnimTable.bin"          ; animation scripts
 
 ; $C3:FF0A-$C3:FFFF (246 B), padding, probable: 246 x $00
 org $C3FF0A

@@ -563,8 +563,11 @@ source.
         (one `ShowFrame` of the frame after it, duration 0: it holds). A later write to that RAM
         is not traced.
       - Two things the interpreter takes as they are, neither touching the lock:
-        - op `$03` (JumpBack) reads a 16-bit word from its operand and masks it, so its stay
-          and jump paths read one byte past it;
+        - op `$03` (JumpBack) loads its operand 16-bit and masks byte 2 off. The interpreter's
+          taint is by whole register, so byte 2 shows as read; `AnimLang.jump_back_length` runs
+          the handler with byte 2 at four values for each of four operands, and since none
+          changes where it goes, the op is 2 bytes, as its header says (any other handler is
+          refused);
         - `$04` (ShowFrame) with duration 0 holds forever.
       - `check`'s own test asserts what the lock sees: 4 sources, 161, 1, 1 and 1 entries,
         708, 3, 4 and 1 opcodes. For the unpackers it asserts the 9 routines with their tables,
@@ -1029,6 +1032,70 @@ On the `data-tables-4` branch, second commit. `tools/actframes.py` gives the 128
   - `actframes.reader_problems` checks those constants and the number of calls against the source.
 - **The text:** per frame its row count and the header's high nibble, per row `column=tile/attr`
   (or `-`), and the skipped bytes.
+
+## Scene animation scripts
+
+On the `data-tables-5` branch. `C2SceneRom_AnimTable` (`$C3:E000`, 7,946 B: 166 pointers, then
+the scripts) is now a piece of `tools/scripts.py` (piece `anim`, `build/assets/anim/<label>.ban`),
+disassembled by `AnimLang`, the interpreter `check()` already used for its lock on the record
+bytes.
+
+- **The reader.** `C2Scene_SetAnim` puts entry A of the table in `.AnimPtr`, and `C2Anim_Run` runs
+  the script from there through `C2Anim_OpTable`. Each handler is traced: it returns the bytes to
+  advance, or stops. `AnimLang.head()` runs `C2Scene_SetAnim` and finds that the script starts at
+  the entry itself (offset 0).
+  - Every entry and every jump lands on an opcode line (no `@inner` lines).
+  - `EXITS['anim']` locks the opcode classes (none returns, reads a position from RAM, or ends a
+    task). An animation op that needed a trusted callee would be reported: none does.
+- **The sprite frames.** `C2Anim_OpShowFrame` names a frame by its operand bytes 1-2, an address in
+  the script's bank. `C2Scene_SprDrawNode` reads a frame as a count byte, then that many 4-byte
+  pieces: signed X and Y, then a tile word.
+  - The frames the reached ShowFrame ops name are written as `@frame X,Y:TTTT ...` lines (all
+    277 frames they name).
+  - A frame stays `@bytes` if it lies on the opcodes, runs past the piece, has a count of 0, or
+    overlaps another frame.
+  - The assembler refuses a frame a ShowFrame names that is written as bytes, and an `@frame` no
+    ShowFrame names.
+- **Results.** The piece assembles back byte-exact: 708 opcode lines (no `@inner`: the 62
+  JumpBacks are 2 bytes, so the ops after them start where they do), 277 frames, 177 B that
+  nothing reaches (ops after a loop that no entry reaches, and frames no reached op shows).
+
+## Scene lists and the unknown rows
+
+On the `data-tables-5` branch, second commit.
+
+- **Scene list packs** (`tools/maps.py`, piece `scenelists`; all 8 `C2SceneRom_ListPacks`, 1,499 B
+  packed, 1,694 B unpacked).
+  - `C2Scene_LoadLists` unpacks the pack the scene header names (`C2Scene_HdrLists`) and splits it
+    into four lists: a count byte, then that many entries of 7 B (`C2Scene_ListA`), 3 B (B), 3 B
+    (C) and 2 B (D, the script addresses `scripts.scene_entries` reads).
+  - `list_problems` re-derives the entry sizes from the loader's unrolled copies.
+  - Extraction refuses a count of 0 (the loops would copy 65,536 entries) and bytes after list D;
+    all 8 packs end exactly there.
+  - `scripts.scene_pairs_built` now assembles a list pack from its text.
+- **`$FF:D024`**, an unknown row of 26 rising bytes, is `MenuRom_SlotLocBounds`. Its reader is
+  `Menu_SlotLocName` (named only by a stub in `asm/include/unmatched.asm`), which counts down from
+  `Menu_SlotLocCount` (26) to the first entry not above the save's location byte. It is now 26
+  records; `DERIVED` checks the count.
+- **The other 50 unknown rows (9,524 B)** stay unknown:
+  - No matched routine names an address in them (none of the code's defines points inside one).
+  - A scan of the unpacked `$C3` module for long addressing into them finds one hit, at
+    `$FD:8F80`. It is an `ORA long,X` operand inside a not-a-pack row, so most likely chance.
+  - What they are, by their notes:
+    - 25 rows are bytes past a reader's proven reach, split off a table or palette (1-162 B
+      each);
+    - 6 are lone `$DD` bytes after the last pack or list of a run;
+    - the larger ones are stale or invalid packs: `$EF:B168` (3,736 B), `$F5:F7E6` (1,566 B),
+      `$F5:EE02`, `$FD:8E64`, `$F9:AFE9`, `$FA:FAA0`;
+    - then the bytes around the text tables (`$CC:3800`, `$CC:DDC6`) and the list-shaped bytes
+      after two draw lists.
+- **Not done here:**
+  - The menu strings (`MenuRom_StringPtrs`, `MenuRom_ItemTextPtrs` and the equipment labels,
+    3,933 B). `Menu_DrawString` reads them with its own control codes `$01`-`$0F`, whose argument
+    counts are not derived yet, and a string can end at its count instead of a 0 byte.
+  - The battle menu tilemaps (the battle's BG layers are not traced) and `BattleRom_FxMapPtrs`.
+  - The remaining packs: object, dial, `Unk7000`/`7200` and battle background-map packs, the
+    unnamed scene and location packs, and the 12 packs no pointer reaches.
 
 ## Order of work
 
