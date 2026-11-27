@@ -217,7 +217,8 @@ def check_data_layer(rom: bytes, lo: bytes, hi: bytes, emitted: set[int]) -> tup
                'graphics_bytes': 0, 'gfxpack_bytes': 0, 'mapprops_bytes': 0, 'metatiles_bytes': 0, 'scenemaps_bytes': 0,
                'scenemeta_bytes': 0, 'scenebg3_bytes': 0, 'scenepal_bytes': 0, 'scenelists_bytes': 0,
                'actframes_bytes': 0, 'sprframes_bytes': 0,
-               'animframes_bytes': 0, 'animtimes_bytes': 0, 'drawlist_bytes': 0}
+               'animframes_bytes': 0, 'animtimes_bytes': 0, 'drawlist_bytes': 0,
+               'menutext_bytes': 0}
     for p in pieces:
         s, e = p['offset'], p['stop']
         if any(want[s:e]):
@@ -484,6 +485,9 @@ def main() -> int:
         print(f'  {"action frames":<16} {data["actframes_bytes"]:>9,} bytes of {af["packs"]} battle action-frame '
               f'packs packed by the build from text assembled to their unpacked bytes (build/assets/actframes/ '
               f'-> build/maps/ -> build/packs/, incbin): {af["unpacked"]:,} B unpacked')
+        print(f'  {"menu strings":<16} {data["menutext_bytes"]:>9,} bytes of menu string tables (Menu_DrawString '
+              f'strings, their pointer tables, bytes no proved string covers) assembled by the build from text '
+              f'extracted from the ROM (build/assets/menu/ -> build/menutext/, incbin)')
         print(f'  {"records":<16} {data["records_bytes"]:>9,} bytes of tables and palettes in records '
               f'(fields from structs and readers, BGR555 colours) encoded by the build from records '
               f'extracted from the ROM (build/assets/records/ -> build/records/, incbin)')

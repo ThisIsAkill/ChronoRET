@@ -198,12 +198,17 @@ org $FFB2A0
 Palette_FFB2A0:
     incbin "../../build/assets/palette/Palette_FFB2A0.bin"
 
-; $FF:B310-$FF:BD17 (2,568 B), text, confirmed: u16 per item id: address of its 9-byte string,
-; then the strings
+; $FF:B310-$FF:B517 (520 B), text, confirmed: menu strings: 242 u16 pointers (bank $FF) per item
+; id, a byte, then the category strings (Menu_DrawString, a count of 9)
 ; Read by Menu_DrawInvEntry.
 org $FFB310
 MenuRom_ItemTextPtrs:
-    incbin "../../build/assets/text/MenuRom_ItemTextPtrs.bin"
+    incbin "../../build/menutext/MenuRom_ItemTextPtrs.bin"          ; menu strings
+
+; $FF:B518-$FF:BD17 (2,048 B), unknown, unknown: 2048 bytes, record-like
+org $FFB518
+Unknown_FFB518:
+    incbin "../../build/assets/unknown/Unknown_FFB518.bin"
 
 ; $FF:BD18-$FF:BD2D (22 B), table, confirmed: per command byte: argument bytes - 1
 ; (Menu_RunDrawList)
@@ -619,30 +624,12 @@ org $FFC429
 MenuRom_NameChoiceList:
     incbin "../../build/menulists/MenuRom_NameChoiceList.bin"          ; menu draw list
 
-; $FF:C457-$FF:C969 (1,299 B), text, confirmed: u16 string addresses (bank $FF), then the
-; strings
-; Read by Menu_DrawCmdString.
+; $FF:C457-$FF:C9AB (1,365 B), text, confirmed: menu strings: 64 u16 pointers (bank $FF), then
+; the strings and the equipment labels (Menu_DrawString)
+; Read by Menu_DrawCmdString, Menu_EquipValueLabel.
 org $FFC457
 MenuRom_StringPtrs:
-    incbin "../../build/assets/text/MenuRom_StringPtrs.bin"
-
-; $FF:C96A-$FF:C970 (7 B), text, confirmed: 11-byte equipment label (runs into the next row)
-; Read by Menu_EquipLabelPtrs.
-org $FFC96A
-MenuRom_EquipLabel3:
-    incbin "../../build/assets/text/MenuRom_EquipLabel3.bin"
-
-; $FF:C971-$FF:C979 (9 B), text, confirmed: 11-byte equipment label
-; Read by Menu_EquipLabelPtrs.
-org $FFC971
-MenuRom_EquipLabel0:
-    incbin "../../build/assets/text/MenuRom_EquipLabel0.bin"
-
-; $FF:C97A-$FF:C9AB (50 B), text, confirmed: 11-byte equipment labels
-; Read by Menu_EquipLabelPtrs.
-org $FFC97A
-MenuRom_EquipLabel12:
-    incbin "../../build/assets/text/MenuRom_EquipLabel12.bin"
+    incbin "../../build/menutext/MenuRom_StringPtrs.bin"          ; menu strings
 
 ; $FF:C9AC-$FF:C9FB (80 B), table, confirmed: 80 B: the name grid's characters, 10 a row
 ; Read by Menu_NameAddChar, Menu_NameGridBuild.

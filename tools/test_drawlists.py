@@ -185,12 +185,12 @@ class WithRom(unittest.TestCase):
         rom = ed.read_rom()
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(ed.extract_text_tools(rom, Path(tmp), ed.read_manifest()), [])
-            self.assertEqual(len(list((Path(tmp) / 'menu').iterdir())), 56)
+            self.assertEqual(len(list((Path(tmp) / 'menu').glob('*.mdl'))), 56)
             bad = [p for p in ed.read_manifest() if p['label'] != 'MenuRom_ShopQtyList']
         with tempfile.TemporaryDirectory() as tmp:
             self.assertIn('MenuRom_ShopMembersList: the list runs past its row, and no draw list follows it',
                           ed.extract_text_tools(rom, Path(tmp), bad))
-            self.assertFalse((Path(tmp) / 'menu').exists())
+            self.assertEqual(list((Path(tmp) / 'menu').glob('*.mdl')), [])
 
 
 if __name__ == '__main__':
