@@ -1377,11 +1377,16 @@ def scene_pairs_built(root: Path = ROOT) -> dict[int, bytes]:
         if i >= len(names) or names[i].startswith('$'):
             return None
         p = pieces.get(names[i])
-        if p is None or p['piece'] != 'packed':
+        if p is None or p['piece'] not in ('packed', 'scenelists'):
             raise ScriptsError(f'C2SceneRom_ListPacks entry {i}: {names[i]} is not a packed piece')
+        import maps
         try:
+            if p['piece'] == 'scenelists':                  # its text, assembled here (tools/maps.py)
+                return maps.assemble_piece(p, (root / extract_data.ASSETS / p['asset']).read_text())
             return (root / extract_data.ASSETS / p['asset']).read_bytes()
         except OSError as e:
+            raise ScriptsError(f'{names[i]}: {e}') from None
+        except maps.MapsError as e:
             raise ScriptsError(f'{names[i]}: {e}') from None
     try:
         headers = (root / extract_data.ASSETS / hp['asset']).read_bytes()

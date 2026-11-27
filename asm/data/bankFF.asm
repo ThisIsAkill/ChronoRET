@@ -883,11 +883,13 @@ org $FFCF3B
 MenuRom_NameStrings:
     incbin "../../build/text/MenuRom_NameStrings.bin"          ; text unit MenuNameTexts (strtable)
 
-; $FF:D024-$FF:D03D (26 B), unknown, unknown: 26 bytes rising from $00 to $D6 (a table,
-; probably)
+; $FF:D024-$FF:D03D (26 B), table, confirmed: 1 B per save-location string 0-25: the lowest SRAM
+; location byte that picks it (rising)
+; Read by Menu_SlotLocName.
+; Also MenuRom_SlotLocBounds (a struct or label of the code source).
 org $FFD024
-Unknown_FFD024:
-    incbin "../../build/assets/unknown/Unknown_FFD024.bin"
+Table_FFD024:
+    incbin "../../build/records/Table_FFD024.bin"          ; records: table 26 x 1 B
 
 ; $FF:D03E-$FF:D295 (600 B), text, confirmed: string table (TextWin_StrTable) of the slot texts
 ; Read by Menu_DrawSlotText.

@@ -379,9 +379,15 @@ class Pairs(unittest.TestCase):
             src.write_text('C2SceneRom_ListPacks:\n    dl $000000\n    dl SceneListPack_001\n    dl $000000\n')
             with self.assertRaisesRegex(scripts.ScriptsError, 'SceneListPack_001: .*No such file'):
                 scripts.scene_pairs_built(root)
-            (assets / 'packed_lz').mkdir()
-            (assets / 'packed_lz' / 'SceneListPack_001.bin').write_bytes(b'lists')
-            self.assertEqual(scripts.scene_pairs_built(root), {1: b'lists'})
+            import maps
+            lists = bytes([1] + [7] * 7 + [1, 3, 3, 3, 1, 4, 4, 4, 1, 2, 2])
+            (assets / 'maps').mkdir()
+            (assets / 'maps' / 'SceneListPack_001.slist').write_text(maps.render_scene_lists('SceneListPack_001',
+                                                                                             lists))
+            self.assertEqual(scripts.scene_pairs_built(root), {1: lists})      # assembled from its text
+            (assets / 'maps' / 'SceneListPack_001.slist').write_text('@scenelists X\n')
+            with self.assertRaisesRegex(scripts.ScriptsError, 'SceneListPack_001: .*the first line is @scenelists'):
+                scripts.scene_pairs_built(root)
 
 
 class FxStub(scripts.FxLang):

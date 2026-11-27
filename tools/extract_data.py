@@ -197,7 +197,8 @@ SPRITES_PREFIX = '../../build/sprites/'
 
 MANIFEST_COLUMNS = ['label', 'start', 'end', 'size', 'piece', 'asset', 'param']
 PIECES = ('fill', 'table', 'extracted', 'packed', 'text', 'records', 'events', 'battle', 'scene', 'fx', 'anim',
-          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'actframes',
+          'mapprops', 'metatiles', 'scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'scenelists',
+          'actframes',
           'graphics', 'gfxpack', 'sprframes', 'animframes', 'animtimes', 'drawlist')
 LABEL = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 ASSET = re.compile(r'^[a-z_]+/[A-Za-z_][A-Za-z0-9_]*\.bin$')
@@ -855,7 +856,7 @@ def render_bank(bank: int, pieces: list[dict], tables: dict[str, list[str]] | No
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene script')
         elif p['piece'] == 'mapprops':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, location map')
-        elif p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3', 'scenepal'):
+        elif p['piece'] in ('scenemaps', 'scenemeta', 'scenebg3', 'scenepal', 'scenelists'):
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, scene layer data')
         elif p['piece'] == 'metatiles':
             out.append(f'    incbin "{PACK_PREFIX}{p["label"]}.lz"          ; {p["param"]}, metatiles')

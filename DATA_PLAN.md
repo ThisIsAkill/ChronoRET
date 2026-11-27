@@ -1057,6 +1057,43 @@ bytes.
 - **Results.** The piece assembles back byte-exact: 663 opcode lines, 264 frames, 421 B that
   nothing reaches (the tails of overlapping opcodes, and frames no reached op shows).
 
+## Scene lists and the unknown rows
+
+On the `data-tables-5` branch, second commit.
+
+- **Scene list packs** (`tools/maps.py`, piece `scenelists`; all 8 `C2SceneRom_ListPacks`, 1,499 B
+  packed, 1,694 B unpacked).
+  - `C2Scene_LoadLists` unpacks the pack the scene header names (`C2Scene_HdrLists`) and splits it
+    into four lists: a count byte, then that many entries of 7 B (`C2Scene_ListA`), 3 B (B), 3 B
+    (C) and 2 B (D, the script addresses `scripts.scene_entries` reads).
+  - `list_problems` re-derives the entry sizes from the loader's unrolled copies.
+  - Extraction refuses a count of 0 (the loops would copy 65,536 entries) and bytes after list D;
+    all 8 packs end exactly there.
+  - `scripts.scene_pairs_built` now assembles a list pack from its text.
+- **`$FF:D024`**, an unknown row of 26 rising bytes, is `MenuRom_SlotLocBounds`. Its reader is
+  `Menu_SlotLocName` (named only by a stub in `asm/include/unmatched.asm`), which counts down from
+  `Menu_SlotLocCount` (26) to the first entry not above the save's location byte. It is now 26
+  records; `DERIVED` checks the count.
+- **The other 50 unknown rows (9,524 B)** stay unknown:
+  - No matched routine names an address in them (none of the code's defines points inside one).
+  - A scan of the unpacked `$C3` module for long addressing into them finds one hit, at
+    `$FD:8F80`. It is an `ORA long,X` operand inside a not-a-pack row, so most likely chance.
+  - What they are, by their notes:
+    - 25 rows are bytes past a reader's proven reach, split off a table or palette (1-162 B
+      each);
+    - 6 are lone `$DD` bytes after the last pack or list of a run;
+    - the larger ones are stale or invalid packs: `$EF:B168` (3,736 B), `$F5:F7E6` (1,566 B),
+      `$F5:EE02`, `$FD:8E64`, `$F9:AFE9`, `$FA:FAA0`;
+    - then the bytes around the text tables (`$CC:3800`, `$CC:DDC6`) and the list-shaped bytes
+      after two draw lists.
+- **Not done here:**
+  - The menu strings (`MenuRom_StringPtrs`, `MenuRom_ItemTextPtrs` and the equipment labels,
+    3,933 B). `Menu_DrawString` reads them with its own control codes `$01`-`$0F`, whose argument
+    counts are not derived yet, and a string can end at its count instead of a 0 byte.
+  - The battle menu tilemaps (the battle's BG layers are not traced) and `BattleRom_FxMapPtrs`.
+  - The remaining packs: object, dial, `Unk7000`/`7200` and battle background-map packs, the
+    unnamed scene and location packs, and the 12 packs no pointer reaches.
+
 ## Order of work
 
 0. **Decide where the data lives.** The README promises that no ROM data, assets or compressed
